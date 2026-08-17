@@ -3,11 +3,11 @@
 exports[`parse-time guard → hint pairing > every argParser guard resolves a hint that answers its own message 1`] = `
 "ib attachment list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap
 
 ib attachment search --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
 
 ib auth switch --to <asiakasId>
   ! --to must be an integer >= 1
@@ -75,15 +75,15 @@ ib company switch --to <asiakasId>
 
 ib customer dead-list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow with \`--situation\` / \`--ceased\` rather than raising the cap
 
 ib customer list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
 
 ib customer log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib customer merge --owner <id>
   ! --owner must be an integer >= 1
@@ -91,7 +91,7 @@ ib customer merge --owner <id>
 
 ib customer search --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
 
 ib dev changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
@@ -135,27 +135,27 @@ ib dev changelog update --unlink <ids>
 
 ib dev schema procs --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib dev schema snapshots --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000
 
 ib dev schema tables --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~240 tables) — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib dev schema triggers --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib dev schema views --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib jerry admin onboarding events --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this only keeps the newest N client-side and sets \`truncated\` — OMIT \`--limit\` to keep every event
 
 ib jerry admin onboarding log --time <iso>
   ! --time: not a valid ISO 8601 timestamp: "-5". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
@@ -187,19 +187,19 @@ ib jerry admin request list --provider <id>
 
 ib jerry admin searches list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib jerry request list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; the server caps \`--mine\` at 200, so narrow with \`--status\` rather than raising the cap
 
 ib keikka list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
 
 ib keikka log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib keikka log --owner <id>
   ! --owner must be an integer >= 1
@@ -207,7 +207,7 @@ ib keikka log --owner <id>
 
 ib legal acceptances --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap
 
 ib log by-entity-date --limit <n>
   ! --limit must be an integer >= 1
@@ -227,7 +227,7 @@ ib log entity --owner <id>
 
 ib log latest --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; the server caps at 500 — use \`ib log range --from/--to\` to reach older rows
 
 ib log latest --owner <id>
   ! --owner must be an integer >= 1
@@ -235,7 +235,7 @@ ib log latest --owner <id>
 
 ib log range --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; rows are kept client-side and cap at 2000 — narrow \`--from\` / \`--to\` rather than raising the cap
 
 ib log range --owner <id>
   ! --owner must be an integer >= 1
@@ -247,7 +247,7 @@ ib log range --person <personId>
 
 ib log user --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib log user --owner <id>
   ! --owner must be an integer >= 1
@@ -299,11 +299,11 @@ ib opendata weather pumping --lng <n>
 
 ib person list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
 
 ib person log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib person log --owner <id>
   ! --owner must be an integer >= 1
@@ -327,7 +327,7 @@ ib person notify --data <json>
 
 ib person search --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
 
 ib reference detail list --limit <n>
   ! --limit must be an integer >= 1
@@ -339,23 +339,23 @@ ib reference detail list --stalest <n>
 
 ib schema procs --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib schema snapshots --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000
 
 ib schema tables --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~240 tables) — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib schema triggers --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib schema views --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
 ib sijainti closest --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -375,7 +375,7 @@ ib sijainti closest --worksite <id>
 
 ib sijainti list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow by type rather than raising the cap
 
 ib sijainti plants --limit <n>
   ! --limit must be an integer >= 1
@@ -411,7 +411,7 @@ ib task list --offset <n>
 
 ib task log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 200, so narrow by task rather than raising the cap
 
 ib task set --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -423,11 +423,11 @@ ib task set --assignee <personId>
 
 ib vehicle list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
 
 ib vehicle log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib vehicle log --owner <id>
   ! --owner must be an integer >= 1
@@ -435,7 +435,7 @@ ib vehicle log --owner <id>
 
 ib vehicle search --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
 
 ib weather day --lat <n>
   ! --lat must be a number
@@ -471,11 +471,11 @@ ib weather pumping --lng <n>
 
 ib worksite list --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
 
 ib worksite log --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)
+  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
 
 ib worksite log --owner <id>
   ! --owner must be an integer >= 1
@@ -487,5 +487,5 @@ ib worksite merge --owner <id>
 
 ib worksite search --limit <n>
   ! --limit must be an integer >= 1
-  > (no hint)"
+  > pass a positive integer; the backend caps at 100, so narrow the search term rather than raising the cap"
 `;

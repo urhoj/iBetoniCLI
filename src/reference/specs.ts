@@ -85,6 +85,33 @@ const apiErr = (
 });
 
 /**
+ * The `--limit` parse-guard row: one uniform message, a per-command remedy.
+ *
+ * `cappedInt` validates through `intFlag`, so `--limit abc` / `0` / `5.5` now
+ * fails locally at exit 4 on every call site (cl#1467) instead of travelling to
+ * a backend that may or may not reject it. But an argParser throw resolves the
+ * RUNNING command's own ERRORS row (fb#385), and 36 of the 42 `--limit` guards
+ * had none — so the envelope carried the message with no `hint` (fb#697).
+ *
+ * Only `remedy` varies, because the message never does: `intFlag` emits exactly
+ * `--limit must be an integer >= 1`. Name THIS command's cap and how to reach
+ * rows beyond it — a cursor where one exists, the narrowing filters where none
+ * does. That is the part a caller cannot derive from the message.
+ *
+ * Do NOT collapse this into `intFlag`'s third argument instead: a hint carried
+ * on the ERROR overrides the command's spec row (see `src/targets.ts`), so one
+ * blanket hint would shadow the six commands that already document a real
+ * remedy — which is the regression fb#697 explicitly warns against.
+ */
+const limitErr = (remedy: string): CommandError => ({
+  origin: "client",
+  exit: 4,
+  match: "--limit",
+  meaning: "--limit is not an integer >= 1, rejected locally before any request",
+  remedy,
+});
+
+/**
  * Sandwich the command-specific rows between the universal 401 and 500 rows,
  * preserving their order. Most specs' custom rows (403/404/…) belong BETWEEN
  * the two, which `...COMMON_AUTH_ERRORS` (a trailing spread) cannot express.
@@ -322,7 +349,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
     ],
     outputShape: `ListEnvelope<${ATTACHMENT_ROW}>`,
-    errors: [apiErr(403, "Not a member of the target entity's company", "check the active company (ib auth whoami)"), ...COMMON_AUTH_ERRORS],
+    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap"), apiErr(403, "Not a member of the target entity's company", "check the active company (ib auth whoami)"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "No SAS URLs in list rows — use `ib attachment get` for a download URL.", DEPLOY_NOTE],
     seeAlso: ["ib attachment get", "ib attachment types", "ib attachment search"],
     examples: ["ib attachment list --keikka 9001", "ib attachment list --vehicle 53 --group kuva", "ib attachment list --request 1234"],
@@ -502,7 +529,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
     ],
     outputShape: `ListEnvelope<${ATTACHMENT_ROW}>`,
-    errors: [...COMMON_AUTH_ERRORS],
+    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap"), ...COMMON_AUTH_ERRORS],
     notes: ["Tenant comes from the JWT — there is no company parameter.", "No text and no --missing lists every active attachment in the company (capped at --limit; `truncated:true` signals more).", DEPLOY_NOTE],
     seeAlso: ["ib attachment list", "ib attachment detach"],
     examples: ["ib attachment search", "ib attachment search kuormakirja", "ib attachment search --missing"],
@@ -1035,7 +1062,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a `hint` explaining the count:0 (permitted-but-empty vs how to widen).",
-    errors: permErrors("auth.page.grid.tilaus.read"),
+    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`, or narrow with `--from` / `--to`"), ...permErrors("auth.page.grid.tilaus.read")],
     notes: [
       "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
       "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
@@ -1224,6 +1251,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity", "ib log by-entity-date"],
@@ -1307,7 +1335,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
-    errors: permErrors("auth.page.asiakas.read"),
+    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), ...permErrors("auth.page.asiakas.read")],
     notes: [
       "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
       "--full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`).",
@@ -1337,7 +1365,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.",
-    errors: permErrors("auth.page.asiakas.read"),
+    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow with `--situation` / `--ceased` rather than raising the cap"), ...permErrors("auth.page.asiakas.read")],
     notes: [
       "Reads the prhStatus columns written by the nightly PRH sweep (puminet7) — not a live PRH lookup.",
       "Scope: own tenant; system admins see all tenants.",
@@ -1496,7 +1524,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, score }>",
-    errors: permErrors("auth.page.asiakas.read"),
+    errors: [limitErr("pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it"), ...permErrors("auth.page.asiakas.read")],
     examples: ["ib customer search Example", "ib customer search 1234567"],
   },
   {
@@ -1642,7 +1670,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>" +
       LOG_CAPPED_NOTE,
-    errors: permErrors("auth.page.asiakas.read"),
+    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"), ...permErrors("auth.page.asiakas.read")],
     examples: ["ib customer log 26", "ib customer log 26 --limit 20"],
   },
   {
@@ -1695,7 +1723,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>" + TRUNCATED_NOTE,
-    errors: permErrors("auth.page.tyomaa.read"),
+    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), ...permErrors("auth.page.tyomaa.read")],
     examples: ["ib worksite list", "ib worksite list --customer 1349"],
   },
   {
@@ -1876,7 +1904,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>",
-    errors: permErrors("auth.page.tyomaa.read"),
+    errors: [limitErr("pass a positive integer; the backend caps at 100, so narrow the search term rather than raising the cap"), ...permErrors("auth.page.tyomaa.read")],
     examples: [
       "ib worksite search Mannerheimintie",
       "ib worksite search 'Jokiniementie 13' --limit 10",
@@ -1934,6 +1962,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity"],
@@ -2031,6 +2060,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
     errors: [
+      limitErr("pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap"),
       apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
       ...permErrors("auth.page.person.read"),
     ],
@@ -2135,6 +2165,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--all-companies is an unindexed cross-tenant scan (IX_person_owner is a tenant-first index), so it is bounded server-side by --limit. Prefer --asiakas <id> when you know the company.",
     ],
     errors: authErrors(
+      limitErr("pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it"),
       // ONE 403 row on purpose. Splitting the three causes used to leave two
       // permanently unreachable, because hintForError served the FIRST row at a
       // status (the dead-row trap of feedback #280/#289). Splitting is now
@@ -2315,6 +2346,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     examples: ["ib person log 63", "ib person log 63 --field asiakasPersonSetting", "ib person log 63 --owner 27 --limit 50"],
@@ -2564,6 +2596,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
+      limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
@@ -2658,6 +2691,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
+      limitErr("pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
@@ -2857,6 +2891,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity", "ib vehicle driver history"],
@@ -3371,6 +3406,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance, isPublic }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)",
     errors: [
+      limitErr("pass a positive integer; this command caps at 500, so narrow by type rather than raising the cap"),
       { origin: "client", exit: 4, match: "sijainti type", meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to filter nothing" },
       ...permErrors("auth.page.sijainnit.read"),
@@ -4194,6 +4230,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}",
     errors: [
+      limitErr("pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap"),
       apiErr(400, "Type has no personSettingTypeId mapping", "fix the legalDocumentTypes row first"),
       apiErr(404, "Unknown document type", "ib legal types"),
       ...LEGAL_DEV_ERRORS,
@@ -4682,6 +4719,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
     errors: [
+      limitErr("pass a positive integer; the server caps `--mine` at 200, so narrow with `--status` rather than raising the cap"),
       apiErr(400, "Unknown --tab", "use one of avoimet, tarjotut, voitetut, paattyneet (server-validated)"),
       apiErr(403, "Not a provider (for --open / --provider)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
@@ -5383,6 +5421,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ jerryOnboardingEventId, asiakasId, eventType, eventText, templateKey, emailTo, emailSubject, emailBody, eventTime, createdByPersonId, createdTime }> — `hint` names how many emailBody snapshots were cut",
     errors: [
+      limitErr("pass a positive integer; this only keeps the newest N client-side and sets `truncated` — OMIT `--limit` to keep every event"),
       apiErr(400, "Invalid asiakasId", "pass a positive integer asiakasId"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
@@ -5534,6 +5573,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>",
     errors: [
+      limitErr("pass a positive integer; max is 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       { origin: "client", exit: 4, match: "--deliverable", meaning: "--deliverable is not covered/no_supply. Rejected locally because the server ignores an unknown value and returns the UNFILTERED list — which reads as 'every address is covered'", remedy: "pass --deliverable covered or --deliverable no_supply, or omit it for all rows" },
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
@@ -5683,7 +5723,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: listFlags,
         outputShape:
           "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count, truncated?, hint? }." + truncNote,
-        errors: devErrors,
+        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~240 tables) — pass `--limit 1000` whenever you intend to enumerate"), ...devErrors],
         examples: ["ib dev schema tables", "ib dev schema tables --search keikka", "ib dev schema tables --limit 1000"],
       },
       {
@@ -5716,7 +5756,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: listFlags,
         outputShape:
           "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count, truncated?, hint? }." + truncNote,
-        errors: devErrors,
+        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass `--limit 1000` whenever you intend to enumerate"), ...devErrors],
         examples: ["ib dev schema views", "ib dev schema views --limit 1000"],
       },
       {
@@ -5738,7 +5778,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: listFlags,
         outputShape:
           "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count, truncated?, hint? }." + truncNote,
-        errors: devErrors,
+        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass `--limit 1000` whenever you intend to enumerate"), ...devErrors],
         examples: ["ib dev schema procs", "ib dev schema procs --search asiakas", "ib dev schema procs --limit 1000"],
       },
       {
@@ -5763,7 +5803,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         ],
         outputShape:
           "{ items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count, truncated?, hint? }." + truncNote,
-        errors: devErrors,
+        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass `--limit 1000` whenever you intend to enumerate"), ...devErrors],
         notes: [
           "Trigger bodies carry real business logic here (keikka_after_ins_trig creates keikkaBetoni/toimitus/keikkaPerson rows), so a table's writers are not fully described by its procs alone.",
           "`ib dev schema table <name>` already lists that table's triggers in its `triggers` summary — use this command to search across tables or to filter by name.",
@@ -5803,7 +5843,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: [{ name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" }],
         outputShape:
           "{ items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count, truncated?, hint? } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped." + truncNote,
-        errors: devErrors,
+        errors: [limitErr("pass a positive integer; max is 1000"), ...devErrors],
         notes: [
           "The retention contract is an `IB_Snapshot` extended property on the table itself, so it travels with the object and dies with it. `origin` names the migration that created the snapshot; `reason` says what it holds.",
           "`unstamped` = the table LOOKS like a snapshot by name but carries no contract — detection deliberately does not rely on the naming convention, since a forgotten stamp is the failure being caught. `malformed` = a stamp with no usable date, which is worse than none: it reads as owned but can never expire.",
@@ -7334,6 +7374,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>" +
       LOG_CAPPED_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; the server caps at 500 — use `ib log range --from/--to` to reach older rows"),
       apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib log entity`")
     ),
     seeAlso: ["ib log range", "ib log by-entity-date"],
@@ -7355,6 +7396,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)",
     errors: authErrors(
+      limitErr("pass a positive integer; rows are kept client-side and cap at 2000 — narrow `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Not an admin in the owner company", "use an admin token"),
       // `match` scopes the row to the date guard: it is the command's only
       // client/exit-4 row, so without it the exit-only fallback served "use
@@ -7405,6 +7447,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>" +
       LOG_CAPPED_NOTE,
     errors: authErrors(
+      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
       apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token")
     ),
     examples: ["ib log user", "ib log user 63 --limit 50"],
@@ -8345,6 +8388,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ items: LogRow[], nextCursor: null, count, truncated? } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }",
     errors: [
+      limitErr("pass a positive integer; this command caps at 200, so narrow by task rather than raising the cap"),
       apiErr(403, "Permission denied", "requires a developer token"),
       apiErr(404, "Not found", "check the id via `ib task list --inactive`"),
       apiErr(500, "Backend error", "retry with --verbose"),

@@ -279,6 +279,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap
   exit 3 (HTTP 403)  Not a member of the target entity's company → check the active company (ib auth whoami)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -383,6 +384,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -1258,6 +1260,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow with \`--situation\` / \`--ceased\` rather than raising the cap
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -1416,6 +1419,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -1463,6 +1467,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -1756,6 +1761,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, score }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3479,6 +3485,7 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3509,6 +3516,7 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count, truncated?, hint? } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3581,6 +3589,7 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'table', columnCount }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~240 tables) — pass \`--limit 1000\` whenever you intend to enumerate
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3647,6 +3656,7 @@ OUTPUT (JSON, stdout)
   { items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3716,6 +3726,7 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'view', columnCount }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4370,6 +4381,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ jerryOnboardingEventId, asiakasId, eventType, eventText, templateKey, emailTo, emailSubject, emailBody, eventTime, createdByPersonId, createdTime }> — \`hint\` names how many emailBody snapshots were cut
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this only keeps the newest N client-side and sets \`truncated\` — OMIT \`--limit\` to keep every event
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a positive integer asiakasId
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4958,6 +4970,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 4 (client-side)  --deliverable is not covered/no_supply. Rejected locally because the server ignores an unknown value and returns the UNFILTERED list — which reads as 'every address is covered' → pass --deliverable covered or --deliverable no_supply, or omit it for all rows
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5643,6 +5656,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; the server caps \`--mine\` at 200, so narrow with \`--status\` rather than raising the cap
   exit 4 (HTTP 400)  Unknown --tab          → use one of avoimet, tarjotut, voitetut, paattyneet (server-validated)
   exit 3 (HTTP 403)  Not a provider (for --open / --provider) → switch to a provider company, or use --mine
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5949,6 +5963,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (permitted-but-empty vs how to widen).
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5995,6 +6010,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -6197,6 +6213,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap
   exit 4 (HTTP 400)  Type has no personSettingTypeId mapping → fix the legalDocumentTypes row first
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6846,6 +6863,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; the server caps at 500 — use \`ib log range --from/--to\` to reach older rows
   exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token, or per-entity \`ib log entity\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -6884,6 +6902,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; rows are kept client-side and cap at 2000 — narrow \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
   exit 4 (client-side)  Invalid --from/--to (client-side) → use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted
   exit 4 (HTTP 400)  Backend rejected the dates → use ISO date strings
@@ -6948,6 +6967,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Another person's history without an admin role → omit personId, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9740,6 +9760,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
   exit 4 (HTTP 400)  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
@@ -9783,6 +9804,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10134,6 +10156,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
   exit 3 (HTTP 403)  Permission denied (page permission, or no access to the requested scope) → check auth.page.person.read; --asiakas on another tenant and --all-companies additionally require sysadmin/developer
   exit 5 (HTTP 404)  --all-companies route not deployed on this backend → check \`ib version\`; drop --all-companies and use --asiakas <id> or --my-companies meanwhile
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10886,6 +10909,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance, isPublic }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow by type rather than raising the cap
   exit 4 (client-side)  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
   exit 4 (client-side)  Both --public and --private given → pass at most one — omit both to filter nothing
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11427,6 +11451,7 @@ OUTPUT (JSON, stdout)
   { items: LogRow[], nextCursor: null, count, truncated? } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200, so narrow by task rather than raising the cap
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
   exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -12153,6 +12178,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
@@ -12236,6 +12262,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -12305,6 +12332,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
@@ -12854,6 +12882,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, asiakasId, city }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -12889,6 +12918,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -13147,6 +13177,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; the backend caps at 100, so narrow the search term rather than raising the cap
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
