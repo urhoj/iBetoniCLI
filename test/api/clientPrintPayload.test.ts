@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
+import { captureStderr, parseDiagnostic, type StderrCapture } from "../helpers/stderr.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -8,23 +9,11 @@ vi.stubGlobal("fetch", mockFetch);
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-/** Capture process.stderr writes — `--print-payload` must never touch stdout. */
-function captureStderr(): { lines: () => string[]; restore: () => void } {
-  const written: string[] = [];
-  const spy = vi
-    .spyOn(process.stderr, "write")
-    .mockImplementation((chunk: unknown) => {
-      written.push(String(chunk));
-      return true;
-    });
-  return { lines: () => written, restore: () => spy.mockRestore() };
-}
-
 /** The one `[ib] payload · {…}` line, parsed back into an object. */
-function parsePayloadLine(lines: string[]): Record<string, unknown> {
-  const line = lines.find((l) => l.includes("[ib] payload · "));
-  expect(line, "expected a payload diagnostic line on stderr").toBeDefined();
-  return JSON.parse(line!.slice(line!.indexOf("· ") + 2)) as Record<string, unknown>;
+function parsePayloadLine(cap: StderrCapture): Record<string, unknown> {
+  const payload = parseDiagnostic(cap, "payload");
+  expect(payload, "expected a payload diagnostic line on stderr").not.toBeNull();
+  return payload!;
 }
 
 // fb#636 — "did my flag parse into the body I intended?" had no answer through
@@ -51,7 +40,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.put("/api/jerry-provider-settings", { email: "", asiakasId: 1380 });
 
-    const payload = parsePayloadLine(err.lines());
+    const payload = parsePayloadLine(err);
     expect(payload.method).toBe("PUT");
     expect(payload.path).toBe("/api/jerry-provider-settings");
     // The whole point: an EMPTY string must be visibly present, not absent.
@@ -69,9 +58,9 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.post("/api/x", { a: 1 });
 
-    const raw = err.lines().join("");
+    const raw = err.text();
     expect(raw).not.toContain("eyJsuperuser.secret.jwt");
-    const headers = parsePayloadLine(err.lines()).headers as Record<string, string>;
+    const headers = parsePayloadLine(err).headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer ***");
   });
 
@@ -85,7 +74,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.post("/api/x", { a: 1 });
 
-    const headers = parsePayloadLine(err.lines()).headers as Record<string, string>;
+    const headers = parsePayloadLine(err).headers as Record<string, string>;
     const sent = mockFetch.mock.calls[0][1].headers["X-Request-ID"];
     // A fresh UUID is minted per attempt, so any concrete value here would be a
     // plausible-but-wrong correlation id — worse than none.
@@ -104,7 +93,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.post("/api/x", { a: 1 });
 
-    const headers = parsePayloadLine(err.lines()).headers as Record<string, string>;
+    const headers = parsePayloadLine(err).headers as Record<string, string>;
     expect(headers["X-Request-ID"]).toBe("pinned-123");
   });
 
@@ -118,7 +107,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.post("/api/x", { a: 1 }, { headers: { "X-Action-Reason": "fb#636 probe" } });
 
-    const headers = parsePayloadLine(err.lines()).headers as Record<string, string>;
+    const headers = parsePayloadLine(err).headers as Record<string, string>;
     expect(headers["X-Action-Reason"]).toBe("fb#636 probe");
   });
 
@@ -134,7 +123,7 @@ describe("--print-payload (fb#636)", () => {
 
     // The body was visible even though the request never left the process —
     // exactly the gap fb#636 filed (the refusal named only method + path).
-    const payload = parsePayloadLine(err.lines());
+    const payload = parsePayloadLine(err);
     expect(payload.body).toEqual({ email: "" });
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -162,7 +151,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.get("/api/vehicle/5");
 
-    const payload = parsePayloadLine(err.lines());
+    const payload = parsePayloadLine(err);
     expect(payload.method).toBe("GET");
     expect(payload.path).toBe("/api/vehicle/5");
     expect(payload).not.toHaveProperty("body");
@@ -177,7 +166,7 @@ describe("--print-payload (fb#636)", () => {
     });
     await client.post("/api/x", { a: 1 });
 
-    expect(err.lines().join("")).not.toContain("[ib] payload");
+    expect(err.text()).not.toContain("[ib] payload");
     expect(mockFetch.mock.calls[0][1].body).toBe(JSON.stringify({ a: 1 }));
   });
 
@@ -194,7 +183,7 @@ describe("--print-payload (fb#636)", () => {
       verbose: true,
     });
     await expect(client.get("/api/x")).rejects.toBeInstanceOf(CliError);
-    const raw = err.lines().join("");
+    const raw = err.text();
     expect(raw).toContain("pinned-abc");
   });
 });
