@@ -3,14 +3,28 @@ import { CliError } from "./api/errors.js";
 import { closestName } from "./output/nearest.js";
 import { resolveDate } from "./dates.js";
 /**
- * Commander coercer for a `--limit`-style flag that is clamped to `cap`.
- * Deliberately NOT a validator: a non-numeric value still yields `NaN` (which
- * the backend rejects) — this only reproduces the long-standing clamp, so the
- * ~25 hand-spelled `(v) => Math.min(Number(v), N)` copies stay behaviourally
- * identical.
+ * Commander coercer for a `--limit`-style flag: reject a non-positive-integer
+ * locally, then clamp to `cap`.
+ *
+ * It used to be deliberately NOT a validator, justified by "a non-numeric value
+ * still yields `NaN` (which the backend rejects)". That was an assumption, not a
+ * verified fact, and it was FALSE for the first route anyone checked: on
+ * `GET /api/admin/jerry-requests`, `limit=NaN` and `limit=0` both fell through
+ * `Number(limit) || REQUEST_CAP` and returned the 300-row MAXIMUM — the
+ * narrowest request answered with the widest result, silently (fb#656, closed
+ * backend-side in puminet5api@1.29.1). Twenty-eight other backends were never
+ * audited, so the assumption is not one to keep outsourcing.
+ *
+ * All call sites are `--limit`, but the flag name stays a parameter so a future
+ * non-limit use cannot emit a message naming the wrong flag.
+ *
+ * Deliberately does NOT pass intFlag's `hint`: a hint rides on the error and
+ * overrides the running command's own spec ERRORS row, so a blanket one here
+ * would shadow every per-command `--limit` remedy (see intFlag's jsdoc below).
  */
-export function cappedInt(cap) {
-    return (v) => Math.min(Number(v), cap);
+export function cappedInt(cap, flag = "--limit") {
+    const parse = intFlag(flag, 1);
+    return (v) => Math.min(parse(v), cap);
 }
 /**
  * Guard an OPTIONAL enum-valued flag against its allowed set. `undefined` is a

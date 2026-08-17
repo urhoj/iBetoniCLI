@@ -1,7 +1,15 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`parse-time guard → hint pairing > every argParser guard resolves a hint that answers its own message 1`] = `
-"ib auth switch --to <asiakasId>
+"ib attachment list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib attachment search --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib auth switch --to <asiakasId>
   ! --to must be an integer >= 1
   > (no hint)
 
@@ -65,9 +73,25 @@ ib company switch --to <asiakasId>
   ! --to must be an integer >= 1
   > (no hint)
 
+ib customer dead-list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib customer list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib customer log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib customer merge --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib customer search --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
 
 ib dev changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
@@ -109,6 +133,30 @@ ib dev changelog update --unlink <ids>
   ! --unlink must be an integer >= 1 (got "abc")
   > (no hint)
 
+ib dev schema procs --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib dev schema snapshots --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib dev schema tables --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib dev schema triggers --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib dev schema views --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib jerry admin onboarding events --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib jerry admin onboarding log --time <iso>
   ! --time: not a valid ISO 8601 timestamp: "-5". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
   > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
@@ -127,27 +175,67 @@ ib jerry admin onboarding note --time <iso>
 
 ib jerry admin request list --customer <id>
   ! --customer must be an integer >= 1
-  > pass a positive integer asiakasId; resolve one with \`ib company list\`
+  > pass a positive integer; resolve an asiakasId with \`ib company list\`
+
+ib jerry admin request list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; resolve an asiakasId with \`ib company list\`
 
 ib jerry admin request list --provider <id>
   ! --provider must be an integer >= 1
-  > pass a positive integer asiakasId; resolve one with \`ib company list\`
+  > pass a positive integer; resolve an asiakasId with \`ib company list\`
+
+ib jerry admin searches list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib jerry request list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib keikka list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib keikka log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
 
 ib keikka log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib legal acceptances --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib log by-entity-date --limit <n>
+  ! --limit must be an integer >= 1
+  > use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow
+
 ib log by-entity-date --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log entity --limit <n>
+  ! --limit must be an integer >= 1
+  > ib log types
 
 ib log entity --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib log latest --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib log latest --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log range --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
 
 ib log range --owner <id>
   ! --owner must be an integer >= 1
@@ -155,6 +243,10 @@ ib log range --owner <id>
 
 ib log range --person <personId>
   ! --person must be an integer >= 1
+  > (no hint)
+
+ib log user --limit <n>
+  ! --limit must be an integer >= 1
   > (no hint)
 
 ib log user --owner <id>
@@ -205,6 +297,14 @@ ib opendata weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib person list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib person log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib person log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
@@ -225,6 +325,10 @@ ib person notify --data <json>
   ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
   > received: abc
 
+ib person search --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib reference detail list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
@@ -232,6 +336,26 @@ ib reference detail list --limit <n>
 ib reference detail list --stalest <n>
   ! --stalest must be an integer >= 1
   > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+
+ib schema procs --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib schema snapshots --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib schema tables --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib schema triggers --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib schema views --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
 
 ib sijainti closest --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -248,6 +372,14 @@ ib sijainti closest --type <id>
 ib sijainti closest --worksite <id>
   ! --worksite must be an integer >= 1
   > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib sijainti list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib sijainti plants --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via \`ib search <name>\`)
 
 ib task add --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -289,9 +421,21 @@ ib task set --assignee <personId>
   ! --assignee must be an integer >= 1
   > provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
 
+ib vehicle list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib vehicle log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib vehicle log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib vehicle search --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
 
 ib weather day --lat <n>
   ! --lat must be a number
@@ -325,11 +469,23 @@ ib weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib worksite list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib worksite log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib worksite log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
 ib worksite merge --owner <id>
   ! --owner must be an integer >= 1
-  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`"
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib worksite search --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)"
 `;

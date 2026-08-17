@@ -14,7 +14,6 @@
     "node": "^22.18.0 || >=24.11.0"
   },
   "scripts": {
-    "check:invocation": "node scripts/check-invocation.js",
     "prebuild": "node scripts/check-invocation.js && node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json && node scripts/pack-specs.mjs dist",
     "precheck:dist": "node scripts/check-invocation.js",

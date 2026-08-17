@@ -49,9 +49,9 @@ function refuse(what, why) {
   process.exitCode = 1;
 }
 
-// Checked FIRST on purpose: the vendored copy can legitimately carry its own
-// node_modules, so the cheaper existence test below would clear it and report
-// the wrong fault.
+// Checked FIRST on purpose: a vendored copy with no node_modules satisfies BOTH
+// tests, and "you are in the vendored copy" is the actionable fault of the two —
+// reversing the order would answer it with the junction advice instead.
 if (packageName(path.dirname(root)) === "puminet5api") {
   refuse(
     `this is the VENDORED copy (${root})`,
