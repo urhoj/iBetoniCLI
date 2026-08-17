@@ -175,7 +175,7 @@ describe("every CommandSpec example is invocable as written", () => {
           parsed = await parseExample(argv!);
         } catch (err) {
           if (isCleanExit(err)) continue;
-          throw new Error(`${spec.command} — example does not parse:\n  ${example}\n  ${(err as Error).message}`);
+          throw new Error(`${spec.command} — example does not parse:\n  ${example}\n  ${(err as Error).message}`, { cause: err });
         }
 
         expect(parsed.swallowed, `${spec.command} — example ate a flag as an option value:\n  ${example}`).toEqual([]);

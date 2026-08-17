@@ -61,7 +61,7 @@ export async function performLogin(opts) {
             server.close();
             const msg = errorMessage(e);
             const cause = e instanceof Error && e.cause instanceof Error ? `: ${e.cause.message}` : "";
-            throw new Error(`Cannot reach ${opts.endpoint} (${msg}${cause}) — login cannot succeed from this machine, so the browser was not opened. Check the endpoint/network, or set IB_TOKEN=<jwt> instead.`);
+            throw new Error(`Cannot reach ${opts.endpoint} (${msg}${cause}) — login cannot succeed from this machine, so the browser was not opened. Check the endpoint/network, or set IB_TOKEN=<jwt> instead.`, { cause: e });
         }
     }
     if (probe && probe.status >= 400) {

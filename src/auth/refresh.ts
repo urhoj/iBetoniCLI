@@ -124,7 +124,7 @@ export async function refreshSession(opts: {
   } catch (grantError) {
     const bearer = errorMessage(bearerError);
     const grant = errorMessage(grantError);
-    throw new Error(`${bearer}; ${grant} — session unrecoverable, run \`ib auth login\``);
+    throw new Error(`${bearer}; ${grant} — session unrecoverable, run \`ib auth login\``, { cause: grantError });
   }
 }
 
