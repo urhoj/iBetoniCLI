@@ -1,6 +1,7 @@
 import { CliError, errorMessage, exitCodeForError, hintDetailForError, } from "../api/errors.js";
 import { isListEnvelope } from "../api/envelopes.js";
 import { renderError, renderList, renderRecord } from "./pretty.js";
+import { closestName } from "./nearest.js";
 import { buildValidationEnvelope } from "./validationEnvelope.js";
 import { getEmbeddedCtx } from "../embedded.js";
 import { recordFriction } from "../friction.js";
@@ -98,6 +99,26 @@ function warnDroppedNestedLists(record, projected) {
     warnNote(`[ib] --columns projects TOP-LEVEL fields only — dropped nested list(s): ${dropped.join(", ")}. Re-run without --columns to get them.`);
 }
 /**
+ * Render `col` with a `did you mean` suffix when one of the payload's OWN keys
+ * is a near miss (fb#671). The candidate list is the row keys, so — like every
+ * other `closestName` caller — it can only ever name a column that exists.
+ *
+ * Worth the two lines because an unmatched column is reported on **stderr**
+ * while the command still exits 0 with a 200-shaped payload: a pipeline that
+ * parses stdout and discards stderr (this CLI's documented contract) sees rows
+ * that simply lack the field and can read that as "this row has no version" —
+ * a data conclusion drawn from a typo. `version` → `versionTag` is resolved by
+ * `closestName`'s FIRST rule (prefix), so the machinery was already here.
+ *
+ * Deliberately NOT an auto-correction, and deliberately not promoted to exit 4:
+ * a projection is not a filter, and silently substituting a column the caller
+ * did not ask for would be worse than the current warning.
+ */
+function describeUnknownColumn(col, available) {
+    const guess = closestName(col, available);
+    return guess ? `${col} (did you mean \`${guess}\`?)` : col;
+}
+/**
  * Apply the global `--columns` projection to a command's success output
  * (fb#451). A `ListEnvelope` / raw array projects each object row (envelope
  * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); a single
@@ -133,12 +154,15 @@ export function applyColumnsProjection(value, cols) {
         failUsage("--columns cannot project this command's output (its rows are not objects) — drop --columns here.");
     }
     const matched = cols.filter((c) => rows.some((r) => c in r));
+    const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
     if (matched.length === 0) {
-        const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
-        failUsage(`--columns: none of [${cols.join(", ")}] exist in this output. Available: ${available.join(", ")}.`);
+        const asked = cols.map((c) => describeUnknownColumn(c, available)).join(", ");
+        failUsage(`--columns: none of [${asked}] exist in this output. Available: ${available.join(", ")}.`);
     }
     if (matched.length < cols.length) {
-        const unknown = cols.filter((c) => !matched.includes(c));
+        const unknown = cols
+            .filter((c) => !matched.includes(c))
+            .map((c) => describeUnknownColumn(c, available));
         warnNote(`[ib] --columns: unknown column(s) ignored: ${unknown.join(", ")}`);
     }
     const pick = (r) => {

@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   resolveClaimId,
+  claimIdSource,
   runFeedbackClaim,
   runFeedbackRelease,
   runFeedbackList,
@@ -93,6 +94,122 @@ describe("runFeedbackRelease", () => {
       { by: "c6b96c" },
       expect.anything()
     );
+  });
+});
+
+/**
+ * fb#652 / fb#695 — the label is resolved PER INVOCATION, and when nothing
+ * identifies the caller it is INVENTED (`user@host`) rather than refused. An
+ * agent that exported IB_CLAIM_ID in one tool call and released in another
+ * therefore asks as a different holder, and neither release path said so:
+ * the single-id form 409s naming a label the caller never chose, and `--all`
+ * answers `{ released: 0 }` with exit 0, which reads as "you held nothing"
+ * while the rows stay locked for the full 24h.
+ */
+describe("release — derived-identity diagnosis (fb#652/fb#695)", () => {
+  const saved = process.env.IB_CLAIM_ID;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    delete process.env.IB_CLAIM_ID;
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => {
+    stderrSpy.mockRestore();
+    if (saved === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = saved;
+  });
+
+  const warnings = (): string =>
+    stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+
+  test("claimIdSource reports the ladder rung, not just the label", () => {
+    expect(claimIdSource("c6b96c")).toBe("flag");
+    expect(claimIdSource(undefined)).toBe("derived");
+    process.env.IB_CLAIM_ID = "f77d9d";
+    expect(claimIdSource(undefined)).toBe("env");
+    expect(claimIdSource("c6b96c")).toBe("flag");
+  });
+
+  // Whitespace-only must not read as "chosen" — it resolves to user@host too.
+  test("a blank IB_CLAIM_ID is still derived", () => {
+    process.env.IB_CLAIM_ID = "   ";
+    expect(claimIdSource(undefined)).toBe("derived");
+  });
+
+  test("--all releasing 0 under a derived label warns (fb#695)", async () => {
+    const client = mockClient();
+    (client as never as { post: ReturnType<typeof vi.fn> }).post.mockResolvedValueOnce({
+      by: "juhau@iBetoni2",
+      released: 0,
+    });
+    await runFeedbackRelease(client, null, { all: true });
+    expect(warnings()).toContain("freed 0 claims");
+    expect(warnings()).toContain("DERIVED");
+    expect(warnings()).toContain("IB_CLAIM_ID");
+  });
+
+  // The legitimate no-op: the label was CHOSEN and genuinely holds nothing.
+  // Warning here would train agents to ignore the warning.
+  test("--all releasing 0 under a chosen label stays silent", async () => {
+    process.env.IB_CLAIM_ID = "f77d9d";
+    const client = mockClient();
+    (client as never as { post: ReturnType<typeof vi.fn> }).post.mockResolvedValueOnce({
+      by: "f77d9d",
+      released: 0,
+    });
+    await runFeedbackRelease(client, null, { all: true });
+    expect(warnings()).not.toContain("DERIVED");
+  });
+
+  test("--all that actually released something stays silent", async () => {
+    const client = mockClient();
+    (client as never as { post: ReturnType<typeof vi.fn> }).post.mockResolvedValueOnce({
+      by: "juhau@iBetoni2",
+      released: 3,
+    });
+    await runFeedbackRelease(client, null, { all: true });
+    expect(warnings()).not.toContain("DERIVED");
+  });
+
+  test("a single-id 409 under a derived label explains the label (fb#652)", async () => {
+    const client = mockClient();
+    const err = new CliError(
+      "Feedback 572 is not claimed by juhau@iBetoni2",
+      409,
+      null,
+      exitCodeFromStatus(409)
+    );
+    (client as never as { delete: ReturnType<typeof vi.fn> }).delete.mockRejectedValueOnce(err);
+    await expect(runFeedbackRelease(client, 572, {})).rejects.toThrow(err);
+    expect(warnings()).toContain("DERIVED");
+  });
+
+  // A 404 is a real "no such row" — the label is not the story, so do not
+  // bury the actual cause under an identity lecture.
+  test("a non-409 failure is not blamed on the identity", async () => {
+    const client = mockClient();
+    const err = new CliError("Not found", 404, null, exitCodeFromStatus(404));
+    (client as never as { delete: ReturnType<typeof vi.fn> }).delete.mockRejectedValueOnce(err);
+    await expect(runFeedbackRelease(client, 999, {})).rejects.toThrow(err);
+    expect(warnings()).not.toContain("DERIVED");
+  });
+});
+
+/**
+ * fb#652's other half: the 409 remedy used to send the reader to `--by`, the
+ * one lever the workspace CLAUDE.md tells agents NOT to use (resolve/update
+ * have no --by at all and prove holdership from $IB_CLAIM_ID).
+ */
+describe("ib dev feedback release — the 409 remedy names IB_CLAIM_ID first (fb#652)", () => {
+  const spec = COMMAND_SPECS.find((s) => s.command === "ib dev feedback release");
+
+  test("the remedy leads with the env var, not --by", () => {
+    const row = spec!.errors?.find((r) => "http" in r && r.http === 409);
+    expect(row).toBeDefined();
+    const remedy = (row as { remedy: string }).remedy;
+    expect(remedy).toContain("IB_CLAIM_ID");
+    expect(remedy.indexOf("IB_CLAIM_ID")).toBeLessThan(remedy.indexOf("--by"));
   });
 });
 

@@ -362,14 +362,22 @@ export const ONBOARDING_SOURCES = ["manual", "import", "scheduled"];
 export const ONBOARDING_EVENT_TYPES = ["call", "response", "note"];
 /**
  * Every event kind that can APPEAR in the trail: the three a caller may write
- * plus the two the backend writes itself (`status_change` on every status move,
- * `email_sent` with the sent-body snapshot). Read-side only — passing either of
- * the extra two to `onboarding note` is a 400.
+ * plus the three the backend writes itself (`status_change` on every status
+ * move, `email_sent` with the sent-body snapshot, `self_apply` when an operator
+ * applies to join Jerry from betonijerry.fi). Read-side only — passing any of
+ * the extra three to `onboarding note` is a 400.
+ *
+ * `self_apply` was missing until fb#690, which made it worse than a docs gap:
+ * `--type` is validated against THIS list by `assertEnum`, so the one filter
+ * that could isolate inbound applications exited 4 client-side and never
+ * reached the backend. Written by `pumppuRequestRoutes.js` `/apply-jerry`,
+ * which also reads it back for its 30-minute re-notify throttle.
  */
 export const ONBOARDING_EVENT_TYPES_ALL = [
     ...ONBOARDING_EVENT_TYPES,
     "status_change",
     "email_sent",
+    "self_apply",
 ];
 /** Fields a `--search` substring matches against (company name + outreach/contact). */
 const ONBOARDING_SEARCH_FIELDS = [

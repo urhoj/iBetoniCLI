@@ -5,7 +5,10 @@ import {
   runJerryOnboardingAdd,
   runJerryOnboardingSet,
   runJerryOnboardingLog,
+  ONBOARDING_EVENT_TYPES,
+  ONBOARDING_EVENT_TYPES_ALL,
 } from "../../src/commands/jerry/index.js";
+import { assertEnum } from "../../src/targets.js";
 
 const mockClient = mockApiClient();
 
@@ -70,6 +73,23 @@ describe("jerry admin onboarding", () => {
       { status: "vastasi_kylla" },
       { headers: expect.objectContaining({ "X-Action-Reason": "puhelu" }) }
     );
+  });
+
+  // fb#690. The backend has written self_apply since /apply-jerry shipped, but
+  // the READ filter validated --type against a list that omitted it — so the
+  // one call that isolates inbound applications exited 4 client-side and never
+  // reached the server. The docs half of the drift was the visible symptom.
+  test("--type self_apply is accepted by the read filter (fb#690)", () => {
+    expect(ONBOARDING_EVENT_TYPES_ALL).toContain("self_apply");
+    expect(() => assertEnum("self_apply", ONBOARDING_EVENT_TYPES_ALL, "--type")).not.toThrow();
+  });
+
+  // The WRITE half must stay short by three: the backend rejects a caller-sent
+  // self_apply/status_change/email_sent with a 400, so widening the read list
+  // must not widen `onboarding note`.
+  test("the writable event set stays call/response/note only", () => {
+    expect([...ONBOARDING_EVENT_TYPES]).toEqual(["call", "response", "note"]);
+    expect(() => assertEnum("self_apply", ONBOARDING_EVENT_TYPES, "--type")).toThrow();
   });
 
   test("log POSTs an event with optional setStatus", async () => {

@@ -251,6 +251,40 @@ describe("JSON output", () => {
       expect(stdoutSpy.mock.calls.length).toBe(callsBefore);
     });
 
+    // fb#671. The real miss: `--columns changelogId,version` on a row whose
+    // field is `versionTag`. Warned, exited 0, and returned rows without it —
+    // a stdout-only pipeline reads that as "this entry has no version".
+    test("a near-miss column is named in the warning (fb#671)", () => {
+      setProjectionColumns(["changelogId", "version"]);
+      writeJson({ changelogId: 1484, versionTag: "betonicli", title: "x" });
+      const warn = String(stderrSpy.mock.calls.at(-1)![0]);
+      expect(warn).toContain("version");
+      expect(warn).toContain("did you mean `versionTag`?");
+    });
+
+    // The suggestion must not fire on a column that resembles nothing —
+    // an invented-looking hint costs more than no hint.
+    test("a column resembling nothing gets no suggestion", () => {
+      setProjectionColumns(["a", "zzzzzzzz"]);
+      writeJson({ a: 1, b: 2 });
+      const warn = String(stderrSpy.mock.calls.at(-1)![0]);
+      expect(warn).toContain("zzzzzzzz");
+      expect(warn).not.toContain("did you mean");
+    });
+
+    // The exit-4 twin: same typo class, harder failure, so it gets the same hint.
+    test("the no-match exit-4 message also suggests (fb#671)", () => {
+      setProjectionColumns(["version"]);
+      let err: unknown;
+      try {
+        writeJson({ changelogId: 1484, versionTag: "betonicli" });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).message).toContain("did you mean `versionTag`?");
+    });
+
     test("unprojectable scalar output exits 4 instead of a silent no-op", () => {
       setProjectionColumns(["a"]);
       const callsBefore = stdoutSpy.mock.calls.length;

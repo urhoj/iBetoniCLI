@@ -9,6 +9,7 @@ import {
   buildUnknownOptionEnvelope,
   truncateOptionToken,
   prosePrefixHint,
+  shellSplitHint,
   buildExcessArgumentsEnvelope,
   asDateSuggestion,
   dateFlagSuggestion,
@@ -673,6 +674,35 @@ describe("unknown option — alias identity and prose tokens (fb#342 / fb#359)",
     const [hint] = prosePrefixHint("--foo bar baz", ["--limit"]);
     expect(hint).toMatch(/reads as prose/);
     expect(hint).not.toMatch(/--description/);
+  });
+
+  // fb#702 — the real hit: a multi-line description passed as one PowerShell
+  // variable was re-split while the command line was built, and `->` (out of
+  // "200 -> null") arrived as its own argv element. The error read "you passed
+  // a bad flag", so the next move is to re-check the flags — which are fine.
+  test("shellSplitHint fires on a token that is not a flag name (fb#702)", () => {
+    const [hint] = shellSplitHint("->", ["--description", "--from-json"]);
+    expect(hint).toMatch(/shell split/);
+    expect(hint).toMatch(/--from-json/);
+    expect(hint).toMatch(/flags are probably fine/);
+  });
+
+  // A single-dash typo IS a flag someone typed; did-you-mean owns it, and
+  // telling them to blame their shell would send them somewhere useless.
+  test("shellSplitHint stays silent for a mistyped flag", () => {
+    expect(shellSplitHint("-reason", ["--reason", "--from-json"])).toEqual([]);
+    expect(shellSplitHint("--serverity", ["--severity", "--from-json"])).toEqual([]);
+  });
+
+  // prosePrefixHint owns the whitespace case — both firing would say the same
+  // thing twice with two different remedies.
+  test("shellSplitHint yields the prose-block case to prosePrefixHint", () => {
+    expect(shellSplitHint("--severity means two things", ["--description", "--from-json"])).toEqual([]);
+  });
+
+  // A remedy naming a flag the command does not have is worse than none.
+  test("shellSplitHint stays silent when the command has no --from-json", () => {
+    expect(shellSplitHint("->", ["--limit"])).toEqual([]);
   });
 });
 

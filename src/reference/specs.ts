@@ -5371,12 +5371,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin onboarding events",
     description:
-      "Read a prospect's contact history, newest-first (GET /api/admin/jerry-onboarding/:asiakasId/events) — the append-only trail of calls, responses, notes, status_change moves and email_sent snapshots. This is where a decision's REASON lives: the prospect row carries only the current status, so a terminal status like `ei_sovellu` is indistinguishable from a deliberate hold until you read the trail. System-admin only.",
+      "Read a prospect's contact history, newest-first (GET /api/admin/jerry-onboarding/:asiakasId/events) — the append-only trail of calls, responses, notes, status_change moves, email_sent snapshots and self_apply applications. This is where a decision's REASON lives: the prospect row carries only the current status, so a terminal status like `ei_sovellu` is indistinguishable from a deliberate hold until you read the trail. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
     flags: [
-      { name: "type", type: "string", description: "Only this event kind. call/response/note are caller-written; status_change and email_sent are written by the backend", allowed: [...ONBOARDING_EVENT_TYPES_ALL] },
+      { name: "type", type: "string", description: "Only this event kind. call/response/note are caller-written; status_change, email_sent and self_apply are written by the backend — `--type self_apply` is how you isolate inbound applications from betonijerry.fi", allowed: [...ONBOARDING_EVENT_TYPES_ALL] },
       { name: "limit", type: "number", description: "Keep only the newest N events (sets `truncated`)" },
       { name: "full", type: "boolean", description: `Return complete emailBody snapshots instead of the ${ONBOARDING_EVENT_BODY_CAP}-char preview` },
     ],
@@ -6697,7 +6697,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one" },
-      { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
+      { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
+      { origin: "client", exit: 4, match: "unknown option", meaning: "unknown option — when the rejected token is not a flag name anybody would type (`->`, `--`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702)", remedy: "Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
@@ -6706,7 +6707,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
       "gh-issue-style invocation works: `feedback add --title X --description Y` — `add` aliases `create`, and --title is prepended to the description as its first line (blank line between). Feedback rows store only a description, so the title is a formatting convenience, not a separate field.",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
-      "SHELL QUOTING (fb#299): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — pass long or quote-bearing reports via --from-json <file|->; see `ib help shell-quoting`.",
+      "SHELL QUOTING (fb#299, fb#702): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — and NEWLINES split the same way, so a multi-line here-string with no quotes at all fails too. The tell differs by where the fragment lands: a bare word reads as `too many arguments`, a dash-led one (`->` out of \"200 -> null\") reads as `unknown option`, which looks like a flag mistake and is not. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see `ib help shell-quoting`.",
       "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
     ],
     examples: [
@@ -6965,11 +6966,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "provide a feedbackid", meaning: "Validation", remedy: "pass a feedbackId, or --all to release every claim" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
-      apiErr(409, "You do not hold that claim", "check the holder with `ib dev feedback get <id>`; --by must match the label used to claim"),
+      apiErr(409, "You do not hold that claim", "the label you asked as does not match the holder. Set $IB_CLAIM_ID to the label you claimed under and retry — that is the mechanism `resolve`/`update` also prove holdership with, and they have no --by flag at all. `--by <label>` overrides it for a one-off call. Check the current holder with `ib dev feedback get <id>`"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
       "Releasing is an optimisation, not the correctness mechanism — an abandoned claim expires on its own after 24h. Release so the item frees in seconds instead.",
+      "IDENTITY IS PER-INVOCATION, and an unset one is INVENTED rather than refused (fb#652/fb#695). Each shell invocation resolves the label independently — explicit --by, then the hosted bridge's ctx, then $IB_CLAIM_ID, then a `user@host` fallback — so an agent that exported IB_CLAIM_ID in one tool call and released in another asks as a DIFFERENT holder. The single-id form then 409s naming a label you never chose; `--all` is worse, because it answers `{ released: 0 }` with exit 0, which reads as \"you held nothing\". Both cases now say on stderr that the label was derived. Set IB_CLAIM_ID in the same invocation as the release.",
     ],
     seeAlso: ["ib dev feedback claim", "ib dev feedback list"],
     examples: [

@@ -689,6 +689,36 @@ export function prosePrefixHint(token: string, availableOptions: string[]): stri
 }
 
 /**
+ * Lead the hint with "your shell split the value" when the rejected token is
+ * not a flag NAME at all (fb#702).
+ *
+ * {@link prosePrefixHint} catches the whitespace-bearing sibling of this — a
+ * whole quoted sentence arriving as one argv element. This catches the other
+ * half: a MULTI-LINE value that PowerShell 5.1 re-split while building the
+ * command line, so a fragment like `->` (from "200 -> null") arrives as its own
+ * argument. Commander labels any dash-led element an unknown option, so the
+ * caller is told "you passed a bad flag" and re-checks their flags — which are
+ * all fine. The cause is the shell and the remedy is `--from-json`.
+ *
+ * The test is SHAPE, not content: a real flag is `-x` / `--some-flag`, so a
+ * dash-led token whose body does not start with a letter cannot be one anybody
+ * typed. That keeps single-dash typos (`-reason`) on the did-you-mean path
+ * where they belong.
+ *
+ * Gated on the command actually owning `--from-json` — a remedy naming a flag
+ * the command does not have is worse than no remedy.
+ */
+export function shellSplitHint(token: string, availableOptions: string[]): string[] {
+  const flat = token.trim();
+  if (/\s/.test(flat)) return []; // prosePrefixHint owns the prose-block case
+  if (/^--?[A-Za-z][\w-]*$/.test(flat)) return []; // plausibly a flag someone typed
+  if (!availableOptions.includes("--from-json")) return [];
+  return [
+    `\`${truncateOptionToken(flat)}\` is not a flag name, which usually means the shell split a multi-line or quote-bearing value and handed a fragment of it to the parser as its own argument (typical on Windows PowerShell). Your flags are probably fine — pass the whole payload via \`--from-json <file|->\`, which sidesteps argv quoting entirely; see \`ib help shell-quoting\`.`,
+  ];
+}
+
+/**
  * Enriched "unknown option" error envelope — the flag analogue of
  * {@link buildUnknownCommandEnvelope}. When Commander rejects a guessed flag
  * (`ib customer search --search X`) the default USAGE envelope only echoes
@@ -808,6 +838,10 @@ export function buildUnknownOptionEnvelope(
     positionals,
     acceptedBy,
     ...(viaSynonym ? { acceptedAs: viaSynonym.flag } : {}),
-    hint: [...prosePrefixHint(unknownOption, availableOptions), ...parts].join(" "),
+    hint: [
+      ...prosePrefixHint(unknownOption, availableOptions),
+      ...shellSplitHint(unknownOption, availableOptions),
+      ...parts,
+    ].join(" "),
   };
 }

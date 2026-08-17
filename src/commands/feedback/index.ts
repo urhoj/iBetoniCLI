@@ -872,6 +872,41 @@ export function resolveClaimId(explicit?: string): string {
   return `${user}@${os.hostname()}`.slice(0, CLAIM_LABEL_MAX);
 }
 
+/**
+ * WHERE the label {@link resolveClaimId} returns came from — the same precedence
+ * ladder, reported instead of resolved. `"derived"` means nothing identified the
+ * caller and the `user@host` fallback was INVENTED for it.
+ *
+ * That distinction is invisible at the call site and is what fb#652/fb#695 both
+ * turn on: an agent claims and releases from DIFFERENT shell invocations (each
+ * tool call is a fresh shell, so an exported env var does not survive), so the
+ * claim goes in under `IB_CLAIM_ID` and the release asks as `juhau@iBetoni2`.
+ * The caller cannot currently tell that the label it was judged against was not
+ * one it chose.
+ */
+export function claimIdSource(explicit?: string): "flag" | "ctx" | "env" | "derived" {
+  if (explicit?.trim()) return "flag";
+  if (getEmbeddedCtx()?.claimId?.trim()) return "ctx";
+  if (process.env.IB_CLAIM_ID?.trim()) return "env";
+  return "derived";
+}
+
+/**
+ * The sentence both release paths append when the identity was DERIVED. Names
+ * `IB_CLAIM_ID` first and `--by` as the override, because the workspace
+ * CLAUDE.md mandates the env var: `resolve`/`update` have no `--by` flag at all
+ * and prove holdership from `IB_CLAIM_ID`, so an agent that identifies itself
+ * only via `--by` mismatches on the `x-claim-id` header later and gets warned
+ * about its own claim (fb#652 — the old remedy sent the reader to `--by`, the
+ * one lever the documented workflow tells them not to use).
+ */
+function derivedIdentityNote(by: string): string {
+  return (
+    `the label "${by}" was DERIVED from user@host, not chosen — nothing set $IB_CLAIM_ID, --by, or an MCP session id. ` +
+    `If you claimed under a different label, set IB_CLAIM_ID to it and retry (--by <label> overrides for a one-off call).`
+  );
+}
+
 /** POST /api/feedback/:id/claim — take or renew the lease. A REAL write. */
 /**
  * Refuse to key a lease on an identity the backend cannot tell callers apart by
@@ -929,9 +964,29 @@ export async function runFeedbackRelease(
   // just this one's. Releasing a SINGLE named id is safe either way.
   if (input.all) assertClaimIdentity(input.by, "release --all");
   const by = resolveClaimId(input.by);
+  const derived = claimIdSource(input.by) === "derived";
   const headers = writeFlagsToHeaders({ reason: input.reason });
   if (input.all) {
-    return client.post<Record<string, unknown>>("/api/feedback/claims/release", { by }, { headers });
+    const row = await client.post<Record<string, unknown>>(
+      "/api/feedback/claims/release",
+      { by },
+      { headers }
+    );
+    // fb#695. `release --all` is the LAST call an agent makes, which is exactly
+    // when a session-scoped IB_CLAIM_ID is most likely to have been lost. The
+    // response is success-shaped and exits 0, and `released: 0` reads as "you
+    // held nothing" rather than "you asked as somebody else" — so the rows sit
+    // claimed for the full 24h expiry while every other agent's
+    // `list --unclaimed` skips them, and the holder believes they released.
+    //
+    // WARN, not refuse: a genuine zero-release cleanup (CI, a session that
+    // claimed nothing) is legitimate and must keep working. The fail-closed
+    // rule in `assertClaimIdentity` covers the DIFFERENT case it was written
+    // for — a label the backend cannot tell callers apart by.
+    if (derived && Number(row.released ?? 0) === 0) {
+      warnNote(`[ib] ⚠ release --all freed 0 claims — ${derivedIdentityNote(by)}`);
+    }
+    return row;
   }
   if (id == null) failWith("Provide a feedbackId, or --all to release every claim", 4);
   // ⚠ `ApiClient.delete` is `(path, opts?: FetchOptions)` and FetchOptions has NO
@@ -940,7 +995,19 @@ export async function runFeedbackRelease(
   // The label therefore rides in the query string; the controller reads
   // `req.body?.by ?? req.query?.by`.
   const path = `/api/feedback/${id}/claim?by=${encodeURIComponent(by)}`;
-  return client.delete<Record<string, unknown>>(path, { headers });
+  try {
+    return await client.delete<Record<string, unknown>>(path, { headers });
+  } catch (e) {
+    // fb#652. The backend's 409 names the label it judged against ("Feedback 572
+    // is not claimed by juhau@iBetoni2") — which reads as a real identity, so
+    // the caller re-checks the id rather than the label. Say plainly that the
+    // label was invented; that is the whole diagnosis in the common
+    // claimed-in-one-shell-released-in-another case.
+    if (derived && e instanceof CliError && e.statusCode === 409) {
+      warnNote(`[ib] ⚠ ${derivedIdentityNote(by)}`);
+    }
+    throw e;
+  }
 }
 
 /**
