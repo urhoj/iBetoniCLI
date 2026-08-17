@@ -21,10 +21,23 @@ function mockClient() {
   } as never;
 }
 
-describe("resolveClaimId", () => {
+/**
+ * Every describe that reads the claim-id ladder must start from a clean env —
+ * the real IB_CLAIM_ID leaks in from the session running the suite. Call this
+ * INSIDE a describe; promoting it to file level would silently change the env
+ * for the describes that do not want it.
+ */
+function withCleanClaimEnv(): void {
   const saved = process.env.IB_CLAIM_ID;
   beforeEach(() => { delete process.env.IB_CLAIM_ID; });
-  afterEach(() => { if (saved === undefined) delete process.env.IB_CLAIM_ID; else process.env.IB_CLAIM_ID = saved; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = saved;
+  });
+}
+
+describe("resolveClaimId", () => {
+  withCleanClaimEnv();
 
   test("an explicit --by wins", () => {
     process.env.IB_CLAIM_ID = "from-env";
@@ -107,18 +120,13 @@ describe("runFeedbackRelease", () => {
  * while the rows stay locked for the full 24h.
  */
 describe("release — derived-identity diagnosis (fb#652/fb#695)", () => {
-  const saved = process.env.IB_CLAIM_ID;
+  withCleanClaimEnv();
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    delete process.env.IB_CLAIM_ID;
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
-  afterEach(() => {
-    stderrSpy.mockRestore();
-    if (saved === undefined) delete process.env.IB_CLAIM_ID;
-    else process.env.IB_CLAIM_ID = saved;
-  });
+  afterEach(() => stderrSpy.mockRestore());
 
   const warnings = (): string =>
     stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
@@ -135,6 +143,34 @@ describe("release — derived-identity diagnosis (fb#652/fb#695)", () => {
   test("a blank IB_CLAIM_ID is still derived", () => {
     process.env.IB_CLAIM_ID = "   ";
     expect(claimIdSource(undefined)).toBe("derived");
+  });
+
+  // fb#716. The label and the reported source came from two hand-rolled ladders
+  // that disagreed on blanks: `??` treats "" as present and short-circuits,
+  // `?.trim()` skips past it. So the label was INVENTED while the source said
+  // "env" — silencing this very warning in one of the cases it exists for.
+  // The invariant, not the mechanism: they must never describe different rungs.
+  test.each([
+    ["a blank --by with the env set", "", "hermes"],
+    ["a whitespace --by with the env set", " ", "hermes"],
+    ["a blank --by with nothing else", "", undefined],
+    ["a real --by beating the env", "chosen", "hermes"],
+    ["no --by, env set", undefined, "hermes"],
+    ["nothing set anywhere", undefined, undefined],
+  ])("%s: the label and its reported source agree", (_label, explicit, env) => {
+    if (env === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = env;
+    const by = resolveClaimId(explicit);
+    const invented = by.includes("@"); // user@host is the only shape with one
+    expect(claimIdSource(explicit) === "derived").toBe(invented);
+  });
+
+  // The direction the fix chose: a blank rung falls THROUGH to the next one,
+  // which is what the doc block always claimed happened.
+  test("a blank --by falls through to IB_CLAIM_ID rather than to user@host", () => {
+    process.env.IB_CLAIM_ID = "hermes";
+    expect(resolveClaimId("")).toBe("hermes");
+    expect(claimIdSource("")).toBe("env");
   });
 
   test("--all releasing 0 under a derived label warns (fb#695)", async () => {
@@ -193,6 +229,58 @@ describe("release — derived-identity diagnosis (fb#652/fb#695)", () => {
     (client as never as { delete: ReturnType<typeof vi.fn> }).delete.mockRejectedValueOnce(err);
     await expect(runFeedbackRelease(client, 999, {})).rejects.toThrow(err);
     expect(warnings()).not.toContain("DERIVED");
+  });
+});
+
+/**
+ * fb#716, second half. The hosted bridge sets IB_CLAIM_ID_SHARED=1 when it could
+ * not derive a per-caller label, and `assertClaimIdentity` fails closed there —
+ * a lease keyed on a label every hosted caller shares does not lock anything.
+ * Its old truthiness test accepted WHITESPACE, which then resolved to
+ * `user@host` anyway, so `--by " "` walked straight through the guard and took
+ * exactly the unlockable lease it exists to refuse.
+ */
+describe("assertClaimIdentity — a blank-ish --by must not buy a shared lease (fb#716)", () => {
+  const savedId = process.env.IB_CLAIM_ID;
+  const savedShared = process.env.IB_CLAIM_ID_SHARED;
+
+  beforeEach(() => {
+    delete process.env.IB_CLAIM_ID;
+    process.env.IB_CLAIM_ID_SHARED = "1";
+  });
+  afterEach(() => {
+    if (savedId === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = savedId;
+    if (savedShared === undefined) delete process.env.IB_CLAIM_ID_SHARED;
+    else process.env.IB_CLAIM_ID_SHARED = savedShared;
+  });
+
+  test.each([["empty", ""], ["a space", " "], ["a tab", "\t"]])(
+    "%s is refused, not accepted as an identity",
+    async (_label, by) => {
+      const client = mockClient();
+      await expect(runFeedbackClaim(client, 42, { by })).rejects.toThrow(/per-caller identity/);
+      expect((client as never as { post: ReturnType<typeof vi.fn> }).post).not.toHaveBeenCalled();
+    }
+  );
+
+  test("a real label is still accepted", async () => {
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, { by: "agent-7" });
+    expect((client as never as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalledWith(
+      "/api/feedback/42/claim",
+      expect.objectContaining({ by: "agent-7" }),
+      expect.anything()
+    );
+  });
+
+  // The guard is scoped to the hosted bridge; a local caller with no identity
+  // must keep working, or every unattended local run breaks.
+  test("without IB_CLAIM_ID_SHARED a derived identity is still allowed", async () => {
+    delete process.env.IB_CLAIM_ID_SHARED;
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, {});
+    expect((client as never as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalled();
   });
 });
 

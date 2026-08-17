@@ -155,16 +155,13 @@ export function applyColumnsProjection(value, cols) {
     }
     const matched = cols.filter((c) => rows.some((r) => c in r));
     const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+    const unknown = cols.filter((c) => !matched.includes(c));
+    const listed = unknown.map((c) => describeUnknownColumn(c, available)).join(", ");
     if (matched.length === 0) {
-        const asked = cols.map((c) => describeUnknownColumn(c, available)).join(", ");
-        failUsage(`--columns: none of [${asked}] exist in this output. Available: ${available.join(", ")}.`);
+        failUsage(`--columns: none of [${listed}] exist in this output. Available: ${available.join(", ")}.`);
     }
-    if (matched.length < cols.length) {
-        const unknown = cols
-            .filter((c) => !matched.includes(c))
-            .map((c) => describeUnknownColumn(c, available));
-        warnNote(`[ib] --columns: unknown column(s) ignored: ${unknown.join(", ")}`);
-    }
+    if (unknown.length)
+        warnNote(`[ib] --columns: unknown column(s) ignored: ${listed}`);
     const pick = (r) => {
         const out = {};
         for (const c of cols)

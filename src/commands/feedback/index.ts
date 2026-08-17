@@ -858,10 +858,32 @@ const CLAIM_LABEL_MAX = 120;
  * (fb#616): interleaved in-process calls share one `process.env`, so an env-only
  * lookup would hand every concurrent hosted caller the same label — and a lease
  * whose holders are indistinguishable does not lock anything.
+ *
+ * WHICH rung answered is reported alongside the label, because `"derived"` —
+ * nothing identified the caller, so `user@host` was INVENTED for it — is
+ * invisible at the call site and is what fb#652/fb#695 both turn on: an agent
+ * claims and releases from DIFFERENT shell invocations (each tool call is a
+ * fresh shell, so an exported env var does not survive), so the claim goes in
+ * under `IB_CLAIM_ID` and the release asks as `juhau@iBetoni2`.
+ *
+ * ONE ladder, walked once (fb#716). This was previously spelled out three times
+ * — here, in `claimIdSource`, and in `assertClaimIdentity` — in three subtly
+ * different dialects, and two of them disagreed: a `??` chain treats `""` as a
+ * present value and short-circuits on it, while a `?.trim()` chain skips past
+ * it. So `--by=""` with `IB_CLAIM_ID` set resolved to `user@host` while
+ * REPORTING `env`, which silenced the fb#695 warning in exactly one of the
+ * cases it exists for. A blank rung now falls THROUGH to the next one, which is
+ * what this doc block always claimed happened.
  */
-export function resolveClaimId(explicit?: string): string {
-  const v = explicit ?? getEmbeddedCtx()?.claimId ?? process.env.IB_CLAIM_ID;
-  if (v && v.trim()) return v.trim().slice(0, CLAIM_LABEL_MAX);
+function resolveClaim(explicit?: string): { by: string; source: ClaimIdSource } {
+  const ladder: [ClaimIdSource, string | null | undefined][] = [
+    ["flag", explicit],
+    ["ctx", getEmbeddedCtx()?.claimId],
+    ["env", process.env.IB_CLAIM_ID],
+  ];
+  for (const [source, v] of ladder) {
+    if (v?.trim()) return { by: v.trim().slice(0, CLAIM_LABEL_MAX), source };
+  }
   let user = "unknown";
   try {
     user = os.userInfo().username;
@@ -869,26 +891,20 @@ export function resolveClaimId(explicit?: string): string {
     // os.userInfo() throws on some locked-down containers; the host half is
     // still a useful discriminator, so degrade rather than fail the command.
   }
-  return `${user}@${os.hostname()}`.slice(0, CLAIM_LABEL_MAX);
+  return { by: `${user}@${os.hostname()}`.slice(0, CLAIM_LABEL_MAX), source: "derived" };
 }
 
-/**
- * WHERE the label {@link resolveClaimId} returns came from — the same precedence
- * ladder, reported instead of resolved. `"derived"` means nothing identified the
- * caller and the `user@host` fallback was INVENTED for it.
- *
- * That distinction is invisible at the call site and is what fb#652/fb#695 both
- * turn on: an agent claims and releases from DIFFERENT shell invocations (each
- * tool call is a fresh shell, so an exported env var does not survive), so the
- * claim goes in under `IB_CLAIM_ID` and the release asks as `juhau@iBetoni2`.
- * The caller cannot currently tell that the label it was judged against was not
- * one it chose.
- */
-export function claimIdSource(explicit?: string): "flag" | "ctx" | "env" | "derived" {
-  if (explicit?.trim()) return "flag";
-  if (getEmbeddedCtx()?.claimId?.trim()) return "ctx";
-  if (process.env.IB_CLAIM_ID?.trim()) return "env";
-  return "derived";
+/** Which rung of the ladder supplied the label; `derived` = invented, not chosen. */
+export type ClaimIdSource = "flag" | "ctx" | "env" | "derived";
+
+/** The claiming agent's label. See {@link resolveClaim}. */
+export function resolveClaimId(explicit?: string): string {
+  return resolveClaim(explicit).by;
+}
+
+/** Where that label came from. See {@link resolveClaim}. */
+export function claimIdSource(explicit?: string): ClaimIdSource {
+  return resolveClaim(explicit).source;
 }
 
 /**
@@ -929,7 +945,12 @@ function derivedIdentityNote(by: string): string {
  * behind an identity problem.
  */
 function assertClaimIdentity(explicit: string | undefined, action: string): void {
-  if (explicit || getEmbeddedCtx()?.claimId || process.env.IB_CLAIM_ID) return;
+  // Via the shared ladder (fb#716) rather than a fourth hand-rolled truthiness
+  // test. The old `explicit || ctx || env` accepted a WHITESPACE label, which
+  // then resolved to `user@host` anyway — so `--by " "` walked through this
+  // guard and claimed under the container-wide label, i.e. precisely the
+  // lease-that-does-not-lock it exists to refuse. `claimIdSource` trims.
+  if (claimIdSource(explicit) !== "derived") return;
   if (process.env.IB_CLAIM_ID_SHARED !== "1") return;
   failWith(
     `cannot ${action}: this backend could not derive a per-caller identity, so the claim would be keyed on a label SHARED by every hosted caller — it would not actually lock the row. ` +
@@ -963,8 +984,8 @@ export async function runFeedbackRelease(
   // --all only: a shared label would release every hosted caller's claims, not
   // just this one's. Releasing a SINGLE named id is safe either way.
   if (input.all) assertClaimIdentity(input.by, "release --all");
-  const by = resolveClaimId(input.by);
-  const derived = claimIdSource(input.by) === "derived";
+  const { by, source } = resolveClaim(input.by);
+  const derived = source === "derived";
   const headers = writeFlagsToHeaders({ reason: input.reason });
   if (input.all) {
     const row = await client.post<Record<string, unknown>>(
