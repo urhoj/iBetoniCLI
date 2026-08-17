@@ -75,7 +75,7 @@ ib company switch --to <asiakasId>
 
 ib customer dead-list --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow with \`--situation\` / \`--ceased\` rather than raising the cap
+  > pass a positive integer; this command caps at 500 and has no narrowing filter — raise --limit if you need more than the 200 default
 
 ib customer list --limit <n>
   ! --limit must be an integer >= 1
@@ -83,7 +83,7 @@ ib customer list --limit <n>
 
 ib customer log --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 and has no narrowing filter — raise --limit to reach older rows
 
 ib customer merge --owner <id>
   ! --owner must be an integer >= 1
@@ -199,7 +199,7 @@ ib keikka list --limit <n>
 
 ib keikka log --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
 
 ib keikka log --owner <id>
   ! --owner must be an integer >= 1
@@ -207,7 +207,7 @@ ib keikka log --owner <id>
 
 ib legal acceptances --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap
+  > pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap
 
 ib log by-entity-date --limit <n>
   ! --limit must be an integer >= 1
@@ -247,7 +247,7 @@ ib log range --person <personId>
 
 ib log user --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 — raise --limit, or use \`ib log range --person <id> --from\`/\`--to\` for a date-ranged view
 
 ib log user --owner <id>
   ! --owner must be an integer >= 1
@@ -303,7 +303,7 @@ ib person list --limit <n>
 
 ib person log --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
 
 ib person log --owner <id>
   ! --owner must be an integer >= 1
@@ -427,7 +427,7 @@ ib vehicle list --limit <n>
 
 ib vehicle log --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
 
 ib vehicle log --owner <id>
   ! --owner must be an integer >= 1
@@ -475,7 +475,7 @@ ib worksite list --limit <n>
 
 ib worksite log --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  > pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
 
 ib worksite log --owner <id>
   ! --owner must be an integer >= 1

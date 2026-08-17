@@ -1260,7 +1260,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow with \`--situation\` / \`--ceased\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 and has no narrowing filter — raise --limit if you need more than the 200 default
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -1467,7 +1467,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 and has no narrowing filter — raise --limit to reach older rows
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6010,7 +6010,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -6213,7 +6213,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap
   exit 4 (HTTP 400)  Type has no personSettingTypeId mapping → fix the legalDocumentTypes row first
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6967,7 +6967,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit, or use \`ib log range --person <id> --from\`/\`--to\` for a date-ranged view
   exit 3 (HTTP 403)  Another person's history without an admin role → omit personId, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9804,7 +9804,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -12262,7 +12262,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -12918,7 +12918,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
   exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

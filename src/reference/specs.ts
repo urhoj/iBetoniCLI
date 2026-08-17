@@ -1251,7 +1251,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
-      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
+      limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity", "ib log by-entity-date"],
@@ -1365,7 +1365,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.",
-    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow with `--situation` / `--ceased` rather than raising the cap"), ...permErrors("auth.page.asiakas.read")],
+    errors: [limitErr("pass a positive integer; this command caps at 500 and has no narrowing filter — raise --limit if you need more than the 200 default"), ...permErrors("auth.page.asiakas.read")],
     notes: [
       "Reads the prhStatus columns written by the nightly PRH sweep (puminet7) — not a live PRH lookup.",
       "Scope: own tenant; system admins see all tenants.",
@@ -1670,7 +1670,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>" +
       LOG_CAPPED_NOTE,
-    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"), ...permErrors("auth.page.asiakas.read")],
+    errors: [limitErr("pass a positive integer; this cursor-less route caps at 500 and has no narrowing filter — raise --limit to reach older rows"), ...permErrors("auth.page.asiakas.read")],
     examples: ["ib customer log 26", "ib customer log 26 --limit 20"],
   },
   {
@@ -1962,7 +1962,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
-      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
+      limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity"],
@@ -2346,7 +2346,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
-      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
+      limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     examples: ["ib person log 63", "ib person log 63 --field asiakasPersonSetting", "ib person log 63 --owner 27 --limit 50"],
@@ -2891,7 +2891,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
-      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
+      limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
     seeAlso: ["ib log entity", "ib vehicle driver history"],
@@ -4230,7 +4230,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}",
     errors: [
-      limitErr("pass a positive integer; this command caps at 500, so narrow by document rather than raising the cap"),
+      limitErr("pass a positive integer; this command caps at 500 — narrow with `--doc-version` rather than raising the cap"),
       apiErr(400, "Type has no personSettingTypeId mapping", "fix the legalDocumentTypes row first"),
       apiErr(404, "Unknown document type", "ib legal types"),
       ...LEGAL_DEV_ERRORS,
@@ -7447,7 +7447,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>" +
       LOG_CAPPED_NOTE,
     errors: authErrors(
-      limitErr("pass a positive integer; this command caps at 500, so narrow the window with `--from` / `--to` rather than raising the cap"),
+      limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit, or use `ib log range --person <id> --from`/`--to` for a date-ranged view"),
       apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token")
     ),
     examples: ["ib log user", "ib log user 63 --limit 50"],

@@ -26,8 +26,15 @@ export type StderrCapture = {
   lines: () => string[];
   /**
    * Every chunk joined. Prefer this over `lines()` when asserting on message
-   * CONTENT: a diagnostic split across two `write()` calls is one message, and
-   * matching per-chunk would miss it.
+   * CONTENT: a substring can span two SEPARATE diagnostics, and per-line
+   * matching would miss it. That is what the still-hand-rolled files already do
+   * by hand — `written.join("")` in test/parse-errors.test.ts,
+   * test/commands/feedback.test.ts and test/commands/feedbackClaim.test.ts —
+   * so `text()` is that idiom spelled once.
+   *
+   * (No diagnostic is currently split ACROSS `write()` calls; every emitter
+   * builds one complete string and writes it in a single call. The reason to
+   * prefer `text()` is the cross-message search above, not chunk reassembly.)
    */
   text: () => string;
   /** Restore the real stream. Always call this — usually from `afterEach`. */
@@ -38,8 +45,15 @@ export type StderrCapture = {
  * Spy on `process.stderr.write`, collecting what was written.
  *
  * Silences the stream for the duration, so a test that only needs quiet can
- * capture and ignore the result. `lines()` being empty is the replacement for
- * asserting `not.toHaveBeenCalled()` on a bare spy.
+ * capture and ignore the result.
+ *
+ * ⚠ MIGRATING A HAND-ROLLED CAPTURE IS NOT ALWAYS A STRAIGHT SWAP. This returns
+ * a plain object, not a `Mock`, so the spy matchers some files use — e.g.
+ * `expect(stderrSpy).not.toHaveBeenCalled()` in test/program-embedded.test.ts
+ * and test/embedded-context.test.ts, and `toHaveBeenCalledTimes(1)` in
+ * test/api/client.test.ts — will THROW here ("received value must be a mock or
+ * spy function") rather than fail cleanly. Translate those to
+ * `expect(cap.lines()).toHaveLength(0)` / `toHaveLength(1)`.
  */
 export function captureStderr(): StderrCapture {
   const written: string[] = [];
@@ -59,11 +73,19 @@ export function captureStderr(): StderrCapture {
 /**
  * Parse the `[ib] <name> · {json}` diagnostic shape back into an object.
  *
- * Shared by `--print-payload` (`[ib] payload · …`) and the `--stats` line, which
- * both encode a JSON body after a `·` separator. Returns `null` when no such
- * line was written, so a caller can assert absence without a throw; callers that
- * REQUIRE the line should assert on the result themselves rather than have this
- * helper own the expectation.
+ * Today that shape has exactly ONE emitter: `--print-payload`
+ * (`[ib] payload · {…}`, src/api/client.ts). Do not reach for this with
+ * `"stats"` — the `--stats` line does NOT use this shape in either mode:
+ * `--pretty` emits human prose after a COLON (`[ib] stats: api=120ms …`,
+ * src/stats.ts `buildStatsLine`) and JSON mode emits a bare `{"stats":{…}}`
+ * with no `[ib]` prefix at all. `parseDiagnostic(cap, "stats")` would therefore
+ * return `null` forever, which is a silent nothing rather than a failure —
+ * assert on `cap.text()` for the pretty line, or `JSON.parse(cap.text())` for
+ * the JSON one.
+ *
+ * Returns `null` when no matching line was written, so a caller can assert
+ * absence without a throw; callers that REQUIRE the line should assert on the
+ * result themselves rather than have this helper own the expectation.
  */
 export function parseDiagnostic(
   cap: StderrCapture,

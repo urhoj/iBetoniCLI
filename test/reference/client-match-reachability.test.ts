@@ -159,7 +159,9 @@ describe("shared-helper guards still reach their command's own remedy (fb#672)",
  * all 90 rows at zero maintenance cost, and it fails loudly if a future edit
  * makes two rows collide.
  */
-describe("every client row with a `match` selects itself (all 90 rows)", () => {
+// Deliberately count-free: the corpus is derived, so a number in the title goes
+// stale the moment anyone adds a `match` row (fb#697 took it 90 -> 121).
+describe("every client row with a `match` selects itself", () => {
   const cases: Array<[string, string, number, string]> = [];
   for (const spec of COMMAND_SPECS) {
     for (const row of spec.errors ?? []) {
