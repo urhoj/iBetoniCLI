@@ -49,6 +49,14 @@ export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
 /**
+ * The `--severity` FILTER value that selects the rows carrying no grade at all.
+ * Spelled the same as `--complexity none` deliberately: the two triage grades
+ * are asked about together, and a caller who learned one spelling must not have
+ * to discover a second (fb#535 established the idiom).
+ */
+export const SEVERITY_NONE = "none";
+
+/**
  * The OTHER severity vocabulary — high/medium/low is what issue trackers and
  * most AI tooling use, so it is the natural first guess here and too far from
  * ours for edit distance to bridge (`high`→`major` is 5 edits). Mapped to a
@@ -111,6 +119,41 @@ const TRUNCATE_HINT =
 const COMPLEXITY_NULL_HINT =
   "a complexity filter is active and EXCLUDES rows with no estimate (complexity is optional on create, so most rows are unset — absent means unestimated, not complex); re-run without --complexity/--max-complexity to see the full candidate set, or with --complexity none to see ONLY the unestimated rows";
 
+/**
+ * Emitted when `--severity` was sent but the rows that came back do not obey it.
+ *
+ * The filter is deploy-gated, and an older backend does not reject an unknown
+ * query param — it IGNORES it and answers with the unfiltered list. That failure
+ * is silent and points the wrong way: `--severity none` against such a backend
+ * returns every active row, which reads as "the entire queue is ungraded" and
+ * would send a groomer to re-grade rows that are already graded — the precise
+ * thing the skill's fill-NULLs-only rule exists to prevent. So we do not merely
+ * DOCUMENT the gate (which is what `--complexity none` had to settle for); we
+ * check the answer against what was asked and say so when they disagree.
+ */
+const SEVERITY_IGNORED_HINT =
+  "⚠ --severity was IGNORED by this backend (rows came back that do not match it) — " +
+  "the filter is deploy-gated and predates the backend serving --endpoint. These results are " +
+  "UNFILTERED by severity; do not read them as the graded/ungraded set. Filter client-side, " +
+  "or point --endpoint at a backend that has it.";
+
+/**
+ * True when a severity filter was requested but the result violates it — i.e.
+ * the backend ignored the param. `none` asks for rows with NO severity, so any
+ * row carrying one is a violation; a named severity is violated by any row not
+ * carrying exactly it. An empty result proves nothing either way and is not a
+ * violation: a genuinely empty slice looks identical to a filtered-out one.
+ */
+function severityFilterIgnored(
+  severity: string | undefined,
+  rows: Record<string, unknown>[]
+): boolean {
+  if (!severity || !rows.length) return false;
+  const matches = (r: Record<string, unknown>) =>
+    severity === SEVERITY_NONE ? r.severity == null : r.severity === severity;
+  return rows.some((r) => !matches(r));
+}
+
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
  * pass through untouched. */
 function truncateField(v: unknown): { value: unknown; cut: boolean } {
@@ -144,6 +187,7 @@ async function fetchRows(
     kind?: string;
     scope?: string;
     search?: string;
+    severity?: string;
     complexity?: number | string;
     maxComplexity?: number;
     limit?: number;
@@ -158,6 +202,7 @@ async function fetchRows(
     kind: params.kind || undefined,
     scope: params.scope || undefined,
     search: params.search || undefined,
+    severity: params.severity || undefined,
     complexity: params.complexity,
     maxComplexity: params.maxComplexity,
     limit: params.limit,
@@ -370,6 +415,7 @@ export async function runFeedbackList(
     kind?: string;
     scope?: string;
     search?: string;
+    severity?: string;
     complexity?: number | string;
     maxComplexity?: number;
     limit?: number;
@@ -385,6 +431,14 @@ export async function runFeedbackList(
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.kind, KINDS, "--kind");
   assertEnum(opts.scope, SCOPES, "--scope");
+  // `none` is a real value (the UNGRADED rows), so it bypasses the enum check —
+  // the same shape `--complexity none` already has. Everything else must be a
+  // known severity: `high`/`medium`/`low` are the vocabulary most trackers use
+  // and are too far from ours for edit distance, so SEVERITY_SYNONYMS carries
+  // them to a did-you-mean rather than an unexplained exit 4.
+  if (opts.severity !== SEVERITY_NONE) {
+    assertEnum(opts.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
+  }
   const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy].filter(Boolean).length;
   if (claimFilters > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by", 4);
@@ -403,6 +457,7 @@ export async function runFeedbackList(
       kind: opts.kind,
       scope: opts.scope,
       search: opts.search,
+      severity: opts.severity,
       complexity: opts.complexity,
       maxComplexity: opts.maxComplexity,
       limit: opts.limit,
@@ -425,6 +480,7 @@ export async function runFeedbackList(
           kind: opts.kind,
           scope: opts.scope,
           search: opts.search,
+          severity: opts.severity,
           complexity: opts.complexity,
           maxComplexity: opts.maxComplexity,
           limit: CAP,
@@ -447,6 +503,8 @@ export async function runFeedbackList(
     items = merged.slice(offset, offset + limit);
   }
 
+  const severityIgnored = severityFilterIgnored(opts.severity, items);
+
   items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
 
   let cut = false;
@@ -465,6 +523,10 @@ export async function runFeedbackList(
   if (cut) hints.push(TRUNCATE_HINT);
   if (opts.complexity !== undefined || opts.maxComplexity !== undefined)
     hints.push(COMPLEXITY_NULL_HINT);
+  if (severityIgnored) {
+    warnNote(SEVERITY_IGNORED_HINT);
+    hints.push(SEVERITY_IGNORED_HINT);
+  }
   if (hints.length) env.hint = hints.join("; ");
   return env;
 }
@@ -515,6 +577,30 @@ export async function runFeedbackCount(
     if (status === 401 || status === 403) throw e;
     return countClientSide(client, opts);
   }
+}
+
+/** One incomplete-row finding from `ib dev feedback lint`. */
+export interface FeedbackLintFinding {
+  feedbackId: number;
+  issue: "ungraded" | "stale-claim" | "closed-no-resolution" | "applied-no-changelog";
+  detail: string;
+  severity: "warn" | "info";
+}
+
+/**
+ * `ib dev feedback lint` — GET /api/feedback/lint → the rows that are
+ * INCOMPLETE, as opposed to merely open. Sibling of `ib glossary lint`.
+ *
+ * Thin on purpose: the whole value is that the audit runs SERVER-side, over the
+ * whole table. The CLI's own route to this answer is a page capped at 200 rows
+ * whose drops are the OLDEST — the longest-neglected, i.e. exactly the rows a
+ * completeness audit exists to surface (fb#536, fb#605).
+ */
+export async function runFeedbackLint(
+  client: ApiClient
+): Promise<ListEnvelope<FeedbackLintFinding>> {
+  const items = await client.get<FeedbackLintFinding[]>("/api/feedback/lint");
+  return listEnvelope(Array.isArray(items) ? items : []);
 }
 
 /** Pre-fb#536 rollup: bucket one capped page in JS. Only reached on an older backend. */
@@ -1139,6 +1225,9 @@ export function registerFeedbackCommands(
     // table as if nothing had been asked for (fb#535).
     .option("--complexity <n>", "", (v: string) => (v.toLowerCase() === "none" ? "none" : Number(v)))
     .option("--max-complexity <n>", "", Number)
+    // Lower-cased so `--severity NONE` / `--severity Major` behave like the
+    // `--complexity none` sibling rather than failing the enum check on case.
+    .option("--severity <s>", "", (v: string) => v.toLowerCase())
     .option("--oldest")
     .option("--limit <n>", "", Number)
     .option("--offset <n>", "", Number)
@@ -1146,9 +1235,23 @@ export function registerFeedbackCommands(
     .option("--mine")
     .option("--claimed-by <label>", "", String)
     .action(
-      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; complexity?: number | string; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; unclaimed?: boolean; mine?: boolean; claimedBy?: string; }) =>
+      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; severity?: string; complexity?: number | string; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; unclaimed?: boolean; mine?: boolean; claimedBy?: string; }) =>
         runFeedbackList(client, opts)
       )
+    );
+
+  // Mirrors `ib glossary lint`: read-only audit, `--strict` exits 1 on any
+  // warn-level finding so CI / a scheduled runner can gate on it. Only the
+  // issues a run can actually drive to zero are `warn` — see the backend's
+  // getFeedbackLint for why the documentation-gap issues stay `info`.
+  f.command("lint")
+    .option("--strict")
+    .action(
+      guarded(async (opts: { strict?: boolean }) => {
+        const res = await runFeedbackLint(await getClient());
+        writeJson(res);
+        if (opts.strict && res.items.some((f2) => f2.severity === "warn")) process.exitCode = 1;
+      })
     );
 
   f.command("get <id>")

@@ -9,6 +9,7 @@ import {
   mergeNoteFlags,
   runFeedbackUpdate,
   runFeedbackCount,
+  runFeedbackLint,
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
   type FeedbackResolveInput,
@@ -1640,5 +1641,139 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
     ]);
     await runFeedbackList(mockClient, { all: true });
     expect(note()).toMatch(/fb#168 → cl#900\+cl#901/);
+  });
+});
+
+/**
+ * The severity filter + its deploy-gate detector.
+ *
+ * Severity was in ALLOWED_ORDER_BY but had no filter, so "which rows still need
+ * a grade?" was unanswerable from one call — the grooming skill pulled the whole
+ * active list and filtered client-side, against a page capped at 200 whose drops
+ * are the OLDEST. Same silent under-report fb#536 fixed for counts, fb#605 for
+ * the list.
+ */
+describe("ib feedback list — --severity filter", () => {
+  test("forwards a named severity on the single-status path", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", severity: "critical" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&severity=critical");
+  });
+
+  test("forwards --severity none, the UNGRADED-row selector", async () => {
+    // The severity twin of `--complexity none`: the set a backfill pass needs,
+    // and the one a named severity excludes by construction.
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", severity: "none" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&severity=none");
+  });
+
+  test("rides along on the multi-status fan-out too", async () => {
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { severity: "none" });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&severity=none&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&severity=none&limit=200");
+  });
+
+  test("an unknown severity exits 4 rather than returning the whole table", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open", severity: "urgent" })
+    ).rejects.toThrow(/--severity must be one of/);
+  });
+
+  test("high|medium|low get a did-you-mean instead of a bare enum dump", async () => {
+    // The issue-tracker vocabulary most tooling reaches for first, and too far
+    // from ours for edit distance to bridge (high→major is 5 edits).
+    await expect(
+      runFeedbackList(mockClient, { status: "open", severity: "high" })
+    ).rejects.toThrow(/did you mean major/);
+  });
+});
+
+describe("ib feedback list — a backend that IGNORES --severity is caught", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+
+  test("THE BUG: --severity none answered with graded rows is not read as 'all ungraded'", async () => {
+    // An older backend does not reject an unknown query param, it ignores it and
+    // answers unfiltered. For `none` that returns every active row and reads as
+    // "the whole queue needs grading" — which would send a groomer to re-grade
+    // rows that are already graded, the exact thing fill-NULLs-only prevents.
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, severity: "major", status: "open" },
+      { feedbackId: 2, severity: null, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", severity: "none" });
+    expect(note()).toMatch(/--severity was IGNORED by this backend/);
+    expect(out.hint).toMatch(/UNFILTERED by severity/);
+  });
+
+  test("a named severity answered with a different one is caught the same way", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, severity: "critical", status: "open" },
+      { feedbackId: 2, severity: "cosmetic", status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", severity: "critical" });
+    expect(out.hint).toMatch(/UNFILTERED by severity/);
+  });
+
+  test("an obedient backend stays silent", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, severity: null, status: "open" },
+      { feedbackId: 2, severity: null, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", severity: "none" });
+    expect(note()).not.toMatch(/IGNORED/);
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+
+  test("an EMPTY result is never flagged — it proves nothing either way", async () => {
+    // A genuinely empty slice and a filtered-out one look identical, so warning
+    // here would cry wolf on the single most common clean-queue answer.
+    get.mockResolvedValueOnce([]);
+    const out = await runFeedbackList(mockClient, { status: "open", severity: "critical" });
+    expect(note()).not.toMatch(/IGNORED/);
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+
+  test("no --severity means no check at all", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, severity: "major", status: "open" }]);
+    const out = await runFeedbackList(mockClient, { status: "open" });
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+});
+
+describe("ib feedback lint", () => {
+  test("GETs the server-side audit and wraps it in the list envelope", async () => {
+    // Thin by design: the value is that the audit runs server-side over the
+    // WHOLE table. Doing it client-side means a 200-row page whose drops are
+    // the oldest — exactly the rows a completeness audit exists to surface.
+    const findings = [
+      { feedbackId: 12, issue: "ungraded", detail: "severity missing", severity: "warn" },
+      { feedbackId: 40, issue: "applied-no-changelog", detail: "…", severity: "info" },
+    ];
+    get.mockResolvedValueOnce(findings);
+    const out = await runFeedbackLint(mockClient);
+    expect(get).toHaveBeenCalledWith("/api/feedback/lint");
+    expect(out.items).toEqual(findings);
+    expect(out.count).toBe(2);
+  });
+
+  test("a clean queue is an empty list, not an error", async () => {
+    get.mockResolvedValueOnce([]);
+    const out = await runFeedbackLint(mockClient);
+    expect(out.items).toEqual([]);
+    expect(out.count).toBe(0);
+  });
+
+  test("a non-array body degrades to empty rather than throwing", async () => {
+    get.mockResolvedValueOnce(null as never);
+    expect((await runFeedbackLint(mockClient)).items).toEqual([]);
   });
 });

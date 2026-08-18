@@ -2819,7 +2819,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, unestimated, truncated?, hint? }. \`unestimated\` = rows with complexity IS NULL — pair it with \`list --complexity none\` to work through them.
+  { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, unestimated, ungraded, truncated?, hint? }. The two completeness scalars are twins: \`unestimated\` = complexity IS NULL (pair with \`list --complexity none\`), \`ungraded\` = severity IS NULL (pair with \`list --severity none\`). \`bySeverity\` buckets the graded rows and carries the NULLs under the key \`ungraded\`. ⚠ ALL of these count the WHOLE table including closed rows — most of which are settled applied/dismissed, so grading them is archaeology; narrow to the active bucket before reading a backlog number off this. \`ib dev feedback lint\` answers the same question already scoped to the active rows. bySeverity/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)
@@ -2939,6 +2939,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback lint matches snapshot 1`] = `
+"USAGE
+  ib dev feedback lint [flags]
+
+DESCRIPTION
+  Audit the feedback queue for INCOMPLETE rows — the completeness twin of \`count\`, which only says how many rows exist in each bucket. Developer-only. Read-only, whole-table (no filters: a filter would let a clean slice read as a clean queue). Returns one finding per problem; an empty list means the queue is clean.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --strict    Exit 1 if any warn-level finding exists (CI / scheduled-runner gate). info-level findings never gate — see the notes for why the split is drawn where it is.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: [{ feedbackId, issue, detail, severity }], nextCursor: null, count }. issue = ungraded | stale-claim | closed-no-resolution | applied-no-changelog; severity = warn (gates --strict) | info.
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 5 (HTTP 404)  Not found              → this backend predates \`feedback lint\` — the route falls through to GET /api/feedback/:id and its numeric-id guard answers 404. Deploy the backend, or approximate with \`ib dev feedback count\` (ungraded/unestimated) plus \`ib dev feedback list --severity none\`.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The four issues: \`ungraded\` = an ACTIVE row (open/reviewed) missing severity and/or complexity — the detail says which. \`stale-claim\` = an active row whose lease expired but still names a holder. \`closed-no-resolution\` = an applied/dismissed row with no resolution text. \`applied-no-changelog\` = an applied row with no devChangelogFeedback link, i.e. a fix that shipped without a changelog entry.
+  - WARN vs INFO is chosen so --strict stays actionable rather than permanently red. warn = \`ungraded\` + \`stale-claim\`, which a grooming run and the SessionEnd release hook drive to zero, so a red --strict means act today. info = the two documentation-gap issues, which are a historical backlog no single run clears; gating on those would make the lint always-red, and an always-red check gets rubber-stamped instead of read.
+  - Runs SERVER-side over the whole table on purpose. The CLI's own route to this answer is a page capped at 200 rows whose drops are the OLDEST — i.e. the longest-neglected rows, exactly the ones a completeness audit exists to surface (fb#536, fb#605).
+  - \`ungraded\` is what the groom-feedback-triage skill clears. Use \`ib dev feedback list --severity none\` / \`--complexity none\` to pull the actual rows once lint says they exist.
+
+SEE ALSO
+  ib dev feedback count, ib dev feedback list, ib glossary lint
+
+EXAMPLES
+  ib dev feedback lint
+  ib dev feedback lint --strict
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback list matches snapshot 1`] = `
 "USAGE
   ib dev feedback list [flags]
@@ -2956,6 +2995,7 @@ FLAGS
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
   --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; \`--complexity none\` is how you select exactly that set for a backfill pass (fb#535).
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use \`--complexity none\` to find those.
+  --severity STRING    Only items with this exact severity, or \`none\` for the rows with NO grade at all — the severity twin of \`--complexity none\` (deploy-gated). Before this existed severity was ORDERABLE but not selectable, so 'which rows still need a grade?' cost a full unresolved page filtered client-side, against a 200-row cap. Unlike --complexity, an unknown value is REJECTED (exit 4), never answered with the whole table.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; \`truncated: true\` says the page was capped (fb#605). Page the rest with --offset. (default: 50)
   --offset NUMBER    Skip N rows — how you reach anything beyond the 200-row cap. \`--limit 200\`, then \`--limit 200 --offset 200\`, and so on. (default: 0)
@@ -2981,6 +3021,7 @@ NOTES
   - Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.
   - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
   - --complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). \`--max-complexity 3 --unresolved\` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).
+  - --severity is deploy-gated like the others, but its silent-ignore failure points the WRONG WAY, so this one is CHECKED rather than merely documented: an older backend ignores the param and answers unfiltered, which for \`--severity none\` returns every active row and reads as 'the whole queue is ungraded'. The CLI compares the rows against what was asked and, on a mismatch, emits a loud stderr warning plus an envelope \`hint\` saying the results are unfiltered. An EMPTY result is not flagged — a genuinely empty slice and a filtered-out one look identical, so use \`ib dev feedback count\` (bySeverity/ungraded) to tell them apart.
   - --oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. \`--kind bug --oldest\`) to keep breakages ahead of age.
   - Each row carries claimState (free|held|mine). An expired claim reads as \`free\` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically.
   - PARTLY-SHIPPED ROWS (fb#647): a row can carry \`changelogLinks\` and still be open — that is a fix recorded with \`ib dev changelog add --feedback <id> --no-resolve\`, which links the shipped half WITHOUT closing the row. Any linked row that is still OPEN or REVIEWED is also named in a one-line stderr note (a closed row always has a \`resolves\` link, so those are not worth saying). Read the entry (\`ib dev changelog get <id>\`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.
@@ -2993,6 +3034,8 @@ EXAMPLES
   ib dev feedback list --search IDOR
   ib dev feedback list --max-complexity 3 --unresolved
   ib dev feedback list --scope cli --oldest
+  ib dev feedback list --severity none --unresolved --oldest
+  ib dev feedback list --severity critical --unresolved
 "
 `;
 
