@@ -2,9 +2,9 @@
  * `ib feedback` — file and triage CLI improvement proposals / trouble reports.
  *
  * When an AI (or CI) hits friction using `ib`, it files a freetext note here so
- * the CLI can be improved. Submission is QUIET (no GitHub issue, no spam to you
- * or the user — distinct from `bugReport`); the maintainer gets a private
- * heads-up email. A developer-gated analyzer skill reads them back via
+ * the CLI can be improved. Submission is QUIET (no GitHub issue, no email, no spam
+ * to you or the user — distinct from `bugReport`); developers who opted in get a
+ * push notification. A developer-gated analyzer skill reads them back via
  * `ib dev feedback list` and closes the loop.
  *
  * `create` is sent as a META request → exempt from the read-only write-lock, so
