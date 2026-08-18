@@ -568,6 +568,106 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
   });
 });
 
+// The remedy for a mangled payload was already curated in the command's own
+// ERRORS row and rendered by `--help`, but the runtime hint never reached for
+// it: it spent its whole budget explaining the CAUSE and left the caller with no
+// fix, which cost a filing agent a round-trip (fb#726). Lead with the treatment;
+// the diagnosis follows as explanation. Order is the whole point of these
+// assertions — both sentences were reachable before, only their rank was wrong.
+describe("buildExcessArgumentsEnvelope — the curated remedy leads (fb#726)", () => {
+  /** The remedy opens the hint AND precedes the cause sentence. */
+  const leadsWith = (hint: string, remedy: string) =>
+    hint.startsWith(remedy) && hint.indexOf(remedy) < hint.indexOf("Extra positional(s)");
+
+  test("`dev feedback create` leads with --from-json, ahead of the cause", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("dev", "feedback", "create"),
+      ["line two"],
+      "too many arguments for 'create'. Expected 1 argument but got 2: line one, line two."
+    );
+    expect(env.hint).toContain("--from-json <file|->");
+    expect(leadsWith(env.hint, "Pass the report via --from-json <file|-> instead of argv.")).toBe(
+      true
+    );
+  });
+
+  test("the sibling `dev feedback resolve` is covered too, capitalised into a sentence", () => {
+    // Its row reads "pass the note via …" — authored as a help-table cell, not
+    // as the opening sentence of a hint. fb#726 asked for both commands.
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("dev", "feedback", "resolve"),
+      ["note b"],
+      "too many arguments for 'resolve'. Expected 2 arguments but got 3: 42, note a, note b."
+    );
+    expect(leadsWith(env.hint, "Pass the note via --from-json <file|-> instead of argv.")).toBe(
+      true
+    );
+  });
+
+  test("a command with no curated row invents nothing — the cause still leads", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("vehicle", "timeline"),
+      ["banana"],
+      "too many arguments"
+    );
+    expect(env.hint.startsWith("Extra positional(s)")).toBe(true);
+    // The bare flag NAME still appears in the trailing "Accepted flags" list on
+    // any command that declares it — only the remedy sentence must be absent.
+    expect(env.hint).not.toContain("--from-json <file|->");
+  });
+
+  test("accepting --from-json is NOT the trigger — the spec row is", () => {
+    // `person update` accepts --from-json but documents no too-many-arguments
+    // row, and a surplus positional there is usually an eaten empty string, whose
+    // fix is `--email=`. Gating on the flag's presence (the originally suggested
+    // fix) would serve the --from-json remedy to a caller it cannot help.
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("person", "update"),
+      ["1380"],
+      "too many arguments"
+    );
+    expect(env.availableOptions).toContain("--from-json");
+    expect(env.hint).not.toContain("--from-json <file|->");
+    expect(env.hint.startsWith("Extra positional(s)")).toBe(true);
+  });
+});
+
+// Both causes of a surplus positional are PowerShell argument mangling, but
+// their fixes are OPPOSITE (--from-json vs the `--flag=` equals form) and the old
+// hint printed both at once, leaving the caller to guess. An eaten empty string
+// is detectable — the flag holds another flag's NAME (fb#634) — so emit only the
+// applicable cause, naming the real flag instead of a placeholder `--flag`.
+describe("buildExcessArgumentsEnvelope — cause discrimination (fb#726)", () => {
+  test("an eaten empty string names the flag and the equals-form fix", async () => {
+    // A PRIVATE tree: seeding an option value mutates the command, and the shared
+    // `program` above is asserted against by every other test in this file.
+    const isolated = await buildProgram();
+    let leaf: Command = isolated;
+    for (const name of ["person", "update"]) leaf = leaf.commands.find((c) => c.name() === name)!;
+    // What `--email "" --reason X` becomes once PowerShell drops the bare "".
+    leaf.setOptionValue("email", "--reason");
+
+    const env = buildExcessArgumentsEnvelope(leaf, ["1380"], "too many arguments");
+    expect(env.hint).toContain("`--email=`");
+    expect(env.hint).toContain("DROPPED");
+    expect(env.hint).not.toContain("inner double-quotes");
+  });
+
+  test("a split value gets the quote/newline cause only — no empty-string competition", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("vehicle", "timeline"),
+      ["banana"],
+      "too many arguments"
+    );
+    expect(env.hint).toContain("inner double-quotes");
+    // "equals form" is the clear-a-field fix, and belongs ONLY to the other
+    // cause. Asserted on that phrase rather than on "DROPPED", which the old
+    // combined sentence spelled "DROPS" — the negation would have passed
+    // against exactly the text this test exists to keep out.
+    expect(env.hint).not.toContain("equals form");
+  });
+});
+
 // Commander reports a missing mandatory option BEFORE excess positionals, so on
 // a command with a required flag the date hint was computed but never reached —
 // the same validation-ordering masking fb#309 hit with unknown options. Found by

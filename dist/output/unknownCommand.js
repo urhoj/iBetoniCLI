@@ -2,6 +2,7 @@ import { COMMAND_SPECS } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
 import { commandDomains, fullyHiddenDomains, isWriteSpec } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
+import { matchClientRowForMessage } from "../api/errors.js";
 import packageJson from "../../package.json" with { type: "json" };
 // The matcher itself lives in the leaf module ./nearest.js so `targets.ts`
 // (assertEnum's did-you-mean) can reach it without importing this file, which
@@ -430,6 +431,52 @@ export function dateFlagSuggestion(cmd, excess) {
     return null;
 }
 /**
+ * The flag whose parsed value is another flag NAME — the signature of an
+ * empty-string argument the shell ate, and the discriminator between the two
+ * causes of an excess positional.
+ *
+ * Windows PowerShell DROPS a bare `""`, so `--email "" --asiakas 1380` reaches
+ * the parser as `--email --asiakas` with `1380` stranded as a surplus
+ * positional (fb#634). `assertNoEatenEmptyString` in program.ts detects the same
+ * signature, but it is a preAction hook and Commander throws
+ * `excessArguments` during PARSE — so on this path it never runs, and the hint
+ * had to name both causes at once and let the caller guess (fb#726).
+ *
+ * Names are collected up the `.parent` chain because a root global is a legal
+ * value-shaped token here too. `opts()` on a command that never parsed (a
+ * direct call in a test) is simply empty, which disables the check.
+ */
+function eatenEmptyStringFlag(cmd) {
+    const names = new Set();
+    for (let c = cmd; c; c = c.parent) {
+        for (const o of c.options) {
+            if (o.long)
+                names.add(o.long);
+            if (o.short)
+                names.add(o.short);
+        }
+    }
+    const opts = cmd.opts();
+    for (const o of cmd.options) {
+        const value = opts[o.attributeName()];
+        if (typeof value === "string" && names.has(value)) {
+            return o.long ?? o.short ?? o.attributeName();
+        }
+    }
+    return null;
+}
+/**
+ * Why the surplus positional exists, in one sentence — the applicable cause
+ * ONLY. Both arms name PowerShell because both are PowerShell argument
+ * mangling; which one fired is decided by {@link eatenEmptyStringFlag}.
+ */
+function excessCauseHint(cmd) {
+    const eaten = eatenEmptyStringFlag(cmd);
+    return eaten
+        ? `Extra positional(s) were passed. \`${eaten}\` was given the literal value of another flag, which is what clearing a field does on Windows PowerShell: a bare "" is DROPPED, so \`${eaten} ""\` swallowed the next flag and stranded its argument here. To clear a field use the equals form \`${eaten}=\` (same meaning in bash). See \`ib help shell-quoting\`.`
+        : 'Extra positional(s) were passed. On Windows PowerShell this also happens when a quoted flag value is split on its inner double-quotes, or on its newlines — check whether one long value became several arguments. See `ib help shell-quoting`.';
+}
+/**
  * Enriched "too many arguments" envelope (feedback #328).
  *
  * Commander's default says only what was rejected — "Expected 1 argument but
@@ -444,7 +491,7 @@ export function dateFlagSuggestion(cmd, excess) {
  * special-cased to `vehicle timeline`.
  */
 export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
-    const { command, availableOptions, positionals } = commandSurface(cmd);
+    const { command, spec, availableOptions, positionals } = commandSurface(cmd);
     const dated = dateFlagSuggestion(cmd, excess);
     const didYouMean = dated?.suggestion ?? null;
     const parts = [];
@@ -454,11 +501,20 @@ export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
             ".");
     }
     else {
-        // No date to latch onto — the other two common causes are both PowerShell
-        // argument mangling: a quoted value split on its inner double-quotes, or an
-        // empty-string value dropped outright so the flag swallowed the next token
-        // and left its argument stranded here (fb#634).
-        parts.push('Extra positional(s) were passed. On Windows PowerShell this also happens when a quoted flag value is split on its inner double-quotes — check whether one long value became several arguments. It ALSO happens when you pass an empty string to clear a field: PowerShell DROPS a bare "", so `--flag "" --other X` arrives as `--flag --other` and strands X here. To clear a field use the equals form `--flag=` (same meaning in bash). See `ib help shell-quoting`.');
+        // No date to latch onto. Lead with the command's OWN curated remedy when it
+        // documents this failure — on the prose-bearing commands that is "pass the
+        // payload via --from-json <file|->", the one sentence that actually ends the
+        // round-trip. It was already written in the spec and rendered by `--help`,
+        // just never reached from the runtime hint, which spent its space on
+        // diagnosis instead of treatment (fb#726). The cause follows as the
+        // explanation rather than replacing it.
+        // The curated rows are authored as `--help` table cells, so they vary in
+        // leading case and trailing period; normalise both now that one of them
+        // leads the hint as its own sentence.
+        const remedy = matchClientRowForMessage(spec?.errors, parserDetail, 4)?.remedy;
+        if (remedy)
+            parts.push(remedy[0].toUpperCase() + remedy.slice(1).replace(/\.$/, "") + ".");
+        parts.push(excessCauseHint(cmd));
     }
     if (positionals.length) {
         parts.push(`This command takes positional argument(s): ${positionals.join(" ")}.`);

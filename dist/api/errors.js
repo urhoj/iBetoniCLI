@@ -73,9 +73,24 @@ function isRouteNotFound(body) {
  *     set yields NO hint — silence beats a confidently wrong remedy.
  */
 function matchClientRow(err, specErrors) {
-    const rows = (specErrors ?? []).filter((r) => r.origin === "client" && r.exit === err.exitCode);
-    const message = err.message.toLowerCase();
-    const matched = rows.find((r) => rowMatches(r, message));
+    return matchClientRowForMessage(specErrors, err.message, err.exitCode);
+}
+/**
+ * {@link matchClientRow} keyed on a raw message + exit rather than a
+ * {@link CliError}, for the callers that never build one.
+ *
+ * The parse-error envelopes are exactly that case: Commander rejects the argv
+ * before any action runs, so the command's curated ERRORS remedy — which the
+ * in-action path gets for free via {@link hintDetailForError} — was unreachable
+ * from them, and the excess-positional hint explained the cause at length while
+ * never printing the one-line fix its own spec already carried (fb#726).
+ * Exported so that path resolves rows through THIS matcher; a second
+ * implementation would drift from the #305/#306 disambiguation rules above.
+ */
+export function matchClientRowForMessage(specErrors, message, exit) {
+    const rows = (specErrors ?? []).filter((r) => r.origin === "client" && r.exit === exit);
+    const lower = message.toLowerCase();
+    const matched = rows.find((r) => rowMatches(r, lower));
     if (matched)
         return matched;
     return rows.length === 1 && rows[0].match === undefined ? rows[0] : undefined;
