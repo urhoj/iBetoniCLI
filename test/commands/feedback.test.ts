@@ -1677,17 +1677,57 @@ describe("ib feedback list — --severity filter", () => {
   });
 
   test("an unknown severity exits 4 rather than returning the whole table", async () => {
+    // toMatchObject, not toThrow: the title claims an exit CODE, and the file's
+    // own convention pins it that way everywhere else.
     await expect(
       runFeedbackList(mockClient, { status: "open", severity: "urgent" })
-    ).rejects.toThrow(/--severity must be one of/);
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--severity must be one of/),
+    });
   });
 
-  test("high|medium|low get a did-you-mean instead of a bare enum dump", async () => {
-    // The issue-tracker vocabulary most tooling reaches for first, and too far
-    // from ours for edit distance to bridge (high→major is 5 edits).
+  test("the rejection message LISTS `none` — the spec and the runtime agree", async () => {
+    // These disagreed: the check ran against SEVERITIES with a bypass branch for
+    // `none`, so a typo was told the valid set was "critical, major, minor,
+    // cosmetic" while the spec's machine-readable `allowed` included `none`.
     await expect(
-      runFeedbackList(mockClient, { status: "open", severity: "high" })
-    ).rejects.toThrow(/did you mean major/);
+      runFeedbackList(mockClient, { status: "open", severity: "urgent" })
+    ).rejects.toMatchObject({ message: expect.stringMatching(/\bnone\b/) });
+  });
+
+  test.each([
+    ["high", "major"],
+    ["medium", "minor"],
+    ["low", "cosmetic"],
+    ["blocker", "critical"],
+  ])("the issue-tracker word %s is redirected to %s", async (typed, suggested) => {
+    // The vocabulary most tooling reaches for first, and too far from ours for
+    // edit distance to bridge (high→major is 5 edits). Previously only `high`
+    // was exercised, leaving 4 of the 5 synonym entries unproven.
+    await expect(
+      runFeedbackList(mockClient, { status: "open", severity: typed })
+    ).rejects.toThrow(new RegExp(`did you mean ${suggested}`));
+  });
+
+  test("KNOWN DEFECT: `trivial` is suggested `critical`, the INVERSE of its meaning", async () => {
+    // SEVERITY_SYNONYMS maps trivial→cosmetic, but that entry is DEAD: assertEnum
+    // (src/targets.ts) consults `closestName` BEFORE `synonyms`, and `trivial` is
+    // within edit distance of `critical` (both 8 chars), so the fuzzy match wins
+    // and the synonym never runs. The suggestion is the opposite end of the
+    // severity ladder — the worst direction to be wrong in on this particular
+    // flag, since acting on it files the least urgent thing as the most.
+    //
+    // PRE-EXISTING, not introduced here: `feedback create --severity trivial`
+    // gives the same answer against the narrow SEVERITIES list. Fixing it means
+    // reordering assertEnum (synonyms before fuzzy), which touches every enum
+    // flag in the CLI — out of scope for this change, filed separately.
+    //
+    // This pins CURRENT behaviour deliberately, so the fix flips it visibly
+    // rather than passing silently either way.
+    await expect(
+      runFeedbackList(mockClient, { status: "open", severity: "trivial" })
+    ).rejects.toThrow(/did you mean critical/);
   });
 });
 
@@ -1720,6 +1760,7 @@ describe("ib feedback list — a backend that IGNORES --severity is caught", () 
       { feedbackId: 2, severity: "cosmetic", status: "open" },
     ]);
     const out = await runFeedbackList(mockClient, { status: "open", severity: "critical" });
+    expect(note()).toMatch(/IGNORED/);
     expect(out.hint).toMatch(/UNFILTERED by severity/);
   });
 
@@ -1729,6 +1770,22 @@ describe("ib feedback list — a backend that IGNORES --severity is caught", () 
       { feedbackId: 2, severity: null, status: "open" },
     ]);
     const out = await runFeedbackList(mockClient, { status: "open", severity: "none" });
+    expect(note()).not.toMatch(/IGNORED/);
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+
+  test("an obedient backend stays silent for a NAMED severity too", async () => {
+    // The named branch of severityFilterIgnored was pinned by nothing: inverting
+    // `r.severity === severity` to `!==` left all five original tests green. The
+    // violated-case test warns either way, and the other three short-circuit on
+    // the `!severity` / `!rows.length` guards before the comparison runs. This is
+    // the only case where the named branch must return FALSE, so it is the only
+    // one that dies when the comparison flips.
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, severity: "critical", status: "open" },
+      { feedbackId: 2, severity: "critical", status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", severity: "critical" });
     expect(note()).not.toMatch(/IGNORED/);
     expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
   });
@@ -1775,5 +1832,63 @@ describe("ib feedback lint", () => {
   test("a non-array body degrades to empty rather than throwing", async () => {
     get.mockResolvedValueOnce(null as never);
     expect((await runFeedbackLint(mockClient)).items).toEqual([]);
+  });
+});
+
+describe("ib feedback lint --strict — the gate the warn/info split exists to serve", () => {
+  /**
+   * feedbackStats.test.js pins WHICH issues are warn vs info, but the only
+   * consumer of that distinction is this flag. Without these two tests the
+   * `.some(f => f.severity === "warn")` predicate could be deleted outright and
+   * nothing would go red — i.e. the design decision was documented and pinned
+   * everywhere except where it actually takes effect.
+   */
+  const runLint = async (findings: unknown[], argv: string[]) => {
+    get.mockResolvedValueOnce(findings);
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    const prevExit = process.exitCode;
+    process.exitCode = undefined;
+    await program.parseAsync(["feedback", "lint", ...argv], { from: "user" });
+    const observed = process.exitCode;
+    process.exitCode = prevExit;
+    return observed;
+  };
+
+  test("--strict exits 1 when a warn-level finding exists", async () => {
+    expect(
+      await runLint(
+        [{ feedbackId: 1, issue: "ungraded", detail: "severity missing", severity: "warn" }],
+        ["--strict"]
+      )
+    ).toBe(1);
+  });
+
+  test("--strict does NOT exit 1 on info-only findings — that IS the design", async () => {
+    // The historical documentation-gap backlog is large and no single run clears
+    // it. Gating on it would make --strict permanently red, and a check that is
+    // always red gets rubber-stamped instead of read.
+    expect(
+      await runLint(
+        [
+          { feedbackId: 2, issue: "applied-no-changelog", detail: "…", severity: "info" },
+          { feedbackId: 3, issue: "closed-no-resolution", detail: "…", severity: "info" },
+        ],
+        ["--strict"]
+      )
+    ).not.toBe(1);
+  });
+
+  test("a clean queue under --strict exits 0", async () => {
+    expect(await runLint([], ["--strict"])).not.toBe(1);
+  });
+
+  test("WITHOUT --strict a warn finding still exits 0 — it reports, it does not gate", async () => {
+    expect(
+      await runLint(
+        [{ feedbackId: 1, issue: "ungraded", detail: "severity missing", severity: "warn" }],
+        []
+      )
+    ).not.toBe(1);
   });
 });

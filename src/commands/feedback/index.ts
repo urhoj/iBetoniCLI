@@ -15,7 +15,7 @@
 import os from "node:os";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   FEEDBACK_LIST_CAP,
   FEEDBACK_LIST_DEFAULT,
@@ -55,6 +55,36 @@ type Severity = (typeof SEVERITIES)[number];
  * to discover a second (fb#535 established the idiom).
  */
 export const SEVERITY_NONE = "none";
+
+/**
+ * What `--severity` accepts as a FILTER: every grade, plus the `none` sentinel.
+ *
+ * Deliberately NOT the same list as SEVERITIES, which is what `create`/`update`
+ * accept as a settable grade — `none` selects rows that hold no grade, it is not
+ * a value a row can ever hold. Keeping them separate is what stops `--severity
+ * none` from becoming writable on those commands.
+ *
+ * It exists because the check used to run against SEVERITIES with a bypass
+ * branch around `none`, so a typo was told the valid values were "critical,
+ * major, minor, cosmetic" — omitting one the CLI actually accepts, and
+ * contradicting the machine-readable `allowed` set in the spec.
+ */
+export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE] as const;
+
+/**
+ * Case-folding coercion shared by EVERY `--severity` flag in this group.
+ *
+ * One flag name should behave one way: `list --severity Major` folded case
+ * while `create`/`update --severity Major` exited 4 — same flag, same domain,
+ * opposite answer depending on which leaf you were on.
+ *
+ * Folded at the parser rather than inside `assertEnum` so the blast radius stays
+ * this group. And folded at ALL rather than left to the enum check, because
+ * `closestName` is case-sensitive and SEVERITY_SYNONYMS is keyed on lowercase
+ * words — an unfolded `MAJOR` would miss both and get a bare enum dump instead
+ * of a did-you-mean, which is the worse answer for an AI caller.
+ */
+const foldSeverityCase = (v: string): string => v.toLowerCase();
 
 /**
  * The OTHER severity vocabulary — high/medium/low is what issue trackers and
@@ -431,14 +461,13 @@ export async function runFeedbackList(
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.kind, KINDS, "--kind");
   assertEnum(opts.scope, SCOPES, "--scope");
-  // `none` is a real value (the UNGRADED rows), so it bypasses the enum check —
-  // the same shape `--complexity none` already has. Everything else must be a
-  // known severity: `high`/`medium`/`low` are the vocabulary most trackers use
-  // and are too far from ours for edit distance, so SEVERITY_SYNONYMS carries
-  // them to a did-you-mean rather than an unexplained exit 4.
-  if (opts.severity !== SEVERITY_NONE) {
-    assertEnum(opts.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
-  }
+  // SEVERITY_FILTERS, not SEVERITIES: `none` is a legal filter value, so it has
+  // to be IN the allowed list rather than bypassed around the check — bypassing
+  // left it out of the rejection message. `high`/`medium`/`low` are the
+  // vocabulary most issue trackers use and are too far from ours for edit
+  // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
+  // rather than a bare enum dump.
+  assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
   const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy].filter(Boolean).length;
   if (claimFilters > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by", 4);
@@ -451,20 +480,30 @@ export async function runFeedbackList(
 
   warnIfLimitCapped(opts.limit, CAP, "ib dev feedback list");
 
+  // The filters both branches send identically. Hoisted because they were
+  // written out twice and differ only in status/limit/offset — a NEW filter
+  // threaded into one copy and not the other would work under an explicit
+  // `--status` and silently no-op on the default active-bucket path, which is
+  // the path almost every caller takes. `fetchRows` fixes the query-string key
+  // order internally, so spreading here cannot change the emitted URL.
+  const filters = {
+    kind: opts.kind,
+    scope: opts.scope,
+    search: opts.search,
+    severity: opts.severity,
+    complexity: opts.complexity,
+    maxComplexity: opts.maxComplexity,
+    oldest: opts.oldest,
+    unclaimed: opts.unclaimed,
+    claimedBy,
+  };
+
   if (!statuses || statuses.length <= 1) {
     items = await fetchRows(client, {
+      ...filters,
       status: statuses?.[0],
-      kind: opts.kind,
-      scope: opts.scope,
-      search: opts.search,
-      severity: opts.severity,
-      complexity: opts.complexity,
-      maxComplexity: opts.maxComplexity,
       limit: opts.limit,
       offset: opts.offset,
-      oldest: opts.oldest,
-      unclaimed: opts.unclaimed,
-      claimedBy,
     });
     // The path the merge branch below already covered, and this one did not:
     // a FULL page means more rows exist. The effective limit is min(requested,
@@ -474,21 +513,7 @@ export async function runFeedbackList(
     if (client.getLastListMeta?.()?.truncated || items.length >= effective) truncated = true;
   } else {
     const pages = await Promise.all(
-      statuses.map((s) =>
-        fetchRows(client, {
-          status: s,
-          kind: opts.kind,
-          scope: opts.scope,
-          search: opts.search,
-          severity: opts.severity,
-          complexity: opts.complexity,
-          maxComplexity: opts.maxComplexity,
-          limit: CAP,
-          oldest: opts.oldest,
-          unclaimed: opts.unclaimed,
-          claimedBy,
-        })
-      )
+      statuses.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP }))
     );
     if (pages.some((p) => p.length >= CAP)) truncated = true;
     // feedbackId is monotonic with createdAt, so it doubles as the merge key.
@@ -599,8 +624,10 @@ export interface FeedbackLintFinding {
 export async function runFeedbackLint(
   client: ApiClient
 ): Promise<ListEnvelope<FeedbackLintFinding>> {
-  const items = await client.get<FeedbackLintFinding[]>("/api/feedback/lint");
-  return listEnvelope(Array.isArray(items) ? items : []);
+  // toListEnvelope, not listEnvelope + a hand-rolled Array.isArray guard: it is
+  // the house helper for exactly this (a non-array body — null, an error object —
+  // yields an empty envelope rather than throwing).
+  return toListEnvelope<FeedbackLintFinding>(await client.get("/api/feedback/lint"));
 }
 
 /** Pre-fb#536 rollup: bucket one capped page in JS. Only reached on an older backend. */
@@ -1155,7 +1182,7 @@ export function registerFeedbackCommands(
     )
     .option("--command <argv>")
     .option("--error <msg>")
-    .option("--severity <sev>")
+    .option("--severity <sev>", "", foldSeverityCase)
     .option(
       "--complexity <n>",
       "",
@@ -1225,9 +1252,8 @@ export function registerFeedbackCommands(
     // table as if nothing had been asked for (fb#535).
     .option("--complexity <n>", "", (v: string) => (v.toLowerCase() === "none" ? "none" : Number(v)))
     .option("--max-complexity <n>", "", Number)
-    // Lower-cased so `--severity NONE` / `--severity Major` behave like the
-    // `--complexity none` sibling rather than failing the enum check on case.
-    .option("--severity <s>", "", (v: string) => v.toLowerCase())
+    // See foldSeverityCase: one case policy across list/create/update.
+    .option("--severity <s>", "", foldSeverityCase)
     .option("--oldest")
     .option("--limit <n>", "", Number)
     .option("--offset <n>", "", Number)
@@ -1323,7 +1349,7 @@ export function registerFeedbackCommands(
   f.command("update <id>")
     .option("--scope <scope>")
     .option("--kind <kind>")
-    .option("--severity <sev>")
+    .option("--severity <sev>", "", foldSeverityCase)
     .option("--complexity <n>", "", Number)
     .option("--description <text>")
     .option("--body <text>")

@@ -43,6 +43,7 @@ import {
   SCOPES as FEEDBACK_SCOPES,
   STATUSES as FEEDBACK_STATUSES,
   SEVERITIES as FEEDBACK_SEVERITIES,
+  SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS,
 } from "../commands/feedback/index.js";
 import { EXECUTORS as TASK_EXECUTORS, AGENTS as TASK_AGENTS } from "../commands/task/index.js";
 
@@ -6780,7 +6781,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
       { name: "complexity", type: "string", description: "Only items with this exact complexity 1-5, or `none` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; `--complexity none` is how you select exactly that set for a backfill pass (fb#535)." },
       { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use `--complexity none` to find those." },
-      { name: "severity", type: "string", description: "Only items with this exact severity, or `none` for the rows with NO grade at all — the severity twin of `--complexity none` (deploy-gated). Before this existed severity was ORDERABLE but not selectable, so 'which rows still need a grade?' cost a full unresolved page filtered client-side, against a 200-row cap. Unlike --complexity, an unknown value is REJECTED (exit 4), never answered with the whole table.", allowed: [...FEEDBACK_SEVERITIES, "none"] },
+      { name: "severity", type: "string", description: "Only items with this exact severity, or `none` for the rows with NO grade at all — the severity twin of `--complexity none` (deploy-gated). Before this existed severity was ORDERABLE but not selectable, so 'which rows still need a grade?' cost a full unresolved page filtered client-side, against a 200-row cap. Unlike --complexity, an unknown value is REJECTED (exit 4), never answered with the whole table.", allowed: [...FEEDBACK_SEVERITY_FILTERS] },
       { name: "oldest", type: "boolean", description: "Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first" },
       { name: "limit", type: "number", default: "50", description: "Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; `truncated: true` says the page was capped (fb#605). Page the rest with --offset." },
       { name: "offset", type: "number", default: "0", description: "Skip N rows — how you reach anything beyond the 200-row cap. `--limit 200`, then `--limit 200 --offset 200`, and so on." },
@@ -6837,8 +6838,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(404, "Not found", "this backend predates `feedback lint` — the route falls through to GET /api/feedback/:id and its numeric-id guard answers 404. Deploy the backend, or approximate with `ib dev feedback count` (ungraded/unestimated) plus `ib dev feedback list --severity none`."),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      apiErr(404, "Not found", "this backend predates `feedback lint` — the route falls through to GET /api/feedback/:id and its numeric-id guard answers 404. ⚠ Do NOT reach for `--severity none` as the fallback: it ships in the SAME backend change, so a backend that 404s here is exactly the one that IGNORES that filter and answers with every active row. Until the deploy lands, fetch `ib dev feedback list --unresolved --full` and filter `severity == null` / `complexity == null` client-side (accepting the 200-row cap), or point --endpoint at a backend that has both."),
+      apiErr(500, "Backend error", "a 500 here is usually the SAME deploy gate rather than a fault: a backend old enough to also predate the numeric-id guard reaches SQL as id='lint' and 500s instead of 404ing. Check `ib dev version`; retrying will not help if the route is simply absent."),
     ],
     notes: [
       "The four issues: `ungraded` = an ACTIVE row (open/reviewed) missing severity and/or complexity — the detail says which. `stale-claim` = an active row whose lease expired but still names a holder. `closed-no-resolution` = an applied/dismissed row with no resolution text. `applied-no-changelog` = an applied row with no devChangelogFeedback link, i.e. a fix that shipped without a changelog entry.",
