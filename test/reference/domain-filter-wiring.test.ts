@@ -60,6 +60,8 @@ describe("domain positional wiring", () => {
       "commands",
       "commonErrors",
       "generatedAt",
+      "sharedErrors",
+      "sharedFlags",
       "version",
     ]);
     const cmds = Object.keys(ref.commands);

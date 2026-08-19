@@ -4,6 +4,9 @@ import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { isHiddenAtTier, scrubSpecForTier } from "../../src/tier.js";
 import type { CommandSpec } from "../../src/output/help.js";
 
+/** Narrow a dump row (object | "@id" reference string) to the object form. */
+const isRow = <T,>(r: T | string): r is T => typeof r !== "string";
+
 describe("ib reference dump", () => {
   test("returns a version string + non-empty commands map", () => {
     const ref = buildReference();
@@ -66,7 +69,10 @@ describe("ib reference dump", () => {
           c.remedy === e.remedy
       );
     for (const [name, spec] of Object.entries(ref.commands)) {
-      expect(spec.errors.some(isHoisted), `${name} must not repeat a hoisted row`).toBe(false);
+      expect(
+        spec.errors.filter(isRow).some(isHoisted),
+        `${name} must not repeat a hoisted row`
+      ).toBe(false);
     }
     // A spec that keeps command-specific errors still has them (e.g. keikka list's 403).
     expect(ref.commands["ib keikka list"].errors.length).toBeGreaterThan(0);
@@ -108,6 +114,8 @@ describe("ib reference dump", () => {
       "commands",
       "commonErrors",
       "generatedAt",
+      "sharedErrors",
+      "sharedFlags",
       "version",
     ]);
     for (const spec of Object.values(parsed.commands) as Array<Record<string, unknown>>) {
@@ -181,7 +189,7 @@ describe("ib reference dump <domain...> (multiple domains)", () => {
 });
 
 describe("ib reference dump --commands-only", () => {
-  test("emits only { version, generatedAt, commonErrors, commands } — no primer", () => {
+  test("emits only { version, generatedAt, commonErrors, sharedFlags, sharedErrors, commands } — no primer", () => {
     const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     runReferenceDump("keikka", "developer", [], true);
     const out = spy.mock.calls[0][0] as string;
@@ -191,6 +199,8 @@ describe("ib reference dump --commands-only", () => {
       "commands",
       "commonErrors",
       "generatedAt",
+      "sharedErrors",
+      "sharedFlags",
       "version",
     ]);
     // commonErrors must survive --commands-only: specs no longer carry the
@@ -266,7 +276,9 @@ describe("reference dump leaks no hidden command path (prose + error remedies)",
     // `ib auth whoami` is auth:"any" (visible everywhere); its impersonation-expired
     // remedy names `ib auth impersonate` (tier:"admin").
     const std = buildReference("auth", "standard", []).commands["ib auth whoami"];
-    const row = std.errors.find((e) => /Impersonation session expired/.test(e.meaning));
+    const row = std.errors
+      .filter(isRow)
+      .find((e) => /Impersonation session expired/.test(e.meaning));
     expect(row, "the row must SURVIVE — exit 2 is still the contract").toBeTruthy();
     expect(row?.exit).toBe(2);
     expect(row?.remedy).toBe(
@@ -275,7 +287,8 @@ describe("reference dump leaks no hidden command path (prose + error remedies)",
     // Developer tier keeps the real remedy (parity).
     const dev = buildReference("auth", "developer", []).commands["ib auth whoami"];
     expect(
-      dev.errors.find((e) => /Impersonation session expired/.test(e.meaning))?.remedy
+      dev.errors.filter(isRow).find((e) => /Impersonation session expired/.test(e.meaning))
+        ?.remedy
     ).toContain("ib auth impersonate");
   });
 
@@ -318,10 +331,13 @@ describe("reference dump leaks no hidden command path (prose + error remedies)",
     // scrub can rewrite a remedy — otherwise the globals reappear per spec.
     const std = buildReference(undefined, "standard", []);
     const hoisted = std.commonErrors.map((e) => `${e.http}:${e.remedy}`);
+    // Inline rows AND shared-map rows both count — a 401/500 hidden behind an
+    // "@id" reference would still be a re-emitted global.
     for (const [name, spec] of Object.entries(std.commands)) {
       for (const e of spec.errors) {
+        const row = typeof e === "string" ? std.sharedErrors[e.slice(1)] : e;
         expect(hoisted, `${name} repeats a hoisted row`).not.toContain(
-          `${e.http}:${e.remedy}`
+          `${row.http}:${row.remedy}`
         );
       }
     }

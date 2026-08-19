@@ -16,7 +16,7 @@ import {
   TOPICS,
 } from "./domain.js";
 import type { Topic } from "./domain.js";
-import type { CommandError, CommandSpec } from "../output/help.js";
+import type { CommandError, CommandFlag, CommandSpec } from "../output/help.js";
 import {
   type CallerTier,
   visibleSpecs,
@@ -45,6 +45,17 @@ export function projectGlossaryForPrimer(
   }));
 }
 
+/**
+ * A spec as emitted by the dump: a flag/error row repeated verbatim across
+ * `HOIST_THRESHOLD`+ commands is replaced by an `"@<id>"` reference string
+ * resolving in the dump's top-level `sharedFlags`/`sharedErrors` maps. A real
+ * row is always an object, so a string element is unambiguously a reference.
+ */
+export type DumpSpec = Omit<CommandSpec, "flags" | "errors"> & {
+  flags: Array<CommandFlag | string>;
+  errors: Array<CommandError | string>;
+};
+
 export interface ReferenceDump {
   version: string;
   generatedAt: string;
@@ -56,6 +67,15 @@ export interface ReferenceDump {
    * spec's (now command-specific) `errors`.
    */
   commonErrors: CommandError[];
+  /**
+   * Flag rows repeated verbatim across `HOIST_THRESHOLD`+ commands, stored
+   * once and referenced from each spec's `flags` as `"@<id>"` (fb#779 — the
+   * repeats were ~40 KB of the full dump). Ids are the flag name (ordinal
+   * suffix on collision). Always present; `{}` when nothing repeats.
+   */
+  sharedFlags: Record<string, CommandFlag>;
+  /** Error-row twin of {@link ReferenceDump.sharedFlags}; ids are `<exit>-<meaning-slug>`. */
+  sharedErrors: Record<string, CommandError>;
   /**
    * Present ONLY on the full (no-domain, non-commands-only) dump: a one-line
    * steer to the per-domain form. The full surface is large; an AI almost
@@ -75,7 +95,123 @@ export interface ReferenceDump {
   feedbackGuidance: typeof FEEDBACK_GUIDANCE;
   /** Offline concept guides for cross-cutting knowledge (`ib help <id>`). */
   topics: Topic[];
-  commands: Record<string, CommandSpec>;
+  commands: Record<string, DumpSpec>;
+}
+
+/**
+ * A flag/error row must repeat verbatim across at least this many emitted
+ * specs before it is hoisted into `sharedFlags`/`sharedErrors`. Measured
+ * 2026-08-19: 4 catches 69 rows (~39 KB of the full dump); 3 would add ~10 KB
+ * of savings for 107 more indirections — not worth the reader's hops.
+ */
+const HOIST_THRESHOLD = 4;
+
+/** Lowercase, non-alphanumeric → `-`, trimmed, capped — for shared-error ids. */
+function slugForId(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 28)
+    .replace(/-+$/, "");
+}
+
+/**
+ * Deduplicate the emitted commands map (fb#779): any flag/error row that
+ * repeats verbatim (JSON-equal) across {@link HOIST_THRESHOLD}+ specs is
+ * stored once in a shared map and replaced in each spec's array by an
+ * `"@<id>"` reference string. Ids are READABLE on purpose — the consumer is
+ * an AI reading specs inline, and an opaque hash would force a map lookup on
+ * every row: flag ids are the flag's `name`; error ids are
+ * `<exit>-<slug(meaning)>`; both get `-2`/`-3` ordinals on collision in
+ * first-appearance order. Runs AFTER the per-spec tier scrub, so counts are
+ * over exactly the rows being emitted and a scrubbed remedy can never alias an
+ * unscrubbed one. Pure; inverse is {@link expandSharedRows}.
+ */
+export function hoistSharedRows(commands: Record<string, CommandSpec>): {
+  commands: Record<string, DumpSpec>;
+  sharedFlags: Record<string, CommandFlag>;
+  sharedErrors: Record<string, CommandError>;
+} {
+  const count = <T>(rows: T[], into: Map<string, { row: T; n: number }>) => {
+    for (const row of rows) {
+      const k = JSON.stringify(row);
+      const e = into.get(k);
+      if (e) e.n++;
+      else into.set(k, { row, n: 1 });
+    }
+  };
+  const flagCounts = new Map<string, { row: CommandFlag; n: number }>();
+  const errorCounts = new Map<string, { row: CommandError; n: number }>();
+  for (const spec of Object.values(commands)) {
+    count(spec.flags, flagCounts);
+    count(spec.errors, errorCounts);
+  }
+  const assignIds = <T>(
+    counts: Map<string, { row: T; n: number }>,
+    baseId: (row: T) => string
+  ): { ids: Map<string, string>; map: Record<string, T> } => {
+    const ids = new Map<string, string>();
+    const map: Record<string, T> = {};
+    for (const [k, { row, n }] of counts) {
+      if (n < HOIST_THRESHOLD) continue;
+      const base = baseId(row);
+      let id = base;
+      for (let ord = 2; id in map; ord++) id = `${base}-${ord}`;
+      ids.set(k, id);
+      map[id] = row;
+    }
+    return { ids, map };
+  };
+  const flags = assignIds(flagCounts, (f) => f.name);
+  const errors = assignIds(errorCounts, (e) => `${e.exit}-${slugForId(e.meaning)}`);
+  const ref = <T>(row: T, ids: Map<string, string>): T | string => {
+    const id = ids.get(JSON.stringify(row));
+    return id === undefined ? row : `@${id}`;
+  };
+  return {
+    commands: Object.fromEntries(
+      Object.entries(commands).map(([path, spec]) => [
+        path,
+        {
+          ...spec,
+          flags: spec.flags.map((f) => ref(f, flags.ids)),
+          errors: spec.errors.map((e) => ref(e, errors.ids)),
+        },
+      ])
+    ),
+    sharedFlags: flags.map,
+    sharedErrors: errors.map,
+  };
+}
+
+/**
+ * Inverse of {@link hoistSharedRows}: resolve every `"@<id>"` reference back
+ * to its row. Throws on a dangling reference — a dump that cannot round-trip
+ * is a bug, not data.
+ */
+export function expandSharedRows(ref: {
+  commands: Record<string, DumpSpec>;
+  sharedFlags: Record<string, CommandFlag>;
+  sharedErrors: Record<string, CommandError>;
+}): Record<string, CommandSpec> {
+  const resolve = <T>(rows: Array<T | string>, map: Record<string, T>, kind: string): T[] =>
+    rows.map((row) => {
+      if (typeof row !== "string") return row;
+      const target = row.startsWith("@") ? map[row.slice(1)] : undefined;
+      if (target === undefined) throw new Error(`unresolvable shared-${kind} reference: ${row}`);
+      return target;
+    });
+  return Object.fromEntries(
+    Object.entries(ref.commands).map(([path, spec]) => [
+      path,
+      {
+        ...spec,
+        flags: resolve(spec.flags, ref.sharedFlags, "flag"),
+        errors: resolve(spec.errors, ref.sharedErrors, "error"),
+      } as CommandSpec,
+    ])
+  );
 }
 
 /**
@@ -172,27 +308,33 @@ export function buildReference(
   // filtered dump is already the cheap path, so it needs no nudge.
   const notice =
     domains.length === 0
-      ? `Full command surface (${specs.length} commands) — large. For one area prefer \`ib reference dump <domain>\`${lean ? "" : " (or add `--lean` to drop per-command notes/seeAlso)"}; \`ib commands\` lists the domains. \`commonErrors\` applies to every command.${lean ? " LEAN: notes/seeAlso dropped — see `ib <command> --help` for those." : ""}`
+      ? `Full command surface (${specs.length} commands) — large. For one area prefer \`ib reference dump <domain>\`${lean ? "" : " (or add `--lean` to drop per-command notes/seeAlso)"}; \`ib commands\` lists the domains. \`commonErrors\` applies to every command; an "@id" string in a spec's flags/errors resolves in sharedFlags/sharedErrors.${lean ? " LEAN: notes/seeAlso dropped — see `ib <command> --help` for those." : ""}`
       : undefined;
+  // Per-spec passes first (hoist the universal 401/500 BEFORE the scrub:
+  // `isCommonError` matches by remedy equality, so a scrubbed remedy would stop
+  // matching and the globals would be re-emitted per spec), then the
+  // cross-spec shared-row hoist over exactly the rows being emitted.
+  const { commands, sharedFlags, sharedErrors } = hoistSharedRows(
+    Object.fromEntries(
+      specs.map((spec) => {
+        let s = scrubSpecForTier(stripCommonErrors(spec), tier, hiddenCommands);
+        if (lean) s = stripProse(s);
+        return [spec.command, s];
+      })
+    )
+  );
   return {
     version: packageJson.version,
     generatedAt: new Date().toISOString(),
     commonErrors: COMMON_AUTH_ERRORS,
+    sharedFlags,
+    sharedErrors,
     ...(notice ? { notice } : {}),
     overview: DOMAIN_OVERVIEW,
     glossary,
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
-    commands: Object.fromEntries(
-      specs.map((spec) => {
-        // Hoist FIRST, scrub second: `isCommonError` matches a hoisted row by
-        // remedy equality, so a scrubbed remedy would stop matching and the
-        // universal 401/500 would be re-emitted per spec.
-        let s = scrubSpecForTier(stripCommonErrors(spec), tier, hiddenCommands);
-        if (lean) s = stripProse(s);
-        return [spec.command, s];
-      })
-    ),
+    commands,
   };
 }
 
@@ -204,14 +346,16 @@ export function buildReference(
  * pushed the customer domain over the 10k-token audit threshold.
  *
  * `commandsOnly` strips the primer (overview/glossary/topics/feedbackGuidance)
- * and emits only `{ version, generatedAt, commonErrors, commands }` — the
- * static discovery scaffolding is pure overhead for a caller (e.g. the
- * optimize-ib-summaries cron) that already knows the domain context and just
- * needs the command specs. `commonErrors` is RETAINED (it is not part of the
- * primer): each spec's `errors` has had the universal 401/500 stripped, so the
- * contract must travel with the commands map or it would be lost. The caller
- * also skips the glossary DB fetch in that mode (no token needed), so this is
- * both fewer bytes and one fewer round-trip.
+ * and emits only `{ version, generatedAt, commonErrors, sharedFlags,
+ * sharedErrors, commands }` — the static discovery scaffolding is pure
+ * overhead for a caller (e.g. the optimize-ib-summaries cron) that already
+ * knows the domain context and just needs the command specs. `commonErrors`
+ * and the shared-row maps are RETAINED (they are not part of the primer):
+ * each spec's `errors` has had the universal 401/500 stripped and repeated
+ * rows are `"@id"` references, so both contracts must travel with the
+ * commands map or they would be lost. The caller also skips the glossary DB
+ * fetch in that mode (no token needed), so this is both fewer bytes and one
+ * fewer round-trip.
  *
  * `lean` drops each spec's `notes`/`seeAlso` (kept `examples`) — composes with
  * `commandsOnly` and domain filters; see {@link stripProse}.
@@ -229,6 +373,8 @@ export function runReferenceDump(
         version: ref.version,
         generatedAt: ref.generatedAt,
         commonErrors: ref.commonErrors,
+        sharedFlags: ref.sharedFlags,
+        sharedErrors: ref.sharedErrors,
         commands: ref.commands,
       }
     : ref;
