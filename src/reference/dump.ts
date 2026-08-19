@@ -24,7 +24,7 @@ import {
   scrubSpecForTier,
   getCallerTier,
 } from "../tier.js";
-import { emitStdout } from "../output/json.js";
+import { emitStdout, warnNote } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import type { ApiClient } from "../api/client.js";
 
@@ -380,5 +380,22 @@ export function runReferenceDump(
         commands: ref.commands,
       }
     : ref;
-  emitStdout(JSON.stringify(out) + "\n");
+  const json = JSON.stringify(out) + "\n";
+  if (json.length > SIZE_WARN_BYTES) {
+    // fb#773 — make the cost visible at the moment it is paid. The in-payload
+    // `notice` is read only AFTER the tokens are spent; this line lands on
+    // stderr BEFORE stdout so a piping caller sees it even when stdout is
+    // truncated downstream. Never stdout (the one-line JSON contract).
+    warnNote(
+      `[ib] reference dump: ${Math.round(json.length / 1024)} KB (~${Math.round(
+        json.length / 4000
+      )}k tokens). Cheaper: \`ib reference dump <domain>\` · \`--lean\` · \`--commands-only\` · \`ib commands --signatures\` (call shapes only).`
+    );
+  }
+  emitStdout(json);
 }
+
+/** Outputs above this warn on stderr (fb#773): post-dedup only the full dump
+ *  (~590 KB) and the `dev` domain (~135 KB) trip it; every other domain dump
+ *  stays quiet. */
+const SIZE_WARN_BYTES = 100_000;

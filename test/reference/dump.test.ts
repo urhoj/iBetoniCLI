@@ -401,3 +401,34 @@ describe("projectGlossaryForPrimer — glossary projection security", () => {
     expect(std).not.toContain("AI assistant interface");
   });
 });
+
+describe("reference dump stderr size warning (fb#773)", () => {
+  test("the full developer dump emits exactly one stderr size line, before stdout", () => {
+    const calls: string[] = [];
+    const errSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((s) => (calls.push(`err:${s}`), true));
+    const outSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((s) => (calls.push(`out:${String(s).slice(0, 10)}`), true));
+    runReferenceDump(undefined, "developer", []);
+    errSpy.mockRestore();
+    outSpy.mockRestore();
+    const errLines = calls.filter((c) => c.startsWith("err:"));
+    expect(errLines).toHaveLength(1);
+    expect(errLines[0]).toMatch(/\[ib\] reference dump: \d+ KB \(~\d+k tokens\)/);
+    expect(errLines[0]).toContain("--signatures");
+    // warning lands BEFORE the payload
+    expect(calls[0].startsWith("err:")).toBe(true);
+  });
+
+  test("a small domain dump stays silent on stderr", () => {
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const outSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    runReferenceDump("keikka", "developer", []);
+    const stderrCalls = errSpy.mock.calls.length;
+    errSpy.mockRestore();
+    outSpy.mockRestore();
+    expect(stderrCalls).toBe(0);
+  });
+});
