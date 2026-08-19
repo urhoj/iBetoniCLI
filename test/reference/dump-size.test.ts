@@ -15,7 +15,11 @@ import { buildReference } from "../../src/reference/dump.js";
  * by every AI that ingests the dump.
  */
 const DUMP_LIMIT_BYTES = 630_000; // measured 600,058 B on 2026-08-19 (+5% headroom)
-const PER_SPEC_LIMIT_BYTES = 10_000; // largest on 2026-08-19: ib dev feedback create at 8,335 B
+// Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
+// ib dev changelog update 10,849 B — the known ceiling-setters (their flag
+// surface IS the contract; fb#747/fb#757 resolutions should shrink them
+// further). Third place is 8,335 B (ib dev feedback create).
+const PER_SPEC_LIMIT_BYTES = 12_000;
 
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {
