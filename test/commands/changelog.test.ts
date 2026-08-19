@@ -341,6 +341,21 @@ describe("--area repo-name remedy (fb#212)", () => {
   });
 });
 
+describe("changelog description input and area vocabulary", () => {
+  test("documents the description aliases as one required input group", () => {
+    const spec = CHANGELOG_SPECS.find((s) => s.command === "ib dev changelog add")!;
+    for (const name of ["description", "summary", "body"]) {
+      expect(spec.flags.find((flag) => flag.name === name)?.requiredGroup).toBe("description input");
+    }
+  });
+
+  test("explains that feedback scopes are not changelog areas", () => {
+    const err = captureThrow(() => validateEnums(undefined, "ops"));
+    expect(err.body?.problems?.[0]?.remedy).toContain("--scope ops");
+    expect(err.body?.problems?.[0]?.remedy).toContain("technical layers");
+  });
+});
+
 describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
   test("rejects an over-length --status (30-char varchar) with exit 4 naming the cap", () => {
     const err = captureThrow(() => validateFieldLengths({ status: "x".repeat(31) }));

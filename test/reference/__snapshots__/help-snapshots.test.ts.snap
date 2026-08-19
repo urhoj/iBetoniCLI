@@ -2204,11 +2204,11 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here) (required)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas. (required)
   --title STRING    Entry title (max 300 chars) (required)
-  --description STRING    Alias for the positional description; if both are passed, they must match
-  --summary STRING    Alias for --description (the entry body); if both are passed, they must match
-  --body STRING    Alias for --description (the entry body, free text — NOT the raw-JSON --body of the update commands); if both are passed, they must match
+  --description STRING    Alias for the positional description; one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
+  --summary STRING    Alias for --description (the entry body); one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
+  --body STRING    Alias for --description (the entry body, free text — NOT the raw-JSON --body of the update commands); one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus (max 500 chars)
   --status STRING    Tila (Julkaistu/Korjattu/...) (max 30 chars)
@@ -2364,7 +2364,7 @@ DESCRIPTION
 FLAGS
   --month STRING    YYYY-MM
   --type STRING    feature|improvement|bugfix
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.
   --repo STRING    Repo/submodule — matches entries whose --repo CSV CONTAINS this token, so \`--repo betonicli\` also returns cross-lane rows recorded as "puminet5api,betonicli" (deploy-gated: against an older backend this is an exact string match and those rows are invisible). Aliases resolve (\`cli\` → betonicli); a CSV here matches rows containing ANY of the tokens.
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
@@ -2525,7 +2525,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.
   --title STRING    New title (max 300 chars)
   --description STRING    New description
   --summary STRING    Alias for --description; if both are passed, they must match
