@@ -5823,6 +5823,34 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,tyomaaPerson_after_ins_trig"],
       },
       {
+        command: "ib dev schema rows",
+        description: "Sample rows from an allowlisted reference lookup table (personSettingTypes, asiakasSettingTypes, vehicleTypes, etc.). Developer-only; table names are validated against a curated allowlist. Useful for understanding enum types and small configuration tables.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        args: [{ name: "table", type: "string", description: "Reference table name (e.g. personSettingTypes, asiakasSettingTypes)" }],
+        flags: [
+          { name: "search", type: "string", description: "Filter rows by substring in name columns" },
+          {
+            name: "limit",
+            type: "number",
+            default: "200",
+            description: "Max rows to return (max 1000)",
+          },
+        ],
+        outputShape: "{ items: [{ column1, column2, … }], nextCursor: null, count, truncated?, hint? } — row shape depends on the table being queried.",
+        errors: [
+          apiErr(400, "Table not on allowlist", "use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes"),
+          apiErr(404, "Table not found", "verify the table name with `ib dev schema tables`"),
+          limitErr("pass a positive integer; max is 1000"),
+          ...devErrors,
+        ],
+        notes: [
+          "Only a curated set of small, read-only lookup/configuration tables are allowed — no data tables or PII. This is a safe way to understand enum values and type definitions.",
+          "Table columns and shapes vary; the rows reflect the actual table schema.",
+        ],
+        examples: ["ib dev schema rows personSettingTypes", "ib dev schema rows asiakasSettingTypes --search admin", "ib dev schema rows vehicleTypes --limit 100"],
+      },
+      {
         command: "ib dev schema dump",
         description: "Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, proc signatures, and trigger summaries. No proc/view/trigger bodies (use `schema proc`/`schema view`/`schema trigger` for those).",
         permissions: DEV_PERMS,

@@ -86,6 +86,9 @@ export async function runSchemaProc(client: ApiClient, name: string): Promise<Re
 export async function runSchemaTrigger(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/trigger/${name}`);
 }
+export async function runSchemaRows(client: ApiClient, table: string, opts: SchemaListFilter): Promise<Envelope> {
+  return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);
+}
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");
 }
@@ -167,6 +170,10 @@ export function registerSchemaCommands(
   listOpt(s.command("triggers"))
     .option("--table <name>", "Only triggers whose parent table is <name>")
     .action(jsonAction(getClient, runSchemaTriggers));
+
+  listOpt(s.command("rows <table>"))
+    .description("Sample rows from a reference lookup table (allowlisted, developer-only)")
+    .action(jsonAction(getClient, runSchemaRows));
 
   s.command("table <name>")
     .action(runOneOrBatch(runSchemaTable));

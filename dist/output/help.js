@@ -85,7 +85,11 @@ export function formatHelp(spec) {
     else {
         for (const f of spec.flags) {
             const def = f.default ? ` (default: ${f.default})` : "";
-            const req = f.required ? " (required)" : "";
+            const req = f.required
+                ? " (required)"
+                : f.requiredGroup
+                    ? ` (required: one ${f.requiredGroup})`
+                    : "";
             // Boolean flags are valueless switches — omit the "BOOLEAN" placeholder,
             // which reads as "pass a value" and leads callers to write `--flag false`
             // (a stray positional → a confusing "too many arguments" error). fb#176.

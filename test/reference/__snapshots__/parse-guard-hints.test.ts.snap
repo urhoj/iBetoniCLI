@@ -137,6 +137,10 @@ ib dev schema procs --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
 
+ib dev schema rows --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; max is 1000
+
 ib dev schema snapshots --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000
@@ -340,6 +344,10 @@ ib reference detail list --stalest <n>
 ib schema procs --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
+
+ib schema rows --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; max is 1000
 
 ib schema snapshots --limit <n>
   ! --limit must be an integer >= 1

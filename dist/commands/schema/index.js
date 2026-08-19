@@ -61,6 +61,9 @@ export async function runSchemaProc(client, name) {
 export async function runSchemaTrigger(client, name) {
     return client.get(`/api/cli/schema/trigger/${name}`);
 }
+export async function runSchemaRows(client, table, opts) {
+    return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);
+}
 export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
 }
@@ -122,6 +125,9 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
     listOpt(s.command("triggers"))
         .option("--table <name>", "Only triggers whose parent table is <name>")
         .action(jsonAction(getClient, runSchemaTriggers));
+    listOpt(s.command("rows <table>"))
+        .description("Sample rows from a reference lookup table (allowlisted, developer-only)")
+        .action(jsonAction(getClient, runSchemaRows));
     s.command("table <name>")
         .action(runOneOrBatch(runSchemaTable));
     s.command("view <name>")

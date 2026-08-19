@@ -140,6 +140,8 @@ export interface CommandFlag {
   description: string;
   /** When true, a (required) suffix is appended in the FLAGS section. */
   required?: boolean;
+  /** Names the alternative input group when one of several flags/args is required. */
+  requiredGroup?: string;
   /**
    * Machine-readable set of accepted values for an enum flag (e.g. `["fi","en"]`).
    * NOT rendered in `--help` (the prose description already states them) — it is
@@ -343,7 +345,11 @@ export function formatHelp(spec: CommandSpec): string {
   } else {
     for (const f of spec.flags) {
       const def = f.default ? ` (default: ${f.default})` : "";
-      const req = f.required ? " (required)" : "";
+      const req = f.required
+        ? " (required)"
+        : f.requiredGroup
+          ? ` (required: one ${f.requiredGroup})`
+          : "";
       // Boolean flags are valueless switches — omit the "BOOLEAN" placeholder,
       // which reads as "pass a value" and leads callers to write `--flag false`
       // (a stray positional → a confusing "too many arguments" error). fb#176.

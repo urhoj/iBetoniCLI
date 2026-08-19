@@ -157,6 +157,14 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     expect(env.availableOptions).toContain("--reason");
   });
 
+  test("unscoped person activity explains that --asiakas should be dropped", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "activity"), "--asiakas");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).toContain("reads globally by personId");
+    expect(env.hint).toContain("drop `--asiakas`");
+    expect(env.hint).not.toContain("belongs to a sibling command");
+  });
+
   test("OPTION_REDIRECTS is keyed by full command path + flag", () => {
     expect(OPTION_REDIRECTS).toHaveProperty("ib dev cache invalidate --pattern");
   });

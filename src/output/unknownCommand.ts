@@ -322,6 +322,8 @@ export function buildUnknownCommandEnvelope(
 export const OPTION_REDIRECTS: Record<string, string> = {
   "ib dev cache invalidate --pattern":
     "`cache invalidate` targets an entity FAMILY by its <entityType> positional (e.g. `ib dev cache invalidate keikka --id 123`). For a raw Redis key glob use `ib dev cache pattern <glob>` instead.",
+  "ib person activity --asiakas":
+    "`person activity` is developer-only and reads globally by personId; drop `--asiakas` and run `ib person activity <personId>`. It is not tenant-scoped like `person list`, `get`, and `search`.",
 };
 
 /** Long flags a command accepts, derived from its curated spec (tier-blind — the
