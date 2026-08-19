@@ -132,6 +132,16 @@ export interface CommandsListFilter {
   permission?: string;
   /** Keep only commands in this domain (the token after `ib`). Unknown domain → exit-4 CliError. */
   domain?: string;
+  /**
+   * Intent-first keyword search (fb#781): keep only commands whose PATH,
+   * description, or `--`-prefixed flag names contain this case-insensitive
+   * substring. Offline (pure catalogue scan) — the zero-network twin of
+   * `ib glossary lookup`, for when the caller knows the concept but not the
+   * domain (cross-domain verbs: driver → vehicle, geocode → sijainti).
+   * Empty/whitespace → exit-4 CliError (PowerShell drops a bare "" argument
+   * and would silently swallow the next flag as the needle).
+   */
+  find?: string;
 }
 
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
@@ -213,6 +223,9 @@ export function filterCommandSpecs(
       4
     );
   }
+  if (filter.find !== undefined && filter.find.trim() === "") {
+    throw new CliError("--find requires non-empty search text", 0, null, 4);
+  }
   // Resolve against the FULL specs so a hidden-but-valid domain/subgroup at
   // standard tier yields an empty list instead of leaking developer-only names.
   // The domain/subgroup matcher is shared with `ib reference dump` so the two
@@ -221,6 +234,7 @@ export function filterCommandSpecs(
     ? specMatcherForToken(specs, filter.domain, tier)
     : () => true;
   const needle = filter.permission?.toLowerCase();
+  const findNeedle = filter.find?.trim().toLowerCase();
   return visibleSpecs(specs, tier)
     .filter((s) => {
       if (!matchesToken(s)) return false;
@@ -228,6 +242,15 @@ export function filterCommandSpecs(
       if (filter.mutations && !mutates) return false;
       if (filter.reads && mutates) return false;
       if (needle && !s.permissions?.some((p) => p.toLowerCase().includes(needle))) {
+        return false;
+      }
+      if (
+        findNeedle &&
+        ![s.command, s.description, ...s.flags.map((f) => `--${f.name}`)]
+          .join("\n")
+          .toLowerCase()
+          .includes(findNeedle)
+      ) {
         return false;
       }
       return true;

@@ -359,3 +359,67 @@ describe("tier filtering — domain index", () => {
     expect(dev.count).toBe(dev.commands.length);
   });
 });
+
+describe("ib commands --find (fb#781, intent-first keyword search)", () => {
+  test("matches on the command path", () => {
+    const items = filterCommandSpecs(COMMAND_SPECS, { find: "glossary lookup" });
+    expect(items.map((i) => i.command)).toContain("ib glossary lookup");
+  });
+
+  test("matches on the description, case-insensitively", () => {
+    const lower = filterCommandSpecs(COMMAND_SPECS, { find: "geocode" });
+    const upper = filterCommandSpecs(COMMAND_SPECS, { find: "GEOCODE" });
+    expect(lower.length).toBeGreaterThan(0);
+    expect(upper.map((i) => i.command)).toEqual(lower.map((i) => i.command));
+  });
+
+  test("matches on a flag name with or without the -- prefix", () => {
+    const bare = filterCommandSpecs(COMMAND_SPECS, { find: "idempotency-key" });
+    const dashed = filterCommandSpecs(COMMAND_SPECS, { find: "--idempotency-key" });
+    expect(bare.length).toBeGreaterThan(0);
+    expect(dashed.map((i) => i.command)).toEqual(bare.map((i) => i.command));
+  });
+
+  test("composes AND-wise with a domain and --reads", () => {
+    const items = filterCommandSpecs(COMMAND_SPECS, {
+      domain: "vehicle",
+      find: "driver",
+      reads: true,
+    });
+    expect(items.length).toBeGreaterThan(0);
+    // the match may live in the path, the description, or a flag name — but
+    // every result must satisfy BOTH other filters
+    for (const i of items) {
+      expect(i.command.startsWith("ib vehicle")).toBe(true);
+      expect(i.isWrite).toBe(false);
+    }
+    expect(items.map((i) => i.command)).toContain("ib vehicle driver board");
+    // a vehicle WRITE mentioning driver must be excluded by --reads
+    expect(items.map((i) => i.command)).not.toContain("ib vehicle driver assign");
+  });
+
+  test("no match returns an empty list, not an error", () => {
+    expect(buildCommandsList({ find: "zzz-no-such-concept" }, "developer")).toEqual({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+  });
+
+  test("empty or whitespace text exits 4 (PowerShell bare-\"\" drop guard)", () => {
+    for (const bad of ["", "   "]) {
+      try {
+        filterCommandSpecs(COMMAND_SPECS, { find: bad });
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        expect(e).toMatchObject({ exitCode: 4 });
+        expect((e as Error).message).toContain("--find");
+      }
+    }
+  });
+
+  test("is tier-filtered like every other view", () => {
+    const std = filterCommandSpecs(COMMAND_SPECS, { find: "changelog" }, "standard");
+    expect(std.map((i) => i.command)).not.toContain("ib dev changelog add");
+  });
+});

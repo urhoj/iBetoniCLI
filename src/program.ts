@@ -424,16 +424,28 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     .option(
       "--permission <substr>"
     )
+    .option("--find <text>")
     .option("--all")
     .action(
       guarded((
         domain: string | undefined,
-        opts: { mutations?: boolean; reads?: boolean; permission?: string; all?: boolean }
+        opts: {
+          mutations?: boolean;
+          reads?: boolean;
+          permission?: string;
+          find?: string;
+          all?: boolean;
+        }
       ) => {
         // Bare `ib commands` = cheap domain index; any narrowing argument
         // (domain, filter flag, or explicit --all) = flat leaf list.
         const wantsFlatList =
-          opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
+          opts.all ||
+          domain ||
+          opts.mutations ||
+          opts.reads ||
+          opts.permission !== undefined ||
+          opts.find !== undefined;
         writeJson(
           wantsFlatList
             ? buildCommandsList({
@@ -441,6 +453,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
                 mutations: opts.mutations,
                 reads: opts.reads,
                 permission: opts.permission,
+                find: opts.find,
               })
             : buildDomainIndex()
         );

@@ -299,6 +299,12 @@ export const REFERENCE_SPECS: CommandSpec[] = [
           "Only commands whose required permissions contain this substring",
       },
       {
+        name: "find",
+        type: "string",
+        description:
+          "Keyword search: only commands whose PATH, description, or flag names contain this case-insensitive substring. Intent-first discovery when you know the concept but not the domain (driver lives under vehicle, geocode under sijainti) — offline, composes AND-wise with the domain arg and the other filters, returns the flat list. No match = empty list (exit 0); empty text exits 4.",
+      },
+      {
         name: "all",
         type: "boolean",
         description:
@@ -310,13 +316,15 @@ export const REFERENCE_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, match: "mutually exclusive", meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
       { origin: "client", exit: 4, match: "unknown domain", meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
+      { origin: "client", exit: 4, match: "--find", meaning: "--find given empty/whitespace text (a PowerShell bare \"\" argument is dropped and swallows the next flag)", remedy: "pass real search text: ib commands --find geocode" },
     ],
     examples: [
       "ib commands",
       "ib commands keikka",
       "ib commands --all",
+      "ib commands --find geocode",
+      "ib commands vehicle --find driver --reads",
       "ib commands --mutations",
-      "ib commands --reads",
       "ib commands --permission auth.page.vehicle",
       "ib commands --mutations | jq '.items[].command'",
     ],

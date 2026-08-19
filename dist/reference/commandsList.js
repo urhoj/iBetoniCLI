@@ -114,6 +114,9 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
     if (filter.mutations && filter.reads) {
         throw new CliError("--mutations and --reads are mutually exclusive", 0, null, 4);
     }
+    if (filter.find !== undefined && filter.find.trim() === "") {
+        throw new CliError("--find requires non-empty search text", 0, null, 4);
+    }
     // Resolve against the FULL specs so a hidden-but-valid domain/subgroup at
     // standard tier yields an empty list instead of leaking developer-only names.
     // The domain/subgroup matcher is shared with `ib reference dump` so the two
@@ -122,6 +125,7 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
         ? specMatcherForToken(specs, filter.domain, tier)
         : () => true;
     const needle = filter.permission?.toLowerCase();
+    const findNeedle = filter.find?.trim().toLowerCase();
     return visibleSpecs(specs, tier)
         .filter((s) => {
         if (!matchesToken(s))
@@ -132,6 +136,13 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
         if (filter.reads && mutates)
             return false;
         if (needle && !s.permissions?.some((p) => p.toLowerCase().includes(needle))) {
+            return false;
+        }
+        if (findNeedle &&
+            ![s.command, s.description, ...s.flags.map((f) => `--${f.name}`)]
+                .join("\n")
+                .toLowerCase()
+                .includes(findNeedle)) {
             return false;
         }
         return true;

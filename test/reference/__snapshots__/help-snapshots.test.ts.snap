@@ -989,6 +989,7 @@ FLAGS
   --mutations    Only commands that write (carry write-safety flags)
   --reads    Only read-only commands (no writes)
   --permission STRING    Only commands whose required permissions contain this substring
+  --find STRING    Keyword search: only commands whose PATH, description, or flag names contain this case-insensitive substring. Intent-first discovery when you know the concept but not the domain (driver lives under vehicle, geocode under sijainti) — offline, composes AND-wise with the domain arg and the other filters, returns the flat list. No match = empty list (exit 0); empty text exits 4.
   --all    Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.
 
 GLOBAL FLAGS
@@ -1001,13 +1002,15 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Bad flag combo         → --mutations and --reads are mutually exclusive
   exit 4 (client-side)  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
+  exit 4 (client-side)  --find given empty/whitespace text (a PowerShell bare "" argument is dropped and swallows the next flag) → pass real search text: ib commands --find geocode
 
 EXAMPLES
   ib commands
   ib commands keikka
   ib commands --all
+  ib commands --find geocode
+  ib commands vehicle --find driver --reads
   ib commands --mutations
-  ib commands --reads
   ib commands --permission auth.page.vehicle
   ib commands --mutations | jq '.items[].command'
 "
