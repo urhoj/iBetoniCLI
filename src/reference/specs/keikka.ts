@@ -60,7 +60,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
       "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
       "A keikka spanning multiple worksites returns ONE ROW PER tyomaa (join fan-out): the same keikkaId can appear on several rows with different tyomaaId, and `count` counts ROWS, not distinct deliveries — dedupe by keikkaId when counting deliveries.",
-      "Default window is TODAY only (--from/--to both default to today). A count:0 with exit 0 is a permitted query that found no data in that window — NOT an access error (denial is exit 3 / HTTP 403); the envelope's `hint` says so. Widen with --from/--to, or use `ib keikka latest` to find the most recent keikka regardless of date.",
+      "Default window is TODAY only (--from/--to both default to today). A count:0 with exit 0 is a permitted query that found no data in that window — NOT an access error (denial is exit 3 / HTTP 403); the envelope's `hint` says so. Widen with --from/--to, or use `ib keikka latest` (bounded by --lookback, default 365d).",
     ],
     seeAlso: ["ib keikka latest"],
     examples: [

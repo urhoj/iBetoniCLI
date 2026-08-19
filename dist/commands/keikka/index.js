@@ -14,7 +14,7 @@ import { qs } from "../../api/query.js";
  * it out: 0 rows on a 200/exit-0 is a PERMITTED-but-empty result (access denial
  * is exit 3 / HTTP 403), names the searched window, flags the today-only default,
  * and points at the two ways to see more (widen --from/--to, or `ib keikka latest`
- * for the most recent match regardless of date).
+ * for the most recent match within its own --lookback window, default 365 days).
  */
 function zeroRowHint(range, opts) {
     const window = range.from && range.to
@@ -33,7 +33,7 @@ function zeroRowHint(range, opts) {
         `(denied access surfaces as exit 3 / HTTP 403). ` +
         (scopedToToday ? "The default window is TODAY only. " : "") +
         "Widen the range with --from/--to, or run `ib keikka latest` to fetch the most recent " +
-        "keikka regardless of date.");
+        "keikka within the last 365 days (its --lookback default; raise --lookback for an older one).");
 }
 /**
  * GET /api/cli/keikka/list with the universal list envelope shape.

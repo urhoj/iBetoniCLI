@@ -1,11 +1,17 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runScheduleDay,
   runScheduleWeek,
 } from "../../src/commands/schedule/index.js";
 
-const mockClient = mockApiClient();
+// ownerAsiakasIdFromToken decodes this (fb#777's scope echo) — a bare stub
+// token would fail owner resolution and every test here would 4xx before
+// reaching the assertion.
+const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const TOKEN = `${b64({ alg: "none" })}.${b64({ ownerAsiakasId: 8 })}.sig`;
+
+const mockClient = mockApiClient({ getCurrentToken: vi.fn(() => TOKEN) });
 
 describe("ib schedule date resolution", () => {
   beforeEach(() => {

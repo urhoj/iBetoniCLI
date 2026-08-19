@@ -167,6 +167,15 @@ export interface CustomerFlat {
   /** Registration timestamp (asiakas.entryTime), ISO. */
   registeredAt: string | null;
   /**
+   * The tenant this customer belongs to (asiakas.ownerAsiakasId) — distinct
+   * from `asiakasId` itself, and NOT reliably inferable from `customer list`
+   * membership (fb#744): resolveAsiakasReadAccess grants read on a target via
+   * a view-role on the target's OWNER, so a self-owned row (ownerAsiakasId ===
+   * asiakasId) and a row owned by a different umbrella tenant can both appear
+   * in the same list. Deploy-gated: absent from a backend older than this fix.
+   */
+  ownerAsiakasId?: number | null;
+  /**
    * What the customer IS — the four asiakas roolit booleans, same sub-shape
    * `customer modules` reports (feedback #396). Deploy-gated: absent from a
    * backend older than the 2026-08-10 projection widening, hence optional.

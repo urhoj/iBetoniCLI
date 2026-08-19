@@ -96,6 +96,18 @@ describe("ib customer list/get/search", () => {
     });
   });
 
+  // fb#744: ownerAsiakasId was unreadable via the CLI, so ownership got
+  // inferred (wrongly) from `customer list` membership. Assert it passes
+  // through, including when it names a DIFFERENT tenant than the caller's own.
+  test("runCustomerGet: passes ownerAsiakasId through unchanged", async () => {
+    mockClient.get.mockResolvedValueOnce({
+      asiakasId: 1360,
+      ownerAsiakasId: 1349,
+    });
+    const result = await runCustomerGet(mockClient, 1360);
+    expect(result.ownerAsiakasId).toBe(1349);
+  });
+
   test("runCustomerSearch: GET /api/asiakas/search?searchString=<query>", async () => {
     mockClient.get.mockResolvedValueOnce([
       { asiakasId: 1349, name: "BetoniJerry" },

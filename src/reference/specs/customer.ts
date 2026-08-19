@@ -30,7 +30,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side.", allowed: ["name", "registered"] },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
+      "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, ownerAsiakasId, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
     errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), ...permErrors("auth.page.asiakas.read")],
     notes: [
       "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
@@ -77,7 +77,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to fetch" }],
     flags: [],
     outputShape:
-      "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }",
+      "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, ownerAsiakasId, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.read"),
@@ -86,6 +86,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       "roolit is the answer to 'what is this company?' — isPumppuToimittaja is what gates every provider-side pumppuRequest endpoint (and the frontend's jerry page), so read it rather than inferring the business from the free-text `comment`. The two DO diverge: a comment can say the pumping business was sold while isPumppuToimittaja is still true.",
       "roolit is the same sub-shape `customer modules` reports, minus the 8 module flags — those need the admin-gated read (`ib customer modules <id>`), this one only needs asiakas.read.",
       "roolit needs the 2026-08-10 backend; against an older deployment the field is simply absent (not false).",
+      "ownerAsiakasId (fb#744) is this customer's tenant — do not infer it from `customer list` membership, which may include rows owned by another tenant.",
     ],
     seeAlso: ["ib customer modules", "ib customer settings", "ib customer list"],
     examples: ["ib customer get 1349"],
