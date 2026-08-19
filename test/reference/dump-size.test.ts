@@ -51,7 +51,6 @@ describe("reference dump size ratchet (fb#779)", () => {
   });
 });
 
-// eslint-disable-next-line import/order -- appended with the --signatures tier
 import { buildCommandsList } from "../../src/reference/commandsList.js";
 
 describe("commands --signatures size (fb#779)", () => {
