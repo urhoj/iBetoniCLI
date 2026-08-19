@@ -1,0 +1,41 @@
+{
+  "_doc": [
+    "Per-spec notes byte ceilings (JSON.stringify(spec.notes).length), enforced by test/reference/notes-budget.test.ts.",
+    "Only a NEW offender (>800 B, unlisted here) or a GROWN one (above its ceiling) fails. Philosophy: SHRINK this file —",
+    "when touching a listed spec, trim its notes (move business context to the DB detail tier: `ib reference detail set <cmd> --field detail`,",
+    "an authenticated CLI write, no deploy) and lower or delete its entry. Never raise a ceiling casually; a raise is a reviewed decision.",
+    "A listed spec that drops to/below 800 B (or is renamed away) FAILS the liveness guard until its entry is deleted, so the baseline stays honest."
+  ],
+  "ceilings": {
+    "ib sijainti list": 3095,
+    "ib dev feedback resolve": 2336,
+    "ib dev feedback list": 2294,
+    "ib dev changelog update": 2247,
+    "ib dev changelog add": 2216,
+    "ib glossary set": 2037,
+    "ib jerry stats": 1742,
+    "ib jerry check-address": 1687,
+    "ib reference detail set": 1644,
+    "ib dev feedback create": 1603,
+    "ib dev email-delivery": 1573,
+    "ib customer list": 1451,
+    "ib sijainti set-public": 1413,
+    "ib person companies": 1322,
+    "ib dev feedback lint": 1253,
+    "ib jerry admin list": 1218,
+    "ib jerry admin onboarding note": 1172,
+    "ib vehicle driver assign": 1139,
+    "ib sijainti set-jerry": 1124,
+    "ib opendata parcel": 1096,
+    "ib dev feedback claim": 1091,
+    "ib keikka list": 1048,
+    "ib reference detail list": 1044,
+    "ib vehicle locations": 984,
+    "ib sijainti create": 898,
+    "ib search": 874,
+    "ib jerry admin detail": 870,
+    "ib vehicle driver default set": 830,
+    "ib dev schema snapshots": 829,
+    "ib opendata building": 815
+  }
+}

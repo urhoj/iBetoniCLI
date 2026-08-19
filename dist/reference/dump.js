@@ -167,8 +167,10 @@ function stripCommonErrors(spec) {
 }
 /**
  * Lean mode (`--lean`): drop the per-spec `notes` and `seeAlso` prose. These
- * are the largest low-essential fields across the full surface (~30 KB / ~7.6k
- * tok); `examples` stay because they are invocation-critical (copy-paste
+ * are the largest low-essential fields across the full surface (~100 KB /
+ * ~25k tok as of 2026-08, and budget-ratcheted by
+ * test/reference/notes-budget.test.ts so the figure can only drift DOWN);
+ * `examples` stay because they are invocation-critical (copy-paste
  * correctness). For a whole-surface scan an AI wants what exists + how to call
  * each command; the dropped caveats/cross-references are still one
  * `ib <command> --help` (or a per-domain dump) away when it actually invokes.

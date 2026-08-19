@@ -39,7 +39,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         name: "lean",
         type: "boolean",
         description:
-          "Drop each command's `notes`/`seeAlso` prose (KEEPS `examples`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via `ib <command> --help`. Composes with --commands-only and domain filters.",
+          "Drop each command's `notes`/`seeAlso` prose (KEEPS `examples`) — ~25k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via `ib <command> --help`. Composes with --commands-only and domain filters.",
       },
     ],
     outputShape:
