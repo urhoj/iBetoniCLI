@@ -35,12 +35,15 @@ export function cappedInt(cap: number, flag = "--limit"): (v: string) => number 
  * the house message `--flag must be one of: a, b, c`, plus a `— did you mean X?`
  * suffix whenever one candidate stands out.
  *
- * The suffix costs one retry instead of a guess: `closestName` bridges typos
- * (prefix, then edit distance), and `synonyms` bridges the gaps distance cannot
- * — a caller reaching for a DIFFERENT vocabulary rather than fat-fingering this
- * one (`--severity high` for `major`: 5 edits away, so only the table finds it).
- * The listed set always precedes the suffix, so `hintForError`'s "must be one
- * of" substring match keeps resolving the command's own ERRORS remedy.
+ * The suffix costs one retry instead of a guess: `synonyms` bridges a caller
+ * reaching for a DIFFERENT vocabulary (`--severity high` for `major`: 5 edits
+ * away, so only the table finds it), and `closestName` bridges typos (prefix,
+ * then edit distance) when no synonym matches. `synonyms` is checked FIRST —
+ * an exact, curated mapping must win over a fuzzy one, otherwise a value that
+ * is both a real synonym AND edit-distance-close to an unrelated allowed value
+ * (`trivial` vs `critical`) gets the wrong answer (fb#755/#764). The listed
+ * set always precedes the suffix, so `hintForError`'s "must be one of"
+ * substring match keeps resolving the command's own ERRORS remedy.
  *
  * Raised through {@link failWith}, so the error carries `statusCode: 0` —
  * `origin:"client"`, the only shape `hintForError`'s `matchClientRow` will look
@@ -55,7 +58,7 @@ export function assertEnum(
 ): void {
   if (value !== undefined && !allowed.includes(value)) {
     const guess =
-      closestName(value, [...allowed]) ?? synonyms?.[value.trim().toLowerCase()];
+      synonyms?.[value.trim().toLowerCase()] ?? closestName(value, [...allowed]);
     const hint = guess && allowed.includes(guess) ? ` — did you mean ${guess}?` : "";
     failWith(`${flag} must be one of: ${allowed.join(", ")}${hint}`, 4);
   }

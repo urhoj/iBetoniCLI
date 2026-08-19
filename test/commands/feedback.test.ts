@@ -1710,24 +1710,16 @@ describe("ib feedback list — --severity filter", () => {
     ).rejects.toThrow(new RegExp(`did you mean ${suggested}`));
   });
 
-  test("KNOWN DEFECT: `trivial` is suggested `critical`, the INVERSE of its meaning", async () => {
-    // SEVERITY_SYNONYMS maps trivial→cosmetic, but that entry is DEAD: assertEnum
-    // (src/targets.ts) consults `closestName` BEFORE `synonyms`, and `trivial` is
-    // within edit distance of `critical` (both 8 chars), so the fuzzy match wins
-    // and the synonym never runs. The suggestion is the opposite end of the
-    // severity ladder — the worst direction to be wrong in on this particular
-    // flag, since acting on it files the least urgent thing as the most.
-    //
-    // PRE-EXISTING, not introduced here: `feedback create --severity trivial`
-    // gives the same answer against the narrow SEVERITIES list. Fixing it means
-    // reordering assertEnum (synonyms before fuzzy), which touches every enum
-    // flag in the CLI — out of scope for this change, filed separately.
-    //
-    // This pins CURRENT behaviour deliberately, so the fix flips it visibly
-    // rather than passing silently either way.
+  test("`trivial` is suggested `cosmetic`, not the edit-distance-closer `critical`", async () => {
+    // SEVERITY_SYNONYMS maps trivial→cosmetic. assertEnum (src/targets.ts) used
+    // to consult `closestName` BEFORE `synonyms`, and `trivial` is within edit
+    // distance of `critical` (both 8 chars), so the fuzzy match won and the
+    // synonym never ran — suggesting the opposite end of the severity ladder,
+    // the worst direction to be wrong in on this flag, since acting on it files
+    // the least urgent thing as the most. Fixed by checking synonyms first.
     await expect(
       runFeedbackList(mockClient, { status: "open", severity: "trivial" })
-    ).rejects.toThrow(/did you mean critical/);
+    ).rejects.toThrow(/did you mean cosmetic/);
   });
 });
 

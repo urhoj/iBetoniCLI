@@ -29,7 +29,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["**/reference/specs/*", "./specs/*", "../specs/*", "./shared.js"],
+              group: ["**/reference/specs/*", "./specs/*", "../specs/*"],
               message:
                 "Import COMMAND_SPECS/COMMON_AUTH_ERRORS from src/reference/specs.ts (the barrel) — segment modules are pruned from the packed dist.",
             },
