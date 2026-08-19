@@ -50,3 +50,19 @@ describe("reference dump size ratchet (fb#779)", () => {
     ).toEqual([]);
   });
 });
+
+// eslint-disable-next-line import/order -- appended with the --signatures tier
+import { buildCommandsList } from "../../src/reference/commandsList.js";
+
+describe("commands --signatures size (fb#779)", () => {
+  const SIGNATURES_LIMIT_BYTES = 150_000;
+  test(`the full signatures list stays under ${SIGNATURES_LIMIT_BYTES} bytes`, () => {
+    const size = JSON.stringify(buildCommandsList({ signatures: true }, "developer")).length;
+    expect(
+      size,
+      `signatures list is ${size} B (limit ${SIGNATURES_LIMIT_BYTES}) — it exists to be the` +
+        ` cheap middle rung between \`ib commands --all\` and the full dump; if it stops being` +
+        ` cheap, trim flag surfaces or bump deliberately in the same PR.`
+    ).toBeLessThan(SIGNATURES_LIMIT_BYTES);
+  });
+});

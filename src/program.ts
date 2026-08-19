@@ -425,6 +425,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
       "--permission <substr>"
     )
     .option("--find <text>")
+    .option("--signatures")
     .option("--all")
     .action(
       guarded((
@@ -434,6 +435,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
           reads?: boolean;
           permission?: string;
           find?: string;
+          signatures?: boolean;
           all?: boolean;
         }
       ) => {
@@ -445,7 +447,8 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
           opts.mutations ||
           opts.reads ||
           opts.permission !== undefined ||
-          opts.find !== undefined;
+          opts.find !== undefined ||
+          opts.signatures;
         writeJson(
           wantsFlatList
             ? buildCommandsList({
@@ -454,6 +457,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
                 reads: opts.reads,
                 permission: opts.permission,
                 find: opts.find,
+                signatures: opts.signatures,
               })
             : buildDomainIndex()
         );

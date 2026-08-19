@@ -64,6 +64,29 @@ export function specMatcherForToken(specs, token, tier = getCallerTier()) {
     const domain = filter.kind === "domain" ? filter.domain : token;
     return (s) => domainOf(s.command) === domain;
 }
+/** `<name:type>` (required) / `[name:type]` (optional) — mirrors formatHelp's USAGE rule
+ *  (`required === false` is optional; absent means required). */
+function argSignature(a) {
+    return a.required === false ? `[${a.name}:${a.type}]` : `<${a.name}:${a.type}>`;
+}
+/** An enum short enough to inline beats a bare type name; longer lists stay
+ *  `<string>`. 28 deliberately covers `feature|improvement|bugfix` (26). */
+const ENUM_SIG_MAX = 28;
+/** Compact per-flag call shape: `--name` (boolean), `--name <a|b|c>` (short enum),
+ *  `--name <type>`; suffix `!` = required, `*` = one of a required group. The
+ *  notation is spelled out in the signatures envelope's `hint`. */
+function flagSignature(f) {
+    let sig = `--${f.name}`;
+    if (f.type !== "boolean") {
+        const joined = f.allowed?.join("|");
+        sig += joined && joined.length <= ENUM_SIG_MAX ? ` <${joined}>` : ` <${f.type}>`;
+    }
+    if (f.required)
+        sig += "!";
+    else if (f.requiredGroup)
+        sig += "*";
+    return sig;
+}
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
     return [...new Set(specs.map((s) => domainOf(s.command)).filter(Boolean))].sort();
@@ -104,6 +127,10 @@ export function assertKnownDomain(specs, domain, tier = getCallerTier()) {
         throw new CliError(`unknown domain: ${domain}.${didYouMean} Valid: ${suggest.join(", ")}`, 0, null, 4);
     }
 }
+/** Leading hint on the `--signatures` envelope — read before the rows (same
+ *  pattern as {@link buildDomainIndex}). Names the write-safety trio ONCE
+ *  instead of repeating three flag signatures on ~125 write commands. */
+const SIGNATURES_HINT = "signature notation: <x:t> required arg · [x:t] optional arg · --f <t> flag (booleans take no value) · <a|b> allowed values · ! required · * one of a required group. isWrite commands also accept --dry-run/--idempotency-key/--reason (`ib help write-safety`). Full flag semantics: `ib <command> --help`.";
 /**
  * Filter {@link CommandSpec}s down to the compact {@link CommandSummary} shape.
  * `--mutations` and `--reads` are mutually exclusive (a command cannot be both);
@@ -153,6 +180,12 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
         permissions: s.permissions ?? [],
         isWrite: isWriteSpec(s),
         ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
+        ...(filter.signatures && s.args?.length
+            ? { args: s.args.map(argSignature) }
+            : {}),
+        ...(filter.signatures && s.flags.length
+            ? { flags: s.flags.map(flagSignature) }
+            : {}),
     }));
 }
 /**
@@ -160,7 +193,8 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
  * callers (`program.ts`) handle stdout via `writeJson`.
  */
 export function buildCommandsList(filter, tier = getCallerTier()) {
-    return listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
+    const envelope = listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
+    return filter.signatures ? { hint: SIGNATURES_HINT, ...envelope } : envelope;
 }
 /** Max leaf paths a domain row lists in the bare index — enough to show the
  *  domain's shape without the big domains (dev 44, jerry 39, message 33)

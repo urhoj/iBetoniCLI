@@ -347,6 +347,7 @@ export async function buildProgram(argv) {
         .option("--reads")
         .option("--permission <substr>")
         .option("--find <text>")
+        .option("--signatures")
         .option("--all")
         .action(guarded((domain, opts) => {
         // Bare `ib commands` = cheap domain index; any narrowing argument
@@ -356,7 +357,8 @@ export async function buildProgram(argv) {
             opts.mutations ||
             opts.reads ||
             opts.permission !== undefined ||
-            opts.find !== undefined;
+            opts.find !== undefined ||
+            opts.signatures;
         writeJson(wantsFlatList
             ? buildCommandsList({
                 domain,
@@ -364,6 +366,7 @@ export async function buildProgram(argv) {
                 reads: opts.reads,
                 permission: opts.permission,
                 find: opts.find,
+                signatures: opts.signatures,
             })
             : buildDomainIndex());
     }));

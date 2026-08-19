@@ -310,9 +310,15 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         description:
           "Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.",
       },
+      {
+        name: "signatures",
+        type: "boolean",
+        description:
+          "Add each command's compact call shape to the rows: `args` (`<name:type>` required, `[name:type]` optional) and `flags` signature strings (`--f <type>`; `<a|b>` allowed values; `!` required, `*` one-of-a-required-group). The middle rung between the flat list and `ib reference dump` — everything needed to CONSTRUCT most calls at a fraction of the dump's tokens; the envelope's leading `hint` spells out the notation and the write-safety trio. Triggers the flat list on its own; composes with the domain arg and every filter.",
+      },
     ],
     outputShape:
-      "no args: { hint, items:[{ domain, count, description|null, commands:[\"keikka list\", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
+      "no args: { hint, items:[{ domain, count, description|null, commands:[\"keikka list\", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count } | --signatures adds per-row args?: string[] + flags?: string[] call-shape signatures and a leading envelope `hint` explaining the notation",
     errors: [
       { origin: "client", exit: 4, match: "mutually exclusive", meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
       { origin: "client", exit: 4, match: "unknown domain", meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
@@ -324,6 +330,8 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       "ib commands --all",
       "ib commands --find geocode",
       "ib commands vehicle --find driver --reads",
+      "ib commands keikka --signatures",
+      "ib commands --all --signatures",
       "ib commands --mutations",
       "ib commands --permission auth.page.vehicle",
       "ib commands --mutations | jq '.items[].command'",

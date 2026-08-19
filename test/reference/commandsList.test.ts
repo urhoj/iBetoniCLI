@@ -423,3 +423,76 @@ describe("ib commands --find (fb#781, intent-first keyword search)", () => {
     expect(std.map((i) => i.command)).not.toContain("ib dev changelog add");
   });
 });
+
+describe("ib commands --signatures (fb#779, call-shape tier)", () => {
+  const SIG_SAMPLE: CommandSpec[] = [
+    {
+      command: "ib x sig",
+      description: "sig sample",
+      args: [
+        { name: "id", type: "number", description: "d" },
+        { name: "date", type: "date", required: false, description: "d" },
+      ],
+      flags: [
+        { name: "force", type: "boolean", description: "d" },
+        { name: "kind", type: "string", allowed: ["a", "b"], description: "d" },
+        {
+          name: "mode",
+          type: "string",
+          allowed: ["averyverylongvalue", "anotherevenlongervalue"],
+          description: "d",
+        },
+        { name: "title", type: "string", required: true, description: "d" },
+        { name: "body", type: "string", requiredGroup: "input", description: "d" },
+      ],
+      outputShape: "{}",
+      errors: [],
+      examples: ["ib x sig 1"],
+    },
+  ];
+
+  test("renders args and flag signatures per the documented notation", () => {
+    const [row] = filterCommandSpecs(SIG_SAMPLE, { signatures: true }, "developer");
+    expect(row.args).toEqual(["<id:number>", "[date:date]"]);
+    expect(row.flags).toEqual([
+      "--force",
+      "--kind <a|b>",
+      "--mode <string>", // enum too long to inline
+      "--title <string>!",
+      "--body <string>*",
+    ]);
+  });
+
+  test("without --signatures the rows are unchanged (no args/flags keys)", () => {
+    const [row] = filterCommandSpecs(SIG_SAMPLE, {}, "developer");
+    expect("args" in row).toBe(false);
+    expect("flags" in row).toBe(false);
+  });
+
+  test("the envelope leads with a hint explaining the notation", () => {
+    const env = buildCommandsList({ domain: "keikka", signatures: true }, "developer");
+    expect(Object.keys(env)[0]).toBe("hint");
+    expect(env.hint).toContain("! required");
+    expect(env.hint).toContain("--dry-run");
+    // non-signature envelopes carry no hint
+    expect("hint" in buildCommandsList({ domain: "keikka" }, "developer")).toBe(false);
+  });
+
+  test("real catalogue: a required enum flag renders inline with its values", () => {
+    const env = buildCommandsList({ domain: "changelog", signatures: true }, "developer");
+    const add = env.items.find((i) => i.command === "ib dev changelog add");
+    expect(add?.flags).toContain("--type <feature|improvement|bugfix>!");
+  });
+
+  test("composes with --find and --reads", () => {
+    const env = buildCommandsList(
+      { domain: "vehicle", find: "driver", reads: true, signatures: true },
+      "developer"
+    );
+    expect(env.items.length).toBeGreaterThan(0);
+    for (const i of env.items) expect(i.isWrite).toBe(false);
+    expect(env.items.some((i) => (i.flags ?? []).length > 0 || (i.args ?? []).length > 0)).toBe(
+      true
+    );
+  });
+});

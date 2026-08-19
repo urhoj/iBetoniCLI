@@ -9,7 +9,7 @@
  * Pure and offline (no auth, no network); the source of truth is the same
  * `COMMAND_SPECS` so this never drifts from `--help` / `reference dump`.
  */
-import type { CommandSpec } from "../output/help.js";
+import type { CommandArg, CommandFlag, CommandSpec } from "../output/help.js";
 import { firstSentence } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
@@ -100,6 +100,30 @@ export function specMatcherForToken(
   return (s) => domainOf(s.command) === domain;
 }
 
+/** `<name:type>` (required) / `[name:type]` (optional) — mirrors formatHelp's USAGE rule
+ *  (`required === false` is optional; absent means required). */
+function argSignature(a: CommandArg): string {
+  return a.required === false ? `[${a.name}:${a.type}]` : `<${a.name}:${a.type}>`;
+}
+
+/** An enum short enough to inline beats a bare type name; longer lists stay
+ *  `<string>`. 28 deliberately covers `feature|improvement|bugfix` (26). */
+const ENUM_SIG_MAX = 28;
+
+/** Compact per-flag call shape: `--name` (boolean), `--name <a|b|c>` (short enum),
+ *  `--name <type>`; suffix `!` = required, `*` = one of a required group. The
+ *  notation is spelled out in the signatures envelope's `hint`. */
+function flagSignature(f: CommandFlag): string {
+  let sig = `--${f.name}`;
+  if (f.type !== "boolean") {
+    const joined = f.allowed?.join("|");
+    sig += joined && joined.length <= ENUM_SIG_MAX ? ` <${joined}>` : ` <${f.type}>`;
+  }
+  if (f.required) sig += "!";
+  else if (f.requiredGroup) sig += "*";
+  return sig;
+}
+
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
   command: string;
@@ -120,6 +144,10 @@ export interface CommandSummary {
    * `X-Dry-Run` and trusts the deployed backend guard.
    */
   dryRunKind?: "server" | "client";
+  /** `--signatures` only: positional call shapes (`<name:type>` / `[name:type]`). Omitted when the command takes none. */
+  args?: string[];
+  /** `--signatures` only: per-flag call shapes from {@link flagSignature}. Omitted when the command has no flags. */
+  flags?: string[];
 }
 
 /** Filter inputs for {@link filterCommandSpecs}. */
@@ -142,6 +170,14 @@ export interface CommandsListFilter {
    * and would silently swallow the next flag as the needle).
    */
   find?: string;
+  /**
+   * Signatures tier (fb#779): add each command's compact call shape — `args`
+   * and `flags` signature strings — to the summary rows. The middle rung
+   * between `ib commands --all` (names only) and `ib reference dump` (full
+   * specs): everything needed to CONSTRUCT most invocations at ~⅕ of the
+   * dump's tokens. The envelope's `hint` explains the notation.
+   */
+  signatures?: boolean;
 }
 
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
@@ -197,12 +233,20 @@ export function assertKnownDomain(
   }
 }
 
-/** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
+/** List-envelope shape (matches the universal `{ items, nextCursor, count }`);
+ *  `hint` (first key, `--signatures` only) explains the signature notation. */
 export interface CommandsListEnvelope {
+  hint?: string;
   items: CommandSummary[];
   nextCursor: string | null;
   count: number;
 }
+
+/** Leading hint on the `--signatures` envelope — read before the rows (same
+ *  pattern as {@link buildDomainIndex}). Names the write-safety trio ONCE
+ *  instead of repeating three flag signatures on ~125 write commands. */
+const SIGNATURES_HINT =
+  "signature notation: <x:t> required arg · [x:t] optional arg · --f <t> flag (booleans take no value) · <a|b> allowed values · ! required · * one of a required group. isWrite commands also accept --dry-run/--idempotency-key/--reason (`ib help write-safety`). Full flag semantics: `ib <command> --help`.";
 
 /**
  * Filter {@link CommandSpec}s down to the compact {@link CommandSummary} shape.
@@ -261,6 +305,12 @@ export function filterCommandSpecs(
       permissions: s.permissions ?? [],
       isWrite: isWriteSpec(s),
       ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
+      ...(filter.signatures && s.args?.length
+        ? { args: s.args.map(argSignature) }
+        : {}),
+      ...(filter.signatures && s.flags.length
+        ? { flags: s.flags.map(flagSignature) }
+        : {}),
     }));
 }
 
@@ -272,7 +322,8 @@ export function buildCommandsList(
   filter: CommandsListFilter,
   tier: CallerTier = getCallerTier()
 ): CommandsListEnvelope {
-  return listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
+  const envelope = listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
+  return filter.signatures ? { hint: SIGNATURES_HINT, ...envelope } : envelope;
 }
 
 /** One row of the `ib commands` (no-args) domain index. */
