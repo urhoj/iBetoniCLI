@@ -18,7 +18,7 @@
  *    undefined, non-finite numbers, or class instances).
  */
 import { pathToFileURL } from "node:url";
-import { writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { writeFileSync, unlinkSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 
 const targetDir = process.argv[2];
@@ -87,6 +87,15 @@ writeFileSync(
 
 const mapPath = `${specsPath}.map`;
 if (existsSync(mapPath)) unlinkSync(mapPath);
+
+// The packed specs.js no longer imports the per-domain segment modules
+// (src/reference/specs/*.ts, fb#782) — their compiled output would ship ~600 KB
+// of dead duplicate spec data in the committed dist, so prune the whole dir.
+// check-dist-fresh runs this script against its temp build too, so the
+// byte-compare sees identically pruned trees. An eslint no-restricted-imports
+// rule keeps runtime code from importing a segment directly (it would vanish
+// here).
+rmSync(path.resolve(targetDir, "reference", "specs"), { recursive: true, force: true });
 
 console.log(
   `pack-specs OK — ${path.join(targetDir, "reference/specs.js")} packed ` +
