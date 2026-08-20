@@ -95,6 +95,7 @@ export const DOMAIN_REGISTRARS: ReadonlyMap<string, DomainRegistrar> = new Map<
   ["notification", async (p, d) => (await import("./commands/notification/index.js")).registerNotificationCommands(p, d.getClient)],
   ["sijainti", async (p, d) => (await import("./commands/sijainti/index.js")).registerSijaintiCommands(p, d.getClient)],
   ["ohje", async (p, d) => (await import("./commands/ohje/index.js")).registerOhjeCommands(p, d.getClient)],
+  ["sales", async (p, d) => (await import("./commands/sales/index.js")).registerSalesCommands(p, d.getClient)],
   ["legal", async (p, d) => (await import("./commands/legal/index.js")).registerLegalCommands(p, d.getClient)],
   ["jerry", async (p, d) => (await import("./commands/jerry/index.js")).registerJerryCommands(p, d.getClient)],
   ["message", async (p, d) => (await import("./commands/message/index.js")).registerMessageCommands(p, d.getClient)],

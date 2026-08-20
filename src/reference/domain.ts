@@ -53,6 +53,7 @@ export const DOMAIN_BLURBS: Record<string, string> = {
   validate: "Company and person readiness validation profiles.",
   log: "Field-level audit trail (changeTracker).",
   task: "Recurring operator tasks — weekly/monthly work for humans + AI (due-since + done-log).",
+  sales: "betoni.online SaaS sales pipeline (system admin) — prospects + the companies actually running keikkaa.",
   dev: "Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox.",
   glossary: "Domain glossary — resolve a term/synonym to its meaning + commands.",
   ohje: "UI help-text content behind HelperIcon.",

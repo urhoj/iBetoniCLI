@@ -51,6 +51,7 @@ import { HELP_SEARCH_SPECS } from "./specs/help-search.js";
 import { MESSAGE_SPECS } from "./specs/message.js";
 import { GLOSSARY_SPECS } from "./specs/glossary.js";
 import { TASK_SPECS } from "./specs/task.js";
+import { SALES_SPECS } from "./specs/sales.js";
 
 export { COMMON_AUTH_ERRORS } from "./specs/shared.js";
 
@@ -85,6 +86,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   ...CHANGELOG_SPECS,
   ...GLOSSARY_SPECS,
   ...TASK_SPECS,
+  ...SALES_SPECS,
 ];
 
 /**

@@ -10561,6 +10561,186 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib sales customer list matches snapshot 1`] = `
+"USAGE
+  ib sales customer list [flags]
+
+DESCRIPTION
+  Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership across numerous tenants; lastLoginAny is kept alongside so the difference is inspectable.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, asiakasNimi, ytunnus, entryTime, lastActiveTime, keikat, firstKeikkaTime, lastKeikkaTime, vehicles, persons, lastLoginAny, lastLoginOwn }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
+
+EXAMPLES
+  ib sales customer list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sales prospect add matches snapshot 1`] = `
+"USAGE
+  ib sales prospect add [flags]
+
+DESCRIPTION
+  Add a company to the SaaS sales pipeline. --asiakas for a company already in betoni.online (companyName is backfilled from the asiakas row); --name for a COLD company with no asiakas row — which is the whole reason this pipeline has its own table.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --asiakas NUMBER    Existing betoni.online asiakasId
+  --name STRING    Company name for a cold prospect (no asiakas row)
+  --ytunnus STRING    Finnish business id
+  --segment STRING    pumppu | betoni | all | muu
+  --tier NUMBER    1 | 2 | 3
+  --region STRING    Operating area (toimialue)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { saasProspectId }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither --asiakas nor --name given → pass one of them
+  exit 4 (HTTP 400)  Prospect already exists for this company → \`ib sales prospect get --asiakas <id>\`
+  exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
+
+EXAMPLES
+  ib sales prospect add --asiakas 27 --segment pumppu --tier 1 --reason "seed"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sales prospect get matches snapshot 1`] = `
+"USAGE
+  ib sales prospect get <saasProspectId> [flags]
+
+DESCRIPTION
+  One SaaS prospect, by saasProspectId, --asiakas or --ytunnus. Exits 4 (not a guess) when more than one row matches the reference, and 5 when none does.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <saasProspectId> NUMBER    the row id (optional if --asiakas/--ytunnus given) (required)
+
+FLAGS
+  --asiakas NUMBER    Look up by betoni.online asiakasId
+  --ytunnus STRING    Look up by Finnish business id
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { saasProspectId, asiakasId, companyName, status, analysis, … }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId
+  exit 5 (client-side)  No prospect matches    → \`ib sales prospect list --search <name>\`
+
+EXAMPLES
+  ib sales prospect get --asiakas 27
+  ib sales prospect get --ytunnus 1869376-5 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sales prospect list matches snapshot 1`] = `
+"USAGE
+  ib sales prospect list [flags]
+
+DESCRIPTION
+  List the betoni.online SaaS sales pipeline (dbo.saasProspect) — companies we are selling betoni.online ITSELF to. Distinct from \`ib jerry admin onboarding list\`, the BetoniJerry provider pipeline: a company sits in both at independent stages. Every filter is applied CLIENT-SIDE (the route takes no query params by design). Use --brief to drop the two long narrative columns.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --status STRING    ei_aloitettu | analysoitu | kontaktoitu | tapaaminen | tarjous | voitettu | havitty | ei_sovellu
+  --tier NUMBER    1 priority · 2 secondary · 3 long tail
+  --segment STRING    pumppu | betoni | all | muu
+  --search STRING    Case-insensitive substring over companyName + ytunnus + region
+  --brief    Omit analysis + pitchAngle — the full list is ~60 KB of narrative
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ saasProspectId, asiakasId, companyName, ytunnus, status, tier, segment, region, fleetPumps, staffCount, revenueEur, revenueYear, currentSystem, fitScore, analysis, pitchAngle, parked, jerryStatus, analysisUpdatedTime, … }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
+
+EXAMPLES
+  ib sales prospect list --brief --pretty
+  ib sales prospect list --segment pumppu --status ei_aloitettu
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sales prospect update matches snapshot 1`] = `
+"USAGE
+  ib sales prospect update <saasProspectId> [flags]
+
+DESCRIPTION
+  Write company FACTS onto a SaaS prospect — the weekly suomen-betonipumppausyritykset task's write path. Only facts: the backend DROPS status/tier/notes/parkedUntil arriving here, because a human owns pipeline state and the task must never revert it. --fit-score and --pitch are FIRST-FILL: written only while the stored value is NULL, so a human's answer always wins. Stamps analysisUpdatedTime.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <saasProspectId> NUMBER    the row id (optional if --asiakas/--ytunnus given) (required)
+
+FLAGS
+  --asiakas NUMBER    Resolve the row by asiakasId instead of the positional id
+  --ytunnus STRING    Resolve the row by business id
+  --name STRING    Company name
+  --segment STRING    pumppu | betoni | all | muu
+  --region STRING    Operating area
+  --fleet-pumps NUMBER    Pump trucks
+  --staff NUMBER    Employee count
+  --revenue NUMBER    Revenue in EUR
+  --revenue-year NUMBER    Which year the revenue figure is from
+  --current-system STRING    Excel | Google Sheets | kilpailija | oma | ei tiedossa
+  --analysis STRING    Narrative analysis (markdown). Long prose — use --from-json on Windows.
+  --fit-score NUMBER    1..5. FIRST-FILL only.
+  --pitch STRING    How to market to this company. FIRST-FILL only.
+  --body STRING    Inline JSON object of the same fields. Mutually exclusive with --from-json.
+  --from-json STRING    Read the fields from a JSON file (or - for stdin). The shell-safe route for long Finnish prose: PowerShell splits an argument on its inner double quotes and silently expands backticks. Use a FILE, not a pipe, for anything containing a backslash. Typed flags win over the document.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success: true }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId
+  exit 5 (client-side)  No prospect matches    → \`ib sales prospect add\` first
+  exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
+
+EXAMPLES
+  ib sales prospect update --asiakas 27 --fleet-pumps 27 --staff 70 --reason "weekly registry sync"
+  ib sales prospect update 12 --from-json ./analysis.json --reason "weekly registry sync"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib schedule day matches snapshot 1`] = `
 "USAGE
   ib schedule day <date> [flags]
