@@ -45,6 +45,30 @@ describe("applyTextEdit — append / prepend (verbatim)", () => {
   });
 });
 
+describe("applyTextEdit — seam guard (fb#790)", () => {
+  test("append onto non-empty text with no whitespace boundary inserts a newline seam", () => {
+    expect(applyTextEdit("existing text", { kind: "append", text: "more text" }))
+      .toEqual({ next: "existing text\nmore text", seamInserted: true });
+  });
+  test("prepend onto non-empty text with no whitespace boundary inserts a newline seam", () => {
+    expect(applyTextEdit("existing text", { kind: "prepend", text: "intro text" }))
+      .toEqual({ next: "intro text\nexisting text", seamInserted: true });
+  });
+  test("no seam when the appended text already starts with whitespace", () => {
+    expect(applyTextEdit("existing", { kind: "append", text: " more" })).toEqual({ next: "existing more" });
+  });
+  test("no seam when the current text already ends with whitespace", () => {
+    expect(applyTextEdit("existing \n", { kind: "append", text: "more" })).toEqual({ next: "existing \nmore" });
+  });
+  test("no seam onto empty current (nothing to run together)", () => {
+    expect(applyTextEdit("", { kind: "append", text: "x" })).toEqual({ next: "x" });
+    expect(applyTextEdit("", { kind: "prepend", text: "x" })).toEqual({ next: "x" });
+  });
+  test("no seam when the appended text is itself empty", () => {
+    expect(applyTextEdit("existing", { kind: "append", text: "" })).toEqual({ next: "existing" });
+  });
+});
+
 describe("parseEditOp", () => {
   test("no edit flags → undefined (caller uses whole-body path)", () => {
     expect(parseEditOp({})).toBeUndefined();

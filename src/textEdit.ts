@@ -18,6 +18,14 @@ export interface TextEditResult {
   next: string;
   /** Number of occurrences substituted (replace only; absent for append/prepend). */
   matchCount?: number;
+  /** True when append/prepend inserted a newline seam between non-whitespace-bounded text (fb#790). */
+  seamInserted?: boolean;
+}
+
+/** True when joining `left` directly against `right` would run non-whitespace text together. */
+function needsSeam(left: string, right: string): boolean {
+  if (left === "" || right === "") return false;
+  return !/\s$/.test(left) && !/^\s/.test(right);
 }
 
 /** Raw edit flags an edit-capable command exposes (Commander camelCases them). */
@@ -60,15 +68,21 @@ function countOccurrences(haystack: string, needle: string): number {
  * Apply one in-field edit, returning the new field value. `current` is coerced
  * from null/undefined to "". Throws failWith(exit 4) when a replace breaks the
  * strict match rule (0 matches; >1 and not `all`). append/prepend insert the
- * given text VERBATIM (no separator — the caller controls whitespace).
+ * given text verbatim, UNLESS both sides of the join lack whitespace — then a
+ * `\n` seam is inserted and `seamInserted: true` is reported (fb#790), so
+ * `--append`/`--prepend` can no longer silently run words together.
  */
 export function applyTextEdit(current: string, op: TextEditOp): TextEditResult {
   const base = current ?? "";
   switch (op.kind) {
-    case "append":
-      return { next: base + op.text };
-    case "prepend":
-      return { next: op.text + base };
+    case "append": {
+      const seam = needsSeam(base, op.text);
+      return { next: base + (seam ? "\n" : "") + op.text, ...(seam ? { seamInserted: true } : {}) };
+    }
+    case "prepend": {
+      const seam = needsSeam(op.text, base);
+      return { next: op.text + (seam ? "\n" : "") + base, ...(seam ? { seamInserted: true } : {}) };
+    }
     case "replace": {
       const n = countOccurrences(base, op.find);
       if (n === 0) {
@@ -127,7 +141,8 @@ export function textEditDryRunEnvelope(
   next: string,
   matchCount: number | undefined,
   identity: Record<string, unknown>,
-  field: string
+  field: string,
+  seamInserted?: boolean
 ): Record<string, unknown> {
   const diff = lineDiff(before, next);
   return {
@@ -135,6 +150,7 @@ export function textEditDryRunEnvelope(
     ...identity,
     field,
     ...(matchCount !== undefined ? { matchCount } : {}),
+    ...(seamInserted ? { seamInserted } : {}),
     addedLines: diff.addedLines,
     removedLines: diff.removedLines,
     sameContent: diff.sameContent,

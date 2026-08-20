@@ -1,6 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, failWith, failUsage } from "../../output/json.js";
+import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
@@ -172,9 +172,11 @@ export async function runOhjeEditField(client, helpId, field, op, flags, assess 
         failWith(`helpId "${helpId}" has no existing row to edit — create it with a full --${field} first`, 5);
     }
     const before = String(current[field] ?? "");
-    const { next, matchCount } = applyTextEdit(before, op);
+    const { next, matchCount, seamInserted } = applyTextEdit(before, op);
+    if (seamInserted)
+        warnNote("[ib] a newline seam was inserted between the existing text and the new text (fb#790)");
     if (flags.dryRun) {
-        return textEditDryRunEnvelope(before, next, matchCount, { helpId }, field);
+        return textEditDryRunEnvelope(before, next, matchCount, { helpId }, field, seamInserted);
     }
     return runOhjeUpdate(client, helpId, { [field]: next }, flags, {}, assess);
 }

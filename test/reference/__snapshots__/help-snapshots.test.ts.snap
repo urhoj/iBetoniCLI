@@ -2531,7 +2531,8 @@ FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
   --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.
   --title STRING    New title (max 300 chars)
-  --description STRING    New description — REPLACES the whole text (there is no append flag; for a partial edit fetch the row with \`ib dev changelog get\`, edit, resend via --from-json)
+  --description STRING    New description — REPLACES the whole text (destructive; use --append-description to add to it instead)
+  --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the existing entry text intact. Mutually exclusive with --description/--summary/--body
   --summary STRING    Alias for --description; if both are passed, they must match
   --body STRING    Alias for --description (free text, not JSON); if both are passed, they must match
   --benefits STRING    Hyödyt
@@ -2551,7 +2552,7 @@ FLAGS
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
-  --from-json STRING    Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. Pass them alongside the file. (\`unlink\` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).
+  --from-json STRING    Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. Pass them alongside the file. (\`unlink\` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -2570,9 +2571,11 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped) → For enums the error names the allowed values (language must be fi|en). For a released entry leave the level as recorded — every other field is still editable; only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
+  exit 4 (client-side)  --append-description is empty, or combined with --description/--summary/--body → --append-description must be non-empty and is mutually exclusive with a full --description replace — use one or the other
 
 NOTES
   - SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see \`ib help shell-quoting\`.
+  - --append-description (fb#757) is the non-destructive twin of --description, mirroring \`ib dev feedback update\`: it fetches the current entry, joins the new text onto the end separated by a blank line, and PUTs the merged result — the original entry text is never lost. Exclusive with --description/--summary/--body (exit 4 if combined).
   - THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.
   - --bump-level has NO default here (unlike \`add\`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated \`update --status …\` cannot silently downgrade a deliberate minor.
   - --feedback re-establishes a link lost to delete + re-add — the only way to do it (\`ib dev feedback resolve\` sets status/resolution but not the link). It sets resolvedByChangelogId back to this entry but does NOT mark the row applied: since fb#578 this command writes no status at all, so close the row yourself with \`ib dev feedback resolve <id> --status applied\` once the change is live.
@@ -2589,6 +2592,7 @@ EXAMPLES
   ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"
   ib dev changelog update 386 --from-json ./patch.json
   ib dev changelog update 1280 --unlink 541 --feedback 542 --reason "linked the wrong fb id"
+  ib dev changelog update 1547 --append-description "Reviewed: verified fix landed in prod, no regressions."
 "
 `;
 

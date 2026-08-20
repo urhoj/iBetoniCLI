@@ -355,8 +355,12 @@ describe("ib ohje update — edit mode (in-field partial)", () => {
       { dryRun: true, reason: "r" }
     ) as Record<string, unknown>;
     expect(mockClient.put).not.toHaveBeenCalled();
-    expect(res).toMatchObject({ dryRun: true, helpId: "X", field: "htmltext", sameContent: false });
-    expect(String(res.unified)).toContain("+ <p>old</p><p>more</p>");
+    expect(res).toMatchObject({ dryRun: true, helpId: "X", field: "htmltext", sameContent: false, seamInserted: true });
+    // fb#790: a newline seam is inserted between non-whitespace-bounded markup
+    // instead of running the two tags together verbatim — so the diff shows
+    // the new tag on its OWN added line rather than glued onto the old one.
+    expect(String(res.unified)).toContain("+ <p>more</p>");
+    expect(String(res.unified)).not.toContain("<p>old</p><p>more</p>");
   });
 
   test("real --replace on a chosen field GET-merges then PUTs the full row", async () => {

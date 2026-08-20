@@ -12,6 +12,7 @@ import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
 import type { AssessFlags } from "../assess.js";
 import { applyTextEdit, textEditDryRunEnvelope, type TextEditOp } from "../textEdit.js";
 import { qs } from "../api/query.js";
+import { warnNote } from "../output/json.js";
 
 function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // Be liberal in what we accept. Every discovery surface — including this
@@ -262,12 +263,13 @@ export async function runReferenceDetailEdit(
   } catch (e) {
     if (!(e instanceof CliError && e.statusCode === 404)) throw e;
   }
-  const { next, matchCount } = applyTextEdit(before, op);
+  const { next, matchCount, seamInserted } = applyTextEdit(before, op);
   // Cap-check the MERGED text before the dry-run branch, so a preview that would
   // 400 on write reports it here instead of returning a clean-looking diff.
   assertWithinCap(field, next, "would be");
+  if (seamInserted) warnNote("[ib] a newline seam was inserted between the existing text and the new text (fb#790)");
   if (flags.dryRun) {
-    return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field);
+    return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field, seamInserted);
   }
   return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
 }

@@ -103,6 +103,12 @@ function validateComplexity(value, flag = "--complexity") {
     return n;
 }
 const MAX_FREETEXT = 200;
+/** Head/tail split for a truncated field (fb#714): appended updates land at the
+ *  TAIL (`--append-description`), so a head-only cut discarded exactly the
+ *  newest content in a queue designed to be appended to. */
+const TRUNCATE_HEAD = 120;
+const TRUNCATE_TAIL = 80;
+const ELISION = " … ";
 /**
  * The server's row cap. Was a local literal duplicating the backend constant,
  * and was applied ONLY on the multi-status merge path below — the single-status
@@ -111,7 +117,7 @@ const MAX_FREETEXT = 200;
  */
 const CAP = FEEDBACK_LIST_CAP;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
-const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib dev feedback get <id> for full text";
+const TRUNCATE_HINT = "description/resolution/errorText over 200 chars show head+tail (middle elided) so an appended update is never cut off; ib dev feedback get <id> for full text";
 /**
  * Emitted whenever a complexity filter is active, because that filter's blind
  * spot is invisible in its own result.
@@ -157,11 +163,14 @@ function severityFilterIgnored(severity, rows) {
     const matches = (r) => severity === SEVERITY_NONE ? r.severity == null : r.severity === severity;
     return rows.some((r) => !matches(r));
 }
-/** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
- * pass through untouched. */
+/** Cap a string at MAX_FREETEXT chars, keeping HEAD+TAIL (elided middle) so an
+ * appended update at the tail is never the part that gets cut (fb#714).
+ * Non-strings pass through untouched. */
 function truncateField(v) {
     if (typeof v === "string" && v.length > MAX_FREETEXT) {
-        return { value: v.slice(0, MAX_FREETEXT) + "...", cut: true };
+        const head = v.slice(0, TRUNCATE_HEAD);
+        const tail = v.slice(-TRUNCATE_TAIL);
+        return { value: head + ELISION + tail, cut: true };
     }
     return { value: v, cut: false };
 }

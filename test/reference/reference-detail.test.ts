@@ -308,7 +308,7 @@ describe("field caps (fb#284)", () => {
 
   test("an --append that overflows fails in the DRY-RUN preview, not only on write", async () => {
     // The merge is computed client-side, so without this guard the preview would
-    // return a clean diff and the real write would then 400.
+    // return a clean diff and the real write would then 400. 1990 + seam(1) + 20 = 2011.
     const c = client({ get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn() });
     await expect(
       runReferenceDetailEdit(
@@ -316,7 +316,7 @@ describe("field caps (fb#284)", () => {
         { kind: "append", text: "y".repeat(20) },
         { dryRun: true }, "developer"
       )
-    ).rejects.toMatchObject({ exitCode: 4, message: "detail would be 2010 chars, max 2000" });
+    ).rejects.toMatchObject({ exitCode: 4, message: "detail would be 2011 chars, max 2000" });
     expect(c.put).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,11 @@
 import { failUsage } from "./output/json.js";
 import { lineDiff } from "./textDiff.js";
+/** True when joining `left` directly against `right` would run non-whitespace text together. */
+function needsSeam(left, right) {
+    if (left === "" || right === "")
+        return false;
+    return !/\s$/.test(left) && !/^\s/.test(right);
+}
 /**
  * Register the five in-field edit flags on an edit-capable command. The flag
  * NAMES are the contract (`parseEditOp`, `unknownCommand.ts`, the help-wiring
@@ -30,15 +36,21 @@ function countOccurrences(haystack, needle) {
  * Apply one in-field edit, returning the new field value. `current` is coerced
  * from null/undefined to "". Throws failWith(exit 4) when a replace breaks the
  * strict match rule (0 matches; >1 and not `all`). append/prepend insert the
- * given text VERBATIM (no separator — the caller controls whitespace).
+ * given text verbatim, UNLESS both sides of the join lack whitespace — then a
+ * `\n` seam is inserted and `seamInserted: true` is reported (fb#790), so
+ * `--append`/`--prepend` can no longer silently run words together.
  */
 export function applyTextEdit(current, op) {
     const base = current ?? "";
     switch (op.kind) {
-        case "append":
-            return { next: base + op.text };
-        case "prepend":
-            return { next: op.text + base };
+        case "append": {
+            const seam = needsSeam(base, op.text);
+            return { next: base + (seam ? "\n" : "") + op.text, ...(seam ? { seamInserted: true } : {}) };
+        }
+        case "prepend": {
+            const seam = needsSeam(op.text, base);
+            return { next: op.text + (seam ? "\n" : "") + base, ...(seam ? { seamInserted: true } : {}) };
+        }
         case "replace": {
             const n = countOccurrences(base, op.find);
             if (n === 0) {
@@ -93,13 +105,14 @@ export function parseEditOp(flags) {
  * `{ type }`), the field, the replace match count, and the line diff. Nothing is
  * written, so this works under `--read-only`.
  */
-export function textEditDryRunEnvelope(before, next, matchCount, identity, field) {
+export function textEditDryRunEnvelope(before, next, matchCount, identity, field, seamInserted) {
     const diff = lineDiff(before, next);
     return {
         dryRun: true,
         ...identity,
         field,
         ...(matchCount !== undefined ? { matchCount } : {}),
+        ...(seamInserted ? { seamInserted } : {}),
         addedLines: diff.addedLines,
         removedLines: diff.removedLines,
         sameContent: diff.sameContent,

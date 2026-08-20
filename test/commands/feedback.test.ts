@@ -19,6 +19,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CliError, exitCodeFromStatus } from "../../src/api/errors.js";
+import { captureActionError } from "../helpers/stderr.js";
 
 /**
  * A server error shaped exactly like the client throws one. These fixtures used
@@ -40,34 +41,6 @@ beforeEach(() => {
   get.mockReset();
   put.mockReset();
 });
-
-/**
- * Run a parse whose in-action guard fails, and return what the CALLER sees: the
- * JSON error envelope on stderr plus the mapped exit code (same helper as the
- * changelog tests). `process.exitCode` is restored so a guard assertion never
- * leaks into the runner's own exit code.
- */
-async function captureActionError(
-  run: () => Promise<unknown>
-): Promise<{ exitCode: number | undefined; envelope: Record<string, unknown> }> {
-  const prevExit = process.exitCode;
-  process.exitCode = undefined;
-  const chunks: string[] = [];
-  const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
-    chunks.push(String(s));
-    return true;
-  });
-  try {
-    await run();
-    return {
-      exitCode: process.exitCode as number | undefined,
-      envelope: JSON.parse(chunks.join("")) as Record<string, unknown>,
-    };
-  } finally {
-    spy.mockRestore();
-    process.exitCode = prevExit;
-  }
-}
 
 // ─── create ──────────────────────────────────────────────────────────────────
 
@@ -604,7 +577,7 @@ describe("ib feedback list", () => {
     expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&search=weather&limit=200");
   });
 
-  test("truncates description/resolution/errorText to 200 chars by default + sets hint", async () => {
+  test("truncates description/resolution/errorText to head+tail by default + sets hint (fb#714)", async () => {
     get.mockResolvedValueOnce([
       {
         feedbackId: 1,
@@ -614,10 +587,10 @@ describe("ib feedback list", () => {
       },
     ]);
     const out = await runFeedbackList(mockClient, { all: true });
-    expect(out.items[0].description).toBe("x".repeat(200) + "...");
-    expect(out.items[0].resolution).toBe("y".repeat(200) + "...");
-    expect(out.items[0].errorText).toBe("z".repeat(200) + "...");
-    expect(out.hint).toMatch(/truncated/);
+    expect(out.items[0].description).toBe("x".repeat(120) + " … " + "x".repeat(80));
+    expect(out.items[0].resolution).toBe("y".repeat(120) + " … " + "y".repeat(80));
+    expect(out.items[0].errorText).toBe("z".repeat(120) + " … " + "z".repeat(80));
+    expect(out.hint).toMatch(/head\+tail/);
   });
 
   test("--full returns untruncated rows and no hint", async () => {
@@ -909,7 +882,7 @@ describe("ib feedback resolve", () => {
       feedbackId: 42,
       status: "applied",
       updatedAt: "2026-06-17T00:00:00Z",
-      resolution: "z".repeat(200) + "...",
+      resolution: "z".repeat(120) + " … " + "z".repeat(80),
     });
     expect(out).not.toHaveProperty("description");
   });
@@ -1231,7 +1204,7 @@ describe("ib feedback update", () => {
       kind: "bug",
       severity: "major",
       updatedAt: "2026-07-11T00:00:00Z",
-      description: "d".repeat(200) + "...",
+      description: "d".repeat(120) + " … " + "d".repeat(80),
     });
     expect(out).not.toHaveProperty("resolution");
   });
@@ -1426,7 +1399,7 @@ describe("complexity filters announce their NULL blind spot (fb#362)", () => {
       { feedbackId: 1, complexity: 2, status: "open", description: "x".repeat(300) },
     ]);
     const env = await runFeedbackList(mockClient as never, { maxComplexity: 2, all: true });
-    expect(env.hint).toMatch(/truncated to 200 chars/);
+    expect(env.hint).toMatch(/head\+tail/);
     expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
   });
 });

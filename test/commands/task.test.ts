@@ -13,6 +13,7 @@ import {
   registerTaskCommands,
 } from "../../src/commands/task/index.js";
 import { payloadKeyMap } from "../../src/commands/_shared/fromJson.js";
+import { captureActionError } from "../helpers/stderr.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -267,27 +268,19 @@ describe("task add --from-json wiring (fb#450)", () => {
   test("a --from-json payload naming `once` exits 4 as an unknown key, never silently dropped", async () => {
     const file = join(tmpdir(), `ib-task-once-${process.pid}.json`);
     writeFileSync(file, JSON.stringify({ title: "x", executor: "human", once: true }), "utf8");
-    const prevExit = process.exitCode;
-    process.exitCode = undefined;
-    const chunks: string[] = [];
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
-      chunks.push(String(s));
-      return true;
-    });
     try {
-      const program = new Command();
-      registerTaskCommands(program, async () => client as never);
-      await program.parseAsync(["task", "add", "--from-json", file, "--reason", "r"], { from: "user" });
+      const { exitCode, envelope } = await captureActionError(async () => {
+        const program = new Command();
+        registerTaskCommands(program, async () => client as never);
+        await program.parseAsync(["task", "add", "--from-json", file, "--reason", "r"], { from: "user" });
+      });
 
-      expect(process.exitCode).toBe(4);
-      const envelope = JSON.parse(chunks.join("")) as { error: string };
-      expect(envelope.error).toMatch(/unknown key once/);
+      expect(exitCode).toBe(4);
+      expect((envelope as { error: string }).error).toMatch(/unknown key once/);
       // The accepted-key list must NOT advertise it — that is the whole point.
-      expect(envelope.error).not.toMatch(/accepted:.*\bonce\b/);
+      expect((envelope as { error: string }).error).not.toMatch(/accepted:.*\bonce\b/);
       expect(client.post).not.toHaveBeenCalled();
     } finally {
-      spy.mockRestore();
-      process.exitCode = prevExit;
       unlinkSync(file);
     }
   });

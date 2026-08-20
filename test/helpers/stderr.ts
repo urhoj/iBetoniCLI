@@ -99,3 +99,32 @@ export function parseDiagnostic(
     unknown
   >;
 }
+
+/**
+ * Run a parse whose in-action guard fails, and return what the CALLER sees:
+ * the JSON error envelope on stderr plus the mapped exit code. `process.exitCode`
+ * is saved/restored so a guard assertion never leaks into the runner's own exit
+ * code (fb#729 — this was hand-rolled identically in three test files; `cap.text()`
+ * is an exact drop-in for the old `chunks.join("")`).
+ *
+ * NOTE: this parses the WHOLE stderr capture as one JSON error envelope, which
+ * is a DIFFERENT shape from {@link parseDiagnostic}'s `[ib] <name> · {json}`
+ * diagnostic lines — do not reach for `parseDiagnostic` here.
+ */
+export async function captureActionError(
+  run: () => Promise<unknown>
+): Promise<{ exitCode: number | undefined; envelope: Record<string, unknown> }> {
+  const prevExit = process.exitCode;
+  process.exitCode = undefined;
+  const cap = captureStderr();
+  try {
+    await run();
+    return {
+      exitCode: process.exitCode as number | undefined,
+      envelope: JSON.parse(cap.text()) as Record<string, unknown>,
+    };
+  } finally {
+    cap.restore();
+    process.exitCode = prevExit;
+  }
+}

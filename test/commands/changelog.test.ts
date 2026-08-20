@@ -1,5 +1,6 @@
 import { test, it, expect, vi, beforeEach, describe } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { captureActionError } from "../helpers/stderr.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,36 +27,6 @@ function captureThrow(fn: () => void): { exitCode?: number; body?: Partial<Valid
     return e as never;
   }
   throw new Error("expected fn to throw");
-}
-
-/**
- * Run a parse whose in-action guard fails, and return what the CALLER sees: the
- * JSON error envelope on stderr plus the mapped exit code. The guard's CliError
- * is caught by the action's `guarded` tail (same envelope/code `handleParse-
- * Rejection` would have produced for a throw outside it), so `parseAsync`
- * resolves instead of rejecting. `process.exitCode` is restored so a guard
- * assertion never leaks into the runner's own exit code.
- */
-async function captureActionError(
-  run: () => Promise<unknown>
-): Promise<{ exitCode: number | undefined; envelope: Record<string, unknown> }> {
-  const prevExit = process.exitCode;
-  process.exitCode = undefined;
-  const chunks: string[] = [];
-  const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
-    chunks.push(String(s));
-    return true;
-  });
-  try {
-    await run();
-    return {
-      exitCode: process.exitCode as number | undefined,
-      envelope: JSON.parse(chunks.join("")) as Record<string, unknown>,
-    };
-  } finally {
-    spy.mockRestore();
-    process.exitCode = prevExit;
-  }
 }
 
 const asPost = () => client.post;
@@ -579,6 +550,67 @@ describe("changelog --summary alias for --description (fb#205)", () => {
       expect.objectContaining({ description: "new body" }),
       expect.any(Object)
     );
+  });
+});
+
+describe("changelog update --append-description (fb#757)", () => {
+  test("appends to the CURRENT description, joined by a blank line", async () => {
+    asGet().mockResolvedValueOnce({ changelogId: 42, description: "Original entry text." });
+    asPut().mockResolvedValue({ changelogId: 42 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "update", "42", "--append-description", "Review note: verified in prod."],
+      { from: "user" }
+    );
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/42",
+      expect.objectContaining({
+        description: "Original entry text.\n\nReview note: verified in prod.",
+      }),
+      expect.any(Object)
+    );
+  });
+
+  test("appends onto an empty/missing description without a leading blank line", async () => {
+    asGet().mockResolvedValueOnce({ changelogId: 43, description: null });
+    asPut().mockResolvedValue({ changelogId: 43 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "update", "43", "--append-description", "First note."],
+      { from: "user" }
+    );
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/43",
+      expect.objectContaining({ description: "First note." }),
+      expect.any(Object)
+    );
+  });
+
+  test("rejects an empty --append-description (exit 4, no GET/PUT)", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const { exitCode } = await captureActionError(() =>
+      program.parseAsync(["changelog", "update", "44", "--append-description", "   "], { from: "user" })
+    );
+    expect(exitCode).toBe(4);
+    expect(asGet()).not.toHaveBeenCalled();
+    expect(asPut()).not.toHaveBeenCalled();
+  });
+
+  test("rejects --append-description combined with --description (exit 4, no GET/PUT)", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const { exitCode } = await captureActionError(() =>
+      program.parseAsync(
+        ["changelog", "update", "45", "--append-description", "note", "--description", "replace"],
+        { from: "user" }
+      )
+    );
+    expect(exitCode).toBe(4);
+    expect(asGet()).not.toHaveBeenCalled();
+    expect(asPut()).not.toHaveBeenCalled();
   });
 });
 

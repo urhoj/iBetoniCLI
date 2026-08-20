@@ -1051,6 +1051,7 @@ export function registerChangelogCommands(
       .option("--area <a>", AREA_FLAG_DESC)
       .option("--title <s>")
       .option("--description <s>")
+      .option("--append-description <s>", "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the existing entry text intact; mutually exclusive with --description/--summary/--body")
       .option("--summary <s>")
       .option("--body <s>")
       .option("--benefits <s>")
@@ -1079,7 +1080,7 @@ export function registerChangelogCommands(
       .option(
         "--from-json <file>"
       )
-  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; unlink?: number[]; resolve?: boolean; fromJson?: string }, cmd: Command) => {
+  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; unlink?: number[]; resolve?: boolean; fromJson?: string; appendDescription?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
@@ -1093,8 +1094,22 @@ export function registerChangelogCommands(
       "Provide the description via --description, --summary, or --body, not several with different values"
     );
     if (desc !== undefined) o.description = desc;
+    if (o.appendDescription !== undefined) {
+      if (!o.appendDescription.trim()) failWith("--append-description must be non-empty", 4);
+      if (desc !== undefined) {
+        failWith("--append-description and --description (or --summary/--body) are mutually exclusive", 4);
+      }
+    }
     o.sha = resolveShaAlias(o.sha, o.commit)!;
     validateFieldLengths(o);
+    const client = await getClient();
+    // Read-merge-write: --description REPLACES the entry, which is destructive
+    // (fb#757). Appending keeps the current text and adds to it instead.
+    if (o.appendDescription !== undefined) {
+      const current = await runChangelogGet(client, id);
+      const existing = typeof current.description === "string" ? current.description : "";
+      o.description = existing ? `${existing.trimEnd()}\n\n${o.appendDescription.trim()}` : o.appendDescription.trim();
+    }
     const patch: Partial<ChangelogAddBody> = {};
     for (const k of [
       "type",
@@ -1122,7 +1137,6 @@ export function registerChangelogCommands(
     if (o.sentry) patch.sentryIssue = normalizeSentryRef(o.sentry);
     const updLang = normalizeLanguage(o.language);
     if (updLang) patch.language = updLang;
-    const client = await getClient();
     const result = await runWithSiblingHint(client, id, "feedback", () =>
       runChangelogUpdate(client, id, patch, o)
     );
@@ -1519,7 +1533,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "description",
         type: "string",
         description:
-          "New description — REPLACES the whole text (there is no append flag; for a partial edit fetch the row with `ib dev changelog get`, edit, resend via --from-json)",
+          "New description — REPLACES the whole text (destructive; use --append-description to add to it instead)",
+      },
+      {
+        name: "append-description",
+        type: "string",
+        description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the existing entry text intact. Mutually exclusive with --description/--summary/--body",
       },
       { name: "summary", type: "string", description: "Alias for --description; if both are passed, they must match" },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
@@ -1577,7 +1596,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "from-json",
         type: "string",
         description:
-          "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
+          "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
           FROM_JSON_NON_PAYLOAD_DESC +
           " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).",
       },
@@ -1627,9 +1646,17 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         meaning: "a bounded free-text flag exceeds its devChangelog column width",
         remedy: "trim the named flag by the stated overflow — a column-width limit, so --from-json does not help",
       },
+      {
+        origin: "client",
+        exit: 4,
+        match: "--append-description",
+        meaning: "--append-description is empty, or combined with --description/--summary/--body",
+        remedy: "--append-description must be non-empty and is mutually exclusive with a full --description replace — use one or the other",
+      },
     ],
     notes: [
       "SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see `ib help shell-quoting`.",
+      "--append-description (fb#757) is the non-destructive twin of --description, mirroring `ib dev feedback update`: it fetches the current entry, joins the new text onto the end separated by a blank line, and PUTs the merged result — the original entry text is never lost. Exclusive with --description/--summary/--body (exit 4 if combined).",
       "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
       "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
       "--feedback re-establishes a link lost to delete + re-add — the only way to do it (`ib dev feedback resolve` sets status/resolution but not the link). It sets resolvedByChangelogId back to this entry but does NOT mark the row applied: since fb#578 this command writes no status at all, so close the row yourself with `ib dev feedback resolve <id> --status applied` once the change is live.",
@@ -1644,6 +1671,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       'ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"',
       "ib dev changelog update 386 --from-json ./patch.json",
       'ib dev changelog update 1280 --unlink 541 --feedback 542 --reason "linked the wrong fb id"',
+      'ib dev changelog update 1547 --append-description "Reviewed: verified fix landed in prod, no regressions."',
     ],
   },
   {

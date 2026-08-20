@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { CliError } from "../../api/errors.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
-import { writeJson, failWith, failUsage } from "../../output/json.js";
+import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
 import { parseId, cappedInt, assertEnum } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
@@ -305,9 +305,11 @@ export async function runLegalSaveWithEdit(client, type, op, fields, flags) {
     const current = await runLegalShow(client, type, false, fields.language); // /current/:type ; 404 → CliError exit 5
     assertServedLanguageMatches(type, fields.language, current);
     const before = typeof current.markdownContent === "string" ? current.markdownContent : "";
-    const { next, matchCount } = applyTextEdit(before, op);
+    const { next, matchCount, seamInserted } = applyTextEdit(before, op);
+    if (seamInserted)
+        warnNote("[ib] a newline seam was inserted between the existing text and the new text (fb#790)");
     if (flags.dryRun) {
-        return textEditDryRunEnvelope(before, next, matchCount, { type }, "markdownContent");
+        return textEditDryRunEnvelope(before, next, matchCount, { type }, "markdownContent", seamInserted);
     }
     const title = fields.title ?? (typeof current.title === "string" ? current.title : "");
     return runLegalSave(client, {
