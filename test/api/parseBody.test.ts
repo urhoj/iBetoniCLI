@@ -91,6 +91,56 @@ describe("readJsonObjectInput", () => {
       expect((e as CliError).exitCode).toBe(4);
     }
   });
+
+  // fb#768: an empty file used to fall through to JSON.parse and come back as a
+  // syntax error whose hint explicitly ruled out "the path" — exactly wrong when
+  // the actual cause was a stale 0-byte file or a path mismatch.
+  test("an EMPTY file gets its own message, distinct from a syntax error", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-parsebody-"));
+    const file = join(dir, "body.json");
+    try {
+      writeFileSync(file, "", "utf8");
+      readJsonObjectInput(file);
+      throw new Error("should have thrown");
+    } catch (e) {
+      const err = e as CliError;
+      expect(err.exitCode).toBe(4);
+      expect(err.message).toContain("is empty (0 bytes)");
+      expect(err.message).not.toContain("not valid JSON");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a WHITESPACE-only file is also treated as empty", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-parsebody-"));
+    const file = join(dir, "body.json");
+    try {
+      writeFileSync(file, "   \n\t", "utf8");
+      readJsonObjectInput(file);
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as CliError).message).toContain("is empty (0 bytes)");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a genuine JSON syntax error still names the byte count", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-parsebody-"));
+    const file = join(dir, "body.json");
+    try {
+      writeFileSync(file, '{"a":}', "utf8");
+      readJsonObjectInput(file);
+      throw new Error("should have thrown");
+    } catch (e) {
+      const err = e as CliError;
+      expect(err.message).toContain("(6 bytes)");
+      expect(err.message).toContain("not valid JSON");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 /**

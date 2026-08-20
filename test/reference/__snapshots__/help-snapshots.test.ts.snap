@@ -2782,7 +2782,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation             → --ttl-hours must be 1-24
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
-  exit 4 (HTTP 409)  Already claimed, or already closed → the message names the holder and expiry — pick another item with \`ib dev feedback list --unclaimed\`, or pass --steal to take it anyway
+  exit 4 (HTTP 409)  Already closed         → the row is done — read the linked entry with \`ib dev changelog get <id>\`; reopen it with \`ib dev feedback resolve <id> --status open\` first if it should not be
+  exit 4 (HTTP 409)  Already claimed by another session → the message names the holder and expiry — pick another item with \`ib dev feedback list --unclaimed\`, or pass --steal to take it anyway
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES

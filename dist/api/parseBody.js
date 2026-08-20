@@ -154,13 +154,21 @@ export function readJsonObjectInput(pathOrDash) {
             : "Could not open that path. Check it exists and is readable; the argument is a file path, or `-` to read stdin.";
         throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4, hint);
     }
+    // A distinct cause from a syntax error: the file WAS read, it just holds
+    // nothing — commonly a stale 0-byte file from an earlier attempt, or a path
+    // mismatch between whatever wrote it and the shell/CLI reading it (e.g. /tmp
+    // resolving to two different directories on Windows/Git Bash). The syntax-error
+    // hint below explicitly rules out "the path", which is exactly wrong here (fb#768).
+    if (raw.trim() === "") {
+        throw new CliError(`--from-json ${pathOrDash} is empty (0 bytes)`, 0, null, 4, "The file was read successfully but holds no content. Check you wrote to this exact path — a stale 0-byte file from an earlier attempt, or a tool resolving the same path string to a different location than the CLI (e.g. /tmp on Windows/Git Bash), are the common causes.");
+    }
     let parsed;
     try {
         parsed = JSON.parse(raw);
     }
     catch (e) {
         const detail = errorMessage(e);
-        throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 0, null, 4, fromJsonParseHint(raw, detail));
+        throw new CliError(`--from-json ${pathOrDash} (${raw.length} bytes) is not valid JSON: ${detail}`, 0, null, 4, fromJsonParseHint(raw, detail));
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
         // Name what the root ACTUALLY was: "must contain a JSON object" alone leaves

@@ -307,7 +307,8 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       apiErr(400, "Validation", "--ttl-hours must be 1-24", "ttlhours"),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
-      apiErr(409, "Already claimed, or already closed", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway"),
+      apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback resolve <id> --status open` first if it should not be", "already closed"),
+      apiErr(409, "Already claimed by another session", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway", "claimed by"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
