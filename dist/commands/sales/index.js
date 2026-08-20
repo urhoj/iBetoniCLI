@@ -36,11 +36,19 @@ export async function runProspectList(client, opts = {}) {
 export async function resolveProspect(client, ref) {
     const rows = await client.get("/api/admin/sales-prospects");
     const all = Array.isArray(rows) ? rows : [];
+    // Y-tunnus rendering varies by source: seeded rows took theirs from `asiakas`
+    // (hyphenated, "1869376-5"), the weekly registry-scrape task takes theirs from
+    // markdown (sometimes unhyphenated, "18693765"). Compare digits-only so both
+    // resolve to the same row — an exact-string miss here used to exit 5 and send
+    // the weekly task down the `add` path, creating a duplicate prospect for a
+    // company already in the pipeline. Digit-only normalization is for THIS
+    // lookup only; stored values are left exactly as provided.
+    const normYtunnus = (v) => String(v ?? "").replace(/\D/g, "");
     const matches = ref.id !== undefined
         ? all.filter((r) => r.saasProspectId === ref.id)
         : ref.asiakas !== undefined
             ? all.filter((r) => r.asiakasId === ref.asiakas)
-            : all.filter((r) => (r.ytunnus ?? "") === ref.ytunnus);
+            : all.filter((r) => normYtunnus(r.ytunnus) === normYtunnus(ref.ytunnus));
     if (matches.length === 0) {
         failWith(`No sales prospect matches ${JSON.stringify(ref)}`, 5);
     }
@@ -149,6 +157,10 @@ export function registerSalesCommands(parent, getClient) {
             ?? {});
         const fields = {
             companyName: opts.name ?? parsed.companyName,
+            // JSON-document only: --ytunnus is a resolve-by KEY on this command
+            // (which row to update), never a value to WRITE, so it must not be
+            // merged in here the way the other typed flags are.
+            ytunnus: parsed.ytunnus,
             segment: opts.segment ?? parsed.segment,
             region: opts.region ?? parsed.region,
             fleetPumps: opts.fleetPumps ?? parsed.fleetPumps,
@@ -162,9 +174,11 @@ export function registerSalesCommands(parent, getClient) {
         };
         writeJson(await runProspectUpdate(client, row.saasProspectId, fields, opts));
     }));
-    s.command("customer")
+    const customer = s
+        .command("customer")
+        .description("Companies with their own keikka rows — who is actually running betoni.online");
+    customer
         .command("list")
-        .description("Companies with their own keikka rows — who is actually running betoni.online")
         .action(jsonAction(getClient, (client) => runCustomerList(client)));
 }
 //# sourceMappingURL=index.js.map

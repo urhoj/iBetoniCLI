@@ -10567,7 +10567,7 @@ exports[`Help snapshots — contract stability > help for ib sales customer list
 
 DESCRIPTION
   Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership across numerous tenants; lastLoginAny is kept alongside so the difference is inspectable.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdmin.
 
 FLAGS
   (none)
@@ -10593,7 +10593,7 @@ exports[`Help snapshots — contract stability > help for ib sales prospect add 
 
 DESCRIPTION
   Add a company to the SaaS sales pipeline. --asiakas for a company already in betoni.online (companyName is backfilled from the asiakas row); --name for a COLD company with no asiakas row — which is the whole reason this pipeline has its own table.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdmin.
 
 FLAGS
   --asiakas NUMBER    Existing betoni.online asiakasId
@@ -10632,7 +10632,7 @@ exports[`Help snapshots — contract stability > help for ib sales prospect get 
 
 DESCRIPTION
   One SaaS prospect, by saasProspectId, --asiakas or --ytunnus. Exits 4 (not a guess) when more than one row matches the reference, and 5 when none does.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <saasProspectId> NUMBER    the row id (optional if --asiakas/--ytunnus given) (required)
@@ -10664,7 +10664,7 @@ exports[`Help snapshots — contract stability > help for ib sales prospect list
 
 DESCRIPTION
   List the betoni.online SaaS sales pipeline (dbo.saasProspect) — companies we are selling betoni.online ITSELF to. Distinct from \`ib jerry admin onboarding list\`, the BetoniJerry provider pipeline: a company sits in both at independent stages. Every filter is applied CLIENT-SIDE (the route takes no query params by design). Use --brief to drop the two long narrative columns.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdmin.
 
 FLAGS
   --status STRING    ei_aloitettu | analysoitu | kontaktoitu | tapaaminen | tarjous | voitettu | havitty | ei_sovellu
@@ -10695,7 +10695,7 @@ exports[`Help snapshots — contract stability > help for ib sales prospect upda
 
 DESCRIPTION
   Write company FACTS onto a SaaS prospect — the weekly suomen-betonipumppausyritykset task's write path. Only facts: the backend DROPS status/tier/notes/parkedUntil arriving here, because a human owns pipeline state and the task must never revert it. --fit-score and --pitch are FIRST-FILL: written only while the stored value is NULL, so a human's answer always wins. Stamps analysisUpdatedTime.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <saasProspectId> NUMBER    the row id (optional if --asiakas/--ytunnus given) (required)
@@ -10728,7 +10728,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { success: true }
+  { success: true, fieldsWritten }  — fieldsWritten is 0 when every key in the payload fell outside the scope's whitelist, so nothing was actually written
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId

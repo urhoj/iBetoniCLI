@@ -9,7 +9,7 @@ export const SALES_SPECS: CommandSpec[] = [
     command: "ib sales prospect list",
     description:
       "List the betoni.online SaaS sales pipeline (dbo.saasProspect) — companies we are selling betoni.online ITSELF to. Distinct from `ib jerry admin onboarding list`, the BetoniJerry provider pipeline: a company sits in both at independent stages. Every filter is applied CLIENT-SIDE (the route takes no query params by design). Use --brief to drop the two long narrative columns.",
-    auth: "any",
+    permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
       { name: "status", type: "string", description: "ei_aloitettu | analysoitu | kontaktoitu | tapaaminen | tarjous | voitettu | havitty | ei_sovellu" },
@@ -30,7 +30,7 @@ export const SALES_SPECS: CommandSpec[] = [
     command: "ib sales prospect get",
     description:
       "One SaaS prospect, by saasProspectId, --asiakas or --ytunnus. Exits 4 (not a guess) when more than one row matches the reference, and 5 when none does.",
-    auth: "any",
+    permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "saasProspectId", type: "number", description: "the row id (optional if --asiakas/--ytunnus given)" }],
     flags: [
@@ -48,7 +48,7 @@ export const SALES_SPECS: CommandSpec[] = [
     command: "ib sales prospect add",
     description:
       "Add a company to the SaaS sales pipeline. --asiakas for a company already in betoni.online (companyName is backfilled from the asiakas row); --name for a COLD company with no asiakas row — which is the whole reason this pipeline has its own table.",
-    auth: "any",
+    permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
       { name: "asiakas", type: "number", description: "Existing betoni.online asiakasId" },
@@ -72,7 +72,7 @@ export const SALES_SPECS: CommandSpec[] = [
     command: "ib sales prospect update",
     description:
       "Write company FACTS onto a SaaS prospect — the weekly suomen-betonipumppausyritykset task's write path. Only facts: the backend DROPS status/tier/notes/parkedUntil arriving here, because a human owns pipeline state and the task must never revert it. --fit-score and --pitch are FIRST-FILL: written only while the stored value is NULL, so a human's answer always wins. Stamps analysisUpdatedTime.",
-    auth: "any",
+    permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "saasProspectId", type: "number", description: "the row id (optional if --asiakas/--ytunnus given)" }],
     flags: [
@@ -94,7 +94,7 @@ export const SALES_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ success: true }",
+    outputShape: "{ success: true, fieldsWritten }  — fieldsWritten is 0 when every key in the payload fell outside the scope's whitelist, so nothing was actually written",
     errors: [
       { origin: "client", exit: 4, meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
       { origin: "client", exit: 5, meaning: "No prospect matches", remedy: "`ib sales prospect add` first" },
@@ -109,7 +109,7 @@ export const SALES_SPECS: CommandSpec[] = [
     command: "ib sales customer list",
     description:
       "Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership across numerous tenants; lastLoginAny is kept alongside so the difference is inspectable.",
-    auth: "any",
+    permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [],
     outputShape:
