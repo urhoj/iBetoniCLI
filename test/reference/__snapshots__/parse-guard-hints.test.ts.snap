@@ -79,7 +79,7 @@ ib customer dead-list --limit <n>
 
 ib customer list --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
+  > pass a positive integer; this command caps at 500 with NO cursor pagination (nextCursor is always null, even when truncated) — narrow with --ids/--since/--sort instead of paging
 
 ib customer log --limit <n>
   ! --limit must be an integer >= 1

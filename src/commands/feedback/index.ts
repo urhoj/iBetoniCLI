@@ -873,6 +873,13 @@ export interface FeedbackUpdateInput {
   description?: string;
   /** Text appended to the CURRENT description (read-merge-write) — never replaces it. */
   appendDescription?: string;
+  /**
+   * Audit why-string (fb#801) — `update` has no separate note field to carry it
+   * on, so it merges into --append-description the same way `resolve` merges
+   * --reason into its note (mergeNoteFlags dedupes an identical value). Rejected
+   * alongside a full --description replace, where merging would be ambiguous.
+   */
+  reason?: string;
   dryRun?: boolean;
   full?: boolean;
 }
@@ -917,6 +924,13 @@ export async function runFeedbackUpdate(
   if (input.description !== undefined && input.appendDescription !== undefined) {
     failWith("--description and --append-description are mutually exclusive", 4);
   }
+  // --reason has no field of its own to land on (fb#801) — it can only merge
+  // into the append, not a full replace, where blending in reason text would
+  // silently change what --description was asked to set.
+  if (input.reason !== undefined && input.description !== undefined) {
+    failWith("--reason cannot be combined with --description (a full replace) — use --append-description instead", 4);
+  }
+  const appendDescription = mergeNoteFlags(input.appendDescription?.trim(), input.reason?.trim());
   const body: Record<string, unknown> = {};
   if (input.scope !== undefined) body.scope = input.scope;
   if (input.kind !== undefined) body.kind = input.kind;
@@ -926,15 +940,14 @@ export async function runFeedbackUpdate(
   // Read-merge-write: --description REPLACES the filed report, which is the
   // destructive half of feedback #332. Appending keeps the original text and
   // adds to it, so later commentary can never overwrite the evidence.
-  if (input.appendDescription !== undefined) {
+  if (appendDescription !== undefined) {
     const current = await runFeedbackGet(client, id);
     const existing = typeof current.description === "string" ? current.description : "";
-    const addition = input.appendDescription.trim();
-    body.description = existing ? `${existing.trimEnd()}\n\n${addition}` : addition;
+    body.description = existing ? `${existing.trimEnd()}\n\n${appendDescription}` : appendDescription;
   }
   if (Object.keys(body).length === 0) {
     failWith(
-      "Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description",
+      "Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --reason",
       4
     );
   }
@@ -1354,6 +1367,7 @@ export function registerFeedbackCommands(
     .option("--description <text>")
     .option("--body <text>")
     .option("--append-description <text>")
+    .option("--reason <text>", "Audit why-string (fb#801) — merges into --append-description; rejected alongside a full --description replace")
     .option(
       "--from-json <file>"
     )
@@ -1370,6 +1384,7 @@ export function registerFeedbackCommands(
           description?: string;
           body?: string;
           appendDescription?: string;
+          reason?: string;
           fromJson?: string;
           dryRun?: boolean;
           full?: boolean;
@@ -1389,6 +1404,7 @@ export function registerFeedbackCommands(
           "Provide the description via --description or --body, not both with different values"
         );
         if (desc !== undefined) opts.description = desc;
+        warnIfShellMangled({ appendDescription: opts.appendDescription, reason: opts.reason });
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
@@ -1399,6 +1415,7 @@ export function registerFeedbackCommands(
               complexity: opts.complexity,
               description: opts.description,
               appendDescription: opts.appendDescription,
+              reason: opts.reason,
               dryRun: opts.dryRun,
               full: opts.full,
             })

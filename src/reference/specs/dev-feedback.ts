@@ -252,6 +252,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
+      { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace" },
       { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
@@ -262,7 +263,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // Three client rows share exit 4, so EACH needs `match` — an unmatched row
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
-      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description; enum values must be valid; --complexity must be an integer 1-5; --description and --append-description are mutually exclusive" },
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values", "cannot be combined"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "the error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
@@ -272,6 +273,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     notes: [
       "--description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).",
       "SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see `ib help shell-quoting`.",
+      "--reason has no dedicated audit field here (unlike claim/release) — it merges into --append-description, same idiom `resolve` uses for --reason on its note. Combine it with --description (a full replace) instead and it exits 4.",
     ],
     seeAlso: ["ib dev feedback resolve"],
     examples: [

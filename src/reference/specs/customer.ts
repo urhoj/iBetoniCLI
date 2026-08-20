@@ -20,7 +20,12 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
         default: "100",
         description: "Max rows for the unbounded list (capped at 500). Ignored when --ids is given.",
       },
-      { name: "cursor", type: "string", description: "Pagination cursor" },
+      {
+        name: "cursor",
+        type: "string",
+        description:
+          "Reserved for future cursor pagination — this route has none today (nextCursor is always null); passing --cursor is a silent no-op.",
+      },
       { name: "full", type: "boolean", description: "Return full customer fields + companyDescription (not just id/name/ytunnus/type)" },
       { name: "ids", type: "string", description: "Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches" },
       { name: "include", type: "string", description: "Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)" },
@@ -31,13 +36,13 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, ownerAsiakasId, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
-    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), ...permErrors("auth.page.asiakas.read")],
+    errors: [limitErr("pass a positive integer; this command caps at 500 with NO cursor pagination (nextCursor is always null, even when truncated) — narrow with --ids/--since/--sort instead of paging"), ...permErrors("auth.page.asiakas.read")],
     notes: [
       "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
       "--full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`).",
       "--full also carries `roolit` per row, so 'which of my customers are pump providers?' is ONE call: `ib customer list --full --fields name,roolit` (needs the 2026-08-10 backend; older deployments omit the field).",
       "--ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.",
-      "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
+      "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags the cap; nextCursor is ALWAYS null (fb#745, no true pagination) — narrow with --ids/--since instead of expecting a next page.",
       "--fields / --sijainti-types trim what you ingest: project to the columns you diff and keep only the location types you care about (e.g. varikko/asema). Server-side on a deployed backend, with a client-side fallback so they work pre-deploy.",
       "registeredAt (the customer's registration timestamp) is on every row — combine --since (e.g. --since yesterday) with --sort registered for a 'new customers in the last 24h' report, incl. cross-tenant for system admins. --since/--sort are server-side (no client-side fallback — the server truncates at --limit before any client filter could run), so they need the backend deploy.",
     ],

@@ -77,6 +77,13 @@ export async function runCustomerList(client, opts) {
     if ((opts.fields?.length || opts.sijaintiTypes?.length) && Array.isArray(env.items)) {
         env.items = env.items.map((row) => projectCustomerRow(row, opts.fields, opts.sijaintiTypes));
     }
+    // fb#745: this route has no cursor pagination — nextCursor is always null, so
+    // a caller honouring `truncated` was left with no documented way to see the
+    // rest. Say so on the envelope itself, not just in --help, since a JSON-only
+    // consumer never reads the flag docs.
+    if (env.truncated && env.nextCursor == null && !env.hint) {
+        env.hint = "no cursor pagination on this route — narrow with --ids/--since/--sort instead of paging past the cap";
+    }
     return env;
 }
 /**

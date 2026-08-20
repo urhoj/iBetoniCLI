@@ -238,10 +238,17 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         // `meta` requests (e.g. `ib feedback`) are not domain mutations — they are
         // whitelisted past the lock so feedback can be filed even under read-only.
         if (readOnly && method !== "GET" && !opts.meta && !opts.read) {
+            // fb#775 facet 2: a caller passing --dry-run under read-only got the same
+            // generic refusal as any other write, and read it as "the write was
+            // blocked" without learning that --dry-run gives no preview either (it is
+            // still a POST). Name that explicitly when the header is present.
+            const dryRunNote = opts.headers?.["X-Dry-Run"] === "1"
+                ? " This also blocks --dry-run, since it is still a POST; unset IB_READ_ONLY / drop --read-only to preview."
+                : "";
             // body.code surfaces as `code` in the stderr envelope — a machine-parseable
             // marker distinguishing this client-side refusal (statusCode 0) from a real
             // server-side HTTP 403, which shares exit code 3.
-            throw new CliError(`Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`, 0, { code: "READ_ONLY_BLOCKED" }, 3);
+            throw new CliError(`Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).${dryRunNote}`, 0, { code: "READ_ONLY_BLOCKED" }, 3);
         }
         // Announce the write target once, after the read-only gate (a refused write
         // must not claim to have acted) and before the request leaves the process.

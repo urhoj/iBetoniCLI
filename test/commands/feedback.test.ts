@@ -1105,7 +1105,7 @@ describe("ib feedback update", () => {
         );
         expect(exitCode).toBe(4);
         expect(String(envelope.error)).toMatch(/unknown key status/);
-        expect(String(envelope.error)).toMatch(/accepted: appendDescription, body, complexity, description, kind, scope, severity/);
+        expect(String(envelope.error)).toMatch(/accepted: appendDescription, body, complexity, description, kind, reason, scope, severity/);
       });
       expect(put).not.toHaveBeenCalled();
     });

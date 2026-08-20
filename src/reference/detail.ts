@@ -246,14 +246,28 @@ export async function runReferenceDetailEdit(
   flags: WriteFlags = {},
   tier: CallerTier = getCallerTier()
 ): Promise<unknown> {
-  const current = await runReferenceDetail(client, commandParts, tier);
-  const before = String((current as Record<string, unknown>)[field] ?? "");
+  const command = resolveCommand(commandParts, tier);
+  // resolveCommand above already proved the command itself is valid/visible, so
+  // a 404 here means the catalog just has no row yet — not a wrong command path
+  // (fb#784, previously surfaced the generic not-found/tenancy hint). Edit
+  // against an empty field instead: append/prepend then behave like a create,
+  // matching the glossary `--append-definition` spirit; --replace still fails
+  // its own "0 matches" check below, which is the correct outcome for it.
+  let before = "";
+  let resolvedCommand = command;
+  try {
+    const current = await runReferenceDetail(client, commandParts, tier);
+    before = String((current as Record<string, unknown>)[field] ?? "");
+    resolvedCommand = current.command;
+  } catch (e) {
+    if (!(e instanceof CliError && e.statusCode === 404)) throw e;
+  }
   const { next, matchCount } = applyTextEdit(before, op);
   // Cap-check the MERGED text before the dry-run branch, so a preview that would
   // 400 on write reports it here instead of returning a clean-looking diff.
   assertWithinCap(field, next, "would be");
   if (flags.dryRun) {
-    return textEditDryRunEnvelope(before, next, matchCount, { command: current.command }, field);
+    return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field);
   }
   return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
 }
