@@ -82,7 +82,14 @@ describe("parser errors → JSON envelope", () => {
     // Allowed values are pulled from the command spec so the caller re-runs
     // correctly without a --help round-trip (fb#204).
     expect(byFlag["--type"].allowed).toEqual(["feature", "improvement", "bugfix"]);
-    expect(byFlag["--area"].allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(byFlag["--area"].allowed).toEqual([
+      "frontend",
+      "backend",
+      "cli",
+      "database",
+      "cicd",
+      "workspace",
+    ]);
     expect(String(parsed.sample)).toContain("ib dev changelog add");
     expect(process.exitCode).toBe(4);
   });

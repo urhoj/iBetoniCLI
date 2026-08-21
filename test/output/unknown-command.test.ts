@@ -409,7 +409,17 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
   });
 
   test("a direct sibling is not re-suggested (depth-1 is already `available`)", () => {
-    expect(descendantsOwningVerb("ib keikka", "list", "developer")).toEqual([]);
+    // `ib keikka get` is a depth-1 sibling and no depth-2 descendant of
+    // `ib keikka` owns `get`, so the descendant scan adds nothing on top of
+    // `available`/didYouMean. ("list" can no longer probe this: `ib keikka
+    // person list` (fb#833) IS a legitimate depth-2 owner — next test.)
+    expect(descendantsOwningVerb("ib keikka", "get", "developer")).toEqual([]);
+  });
+
+  test("a depth-2 descendant owning the verb IS surfaced (fb#833)", () => {
+    expect(descendantsOwningVerb("ib keikka", "list", "developer")).toEqual([
+      "ib keikka person list",
+    ]);
   });
 
   test("tier-gated: a developer-only descendant is invisible below its tier", () => {

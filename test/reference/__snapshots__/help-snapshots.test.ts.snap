@@ -2211,7 +2211,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas. (required)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas. (required)
   --title STRING    Entry title (max 300 chars) (required)
   --description STRING    Alias for the positional description; one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
   --summary STRING    Alias for --description (same one-required description-input group; several passed must match) (required: one description input)
@@ -2368,7 +2368,7 @@ DESCRIPTION
 FLAGS
   --month STRING    YYYY-MM
   --type STRING    feature|improvement|bugfix
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --repo STRING    Repo/submodule — matches entries whose --repo CSV CONTAINS this token, so \`--repo betonicli\` also returns cross-lane rows recorded as "puminet5api,betonicli" (deploy-gated: against an older backend this is an exact string match and those rows are invisible). Aliases resolve (\`cli\` → betonicli); a CSV here matches rows containing ANY of the tokens.
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
@@ -2529,7 +2529,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --title STRING    New title (max 300 chars)
   --description STRING    New description — REPLACES the whole text (destructive; use --append-description to add to it instead)
   --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the existing entry text intact. Mutually exclusive with --description/--summary/--body
@@ -6112,6 +6112,56 @@ SEE ALSO
 EXAMPLES
   ib keikka log 12345
   ib keikka log 12345 --field kuskit
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka person list matches snapshot 1`] = `
+"USAGE
+  ib keikka person list [<keikkaId>] [flags]
+
+DESCRIPTION
+  List the persons attached to a keikka as RAW keikkaPerson rows — one row per link, with the source id resolved to its source text. The SAME person legitimately holds several rows (one per source), so use --by-person to fold them per person, or --count for the per-source totals when a keikka carries a surprising number of rows.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <keikkaId> NUMBER    keikkaId (or pass --keikka) (optional)
+
+FLAGS
+  --keikka NUMBER    Target keikkaId (alias for the positional)
+  --source NUMBER    Only rows with this keikkaPersonSourceId (applies to every mode)
+  --by-person    Collapse rows per person (rowCount, sources[], auth flags OR-ed). Mutually exclusive with --count.
+  --count    Only { summary }: total, distinctPersons, bySource counts. Mutually exclusive with --by-person.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  default: ListEnvelope<{ keikkaPersonId, personId, name, email, phone, sourceId, sourceText, contactType, entryTime, authRead, authEdit, authListPersons, authAddPerson, authEditPerson }> · --by-person: ListEnvelope<{ personId, name, email, phone, rowCount, sources:[{sourceId,sourceText}], contactTypes:[], auth:{read,edit,listPersons,addPerson,editPerson} }> · --count: { summary: { total, distinctPersons, bySource:[{sourceId,sourceText,count}] } }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No company role on the keikka's owner company and no delegated authEdit grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers → verify the keikkaId; \`ib company switch\` to the keikka's owner, or use a sysadmin/developer token
+  exit 5 (HTTP 404)  The route itself never 404s — a 404 here means GET /api/cli/keikka/persons is not deployed yet (deploy-gated) → deploy the backend (npm run deploy + swap), then retry
+  exit 4 (client-side)  Both collapse modes passed together → pass exactly one of --by-person or --count
+  exit 4 (client-side)  No keikkaId given (or not a positive integer) → pass <keikkaId> positionally or via --keikka <id>
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Gate = requireKeikkaManageAccess (same as the FE route): sysadmin/developer, any company role on the keikka's OWNER, or a delegated authEdit grant — delegated read-only is NOT enough.
+  - RAW is the default ON PURPOSE: one person holds one row per source, and a silent collapse would hide exactly the bloat this command diagnoses (fb#833). --by-person is the opt-in fold.
+  - Source ids resolve to text server-side (dbo.keikkaPersonSource); typical: 1 created-by, 10/11 asiakas mirror/contact, 20/21 tyomaa mirror/contact, 30/31 manual/keikka contact, 50 pumppari.
+  - Deleted links (isDeleted=1) and system persons (personId<=0) are excluded server-side.
+  - Deploy-gated: 404 until the backend ships GET /api/cli/keikka/persons.
+
+SEE ALSO
+  ib keikka get, ib customer person list, ib worksite person list
+
+EXAMPLES
+  ib keikka person list 9096
+  ib keikka person list --keikka 9096 --by-person
+  ib keikka person list 9096 --count
+  ib keikka person list 9096 --source 30
 "
 `;
 

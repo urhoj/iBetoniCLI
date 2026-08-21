@@ -126,6 +126,49 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     examples: ["ib keikka get 9001"],
   },
   {
+    command: "ib keikka person list",
+    description:
+      "List the persons attached to a keikka as RAW keikkaPerson rows — one row per link, with the source id resolved to its source text. The SAME person legitimately holds several rows (one per source), so use --by-person to fold them per person, or --count for the per-source totals when a keikka carries a surprising number of rows.",
+    auth: "any",
+    args: [{ name: "keikkaId", type: "number", required: false, description: "keikkaId (or pass --keikka)" }],
+    flags: [
+      { name: "keikka", type: "number", description: "Target keikkaId (alias for the positional)" },
+      { name: "source", type: "number", description: "Only rows with this keikkaPersonSourceId (applies to every mode)" },
+      { name: "by-person", type: "boolean", description: "Collapse rows per person (rowCount, sources[], auth flags OR-ed). Mutually exclusive with --count." },
+      { name: "count", type: "boolean", description: "Only { summary }: total, distinctPersons, bySource counts. Mutually exclusive with --by-person." },
+    ],
+    outputShape:
+      "default: ListEnvelope<{ keikkaPersonId, personId, name, email, phone, sourceId, sourceText, contactType, entryTime, authRead, authEdit, authListPersons, authAddPerson, authEditPerson }> · --by-person: ListEnvelope<{ personId, name, email, phone, rowCount, sources:[{sourceId,sourceText}], contactTypes:[], auth:{read,edit,listPersons,addPerson,editPerson} }> · --count: { summary: { total, distinctPersons, bySource:[{sourceId,sourceText,count}] } }",
+    errors: authErrors(
+      apiErr(
+        403,
+        "No company role on the keikka's owner company and no delegated authEdit grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers",
+        "verify the keikkaId; `ib company switch` to the keikka's owner, or use a sysadmin/developer token"
+      ),
+      apiErr(
+        404,
+        "The route itself never 404s — a 404 here means GET /api/cli/keikka/persons is not deployed yet (deploy-gated)",
+        "deploy the backend (npm run deploy + swap), then retry"
+      ),
+      { origin: "client", exit: 4, match: "--by-person and --count are mutually exclusive", meaning: "Both collapse modes passed together", remedy: "pass exactly one of --by-person or --count" },
+      { origin: "client", exit: 4, match: "missing or invalid target", meaning: "No keikkaId given (or not a positive integer)", remedy: "pass <keikkaId> positionally or via --keikka <id>" }
+    ),
+    notes: [
+      "Gate = requireKeikkaManageAccess (same as the FE route): sysadmin/developer, any company role on the keikka's OWNER, or a delegated authEdit grant — delegated read-only is NOT enough.",
+      "RAW is the default ON PURPOSE: one person holds one row per source, and a silent collapse would hide exactly the bloat this command diagnoses (fb#833). --by-person is the opt-in fold.",
+      "Source ids resolve to text server-side (dbo.keikkaPersonSource); typical: 1 created-by, 10/11 asiakas mirror/contact, 20/21 tyomaa mirror/contact, 30/31 manual/keikka contact, 50 pumppari.",
+      "Deleted links (isDeleted=1) and system persons (personId<=0) are excluded server-side.",
+      "Deploy-gated: 404 until the backend ships GET /api/cli/keikka/persons.",
+    ],
+    seeAlso: ["ib keikka get", "ib customer person list", "ib worksite person list"],
+    examples: [
+      "ib keikka person list 9096",
+      "ib keikka person list --keikka 9096 --by-person",
+      "ib keikka person list 9096 --count",
+      "ib keikka person list 9096 --source 30",
+    ],
+  },
+  {
     command: "ib keikka create",
     description:
       "Create a new keikka. The body is forwarded verbatim to POST /api/keikka/newKeikka — see the backend route for required fields.",

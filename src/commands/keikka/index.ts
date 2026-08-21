@@ -11,7 +11,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
@@ -333,6 +333,193 @@ export async function runKeikkaValidate(
   return failWith("Pass a keikkaId or --date <YYYY-MM-DD>", 4);
 }
 
+/** One raw row from GET /api/cli/keikka/persons/:keikkaId (keikkaPerson + person + source JOIN). */
+interface KeikkaPersonRawRow {
+  keikkaPersonId: number;
+  personId: number;
+  personFirstName?: string | null;
+  personLastName?: string | null;
+  personEmail?: string | null;
+  personPhone?: string | null;
+  keikkaPersonSourceId?: number | null;
+  keikkaPersonSourceText?: string | null;
+  contactPersonTypeId?: number | null;
+  entryTime?: string | null;
+  authRead?: boolean | number;
+  authEdit?: boolean | number;
+  authListPersons?: boolean | number;
+  authAddPerson?: boolean | number;
+  authEditPerson?: boolean | number;
+}
+
+/** One projected RAW list row — one entry per keikkaPerson row (fb#833). */
+export interface KeikkaPersonListItem {
+  keikkaPersonId: number;
+  personId: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  sourceId: number | null;
+  sourceText: string | null;
+  contactType: number | null;
+  entryTime: string | null;
+  authRead: boolean;
+  authEdit: boolean;
+  authListPersons: boolean;
+  authAddPerson: boolean;
+  authEditPerson: boolean;
+}
+
+/** A `--by-person` collapsed row: every source row one person holds, auth OR-ed. */
+export interface KeikkaPersonCollapsedItem {
+  personId: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  rowCount: number;
+  sources: { sourceId: number | null; sourceText: string | null }[];
+  contactTypes: number[];
+  auth: {
+    read: boolean;
+    edit: boolean;
+    listPersons: boolean;
+    addPerson: boolean;
+    editPerson: boolean;
+  };
+}
+
+/** A `--count` summary: totals grouped by source (the bloat diagnostic). */
+export interface KeikkaPersonCountSummary {
+  total: number;
+  distinctPersons: number;
+  bySource: { sourceId: number | null; sourceText: string | null; count: number }[];
+}
+
+function projectKeikkaPersonRow(r: KeikkaPersonRawRow): KeikkaPersonListItem {
+  return {
+    keikkaPersonId: r.keikkaPersonId,
+    personId: r.personId,
+    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
+    email: r.personEmail || null,
+    phone: r.personPhone || null,
+    sourceId: r.keikkaPersonSourceId ?? null,
+    sourceText: r.keikkaPersonSourceText || null,
+    contactType: r.contactPersonTypeId ?? null,
+    entryTime: r.entryTime != null ? String(r.entryTime) : null,
+    authRead: Boolean(r.authRead),
+    authEdit: Boolean(r.authEdit),
+    authListPersons: Boolean(r.authListPersons),
+    authAddPerson: Boolean(r.authAddPerson),
+    authEditPerson: Boolean(r.authEditPerson),
+  };
+}
+
+/**
+ * Collapse the raw rows per person (`--by-person`). keikkaPerson is UNIQUE on
+ * (personId, keikkaId, keikkaPersonSourceId[, contactPersonTypeId]), so one
+ * person legitimately holds several rows — one per source. Collapsing is
+ * OPT-IN for exactly that reason: a silent fold would hide the per-source
+ * multiplicity this command exists to diagnose (fb#833). Auth flags OR across
+ * the person's rows (any row granting edit means the person holds edit).
+ */
+function collapseByPerson(items: KeikkaPersonListItem[]): KeikkaPersonCollapsedItem[] {
+  const byPerson = new Map<number, KeikkaPersonCollapsedItem>();
+  for (const item of items) {
+    let entry = byPerson.get(item.personId);
+    if (!entry) {
+      entry = {
+        personId: item.personId,
+        name: item.name,
+        email: item.email,
+        phone: item.phone,
+        rowCount: 0,
+        sources: [],
+        contactTypes: [],
+        auth: { read: false, edit: false, listPersons: false, addPerson: false, editPerson: false },
+      };
+      byPerson.set(item.personId, entry);
+    }
+    entry.rowCount += 1;
+    // name/email/phone repeat on every row; keep the first non-empty spelling.
+    if (!entry.name && item.name) entry.name = item.name;
+    if (!entry.email && item.email) entry.email = item.email;
+    if (!entry.phone && item.phone) entry.phone = item.phone;
+    entry.sources.push({ sourceId: item.sourceId, sourceText: item.sourceText });
+    if (item.contactType != null && !entry.contactTypes.includes(item.contactType)) {
+      entry.contactTypes.push(item.contactType);
+    }
+    entry.auth.read = entry.auth.read || item.authRead;
+    entry.auth.edit = entry.auth.edit || item.authEdit;
+    entry.auth.listPersons = entry.auth.listPersons || item.authListPersons;
+    entry.auth.addPerson = entry.auth.addPerson || item.authAddPerson;
+    entry.auth.editPerson = entry.auth.editPerson || item.authEditPerson;
+  }
+  return [...byPerson.values()];
+}
+
+/**
+ * GET /api/cli/keikka/persons/:keikkaId — the persons attached to a keikka.
+ *
+ * The backend route returns one row PER keikkaPerson row with the source id
+ * resolved to keikkaPersonSourceText server-side (fb#833). This is the raw
+ * surface the FE list route lacks: keikkaPersonView groups per person and
+ * keeps only MAX(keikkaPersonSourceId), hiding the per-source multiplicity
+ * (same person, one row per source: 1 created-by, 10/11 asiakas mirror /
+ * contact, 20/21 tyomaa mirror / contact, 30/31 manual / keikka contact,
+ * 50 pumppari).
+ *
+ * Modes:
+ *   - default    ListEnvelope of RAW rows (one per keikkaPerson row)
+ *   - --by-person  collapsed per personId (rowCount, sources[], auth OR-ed)
+ *   - --count    { summary: { total, distinctPersons, bySource[] } }
+ *   - --source   filters rows by keikkaPersonSourceId before any of the above
+ *
+ * `--by-person` and `--count` are mutually exclusive (exit 4). Deploy-gated:
+ * 404 until the backend ships /api/cli/keikka/persons.
+ */
+export async function runKeikkaPersonList(
+  client: ApiClient,
+  keikkaId: number,
+  opts: { source?: number; byPerson?: boolean; count?: boolean } = {}
+): Promise<
+  | ListEnvelope<KeikkaPersonListItem>
+  | ListEnvelope<KeikkaPersonCollapsedItem>
+  | { summary: KeikkaPersonCountSummary }
+> {
+  if (opts.byPerson && opts.count) {
+    failWith("--by-person and --count are mutually exclusive — pass one or the other", 4);
+  }
+  const rows = await client.get<KeikkaPersonRawRow[]>(
+    `/api/cli/keikka/persons/${keikkaId}`
+  );
+  const filtered = (rows || []).filter(
+    (r) => opts.source === undefined || (r.keikkaPersonSourceId ?? null) === opts.source
+  );
+  if (opts.count) {
+    const bySource = new Map<number | null, { sourceId: number | null; sourceText: string | null; count: number }>();
+    const persons = new Set<number>();
+    for (const r of filtered) {
+      persons.add(r.personId);
+      const id = r.keikkaPersonSourceId ?? null;
+      const entry = bySource.get(id);
+      if (entry) {
+        entry.count += 1;
+      } else {
+        bySource.set(id, { sourceId: id, sourceText: r.keikkaPersonSourceText || null, count: 1 });
+      }
+    }
+    return {
+      summary: {
+        total: filtered.length,
+        distinctPersons: persons.size,
+        bySource: [...bySource.values()].sort((a, b) => (a.sourceId ?? -1) - (b.sourceId ?? -1)),
+      },
+    };
+  }
+  const items = filtered.map(projectKeikkaPersonRow);
+  return opts.byPerson ? listEnvelope(collapseByPerson(items)) : listEnvelope(items);
+}
+
 /**
  * Register `ib keikka` subcommands on the parent commander instance:
  *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
@@ -340,6 +527,7 @@ export async function runKeikkaValidate(
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
  *   - update   POST /api/keikka/setStatus (v1.0: --status only)
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
+ *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
  *
  * Date aliases (today/yesterday/tomorrow) are resolved before the API call.
  * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
@@ -487,6 +675,32 @@ export function registerKeikkaCommands(
       runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), opts)
     )
   );
+
+  const keikkaPerson = k
+    .command("person")
+    .description("Persons attached to a keikka (keikkaPerson links)");
+
+  keikkaPerson
+    .command("list [keikkaId]")
+    .option("--keikka <id>", "", Number)
+    .option("--source <id>", "", Number)
+    .option("--by-person")
+    .option("--count")
+    .action(
+      jsonAction(
+        getClient,
+        (
+          client,
+          keikkaIdStr: string | undefined,
+          opts: { keikka?: number; source?: number; byPerson?: boolean; count?: boolean }
+        ) =>
+          runKeikkaPersonList(
+            client,
+            resolveTarget(keikkaIdStr, opts.keikka, "keikkaId", "keikka"),
+            { source: opts.source, byPerson: opts.byPerson, count: opts.count }
+          )
+      )
+    );
 
   registerLogAlias(
     k,
