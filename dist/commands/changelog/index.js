@@ -12,7 +12,7 @@ import { explicitFlags, foldAliases, warnIfShellMangled } from "../_shared/flags
 import { payloadKeyMap as sharedPayloadKeyMap, normalizeFromJson, applyFromJson as sharedApplyFromJson, } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 const TYPES = ["feature", "improvement", "bugfix"];
-const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
+const AREAS = ["frontend", "backend", "cli", "database", "cicd", "workspace"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];

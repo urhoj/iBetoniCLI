@@ -116,6 +116,19 @@ export function closestName(target, names, synonyms = VERB_SYNONYMS) {
     const prefix = names.find((n) => t.length >= 2 && n.toLowerCase().startsWith(t));
     if (prefix)
         return prefix;
+    // Substring/ends-with pass (fb#832): for short tokens like "id", edit distance
+    // ranks "kind" (distance 2) above "feedbackId" (distance 8) — but "feedbackId"
+    // literally contains the typed token. Prefer a column that ENDS WITH the token
+    // (the most natural match for identifier shorthand), then any column that
+    // CONTAINS it, before falling through to edit distance.
+    if (t.length >= 2) {
+        const endsWith = names.find((n) => n.toLowerCase().endsWith(t));
+        if (endsWith)
+            return endsWith;
+        const contains = names.find((n) => n.toLowerCase().includes(t));
+        if (contains)
+            return contains;
+    }
     const threshold = Math.max(2, Math.floor(t.length / 2));
     let best = null;
     let bestDist = Infinity;
