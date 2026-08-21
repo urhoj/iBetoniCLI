@@ -9,6 +9,7 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { parseOptionalId } from "../../targets.js";
 
 /**
  * `ib sales` — the betoni.online SaaS sales pipeline (system-admin CRM behind
@@ -96,6 +97,12 @@ export async function resolveProspect(
   client: ApiClient,
   ref: { id?: number; asiakas?: number; ytunnus?: string }
 ): Promise<SalesProspect> {
+  // Guarded HERE, not at each call site: an all-undefined ref would otherwise
+  // fall through to the ytunnus branch, where normYtunnus(undefined) === "" and
+  // matches every row with a blank ytunnus.
+  if (ref.id === undefined && ref.asiakas === undefined && !ref.ytunnus) {
+    failWith("Pass a saasProspectId, --asiakas <id> or --ytunnus <y>", 4);
+  }
   const rows = await client.get<SalesProspect[]>("/api/admin/sales-prospects");
   const all = Array.isArray(rows) ? rows : [];
   // Y-tunnus rendering varies by source: seeded rows took theirs from `asiakas`
@@ -201,10 +208,7 @@ export function registerSalesCommands(
     .action(
       guarded(async (idArg: string | undefined, opts: { asiakas?: number; ytunnus?: string }) => {
         const client = await getClient();
-        const id = idArg ? Number(idArg) : undefined;
-        if (id === undefined && opts.asiakas === undefined && !opts.ytunnus) {
-          failWith("Pass a saasProspectId, --asiakas <id> or --ytunnus <y>", 4);
-        }
+        const id = parseOptionalId(idArg, "saasProspectId");
         writeJson(await resolveProspect(client, { id, asiakas: opts.asiakas, ytunnus: opts.ytunnus }));
       })
     );
@@ -274,10 +278,7 @@ export function registerSalesCommands(
       }
     ) => {
       const client = await getClient();
-      const id = idArg ? Number(idArg) : undefined;
-      if (id === undefined && opts.asiakas === undefined && !opts.ytunnus) {
-        failWith("Pass a saasProspectId, --asiakas <id> or --ytunnus <y>", 4);
-      }
+      const id = parseOptionalId(idArg, "saasProspectId");
       const row = await resolveProspect(client, { id, asiakas: opts.asiakas, ytunnus: opts.ytunnus });
       // Typed flags win over the JSON document — the same precedence as
       // buildOhjeFields/buildSijaintiBody, so a one-off override on the command
