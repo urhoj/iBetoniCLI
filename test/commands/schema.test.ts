@@ -12,6 +12,7 @@ import {
   runSchemaTriggers,
   runSchemaTrigger,
   runSchemaSnapshots,
+  runSchemaQuery,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -203,6 +204,48 @@ describe("ib schema", () => {
       get().mockResolvedValueOnce({ items: [{ name: "a" }], nextCursor: null, count: 1 });
       await runSchemaProcs(mockClient, {});
       expect(warned.join("")).toBe("");
+    });
+  });
+
+  /**
+   * fb#438 — ad-hoc read-only SQL. The wire contract that matters here is the
+   * `{ read: true }` marker: without it the command would be refused under
+   * `--read-only` and would print the acting-as WRITE banner for a read.
+   */
+  describe("runSchemaQuery (fb#438)", () => {
+    const post = () => mockClient.post;
+    let warned: string[];
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      post().mockReset();
+      warned = [];
+      spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        warned.push(String(chunk));
+        return true;
+      });
+    });
+    afterEach(() => spy.mockRestore());
+
+    const complete = { columns: ["n"], rows: [{ n: 1 }], rowCount: 1, truncated: false, cap: 1000 };
+
+    test("POSTs the sql as a read-over-POST and returns the payload untouched", async () => {
+      post().mockResolvedValueOnce(complete);
+      const sql = "SELECT COUNT(*) AS n FROM keikka";
+      const result = await runSchemaQuery(mockClient, sql);
+      expect(mockClient.post).toHaveBeenCalledWith("/api/cli/schema/query", { sql }, { read: true });
+      expect(result).toEqual(complete);
+      expect(warned.join("")).toBe("");
+    });
+
+    test("a capped result warns on stderr, names the command, and steers to aggregation", async () => {
+      post().mockResolvedValueOnce({ columns: ["a"], rows: [{ a: 1 }], rowCount: 1000, truncated: true, cap: 1000 });
+      const result = await runSchemaQuery(mockClient, "SELECT * FROM keikka");
+      expect(result.truncated).toBe(true);
+      const msg = warned.join("");
+      expect(msg).toContain("TRUNCATED");
+      expect(msg).toContain("ib dev schema query");
+      expect(msg).toContain("GROUP BY");
     });
   });
 });

@@ -3548,6 +3548,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev schema query matches snapshot 1`] = `
+"USAGE
+  ib dev schema query --sql <sql> [flags]
+
+DESCRIPTION
+  Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that \`schema tables/table\` cannot answer. Read-over-POST: works under --read-only. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --sql STRING    The SELECT statement (single statement; one trailing ';' tolerated) (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000 }. \`truncated: true\` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
+  exit 6 (HTTP 503)  Read-only login not provisioned on this backend → the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool
+
+NOTES
+  - Runs under the db_datareader-only \`ib_readonly\` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.
+  - dbo scope like the rest of \`ib dev schema\`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).
+
+EXAMPLES
+  ib dev schema query --sql "SELECT COUNT(*) AS n FROM person"
+  ib dev schema query --sql "SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev schema rows matches snapshot 1`] = `
 "USAGE
   ib dev schema rows <table> [flags]

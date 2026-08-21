@@ -92,6 +92,40 @@ export async function runSchemaRows(client: ApiClient, table: string, opts: Sche
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");
 }
+
+export interface SchemaQueryResult {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  truncated: boolean;
+  cap: number;
+}
+
+/**
+ * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
+ * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
+ * and the acting-as write banner. The server enforces read-only twice: a text
+ * guard (single SELECT/WITH statement, no semicolons, no INTO) and a
+ * db_datareader-only login. Results are hard-capped at 1000 rows with
+ * `truncated: true` when the cap bit — warn like every other capped list, so
+ * a caller reading only `rows` cannot mistake a cut result for a complete one.
+ */
+export async function runSchemaQuery(client: ApiClient, sql: string): Promise<SchemaQueryResult> {
+  const result = await client.post<SchemaQueryResult>("/api/cli/schema/query", { sql }, { read: true });
+  if (result.truncated) {
+    // Tailored hint: this route has no --limit/--offset — the way past the cap
+    // is a narrower WHERE or an aggregate (which is what this command is for).
+    warnIfTruncated(
+      {
+        truncated: true,
+        count: result.rowCount,
+        hint: `results are hard-capped at ${result.cap} rows — narrow with WHERE, or aggregate (COUNT/GROUP BY) instead of selecting raw rows`,
+      },
+      "ib dev schema query"
+    );
+  }
+  return result;
+}
 /**
  * Migration snapshot tables + their retention state (fb#440). No `search` —
  * the server decides what counts as a snapshot (stamped, or matching the name
@@ -183,6 +217,18 @@ export function registerSchemaCommands(
     .action(runOneOrBatch(runSchemaProc));
   s.command("trigger <name>")
     .action(runOneOrBatch(runSchemaTrigger));
+
+  s.command("query")
+    .description(
+      "Run one read-only SELECT (or WITH … SELECT) against the live DB — for data-SHAPE questions (COUNT, GROUP BY, histograms). Single statement, no semicolons, hard 1000-row cap; runs under a db_datareader-only login."
+    )
+    .requiredOption("--sql <select>", "The SELECT statement to run")
+    .action(
+      guarded(async (opts: { sql: string }) => {
+        const client = await getClient();
+        writeJson(await runSchemaQuery(client, opts.sql));
+      })
+    );
 
   s.command("dump")
     .action(jsonAction(getClient, runSchemaDump));

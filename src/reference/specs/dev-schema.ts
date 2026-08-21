@@ -7,7 +7,7 @@ import { apiErr, limitErr } from "./shared.js";
 
 export const DEV_SCHEMA_SPECS: CommandSpec[] = [
 
-  // ─── schema (10) — developer-only SQL introspection ────────────────────────
+  // ─── schema (11) — developer-only SQL introspection ───────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors: CommandError[] = [
@@ -194,6 +194,33 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "Convention, the 90-day cap and the GDPR position: puminet5api `migrations/README.md` § Snapshot tables.",
         ],
         examples: ["ib dev schema snapshots"],
+      },
+      {
+        command: "ib dev schema query",
+        description:
+          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that `schema tables/table` cannot answer. Read-over-POST: works under --read-only. Developer-only.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        flags: [{ name: "sql", type: "string", required: true, description: "The SELECT statement (single statement; one trailing ';' tolerated)" }],
+        outputShape:
+          "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000 }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows.",
+        errors: [
+          ...devErrors,
+          apiErr(
+            400,
+            "Guard rejection or SQL error",
+            "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
+          ),
+          apiErr(503, "Read-only login not provisioned on this backend", "the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool"),
+        ],
+        notes: [
+          "Runs under the db_datareader-only `ib_readonly` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.",
+          "dbo scope like the rest of `ib dev schema`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).",
+        ],
+        examples: [
+          "ib dev schema query --sql \"SELECT COUNT(*) AS n FROM person\"",
+          "ib dev schema query --sql \"SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId\"",
+        ],
       },
     ];
   })(),
