@@ -84,7 +84,7 @@ const SOURCES = ["human", "routine"];
 const REPO_FLAG_DESC =
   "Repo(s) this entry ships in (CSV). Every token is resolved on its own, so a cross-lane change names BOTH repos — `--repo \"puminet5api,betonicli\"` — instead of demoting one to a --files path. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
 const AREA_FLAG_DESC =
-  "Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/workspace/jerry/security are scopes, not areas.";
+  "Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
 const AREA_SCOPE_REMEDIES: Record<string, string> = {
   app: "use --scope app when filing feedback; --area accepts technical layers only",
   bsg2: "use --scope bsg2 when filing feedback; --area accepts technical layers only",
@@ -93,7 +93,6 @@ const AREA_SCOPE_REMEDIES: Record<string, string> = {
   ops: "use --scope ops when filing feedback; --area accepts technical layers only",
   other: "use --scope other when filing feedback; --area accepts technical layers only",
   security: "use --scope security when filing feedback; --area accepts technical layers only",
-  workspace: "use --scope workspace when filing feedback; --area accepts technical layers only",
 };
 // Named once and used by both the Commander options and the specs, so the
 // "these two --severity flags are different scales" warning cannot survive on
@@ -128,7 +127,6 @@ const AREA_REPO_REMEDIES: Record<string, string> = {
   puminet4: "puminet4",
   puminet5api: "puminet5api",
   "puminet7-functions-app": "puminet7-functions-app",
-  workspace: "workspace",
   betonicli: "betonicli",
 };
 

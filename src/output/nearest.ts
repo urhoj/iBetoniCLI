@@ -102,9 +102,12 @@ export const FLAG_SYNONYMS: Record<string, string[]> = {
 
 /**
  * Closest name to `target` within an edit-distance threshold, else null.
- * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; then the
- * minimum edit distance, accepted only when ≤ max(2, floor(len/2)); finally a
- * known synonym present among `names`.
+ * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; then an
+ * ends-with match, then any substring/contains match (fb#832 — a short token
+ * like `id` should resolve to `feedbackId`, which contains it, before edit
+ * distance ranks a closer-but-unrelated name); then the minimum edit distance,
+ * accepted only when ≤ max(2, floor(len/2)); finally a known synonym present
+ * among `names`.
  *
  * `synonyms` selects the table: {@link VERB_SYNONYMS} for subcommand names (the
  * default, so enum values via `assertEnum` keep their existing behaviour) and

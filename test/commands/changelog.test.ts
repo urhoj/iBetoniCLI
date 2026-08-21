@@ -295,7 +295,7 @@ describe("--area repo-name remedy (fb#212)", () => {
     expect(err.exitCode).toBe(4);
     const p = err.body?.problems?.[0];
     expect(p).toMatchObject({ flag: "--area", issue: "invalid", got: "jerry" });
-    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd", "workspace"]);
     expect(p?.remedy).toContain("--repo betonijerry");
   });
 
@@ -307,7 +307,7 @@ describe("--area repo-name remedy (fb#212)", () => {
   test("a non-repo-shaped invalid --area gets no remedy, just the allowed list", () => {
     const err = captureThrow(() => validateEnums(undefined, "bogus"));
     const p = err.body?.problems?.[0];
-    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd", "workspace"]);
     expect(p?.remedy).toBeUndefined();
   });
 });
