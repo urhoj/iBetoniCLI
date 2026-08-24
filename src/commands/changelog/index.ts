@@ -456,6 +456,27 @@ export function normalizeType(type?: string): string | undefined {
 }
 
 /**
+ * Trim + lowercase the enum flags that have no synonym map of their own:
+ * --area, --bump-level, --source (fb#842).
+ *
+ * `--type Fix` and `--severity High` have always worked, because their synonym
+ * lookup lowercases first — so on the SAME command `--area Workspace` failing on
+ * casing alone is an inconsistency between sibling flags, not a rule. The
+ * validator already lowercases --area to pick a remedy hint
+ * (AREA_REPO_REMEDIES[area.toLowerCase()]), i.e. it lowercases for the error
+ * message but not for the match, which is the tell.
+ *
+ * Unknown values still pass through unchanged for {@link validateEnums} to
+ * reject with the structured problems[] envelope; undefined stays undefined.
+ * Lowercasing is safe for all three: every accepted value is already lowercase.
+ */
+export function normalizeEnumFlag(value?: string): string | undefined {
+  if (value === undefined) return undefined;
+  const v = value.trim().toLowerCase();
+  return v === "" ? undefined : v;
+}
+
+/**
  * The canonical `--severity` vocabulary — an URGENCY ladder, in Finnish, because
  * that is what the ~90 non-null rows in `devChangelog` already hold.
  *
@@ -929,6 +950,9 @@ export function registerChangelogCommands(
       warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
       o.type = normalizeType(o.type)!;
       o.severity = normalizeSeverity(o.severity)!;
+      o.area = normalizeEnumFlag(o.area)!;
+      o.bumpLevel = normalizeEnumFlag(o.bumpLevel)!;
+      o.source = normalizeEnumFlag(o.source)!;
       requireAddFields(description, o as Record<string, unknown>);
       validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity);
       o.sha = resolveShaAlias(o.sha, o.commit)!;
@@ -1083,6 +1107,9 @@ export function registerChangelogCommands(
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
     if (o.severity !== undefined) o.severity = normalizeSeverity(o.severity)!;
+    if (o.area !== undefined) o.area = normalizeEnumFlag(o.area)!;
+    if (o.bumpLevel !== undefined) o.bumpLevel = normalizeEnumFlag(o.bumpLevel)!;
+    if (o.source !== undefined) o.source = normalizeEnumFlag(o.source)!;
     validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
     // --summary/--body are aliases for --description (feedback #205/#278); fold
     // them in before the patch build so the loop below picks them up. Several may

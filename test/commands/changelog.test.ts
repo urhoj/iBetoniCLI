@@ -4,7 +4,7 @@ import { captureActionError } from "../helpers/stderr.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, normalizeSeverity, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias, CHANGELOG_SPECS, FIELD_MAX_LENGTHS }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, normalizeSeverity, normalizeEnumFlag, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias, CHANGELOG_SPECS, FIELD_MAX_LENGTHS }
   from "../../src/commands/changelog/index.js";
 import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
@@ -120,6 +120,33 @@ test("normalizeLanguage lowercases, trims, and passes undefined through", () => 
 
 test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
   expect(() => normalizeLanguage("de")).toThrow(/--language must be one of: fi, en/);
+});
+
+describe("normalizeEnumFlag: case-insensitive --area/--bump-level/--source (fb#842)", () => {
+  test("lowercases, so --area Workspace stops failing on casing alone", () => {
+    // The inconsistency this closes: --type Fix and --severity High have always
+    // worked (their synonym lookup lowercases first), while --area Workspace on
+    // the same command was rejected outright.
+    expect(normalizeEnumFlag("Workspace")).toBe("workspace");
+    expect(normalizeEnumFlag("BACKEND")).toBe("backend");
+    expect(normalizeEnumFlag("  Cicd  ")).toBe("cicd");
+  });
+
+  test("leaves an unknown value for validateEnums to reject, rather than guessing", () => {
+    expect(normalizeEnumFlag("Nonsense")).toBe("nonsense");
+    expect(() => validateEnums(undefined, "nonsense", undefined, undefined, undefined))
+      .toThrow();
+  });
+
+  test("undefined and empty stay undefined", () => {
+    expect(normalizeEnumFlag(undefined)).toBeUndefined();
+    expect(normalizeEnumFlag("   ")).toBeUndefined();
+  });
+
+  test("the same forgiveness reaches --bump-level and --source", () => {
+    expect(normalizeEnumFlag("Minor")).toBe("minor");
+    expect(normalizeEnumFlag("Routine")).toBe("routine");
+  });
 });
 
 describe("normalizeType conventional-commit synonyms (fb#188)", () => {

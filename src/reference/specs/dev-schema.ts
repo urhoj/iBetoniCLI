@@ -138,12 +138,12 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev schema rows",
-        description: "Sample rows from an allowlisted reference lookup table (personSettingTypes, asiakasSettingTypes, vehicleTypes, etc.). Developer-only; table names are validated against a curated allowlist. Useful for understanding enum types and small configuration tables.",
+        description: "Sample rows from an allowlisted reference lookup table. Developer-only; table names are validated against a curated allowlist of small, static, tenant-free enum tables: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila. The keikka trio is what decodes ids the codebase interpolates as bare literals — keikkaPersonSourceId separates a named link from bulk membership fan-out (10/20), contactPersonTypeId 1 is the driver marker, and keikkaTilaId is the status enum behind the 4 / 5,9,12,13,100 magic numbers.",
         permissions: DEV_PERMS,
         tier: "developer",
-        args: [{ name: "table", type: "string", description: "Reference table name (e.g. personSettingTypes, asiakasSettingTypes)" }],
+        args: [{ name: "table", type: "string", description: "Reference table name (e.g. personSettingTypes, keikkaPersonSource, keikkaTila)" }],
         flags: [
-          { name: "search", type: "string", description: "Filter rows by substring in name columns" },
+          { name: "search", type: "string", description: "Filter rows by substring across the table's string columns (not just a `name` column — most of these tables have none; personSettingTypes carries `description`, asiakasSettingTypes `asiakasSettingType`)" },
           {
             name: "limit",
             type: "number",
@@ -153,7 +153,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         ],
         outputShape: "{ items: [{ column1, column2, … }], nextCursor: null, count, truncated?, hint? } — row shape depends on the table being queried.",
         errors: [
-          apiErr(400, "Table not on allowlist", "use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes"),
+          apiErr(400, "Table not on allowlist", "use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila"),
           apiErr(404, "Table not found", "verify the table name with `ib dev schema tables`"),
           limitErr("pass a positive integer; max is 1000"),
           ...devErrors,
@@ -162,7 +162,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "Only a curated set of small, read-only lookup/configuration tables are allowed — no data tables or PII. This is a safe way to understand enum values and type definitions.",
           "Table columns and shapes vary; the rows reflect the actual table schema.",
         ],
-        examples: ["ib dev schema rows personSettingTypes", "ib dev schema rows asiakasSettingTypes --search admin", "ib dev schema rows vehicleTypes --limit 100"],
+        examples: ["ib dev schema rows personSettingTypes", "ib dev schema rows asiakasSettingTypes --search admin", "ib dev schema rows keikkaPersonSource", "ib dev schema rows keikkaTila --search peruttu"],
       },
       {
         command: "ib dev schema dump",

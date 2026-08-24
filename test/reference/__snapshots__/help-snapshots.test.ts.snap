@@ -3588,14 +3588,14 @@ exports[`Help snapshots — contract stability > help for ib dev schema rows mat
   ib dev schema rows <table> [flags]
 
 DESCRIPTION
-  Sample rows from an allowlisted reference lookup table (personSettingTypes, asiakasSettingTypes, vehicleTypes, etc.). Developer-only; table names are validated against a curated allowlist. Useful for understanding enum types and small configuration tables.
+  Sample rows from an allowlisted reference lookup table. Developer-only; table names are validated against a curated allowlist of small, static, tenant-free enum tables: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila. The keikka trio is what decodes ids the codebase interpolates as bare literals — keikkaPersonSourceId separates a named link from bulk membership fan-out (10/20), contactPersonTypeId 1 is the driver marker, and keikkaTilaId is the status enum behind the 4 / 5,9,12,13,100 magic numbers.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
-  <table> STRING    Reference table name (e.g. personSettingTypes, asiakasSettingTypes) (required)
+  <table> STRING    Reference table name (e.g. personSettingTypes, keikkaPersonSource, keikkaTila) (required)
 
 FLAGS
-  --search STRING    Filter rows by substring in name columns
+  --search STRING    Filter rows by substring across the table's string columns (not just a \`name\` column — most of these tables have none; personSettingTypes carries \`description\`, asiakasSettingTypes \`asiakasSettingType\`)
   --limit NUMBER    Max rows to return (max 1000) (default: 200)
 
 GLOBAL FLAGS
@@ -3606,7 +3606,7 @@ OUTPUT (JSON, stdout)
   { items: [{ column1, column2, … }], nextCursor: null, count, truncated?, hint? } — row shape depends on the table being queried.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Table not on allowlist → use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes
+  exit 4 (HTTP 400)  Table not on allowlist → use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila
   exit 5 (HTTP 404)  Table not found        → verify the table name with \`ib dev schema tables\`
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3620,7 +3620,8 @@ NOTES
 EXAMPLES
   ib dev schema rows personSettingTypes
   ib dev schema rows asiakasSettingTypes --search admin
-  ib dev schema rows vehicleTypes --limit 100
+  ib dev schema rows keikkaPersonSource
+  ib dev schema rows keikkaTila --search peruttu
 "
 `;
 
