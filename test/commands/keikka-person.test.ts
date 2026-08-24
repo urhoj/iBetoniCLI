@@ -8,8 +8,22 @@ import {
   type KeikkaPersonListItem,
   type KeikkaPersonCollapsedItem,
 } from "../../src/commands/keikka/index.js";
+import type { ListEnvelope } from "../../src/api/envelopes.js";
 
 const mockClient = mockApiClient();
+
+// The return union is mode-keyed by design (fb#833): list modes yield an
+// envelope, --count a { summary }. List-shaped tests narrow through these
+// guards (fb#857) — a summary reaching one is a real failure, not a type hole.
+type PersonListResult = Awaited<ReturnType<typeof runKeikkaPersonList>>;
+function asList(result: PersonListResult): ListEnvelope<KeikkaPersonListItem> {
+  if ("summary" in result) throw new Error("expected a list envelope, got a --count summary");
+  return result as ListEnvelope<KeikkaPersonListItem>;
+}
+function asCollapsed(result: PersonListResult): ListEnvelope<KeikkaPersonCollapsedItem> {
+  if ("summary" in result) throw new Error("expected a list envelope, got a --count summary");
+  return result as ListEnvelope<KeikkaPersonCollapsedItem>;
+}
 
 function program() {
   const p = new Command();
@@ -81,7 +95,7 @@ describe("runKeikkaPersonList", () => {
 
   test("GETs /api/cli/keikka/persons/<id> and projects RAW rows (default)", async () => {
     mockClient.get.mockResolvedValueOnce(RAW_ROWS);
-    const result = await runKeikkaPersonList(mockClient, 9096);
+    const result = asList(await runKeikkaPersonList(mockClient, 9096));
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/persons/9096");
     expect(result.count).toBe(3);
     expect(result.items[0]).toMatchObject({
@@ -102,14 +116,14 @@ describe("runKeikkaPersonList", () => {
 
   test("--source filters rows by keikkaPersonSourceId", async () => {
     mockClient.get.mockResolvedValueOnce(RAW_ROWS);
-    const result = await runKeikkaPersonList(mockClient, 9096, { source: 30 });
+    const result = asList(await runKeikkaPersonList(mockClient, 9096, { source: 30 }));
     expect(result.count).toBe(1);
     expect(result.items[0]).toMatchObject({ keikkaPersonId: 102, sourceId: 30 });
   });
 
   test("--by-person collapses per person, OR-ing auth and collecting sources", async () => {
     mockClient.get.mockResolvedValueOnce(RAW_ROWS);
-    const result = await runKeikkaPersonList(mockClient, 9096, { byPerson: true });
+    const result = asCollapsed(await runKeikkaPersonList(mockClient, 9096, { byPerson: true }));
     expect(result.count).toBe(2);
     const juha = result.items.find((i: KeikkaPersonCollapsedItem) => i.personId === 5351);
     expect(juha).toMatchObject({
@@ -117,15 +131,15 @@ describe("runKeikkaPersonList", () => {
       rowCount: 2,
       auth: { read: true, edit: true, listPersons: false, addPerson: false, editPerson: false },
     });
-    expect(juha.sources).toEqual([
+    expect(juha?.sources).toEqual([
       { sourceId: 10, sourceText: "AsiakasPerson" },
       { sourceId: 30, sourceText: "Manuaalinen" },
     ]);
-    expect(juha.contactTypes).toEqual([1, 0]);
+    expect(juha?.contactTypes).toEqual([1, 0]);
     const matti = result.items.find((i: KeikkaPersonCollapsedItem) => i.personId === 5352);
-    expect(matti.rowCount).toBe(1);
+    expect(matti?.rowCount).toBe(1);
     // authListPersons rides Matti's only row.
-    expect(matti.auth.listPersons).toBe(true);
+    expect(matti?.auth.listPersons).toBe(true);
   });
 
   test("--count summarizes totals grouped by source", async () => {
@@ -158,7 +172,7 @@ describe("runKeikkaPersonList", () => {
 
   test("an empty keikka returns an empty envelope", async () => {
     mockClient.get.mockResolvedValueOnce([]);
-    const result = await runKeikkaPersonList(mockClient, 9096);
+    const result = asList(await runKeikkaPersonList(mockClient, 9096));
     expect(result.count).toBe(0);
     expect(result.items).toEqual([]);
   });
