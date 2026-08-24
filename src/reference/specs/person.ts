@@ -340,6 +340,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     permissions: ["company admin on the tenant (system admin for another owner)"],
     flags: [
       { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
+      { name: "unowned", type: "boolean", description: "Scan the UNOWNED class instead — persons whose ownerAsiakasId is 0 or NULL (self-registrations, imports, pre-ownership rows). System admin only; mutually exclusive with --owner (fb#849)" },
     ],
     outputShape:
       "{ items: [{ id1, name1, id2, name2, matchCode: 'phone'|'email'|'full_name', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
@@ -353,7 +354,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       "Each pair is returned once (id1 < id2), top 100 by confidence.",
     ],
     seeAlso: ["ib person merge", "ib person get"],
-    examples: ["ib person duplicates", "ib person duplicates --owner 1349"],
+    examples: ["ib person duplicates", "ib person duplicates --owner 1349", "ib person duplicates --unowned"],
   },
   {
     command: "ib person merge",
@@ -364,6 +365,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "main", type: "number", description: "personId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "personId to REMOVE — merged away then deleted (required)" },
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      { name: "unowned", type: "boolean", description: "Merge within the UNOWNED class — BOTH persons must have ownerAsiakasId 0 or NULL (self-registrations, imports, pre-ownership rows: where duplicates actually accumulate). System admin only; mutually exclusive with --owner (fb#849)" },
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
@@ -381,11 +383,13 @@ export const PERSON_SPECS: CommandSpec[] = [
       "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
       "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
       "Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.",
+      "Both persons must share one owner class: a tenant id, or (--unowned) the unowned class where owner 0 and NULL count as equal. Deploy-gated: an older backend 400s on --unowned.",
     ],
     seeAlso: ["ib person duplicates", "ib person delete"],
     examples: [
       "ib person merge --main 6001 --secondary 6002 --dry-run",
       "ib person merge --main 6001 --secondary 6002 --reason 'dedupe: same phone'",
+      "ib person merge --main 10 --secondary 27 --unowned --dry-run",
     ],
   },
   {

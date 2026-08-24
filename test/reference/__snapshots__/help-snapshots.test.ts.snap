@@ -9702,6 +9702,7 @@ DESCRIPTION
 
 FLAGS
   --owner NUMBER    ownerAsiakasId to scan (default: active company)
+  --unowned    Scan the UNOWNED class instead — persons whose ownerAsiakasId is 0 or NULL (self-registrations, imports, pre-ownership rows). System admin only; mutually exclusive with --owner (fb#849)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -9726,6 +9727,7 @@ SEE ALSO
 EXAMPLES
   ib person duplicates
   ib person duplicates --owner 1349
+  ib person duplicates --unowned
 "
 `;
 
@@ -10046,6 +10048,7 @@ FLAGS
   --main NUMBER    personId to KEEP — references merge into this one (required)
   --secondary NUMBER    personId to REMOVE — merged away then deleted (required)
   --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+  --unowned    Merge within the UNOWNED class — BOTH persons must have ownerAsiakasId 0 or NULL (self-registrations, imports, pre-ownership rows: where duplicates actually accumulate). System admin only; mutually exclusive with --owner (fb#849)
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -10070,6 +10073,7 @@ NOTES
   - ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.
   - --dry-run issues a read-only POST to /validate (tagged \`read\`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.
   - Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.
+  - Both persons must share one owner class: a tenant id, or (--unowned) the unowned class where owner 0 and NULL count as equal. Deploy-gated: an older backend 400s on --unowned.
 
 SEE ALSO
   ib person duplicates, ib person delete
@@ -10077,6 +10081,7 @@ SEE ALSO
 EXAMPLES
   ib person merge --main 6001 --secondary 6002 --dry-run
   ib person merge --main 6001 --secondary 6002 --reason 'dedupe: same phone'
+  ib person merge --main 10 --secondary 27 --unowned --dry-run
 "
 `;
 

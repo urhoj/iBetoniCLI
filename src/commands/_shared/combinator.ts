@@ -119,6 +119,31 @@ export interface CombinatorCommandsConfig {
   idLabel: string;
   /** asiakas combinator only: expose the system-admin `--allow-big-merge` escape hatch. */
   allowBigMerge?: boolean;
+  /**
+   * person combinator only (fb#849): expose `--unowned`, which addresses the
+   * UNOWNED class — rows whose ownerAsiakasId is 0 OR NULL (self-registrations,
+   * imports, pre-ownership rows: the population that actually accumulates
+   * duplicates). Sent as ownerAsiakasId 0; the backend accepts it only for
+   * entities whose validator supports the class, and only from a system admin.
+   */
+  unownedClass?: boolean;
+}
+
+/**
+ * Resolve the effective ownerAsiakasId for a combinator call: `--unowned` → 0
+ * (the unowned class), else `--owner`, else the active company. The two flags
+ * are mutually exclusive — silently preferring one would target the wrong
+ * tenant on an IRREVERSIBLE operation.
+ */
+export async function resolveCombinatorOwner(
+  client: ApiClient,
+  opts: { owner?: number; unowned?: boolean }
+): Promise<number> {
+  if (opts.unowned && opts.owner !== undefined) {
+    failWith("--unowned and --owner are mutually exclusive", 4);
+  }
+  if (opts.unowned) return 0;
+  return opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
 }
 
 /**
@@ -135,17 +160,15 @@ export function registerCombinatorCommands(
   getClient: () => Promise<ApiClient>,
   cfg: CombinatorCommandsConfig
 ): void {
-  parent
-    .command("duplicates")
-    .option("--owner <id>", "", Number)
-    .action(
-      guarded(async (opts: { owner?: number }) => {
-        const client = await getClient();
-        const owner =
-          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runCombinatorDuplicates(client, cfg.base, owner));
-      })
-    );
+  const duplicatesCmd = parent.command("duplicates").option("--owner <id>", "", Number);
+  if (cfg.unownedClass) duplicatesCmd.option("--unowned");
+  duplicatesCmd.action(
+    guarded(async (opts: { owner?: number; unowned?: boolean }) => {
+      const client = await getClient();
+      const owner = await resolveCombinatorOwner(client, opts);
+      writeJson(await runCombinatorDuplicates(client, cfg.base, owner));
+    })
+  );
 
   const mergeCmd = addOwnerOption(
     parent
@@ -157,6 +180,9 @@ export function registerCombinatorCommands(
         Number
       )
   );
+  if (cfg.unownedClass) {
+    mergeCmd.option("--unowned");
+  }
   if (cfg.allowBigMerge) {
     mergeCmd.option("--allow-big-merge");
   }
@@ -166,6 +192,7 @@ export function registerCombinatorCommands(
         main: number;
         secondary: number;
         owner?: number;
+        unowned?: boolean;
         allowBigMerge?: boolean;
       }
     ) => {
@@ -179,8 +206,7 @@ export function registerCombinatorCommands(
         failWith("--main and --secondary must differ", 4);
       }
       const client = await getClient();
-      const owner =
-        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+      const owner = await resolveCombinatorOwner(client, opts);
       writeJson(
         await runCombinatorMerge(
           client,

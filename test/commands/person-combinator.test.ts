@@ -4,6 +4,7 @@ import {
   runPersonDuplicates,
   runPersonMerge,
 } from "../../src/commands/person/index.js";
+import { resolveCombinatorOwner } from "../../src/commands/_shared/combinator.js";
 
 const mockClient = mockApiClient();
 
@@ -86,5 +87,35 @@ describe("runPersonMerge", () => {
     // Tagged `read` so it runs under --read-only and skips the acting-as write diagnostic.
     expect(asPost().mock.calls[0][2]).toEqual({ read: true });
     expect(result).toEqual({ dryRun: true, validation: { success: true, referencesToMove: 3 } });
+  });
+
+  // fb#849: the unowned class (ownerAsiakasId 0) must survive to the wire —
+  // a `0 || fallback` anywhere on the path would silently retarget the merge.
+  test("ownerAsiakasId 0 (the unowned class) is sent verbatim", async () => {
+    asPost().mockResolvedValueOnce({ success: true });
+    await runPersonMerge(
+      mockClient,
+      { mainId: 10, secondaryId: 27, ownerAsiakasId: 0 },
+      { dryRun: true }
+    );
+    expect(asPost().mock.calls[0][1]).toEqual({ mainPersonId: 10, secondaryPersonId: 27, ownerAsiakasId: 0 });
+  });
+});
+
+// fb#849: --unowned → owner 0; --owner wins otherwise; both together exit 4
+// (silently preferring one would target the wrong tenant on an IRREVERSIBLE op).
+describe("resolveCombinatorOwner", () => {
+  test("--unowned resolves to 0 without touching the client", async () => {
+    await expect(resolveCombinatorOwner(mockClient, { unowned: true })).resolves.toBe(0);
+  });
+
+  test("--owner passes through", async () => {
+    await expect(resolveCombinatorOwner(mockClient, { owner: 1349 })).resolves.toBe(1349);
+  });
+
+  test("--unowned with --owner exits 4", async () => {
+    await expect(
+      resolveCombinatorOwner(mockClient, { unowned: true, owner: 8 })
+    ).rejects.toMatchObject({ exitCode: 4 });
   });
 });

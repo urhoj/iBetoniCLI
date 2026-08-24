@@ -48,6 +48,20 @@ export async function runCombinatorMerge(client, base, idFields, opts, flags) {
     });
 }
 /**
+ * Resolve the effective ownerAsiakasId for a combinator call: `--unowned` → 0
+ * (the unowned class), else `--owner`, else the active company. The two flags
+ * are mutually exclusive — silently preferring one would target the wrong
+ * tenant on an IRREVERSIBLE operation.
+ */
+export async function resolveCombinatorOwner(client, opts) {
+    if (opts.unowned && opts.owner !== undefined) {
+        failWith("--unowned and --owner are mutually exclusive", 4);
+    }
+    if (opts.unowned)
+        return 0;
+    return opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+}
+/**
  * Register the `duplicates` + `merge` leaves of one combinator on its group.
  *
  * `merge` is IRREVERSIBLE, so both id guards run before any network call
@@ -57,18 +71,21 @@ export async function runCombinatorMerge(client, base, idFields, opts, flags) {
  * spec) and enforced centrally by the preAction hook.
  */
 export function registerCombinatorCommands(parent, getClient, cfg) {
-    parent
-        .command("duplicates")
-        .option("--owner <id>", "", Number)
-        .action(guarded(async (opts) => {
+    const duplicatesCmd = parent.command("duplicates").option("--owner <id>", "", Number);
+    if (cfg.unownedClass)
+        duplicatesCmd.option("--unowned");
+    duplicatesCmd.action(guarded(async (opts) => {
         const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        const owner = await resolveCombinatorOwner(client, opts);
         writeJson(await runCombinatorDuplicates(client, cfg.base, owner));
     }));
     const mergeCmd = addOwnerOption(parent
         .command("merge")
         .requiredOption("--main <id>", "", Number)
         .requiredOption("--secondary <id>", "", Number));
+    if (cfg.unownedClass) {
+        mergeCmd.option("--unowned");
+    }
     if (cfg.allowBigMerge) {
         mergeCmd.option("--allow-big-merge");
     }
@@ -81,7 +98,7 @@ export function registerCombinatorCommands(parent, getClient, cfg) {
             failWith("--main and --secondary must differ", 4);
         }
         const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        const owner = await resolveCombinatorOwner(client, opts);
         writeJson(await runCombinatorMerge(client, cfg.base, cfg.idFields, {
             mainId: opts.main,
             secondaryId: opts.secondary,

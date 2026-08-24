@@ -1080,6 +1080,7 @@ export function registerPersonCommands(
     idFields: PERSON_MERGE_ID_FIELDS,
     entityNoun: "person",
     idLabel: "personId",
+    unownedClass: true,
   });
 
   addOwnerOption(p.command("log <personId>"))

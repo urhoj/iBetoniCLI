@@ -709,6 +709,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         idFields: PERSON_MERGE_ID_FIELDS,
         entityNoun: "person",
         idLabel: "personId",
+        unownedClass: true,
     });
     addOwnerOption(p.command("log <personId>"))
         .option("--limit <n>", "", cappedInt(500), 100)
