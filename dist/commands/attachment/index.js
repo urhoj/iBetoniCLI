@@ -290,6 +290,8 @@ export function registerAttachmentCommands(parent, getClient) {
         writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
     }));
     a.command("get <attachmentId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, id) => runAttachmentGet(client, Number(id))));
     a.command("types")
         .action(jsonAction(getClient, runAttachmentTypes));

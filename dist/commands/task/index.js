@@ -237,6 +237,8 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--offset <n>", "", intFlag("--offset", 0))
         .action(jsonAction(getClient, (client, opts) => runTaskList(client, opts)));
     t.command("get <id>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, idStr) => runTaskGet(client, parseTaskId(idStr, "get"))));
     // --title enforced in runTaskAdd, NOT via .requiredOption: it may arrive from
     // --from-json, and Commander's missing-mandatory check would also fire BEFORE

@@ -11,7 +11,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -1096,6 +1096,8 @@ export function registerCustomerCommands(
     );
 
   c.command("get <asiakasId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runCustomerGet(client, parseId(idStr, "asiakasId"))
@@ -1194,11 +1196,12 @@ export function registerCustomerCommands(
 
   c.command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .option("--limit <n>", "", cappedInt(500))
     .option("--my-companies")
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) =>
-        runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; myCompanies?: boolean }) =>
+        runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies)
       )
     );
 

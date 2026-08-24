@@ -164,6 +164,8 @@ export function registerPersonDayCommands(person, getClient) {
         .action(jsonAction(getClient, (client, opts) => runPersonDayStatuses(client, { full: opts.full })));
     day
         .command("get")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .requiredOption("--person <id>", "", (s) => Number(s))
         .requiredOption("--from <date>")
         .option("--to <date>")

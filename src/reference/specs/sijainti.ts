@@ -90,6 +90,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
   },
   {
     command: "ib sijainti get",
+    aliases: ["ib sijainti show"],
     description: "Get a single sijainti by id.",
     permissions: ["auth.page.sijainnit.read"],
     args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to fetch" }],

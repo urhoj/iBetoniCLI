@@ -10,6 +10,7 @@ export const OHJE_SPECS: CommandSpec[] = [
   // ─── ohje (4) — UI help-text content (helps table behind HelperIcon) ──────
   {
     command: "ib ohje get",
+    aliases: ["ib ohje show"],
     description:
       "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. The HTTP route is unauthenticated, but ib calls it with your session token (login still required).",
     auth: "any",

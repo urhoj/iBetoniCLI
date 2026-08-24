@@ -45,6 +45,7 @@ export const TASK_SPECS: CommandSpec[] = [
   },
   {
     command: "ib task get",
+    aliases: ["ib task show"],
     description: "Fetch one recurring task by id (developer-only).",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",

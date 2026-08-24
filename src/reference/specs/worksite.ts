@@ -34,6 +34,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib worksite get",
+    aliases: ["ib worksite show"],
     description:
       "Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.",
     permissions: ["auth.page.tyomaa.read"],

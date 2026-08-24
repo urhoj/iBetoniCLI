@@ -57,6 +57,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person get",
+    aliases: ["ib person show"],
     description:
       "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.",
     permissions: ["auth.page.person.read"],
@@ -405,6 +406,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person day get",
+    aliases: ["ib person day show"],
     description: "List a person's day rows (status / vehicle / text) over a date range",
     auth: "any",
     flags: [

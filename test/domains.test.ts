@@ -99,4 +99,15 @@ describe("resolveArgvDomain", () => {
     expect(resolveArgvDomain(["weather", "forecast"])).toBe("weather");
     expect(resolveArgvDomain(["dev", "feedback", "list"])).toBe("dev");
   });
+
+  test("plural root aliases resolve to their canonical domain (fb#740)", async () => {
+    // The plural selects the SAME domain token, so the selective build loads
+    // only the canonical module...
+    expect(resolveArgvDomain(["vehicles", "list"])).toBe("vehicle");
+    // ...and Commander's `.aliases()` dispatches the spelled-plural argv to it.
+    const lean = await buildProgram(["vehicles", "list"]);
+    expect(names(lean)).toEqual(["commands", "reference", "vehicle"]);
+    const vehicle = lean.commands.find((c) => c.name() === "vehicle");
+    expect(vehicle?.aliases()).toContain("vehicles");
+  });
 });

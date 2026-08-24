@@ -76,6 +76,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer get",
+    aliases: ["ib customer show"],
     description:
       "Get a single customer (asiakas) by id: flat contact fields + roolit (what the company IS — pump/concrete/floor supplier, worksite customer).",
     permissions: ["auth.page.asiakas.read"],

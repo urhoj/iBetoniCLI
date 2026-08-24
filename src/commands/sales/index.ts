@@ -99,8 +99,10 @@ export async function resolveProspect(
 ): Promise<SalesProspect> {
   // Guarded HERE, not at each call site: an all-undefined ref would otherwise
   // fall through to the ytunnus branch, where normYtunnus(undefined) === "" and
-  // matches every row with a blank ytunnus.
-  if (ref.id === undefined && ref.asiakas === undefined && !ref.ytunnus) {
+  // matches every row with a blank ytunnus. Whitespace-only is empty too
+  // (fb#819): normYtunnus(" ") === "" would match an arbitrary row whose stored
+  // ytunnus is null, so the guard rejects it before the lookup runs.
+  if (ref.id === undefined && ref.asiakas === undefined && !ref.ytunnus?.trim()) {
     failWith("Pass a saasProspectId, --asiakas <id> or --ytunnus <y>", 4);
   }
   const rows = await client.get<SalesProspect[]>("/api/admin/sales-prospects");
@@ -203,6 +205,8 @@ export function registerSalesCommands(
 
   prospect
     .command("get [saasProspectId]")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--asiakas <id>", "", (v: string) => Number(v))
     .option("--ytunnus <y>")
     .action(

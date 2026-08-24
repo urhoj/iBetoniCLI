@@ -2,7 +2,7 @@ import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom } from "./resolveThread.js";
-import { parseId, resolveSearchQuery } from "../../../targets.js";
+import { parseId, resolveSearchQuery, queryAliasOption } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 /**
@@ -201,8 +201,9 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     c.command("search [query]")
         .option("--search <s>")
+        .addOption(queryAliasOption())
         .option("--limit <n>", "", Number)
-        .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search), opts)));
+        .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts)));
     const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
         .requiredOption("--body <text>")
         .option("--source <src>");

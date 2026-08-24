@@ -486,6 +486,9 @@ export function registerLegalCommands(parent, getClient) {
         const client = await getClient();
         writeJson(await runLegalDiff(client, input));
     }));
+    // NO `show` alias here (unlike the other get leaves, fb#836): the legal group
+    // ALREADY owns a real `show <typeName>` command — Commander refuses the alias,
+    // and the show reflex already lands on a working (type-shaped) read.
     legal
         .command("get <documentIdOrType>")
         .action(guarded(async (refStr) => {

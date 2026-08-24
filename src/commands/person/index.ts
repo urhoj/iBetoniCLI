@@ -34,6 +34,7 @@ import {
   resolveSearchQuery,
   cappedInt,
   addOwnerOption,
+  queryAliasOption,
 } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend } from "../notification/index.js";
@@ -690,6 +691,8 @@ export function registerPersonCommands(
     .action(jsonAction(getClient, (client, opts: PersonListFilter) => runPersonList(client, opts)));
 
   p.command("get <personId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--asiakas <id>", "", (v: string) => Number(v))
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
@@ -699,6 +702,7 @@ export function registerPersonCommands(
 
   p.command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .option("--limit <n>", "", cappedInt(500))
     .option(
       "--my-companies"
@@ -716,6 +720,7 @@ export function registerPersonCommands(
         query: string | undefined,
         opts: {
           search?: string;
+          query?: string;
           limit?: number;
           myCompanies?: boolean;
           asiakas?: number;
@@ -737,7 +742,7 @@ export function registerPersonCommands(
           );
         }
         const client = await getClient();
-        const q = resolveSearchQuery(query, opts.search);
+        const q = resolveSearchQuery(query, opts.search, opts.query);
         if (opts.allCompanies) {
           writeJson(await runPersonSearchAllCompanies(client, q, opts.limit));
           return;

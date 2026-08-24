@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, errorMessage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
-import { resolveSearchQuery } from "../../targets.js";
+import { resolveSearchQuery, queryAliasOption } from "../../targets.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { runCustomerSearch } from "../customer/index.js";
 import { runPersonSearch, type PersonSearchHit } from "../person/index.js";
@@ -273,12 +273,13 @@ export function registerSearchCommands(
   parent
     .command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .option("--in <entities>")
     .option("--limit <n>", "", (v: string) => Number(v), DEFAULT_LIMIT)
     .option("--my-companies")
     .action(
-      guarded(async (query: string | undefined, opts: { search?: string; in?: string; limit: number; myCompanies?: boolean }) => {
-        const q = resolveSearchQuery(query, opts.search);
+      guarded(async (query: string | undefined, opts: { search?: string; query?: string; in?: string; limit: number; myCompanies?: boolean }) => {
+        const q = resolveSearchQuery(query, opts.search, opts.query);
         const entities = parseEntityFilter(opts.in);
         const client = await getClient();
         const srcs = buildSearchSources(client, q, opts.limit, !!opts.myCompanies);

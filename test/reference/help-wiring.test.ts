@@ -135,6 +135,17 @@ describe("Rich --help wiring — real command tree", () => {
     "ib attachment list --asiakas": "--customer",
     "ib attachment register --asiakas": "--customer",
     "ib attachment upload --asiakas": "--customer",
+    // fb#740: the search-shaped commands name their positional `<query>` in the
+    // usage line, so callers type `--query` — the flag the usage line just
+    // showed them. Accept it as a hidden alias of the documented `--search`.
+    "ib search --query": "--search",
+    "ib customer search --query": "--search",
+    "ib jerry admin search --query": "--search",
+    "ib keikka search --query": "--search",
+    "ib message chat search --query": "--search",
+    "ib person search --query": "--search",
+    "ib vehicle search --query": "--search",
+    "ib worksite search --query": "--search",
   };
 
   const isHidden = (opt: { hidden?: boolean }): boolean => !!opt.hidden;

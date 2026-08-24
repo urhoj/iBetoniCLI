@@ -271,6 +271,8 @@ export function registerBetoniCommands(
 
   laatu
     .command("get <laatuId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, laatuId: string, opts: { asiakas?: number }) =>
@@ -291,6 +293,8 @@ export function registerBetoniCommands(
 
   attr
     .command("get <attrId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--owner <id>", "", intFlag("--owner"))
     .action(
       jsonAction(getClient, (client, attrId: string, opts: { owner?: number }) =>

@@ -436,6 +436,8 @@ export function registerAttachmentCommands(
   }));
 
   a.command("get <attachmentId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(jsonAction(getClient, (client, id: string) => runAttachmentGet(client, Number(id))));
 
   a.command("types")

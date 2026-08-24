@@ -8,7 +8,7 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom } from "./resolveThread.js";
-import { parseId, resolveSearchQuery } from "../../../targets.js";
+import { parseId, resolveSearchQuery, queryAliasOption } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 
@@ -312,10 +312,11 @@ export function registerMessageChatCommands(
 
   c.command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .option("--limit <n>", "", Number)
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number }) =>
-        runChatSearch(client, resolveSearchQuery(query, opts.search), opts)
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number }) =>
+        runChatSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts)
       )
     );
 

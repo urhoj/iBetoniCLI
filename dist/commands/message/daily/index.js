@@ -208,6 +208,8 @@ export function registerMessageDailyCommands(parent, getClient) {
         writeJson(await runDailyList(client, asiakasId, opts.date ? toYyyymmdd(opts.date) : undefined));
     }));
     d.command("get <boxId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .requiredOption("--asiakas <id>", "", Number)
         .option("--date <date>")
         .action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)));
@@ -309,6 +311,7 @@ export const MESSAGE_DAILY_SPECS = [
     },
     {
         command: "ib message daily get",
+        aliases: ["ib message daily show"],
         description: "One daily box's row + its message for the date + its permission rows, resolved client-side over the list (there is no per-box GET).",
         auth: "any",
         args: [{ name: "boxId", type: "number", description: "Box to fetch" }],

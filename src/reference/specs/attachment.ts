@@ -25,6 +25,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
   },
   {
     command: "ib attachment get",
+    aliases: ["ib attachment show"],
     description: "One attachment: full metadata, group/type names, and a 1-hour read-SAS blobUrl for downloading the bytes directly from Azure.",
     auth: "any",
     args: [{ name: "attachmentId", type: "number", description: "attachments.attachmentId" }],

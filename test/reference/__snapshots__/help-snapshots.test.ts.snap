@@ -210,6 +210,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib attachment get matches snapshot 1`] = `
 "USAGE
   ib attachment get <attachmentId> [flags]
+  (also: ib attachment show)
 
 DESCRIPTION
   One attachment: full metadata, group/type names, and a 1-hour read-SAS blobUrl for downloading the bytes directly from Azure.
@@ -790,6 +791,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib betoni attr get matches snapshot 1`] = `
 "USAGE
   ib betoni attr get <attrId> [flags]
+  (also: ib betoni attr show)
 
 DESCRIPTION
   One concrete additive by attrId, scoped to an owning tenant (GET /api/betoni/attr/get/:attrId/:ownerAsiakasId). The route returns a recordset even for one row; this unwraps it.
@@ -865,6 +867,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib betoni laatu get matches snapshot 1`] = `
 "USAGE
   ib betoni laatu get <laatuId> [flags]
+  (also: ib betoni laatu show)
 
 DESCRIPTION
   One concrete grade by laatuId. Resolved from the supplier's list rather than a get endpoint (the backend mounts no route for \`betoniLaatu.get\`), so visibility is identical to \`laatu list\` — you can only get a grade you could already list.
@@ -1361,6 +1364,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib customer get matches snapshot 1`] = `
 "USAGE
   ib customer get <asiakasId> [flags]
+  (also: ib customer show)
 
 DESCRIPTION
   Get a single customer (asiakas) by id: flat contact fields + roolit (what the company IS — pump/concrete/floor supplier, worksite customer).
@@ -4829,6 +4833,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib jerry admin request get matches snapshot 1`] = `
 "USAGE
   ib jerry admin request get <requestId> [flags]
+  (also: ib jerry admin request show)
 
 DESCRIPTION
   One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). Read \`viewSource\`, not \`viewedAt\`, to judge provider engagement: a view recorded through the tokenized preview link has no authenticated person behind it, so \`viewedAt\` alone counts an email-link click as a provider reading the lead (fb#638). For the offers use \`ib jerry admin request offers\`. System-admin only.
@@ -5521,6 +5526,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib jerry provider-settings get matches snapshot 1`] = `
 "USAGE
   ib jerry provider-settings get [flags]
+  (also: ib jerry provider-settings show)
 
 DESCRIPTION
   Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.
@@ -5730,6 +5736,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib jerry request get matches snapshot 1`] = `
 "USAGE
   ib jerry request get <requestId> [flags]
+  (also: ib jerry request show)
 
 DESCRIPTION
   Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments. This returns the FULL customer lead (name, address, lat/lng, phone, email) to every matched provider as soon as the request is open — it is NOT masked pre-acceptance. Masking applies to the \`--open\` inbox list and the fan-out email, not here.
@@ -5989,6 +5996,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib keikka get matches snapshot 1`] = `
 "USAGE
   ib keikka get <keikkaId> [flags]
+  (also: ib keikka show)
 
 DESCRIPTION
   Get a single keikka by id with related customer / worksite / vehicle / driver projections.
@@ -7270,6 +7278,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib message board get matches snapshot 1`] = `
 "USAGE
   ib message board get <messageId> [flags]
+  (also: ib message board show)
 
 DESCRIPTION
   Get one notice by id. There is no single-message GET route, so it is resolved CLIENT-SIDE over \`all\` — and therefore needs the same admin/editor access. Unknown id → exit 5.
@@ -7862,6 +7871,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib message daily get matches snapshot 1`] = `
 "USAGE
   ib message daily get <boxId> --asiakas <asiakas> [flags]
+  (also: ib message daily show)
 
 DESCRIPTION
   One daily box's row + its message for the date + its permission rows, resolved client-side over the list (there is no per-box GET).
@@ -8747,6 +8757,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]
+  (also: ib ohje show)
 
 DESCRIPTION
   Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from \`ib --help\` (CLI usage). Returns null when the helpId has no entry yet. The HTTP route is unauthenticated, but ib calls it with your session token (login still required).
@@ -9523,6 +9534,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib person day get matches snapshot 1`] = `
 "USAGE
   ib person day get --person <person> --from <from> [flags]
+  (also: ib person day show)
 
 DESCRIPTION
   List a person's day rows (status / vehicle / text) over a date range
@@ -9879,6 +9891,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
 "USAGE
   ib person get <personId> [flags]
+  (also: ib person show)
 
 DESCRIPTION
   Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.
@@ -10652,7 +10665,7 @@ exports[`Help snapshots — contract stability > help for ib sales customer list
   ib sales customer list [flags]
 
 DESCRIPTION
-  Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership across numerous tenants; lastLoginAny is kept alongside so the difference is inspectable.
+  Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership in many tenants; lastLoginAny is kept alongside so the difference is inspectable.
   Permissions: requires isSystemAdmin.
 
 FLAGS
@@ -10715,6 +10728,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib sales prospect get matches snapshot 1`] = `
 "USAGE
   ib sales prospect get <saasProspectId> [flags]
+  (also: ib sales prospect show)
 
 DESCRIPTION
   One SaaS prospect, by saasProspectId, --asiakas or --ytunnus. Exits 4 (not a guess) when more than one row matches the reference, and 5 when none does.
@@ -11227,6 +11241,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib sijainti get matches snapshot 1`] = `
 "USAGE
   ib sijainti get <sijaintiId> [flags]
+  (also: ib sijainti show)
 
 DESCRIPTION
   Get a single sijainti by id.
@@ -11735,6 +11750,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib task get matches snapshot 1`] = `
 "USAGE
   ib task get <id> [flags]
+  (also: ib task show)
 
 DESCRIPTION
   Fetch one recurring task by id (developer-only).
@@ -12284,6 +12300,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib vehicle driver default get matches snapshot 1`] = `
 "USAGE
   ib vehicle driver default get <vehicleId> [flags]
+  (also: ib vehicle driver default show)
 
 DESCRIPTION
   Read the vehicle's STANDING default driver (vehicle.defaultKuski_personId) — the template driver, distinct from the per-day driver. Projects the field off the vehicle record.
@@ -12494,6 +12511,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib vehicle get matches snapshot 1`] = `
 "USAGE
   ib vehicle get <vehicleId> [flags]
+  (also: ib vehicle show)
 
 DESCRIPTION
   Get a single vehicle by id. --asiakas reads a vehicle owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign vehicleId returns 404.
@@ -13168,6 +13186,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib worksite get matches snapshot 1`] = `
 "USAGE
   ib worksite get <tyomaaId> [flags]
+  (also: ib worksite show)
 
 DESCRIPTION
   Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.

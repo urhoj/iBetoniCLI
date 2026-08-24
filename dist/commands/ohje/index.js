@@ -215,6 +215,8 @@ export function registerOhjeCommands(parent, getClient) {
         .command("ohje")
         .description("UI help-text content (the helps table behind HelperIcon) — end-user help, NOT `ib --help`");
     o.command("get <helpId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(guarded(async (helpId) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);

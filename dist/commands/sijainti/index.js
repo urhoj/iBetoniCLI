@@ -800,6 +800,8 @@ export function registerSijaintiCommands(parent, getClient) {
         writeJson(result);
     }));
     s.command("get <sijaintiId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, idStr) => runSijaintiGet(client, parseId(idStr, "sijaintiId"))));
     registerDashboardCommand(s, getClient, {
         idArg: "sijaintiId",

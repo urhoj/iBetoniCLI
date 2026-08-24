@@ -66,11 +66,31 @@ describe("tier tagging", () => {
     expect(byCmd(cmd).tier).toBeUndefined();
   });
 
+  // fb#810: word-boundary match, NOT a plain substring. `includes("any tenant")`
+  // trips on "m[any tenant]s" — the phrase "many tenants" is not a cross-tenant
+  // claim, yet it forced a reword to "numerous tenants" to go quiet. Verified:
+  // the trailing 's' blocks the right boundary and the leading 'm' the left, so
+  // the word-boundaried form never matches "many tenants" (nor "company
+  // tenant"), while every real claim shape still does. `tenants?` keeps the
+  // plural claim "any tenants" in scope. A guard that cries wolf teaches authors
+  // to edit prose until it goes quiet — which is how a real hit gets waved
+  // through.
+  const CROSS_TENANT_CLAIM = /\bany tenants?\b/;
+
+  test("cross-tenant claim detector: benign plurals pass, claims trip (fb#810)", () => {
+    expect(CROSS_TENANT_CLAIM.test("membership in many tenants")).toBe(false);
+    expect(CROSS_TENANT_CLAIM.test("how many tenants use it")).toBe(false);
+    expect(CROSS_TENANT_CLAIM.test("company tenant")).toBe(false);
+    expect(CROSS_TENANT_CLAIM.test("read any tenant")).toBe(true);
+    expect(CROSS_TENANT_CLAIM.test("rows from any tenants")).toBe(true);
+    expect(CROSS_TENANT_CLAIM.test("any tenant's data")).toBe(true);
+  });
+
   test("no tagged leaf advertises cross-tenant PII reads", () => {
     for (const s of COMMAND_SPECS) {
       if (s.tier === "developer") {
         expect(s.description.toLowerCase()).not.toContain("may contain customer pii");
-        expect(s.description.toLowerCase()).not.toContain("any tenant");
+        expect(s.description.toLowerCase()).not.toMatch(CROSS_TENANT_CLAIM);
       }
     }
   });

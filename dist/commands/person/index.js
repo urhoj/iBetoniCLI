@@ -7,7 +7,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
-import { parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, } from "../../targets.js";
+import { parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, queryAliasOption, } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
@@ -424,10 +424,13 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--limit <n>", "", cappedInt(500))
         .action(jsonAction(getClient, (client, opts) => runPersonList(client, opts)));
     p.command("get <personId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--asiakas <id>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, idStr, opts) => runPersonGet(client, parseId(idStr, "personId"), opts.asiakas)));
     p.command("search [query]")
         .option("--search <s>")
+        .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
         .option("--my-companies")
         .option("--asiakas <id>", "", (v) => Number(v))
@@ -446,7 +449,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
                 `--all-companies = every tenant)`);
         }
         const client = await getClient();
-        const q = resolveSearchQuery(query, opts.search);
+        const q = resolveSearchQuery(query, opts.search, opts.query);
         if (opts.allCompanies) {
             writeJson(await runPersonSearchAllCompanies(client, q, opts.limit));
             return;

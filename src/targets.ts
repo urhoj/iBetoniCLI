@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import { failWith } from "./output/json.js";
 import { CliError } from "./api/errors.js";
 import { closestName } from "./output/nearest.js";
@@ -460,10 +460,36 @@ export function resolveAsiakasTarget(
  * AIs learn the `--search` convention from list commands (`glossary list`,
  * `dev schema tables`) and reach for it on search-style commands too;
  * accepting both spellings removes that friction.
+ *
+ * `queryAlias` carries the hidden `--query` flag (fb#740): the positional is
+ * NAMED `<query>` in every usage line, so callers type the flag the usage
+ * line just showed them. Same value, second spelling — both agree or exit 4.
  */
 export function resolveSearchQuery(
   positional: string | undefined,
-  flag: string | undefined
+  flag: string | undefined,
+  queryAlias?: string
 ): string {
-  return resolveDualString(positional, flag, "query", "search");
+  let search = flag;
+  if (queryAlias !== undefined) {
+    const canonical = flag?.trim();
+    const alias = queryAlias.trim();
+    if (canonical && alias && canonical !== alias) {
+      failWith(`--search ("${canonical}") and --query ("${alias}") are aliases — pass one value, not two`, 4);
+    }
+    if (alias) search = queryAlias;
+  }
+  return resolveDualString(positional, search, "query", "search");
+}
+
+/**
+ * The hidden `--query` flag alias of `--search` for search-shaped commands
+ * (fb#740) — the positional is NAMED `<query>` in the usage line, so the flag
+ * spelling the caller just read should work. Hidden because the spec (and
+ * therefore `--help`) documents ONE spelling; `DEPRECATED_FLAG_ALIASES` in
+ * help-wiring.test.ts pins the pairing so it cannot drift into an undocumented
+ * capability. Feed the value to {@link resolveSearchQuery}'s third parameter.
+ */
+export function queryAliasOption(): Option {
+  return new Option("--query <s>").hideHelp();
 }

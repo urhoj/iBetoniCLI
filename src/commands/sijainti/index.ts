@@ -1124,6 +1124,8 @@ export function registerSijaintiCommands(
     }));
 
   s.command("get <sijaintiId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runSijaintiGet(client, parseId(idStr, "sijaintiId"))

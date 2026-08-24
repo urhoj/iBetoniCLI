@@ -306,6 +306,8 @@ export function registerMessageDailyCommands(
     );
 
   d.command("get <boxId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .requiredOption("--asiakas <id>", "", Number)
     .option("--date <date>")
     .action(
@@ -498,6 +500,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib message daily get",
+    aliases: ["ib message daily show"],
     description: "One daily box's row + its message for the date + its permission rows, resolved client-side over the list (there is no per-box GET).",
     auth: "any",
     args: [{ name: "boxId", type: "number", description: "Box to fetch" }],

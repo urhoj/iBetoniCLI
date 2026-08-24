@@ -109,6 +109,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
   {
     command: "ib keikka get",
+    aliases: ["ib keikka show"],
     description:
       "Get a single keikka by id with related customer / worksite / vehicle / driver projections.",
     permissions: ["auth.page.grid.tilaus.read"],

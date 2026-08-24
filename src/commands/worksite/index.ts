@@ -10,7 +10,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption } from "../../targets.js";
 import {
   runAddressDashboard,
   registerDashboardCommand,
@@ -505,6 +505,8 @@ export function registerWorksiteCommands(
     );
 
   w.command("get <tyomaaId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--include-building")
     .option("--include-cameras")
     .action(
@@ -542,11 +544,12 @@ export function registerWorksiteCommands(
 
   w.command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .option("--limit <n>", "", cappedInt(500))
     .option("--my-companies")
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) =>
-        runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; myCompanies?: boolean }) =>
+        runWorksiteSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies)
       )
     );
 

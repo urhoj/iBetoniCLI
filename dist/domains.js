@@ -103,6 +103,18 @@ export const DOMAIN_REGISTRARS = new Map([
  */
 export const STATIC_DOMAIN_TOKENS = new Set(["reference", "commands"]);
 /**
+ * Hidden bare-plural root aliases → canonical domain (fb#740). `ib vehicles`
+ * dispatches to the `vehicle` group: the alias is a Commander `.aliases()` on
+ * the group command itself, and this table is the registration half — it lets
+ * {@link scanArgv} select the canonical domain so a plural invocation loads
+ * only that module instead of falling back to the full tree. One row per
+ * alias; deliberately curated, not derived (a plural is a vocabulary decision,
+ * and only OBSERVED misses earn one).
+ */
+export const PLURAL_DOMAIN_ALIASES = {
+    vehicles: "vehicle",
+};
+/**
  * The domain an argv is asking for, or `null` to build the whole tree.
  *
  * Scans past the root flags to the first bare token: a value-taking global
@@ -131,8 +143,12 @@ function scanArgv(argv) {
         if (token === "-" || token === "--")
             return null;
         if (!token.startsWith("-")) {
-            return DOMAIN_REGISTRARS.has(token) || STATIC_DOMAIN_TOKENS.has(token)
-                ? { token, rest: argv.slice(i + 1) }
+            // A plural alias selects its CANONICAL domain (`vehicles` → `vehicle`,
+            // fb#740), so the selective build loads the right single module.
+            const plural = PLURAL_DOMAIN_ALIASES[token];
+            const name = plural ?? token;
+            return DOMAIN_REGISTRARS.has(name) || STATIC_DOMAIN_TOKENS.has(name)
+                ? { token: name, rest: argv.slice(i + 1) }
                 : null;
         }
         if (!token.includes("=") && GLOBAL_VALUE_FLAGS.has(token))

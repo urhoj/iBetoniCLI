@@ -147,6 +147,8 @@ export function registerBetoniCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, opts) => runLaatuList(client, opts)));
     laatu
         .command("get <laatuId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, laatuId, opts) => runLaatuGet(client, Number(laatuId), opts)));
     const attr = betoni.command("attr").description("Concrete additives (betoniAttr)");
@@ -156,6 +158,8 @@ export function registerBetoniCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, betoniAsiakasId, opts) => runAttrList(client, Number(betoniAsiakasId), opts)));
     attr
         .command("get <attrId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--owner <id>", "", intFlag("--owner"))
         .action(jsonAction(getClient, (client, attrId, opts) => runAttrGet(client, Number(attrId), opts)));
     betoni

@@ -232,6 +232,8 @@ export function registerPersonDayCommands(
 
   day
     .command("get")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .requiredOption("--person <id>", "", (s: string) => Number(s))
     .requiredOption("--from <date>")
     .option("--to <date>")

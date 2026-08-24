@@ -273,6 +273,8 @@ export function registerVehicleDriverCommands(
 
   def
     .command("get <vehicleId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(
       jsonAction(getClient, (client, vehicleIdStr: string) =>
         runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))

@@ -160,6 +160,8 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .description("The vehicle's STANDING default driver (vehicle.defaultKuski_personId)");
     def
         .command("get <vehicleId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, vehicleIdStr) => runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")

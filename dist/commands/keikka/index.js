@@ -5,7 +5,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, resolveTarget, cappedInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 /**
@@ -383,14 +383,17 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--lookback <days>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, opts) => runKeikkaLatest(client, opts)));
     k.command("get <keikkaId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, idStr) => runKeikkaGet(client, parseId(idStr, "keikkaId"))));
     k.command("search [query]")
         .option("--search <s>")
+        .addOption(queryAliasOption())
         .option("--limit <n>", "", (v) => Number(v))
         .action(guarded(async (query, opts) => {
         const client = await getClient();
         const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
+        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search, opts.query), ownerAsiakasId, opts.limit);
         writeJson(result);
     }));
     k.command("validate [keikkaId]")

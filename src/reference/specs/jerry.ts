@@ -40,6 +40,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib jerry request get",
+    aliases: ["ib jerry request show"],
     // The masking sentences at the end of this description are also stated in the
     // `jerry-lifecycle` TOPICS entry in reference/domain.ts (served by `ib help
     // jerry-lifecycle` and embedded in every `ib reference dump` primer) — keep both
@@ -468,6 +469,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib jerry provider-settings get",
+    aliases: ["ib jerry provider-settings show"],
     description:
       "Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
@@ -834,6 +836,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib jerry admin request get",
+    aliases: ["ib jerry admin request show"],
     description:
       "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). Read `viewSource`, not `viewedAt`, to judge provider engagement: a view recorded through the tokenized preview link has no authenticated person behind it, so `viewedAt` alone counts an email-link click as a provider reading the lead (fb#638). For the offers use `ib jerry admin request offers`. System-admin only.",
     permissions: ["isSystemAdmin"],

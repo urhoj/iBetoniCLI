@@ -331,6 +331,8 @@ export function registerTaskCommands(
     .action(jsonAction(getClient, (client, opts: TaskListOptions) => runTaskList(client, opts)));
 
   t.command("get <id>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runTaskGet(client, parseTaskId(idStr, "get"))

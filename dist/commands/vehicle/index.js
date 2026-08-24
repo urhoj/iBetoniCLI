@@ -2,7 +2,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, resolveSearchQuery, cappedInt, assertEnum } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -372,7 +372,11 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
  * Exit codes: 1 = generic API/runtime failure (else the mapped CliError codes).
  */
 export function registerVehicleCommands(parent, getClient) {
-    const v = parent.command("vehicle").description("Vehicle commands");
+    // `vehicles` — hidden bare-plural alias (fb#740): a documented group absorbs
+    // the plural guess instead of costing a round-trip. `PLURAL_DOMAIN_ALIASES`
+    // in domains.ts maps the token for selective registration; this makes
+    // Commander dispatch it.
+    const v = parent.command("vehicle").aliases(["vehicles"]).description("Vehicle commands");
     v.command("list")
         .option("--limit <n>", "", cappedInt(500))
         .option("--cursor <c>")
@@ -391,6 +395,8 @@ export function registerVehicleCommands(parent, getClient) {
         asiakas: opts.asiakas,
     })));
     v.command("get <vehicleId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--asiakas <id>", "", (val) => Number(val))
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)));
     v.command("status <vehicleId>")
@@ -402,9 +408,10 @@ export function registerVehicleCommands(parent, getClient) {
         .action(jsonAction(getClient, runVehicleLocations));
     v.command("search [query]")
         .option("--search <s>")
+        .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
         .option("--asiakas <id>", "", (val) => Number(val))
-        .action(jsonAction(getClient, (client, query, opts) => runVehicleSearch(client, resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas)));
+        .action(jsonAction(getClient, (client, query, opts) => runVehicleSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, opts.asiakas)));
     v.command("timeline <vehicleId>")
         .option("--date <date>", "", "today")
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));

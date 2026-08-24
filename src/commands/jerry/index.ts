@@ -9,7 +9,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt, queryAliasOption } from "../../targets.js";
 import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -1023,6 +1023,8 @@ export function registerJerryCommands(
 
   request
     .command("get <requestId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--provider")
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { provider?: boolean }) =>
@@ -1287,6 +1289,8 @@ export function registerJerryCommands(
     .description("Per-provider BetoniJerry settings (contact, opening hours, description)");
 
   ps.command("get")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .option("--asiakas <id>", "", Number)
     .action(
       jsonAction(getClient, (client, opts: { asiakas?: number }) =>
@@ -1345,9 +1349,10 @@ export function registerJerryCommands(
   admin
     .command("search [query]")
     .option("--search <s>")
+    .addOption(queryAliasOption())
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string }) =>
-        runJerryAdminSearch(client, resolveSearchQuery(query, opts.search))
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string }) =>
+        runJerryAdminSearch(client, resolveSearchQuery(query, opts.search, opts.query))
       )
     );
 
@@ -1548,6 +1553,8 @@ export function registerJerryCommands(
 
   adminRequest
     .command("get <requestId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runJerryAdminRequestGet(client, parseId(idStr, "requestId"))

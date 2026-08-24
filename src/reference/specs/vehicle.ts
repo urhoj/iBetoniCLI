@@ -74,6 +74,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib vehicle get",
+    aliases: ["ib vehicle show"],
     description:
       "Get a single vehicle by id. --asiakas reads a vehicle owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign vehicleId returns 404.",
     permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
@@ -547,6 +548,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib vehicle driver default get",
+    aliases: ["ib vehicle driver default show"],
     description:
       "Read the vehicle's STANDING default driver (vehicle.defaultKuski_personId) — the template driver, distinct from the per-day driver. Projects the field off the vehicle record.",
     permissions: ["auth.page.vehicle.read"],

@@ -343,6 +343,8 @@ export function registerOhjeCommands(
     );
 
   o.command("get <helpId>")
+    // `show` — the reflex spelling for read-one-row (fb#836).
+    .alias("show")
     .action(guarded(async (helpId: string) => {
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);

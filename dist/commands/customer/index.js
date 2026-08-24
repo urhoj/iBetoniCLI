@@ -5,7 +5,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -750,6 +750,8 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--limit <n>", "", cappedInt(500))
         .action(jsonAction(getClient, (client, opts) => runCustomerDeadList(client, { limit: opts.limit })));
     c.command("get <asiakasId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, idStr) => runCustomerGet(client, parseId(idStr, "asiakasId"))));
     c.command("worksites <asiakasId>")
         .action(jsonAction(getClient, (client, idStr) => runCustomerWorksites(client, parseId(idStr, "asiakasId"))));
@@ -815,9 +817,10 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     c.command("search [query]")
         .option("--search <s>")
+        .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
         .option("--my-companies")
-        .action(jsonAction(getClient, (client, query, opts) => runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)));
+        .action(jsonAction(getClient, (client, query, opts) => runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies)));
     // Hidden back-compat alias — canonical command is now `ib opendata prh`.
     c.command("prh [ytunnus]", { hidden: true })
         .description("Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>.")

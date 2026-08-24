@@ -28,6 +28,7 @@ export const SALES_SPECS: CommandSpec[] = [
   },
   {
     command: "ib sales prospect get",
+    aliases: ["ib sales prospect show"],
     description:
       "One SaaS prospect, by saasProspectId, --asiakas or --ytunnus. Exits 4 (not a guess) when more than one row matches the reference, and 5 when none does.",
     permissions: ["isSystemAdmin"],
@@ -108,7 +109,7 @@ export const SALES_SPECS: CommandSpec[] = [
   {
     command: "ib sales customer list",
     description:
-      "Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership across numerous tenants; lastLoginAny is kept alongside so the difference is inspectable.",
+      "Companies genuinely running work through betoni.online — those with their own keikka rows. NOT the same as 'has logged in' (59 companies have a login, 2 have keikkaa). lastLoginOwn excludes PumiNet Oy staff, who hold membership in many tenants; lastLoginAny is kept alongside so the difference is inspectable.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [],

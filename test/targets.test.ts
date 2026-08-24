@@ -148,6 +148,34 @@ describe("resolveSearchQuery (feedback #235 — positional OR --search)", () => 
   test("missing-query error names both input forms", () => {
     expect(() => resolveSearchQuery(undefined, undefined)).toThrow(/<query>.*--search/);
   });
+
+  describe("--query alias of --search (fb#740)", () => {
+    test("--query alone resolves like --search", () => {
+      expect(resolveSearchQuery(undefined, undefined, "FPA-837")).toBe("FPA-837");
+      expect(resolveSearchQuery(undefined, undefined, "  FPA-837  ")).toBe("FPA-837");
+    });
+
+    test("positional + --query agree → resolves", () => {
+      expect(resolveSearchQuery("FPA-837", undefined, " FPA-837 ")).toBe("FPA-837");
+    });
+
+    test("--search and --query agree → resolves", () => {
+      expect(resolveSearchQuery(undefined, "FPA-837", " FPA-837 ")).toBe("FPA-837");
+    });
+
+    test("--search and --query differ → exit 4", () => {
+      expect(exitCodeOf(() => resolveSearchQuery(undefined, "FPA-837", "REK-123"))).toBe(4);
+    });
+
+    test("empty/whitespace --query falls back to --search or positional", () => {
+      expect(resolveSearchQuery(undefined, "FPA-837", "   ")).toBe("FPA-837");
+      expect(resolveSearchQuery("FPA-837", undefined, "")).toBe("FPA-837");
+    });
+
+    test("--query alone, whitespace-only → exit 4", () => {
+      expect(exitCodeOf(() => resolveSearchQuery(undefined, undefined, "   "))).toBe(4);
+    });
+  });
 });
 
 describe("resolveDateInput (feedback #393 — positional OR --date)", () => {

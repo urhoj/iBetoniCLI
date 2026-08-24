@@ -3,7 +3,7 @@ import { listEnvelope, toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt, queryAliasOption } from "../../targets.js";
 import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -628,6 +628,8 @@ export function registerJerryCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, opts) => runJerryRequestList(client, opts)));
     request
         .command("get <requestId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--provider")
         .action(jsonAction(getClient, (client, idStr, opts) => runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider)));
     request
@@ -793,6 +795,8 @@ export function registerJerryCommands(parent, getClient) {
         .command("provider-settings")
         .description("Per-provider BetoniJerry settings (contact, opening hours, description)");
     ps.command("get")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .option("--asiakas <id>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runJerryProviderSettingsGet(client, opts.asiakas)));
     addWriteFlagsToCommand(ps
@@ -826,7 +830,8 @@ export function registerJerryCommands(parent, getClient) {
     admin
         .command("search [query]")
         .option("--search <s>")
-        .action(jsonAction(getClient, (client, query, opts) => runJerryAdminSearch(client, resolveSearchQuery(query, opts.search))));
+        .addOption(queryAliasOption())
+        .action(jsonAction(getClient, (client, query, opts) => runJerryAdminSearch(client, resolveSearchQuery(query, opts.search, opts.query))));
     addAsiakasTargetOption(admin.command("detail [asiakasId]")).action(jsonAction(getClient, (client, idStr, opts) => runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas))));
     for (const [name, enable] of [
         ["enable", true],
@@ -971,6 +976,8 @@ export function registerJerryCommands(parent, getClient) {
     }));
     adminRequest
         .command("get <requestId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(jsonAction(getClient, (client, idStr) => runJerryAdminRequestGet(client, parseId(idStr, "requestId"))));
     adminRequest
         .command("offers <requestId>")

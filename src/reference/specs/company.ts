@@ -169,6 +169,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib betoni laatu get",
+    aliases: ["ib betoni laatu show"],
     description:
       "One concrete grade by laatuId. Resolved from the supplier's list rather than a get endpoint (the backend mounts no route for `betoniLaatu.get`), so visibility is identical to `laatu list` — you can only get a grade you could already list.",
     auth: "any",
@@ -212,6 +213,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
   },
   {
     command: "ib betoni attr get",
+    aliases: ["ib betoni attr show"],
     description:
       "One concrete additive by attrId, scoped to an owning tenant (GET /api/betoni/attr/get/:attrId/:ownerAsiakasId). The route returns a recordset even for one row; this unwraps it.",
     auth: "any",

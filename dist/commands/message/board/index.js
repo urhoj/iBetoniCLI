@@ -172,6 +172,8 @@ export function registerMessageBoardCommands(parent, getClient) {
     b.command("all")
         .action(jsonAction(getClient, runBoardAll));
     b.command("get <messageId>")
+        // `show` — the reflex spelling for read-one-row (fb#836).
+        .alias("show")
         .action(guarded(async (raw) => {
         const messageId = parseId(raw, "messageId");
         const client = await getClient();
@@ -277,6 +279,7 @@ export const MESSAGE_BOARD_SPECS = [
     },
     {
         command: "ib message board get",
+        aliases: ["ib message board show"],
         description: "Get one notice by id. There is no single-message GET route, so it is resolved CLIENT-SIDE over `all` — and therefore needs the same admin/editor access. Unknown id → exit 5.",
         permissions: BOARD_EDIT_PERMS,
         args: [{ name: "messageId", type: "number", description: "Notice to fetch" }],
