@@ -176,7 +176,13 @@ export function applyColumnsProjection(
   if (matched.length === 0) {
     failUsage(`--columns: none of [${listed}] exist in this output. Available: ${available.join(", ")}.`);
   }
-  if (unknown.length) warnNote(`[ib] --columns: unknown column(s) ignored: ${listed}`);
+  // Name the ACCEPTED set in the note itself (fb#858): without it, a name the
+  // did-you-mean cannot reach (e.g. `title` here) leaves the caller guessing
+  // blind on the next attempt while exit 0 publishes a degraded table.
+  if (unknown.length)
+    warnNote(
+      `[ib] --columns: unknown column(s) ignored: ${listed} — accepted: ${available.join(", ")}`
+    );
   const pick = (r: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
     for (const c of cols) if (c in r) out[c] = r[c];

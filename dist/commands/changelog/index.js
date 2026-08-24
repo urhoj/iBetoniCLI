@@ -498,7 +498,14 @@ export function requireAddFields(description, o) {
         if (!has(o[f]))
             problems.push({ flag: `--${f}`, issue: "missing" });
     if (![description, o.description, o.summary, o.body].some(has))
-        problems.push({ flag: "--description", issue: "missing" });
+        // The `sample` on the envelope is the full template; this remedy covers the
+        // alternate spellings the sample cannot show (fb#851 — hosted/MCP callers
+        // compose from the rejection alone, without CLAUDE.md priming).
+        problems.push({
+            flag: "--description",
+            issue: "missing",
+            remedy: "provide the entry text once: positionally, or as --description (aliases: --summary, --body) — copy the `sample` below and fill in real values",
+        });
     if (problems.length)
         failValidation("ib dev changelog add", problems, {
             spec: CHANGELOG_SPECS.find((s) => s.command === "ib dev changelog add"),
@@ -595,7 +602,13 @@ function normalizeFeedbackIds(v) {
  *
  * stderr only — the stdout JSON contract is untouched.
  */
-export function warnFeedbackLinkEffects(result, warn = warnNote) {
+export function warnFeedbackLinkEffects(result, warn = warnNote, 
+// `advances: false` = the `update --feedback` path, where the backend passes
+// advanceStatus:false BY DESIGN (update is the link-repair path, not a report
+// of shipped work — changelogSql.js:332). The add-path note used to render
+// there verbatim and contradicted itself: it cited `open` as auto-advancing
+// on a path where nothing ever advances (fb#875).
+{ advances = true } = {}) {
     if (!result || typeof result !== "object")
         return;
     const row = result;
@@ -624,8 +637,11 @@ export function warnFeedbackLinkEffects(result, warn = warnNote) {
             warn(`[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
                 `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`);
         if (typeof feedbackStatus === "string")
-            warn(`[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
-                `A status set deliberately is preserved (only \`open\` auto-advances, and a REOPENED row does not). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`);
+            warn(advances
+                ? `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
+                    `A status set deliberately is preserved (only \`open\` auto-advances, and a REOPENED row does not). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`
+                : `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row stays \`${feedbackStatus}\` — \`update --feedback\` only LINKS, it never advances status (linking is a correction, not a report of shipped work). ` +
+                    `Close it separately with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`);
         // 4. THE LINK FAILED for this id alone (fb#586). The other ids in the set
         //    may well have landed, and the entry exists either way, so the remedy is
         //    to finish the set — NOT to re-run `add`, which would mint a duplicate
@@ -964,7 +980,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             patch.language = updLang;
         const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
         warnIfPatchIgnored(patch, result);
-        warnFeedbackLinkEffects(result);
+        warnFeedbackLinkEffects(result, undefined, { advances: false });
         warnFeedbackUnlinkEffects(result, o.unlink);
         writeJson(result);
     }));

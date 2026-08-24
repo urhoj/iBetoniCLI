@@ -97,6 +97,12 @@ export const FLAG_SYNONYMS = {
     pvm: ["date"],
     type: ["kind"],
     kind: ["type"],
+    // Cross-command synonym family (fb#870): the textEdit trio owns bare
+    // --append, while `feedback update` spells it --append-description and
+    // `glossary set` --append-definition. An agent moving between them reaches
+    // for bare --append; the table resolves it only on commands that own one of
+    // the prefixed forms — the trio's real --append is never overridden.
+    append: ["append-description", "append-definition"],
 };
 /**
  * Closest name to `target` within an edit-distance threshold, else null.

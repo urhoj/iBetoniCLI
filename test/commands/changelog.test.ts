@@ -242,7 +242,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects, warnFeedbackUnlinkEffects } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects, warnFeedbackUnlinkEffects, requireAddFields } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -1311,6 +1311,66 @@ describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#
     const warn = vi.fn();
     warnFeedbackLinkEffects({ changelogId: 1300 }, warn);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  // fb#875 — the reported case: `update 1629 --feedback 839` on an `open` row.
+  // The add-path note rendered there verbatim and contradicted itself ("only
+  // `open` auto-advances" — on a path where the backend passes
+  // advanceStatus:false BY DESIGN). The update path must state its own rule.
+  test("on the update path the note says update never advances status (fb#875)", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects(
+      {
+        changelogId: 1629,
+        feedbackLinks: [{ feedbackId: 839, role: "resolves", feedbackStatus: "open" }],
+      },
+      warn,
+      { advances: false }
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).toMatch(/only LINKS, it never advances status/);
+    // Still carries the way to close the row.
+    expect(msg).toMatch(/feedback resolve <id> --status applied/);
+    // The self-contradictory add-path parenthetical must be gone here.
+    expect(msg).not.toMatch(/only `open` auto-advances/);
+  });
+
+  test("the add path keeps the preservation wording — advances defaults true", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1208, feedbackStatus: "reviewed" }, warn);
+    expect(warn.mock.calls[0][0]).toMatch(/only `open` auto-advances/);
+  });
+});
+
+// fb#851 — 9+ friction-log occurrences of composing `add` without a description.
+// The rejection must be self-sufficient for callers not primed by CLAUDE.md
+// (hosted/MCP): a full copy-paste sample plus a remedy naming the positional and
+// the --summary/--body aliases the sample cannot show.
+describe("requireAddFields — missing --description is self-explanatory (fb#851)", () => {
+  const bodyOf = (fn: () => void): { problems?: Array<{ flag: string; remedy?: string }>; sample?: string } => {
+    try {
+      fn();
+    } catch (e) {
+      return (e as { body: { problems?: Array<{ flag: string; remedy?: string }>; sample?: string } }).body;
+    }
+    throw new Error("expected requireAddFields to throw");
+  };
+
+  test("carries a runnable sample and the alternate description spellings", () => {
+    const body = bodyOf(() => requireAddFields(undefined, { type: "bugfix", area: "cli", title: "x" }));
+    const desc = body.problems?.find((p) => p.flag === "--description");
+    expect(desc?.remedy).toMatch(/positionally/);
+    expect(desc?.remedy).toMatch(/--summary, --body/);
+    // The sample is the complete template — every required flag present.
+    expect(body.sample).toMatch(/--type/);
+    expect(body.sample).toMatch(/--area/);
+    expect(body.sample).toMatch(/--title/);
+    expect(body.sample).toMatch(/--description/);
+  });
+
+  test("a description given positionally satisfies the requirement", () => {
+    expect(() => requireAddFields("did the thing", { type: "bugfix", area: "cli", title: "x" })).not.toThrow();
   });
 });
 
