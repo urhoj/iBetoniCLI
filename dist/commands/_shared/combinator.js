@@ -71,9 +71,15 @@ export async function resolveCombinatorOwner(client, opts) {
  * spec) and enforced centrally by the preAction hook.
  */
 export function registerCombinatorCommands(parent, getClient, cfg) {
-    const duplicatesCmd = parent.command("duplicates").option("--owner <id>", "", Number);
-    if (cfg.unownedClass)
+    // addOwnerOption, not a bare `Number` (matching merge below): NaN is not
+    // nullish, so a bare-Number `--owner abc` survived the `??` default and
+    // reached the wire as ?ownerAsiakasId=NaN — and `--owner 0` was an
+    // undocumented spelling of the unowned class on all three combinators,
+    // which --unowned exists to gate. intFlag rejects both client-side.
+    const duplicatesCmd = addOwnerOption(parent.command("duplicates"));
+    if (cfg.unownedClass) {
         duplicatesCmd.option("--unowned");
+    }
     duplicatesCmd.action(guarded(async (opts) => {
         const client = await getClient();
         const owner = await resolveCombinatorOwner(client, opts);

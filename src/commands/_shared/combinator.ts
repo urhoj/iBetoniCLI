@@ -160,8 +160,15 @@ export function registerCombinatorCommands(
   getClient: () => Promise<ApiClient>,
   cfg: CombinatorCommandsConfig
 ): void {
-  const duplicatesCmd = parent.command("duplicates").option("--owner <id>", "", Number);
-  if (cfg.unownedClass) duplicatesCmd.option("--unowned");
+  // addOwnerOption, not a bare `Number` (matching merge below): NaN is not
+  // nullish, so a bare-Number `--owner abc` survived the `??` default and
+  // reached the wire as ?ownerAsiakasId=NaN — and `--owner 0` was an
+  // undocumented spelling of the unowned class on all three combinators,
+  // which --unowned exists to gate. intFlag rejects both client-side.
+  const duplicatesCmd = addOwnerOption(parent.command("duplicates"));
+  if (cfg.unownedClass) {
+    duplicatesCmd.option("--unowned");
+  }
   duplicatesCmd.action(
     guarded(async (opts: { owner?: number; unowned?: boolean }) => {
       const client = await getClient();

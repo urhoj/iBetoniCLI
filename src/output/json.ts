@@ -171,17 +171,18 @@ export function applyColumnsProjection(
   }
   const matched = cols.filter((c) => rows.some((r) => c in r));
   const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const availableList = available.join(", ");
   const unknown = cols.filter((c) => !matched.includes(c));
   const listed = unknown.map((c) => describeUnknownColumn(c, available)).join(", ");
   if (matched.length === 0) {
-    failUsage(`--columns: none of [${listed}] exist in this output. Available: ${available.join(", ")}.`);
+    failUsage(`--columns: none of [${listed}] exist in this output. Available: ${availableList}.`);
   }
-  // Name the ACCEPTED set in the note itself (fb#858): without it, a name the
+  // Name the AVAILABLE set in the note itself (fb#858): without it, a name the
   // did-you-mean cannot reach (e.g. `title` here) leaves the caller guessing
   // blind on the next attempt while exit 0 publishes a degraded table.
   if (unknown.length)
     warnNote(
-      `[ib] --columns: unknown column(s) ignored: ${listed} — accepted: ${available.join(", ")}`
+      `[ib] --columns: unknown column(s) ignored: ${listed} — available: ${availableList}`
     );
   const pick = (r: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = {};

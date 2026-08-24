@@ -168,6 +168,15 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
   test("OPTION_REDIRECTS is keyed by full command path + flag", () => {
     expect(OPTION_REDIRECTS).toHaveProperty("ib dev cache invalidate --pattern");
   });
+
+  // fb#870: on a command owning a prefixed form, closestName's PREFIX pass
+  // already answers — the FLAG_SYNONYMS `append` row exists for THIS path, the
+  // sibling scan on a command that owns no append-* flag at all.
+  test("bare --append points at the prefixed spelling on a sibling (fb#870)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("glossary", "lookup"), "--append");
+    expect(env.acceptedAs).toBe("--append-definition");
+    expect(env.acceptedBy).toEqual(["ib glossary set"]);
+  });
 });
 
 // feedback #308 — the reported invocation was a dead end: `ib person list

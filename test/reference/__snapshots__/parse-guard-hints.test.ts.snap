@@ -77,6 +77,10 @@ ib customer dead-list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 and has no narrowing filter — raise --limit if you need more than the 200 default
 
+ib customer duplicates --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib customer list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 with NO cursor pagination (nextCursor is always null, even when truncated) — narrow with --ids/--since/--sort instead of paging
@@ -301,6 +305,10 @@ ib opendata weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib person duplicates --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib person list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
@@ -476,6 +484,10 @@ ib weather pumping --lat <n>
 ib weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib worksite duplicates --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
 ib worksite list --limit <n>
   ! --limit must be an integer >= 1

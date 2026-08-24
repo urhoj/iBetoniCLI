@@ -1325,7 +1325,7 @@ describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#
         feedbackLinks: [{ feedbackId: 839, role: "resolves", feedbackStatus: "open" }],
       },
       warn,
-      { advances: false }
+      { advancesStatus: false }
     );
     expect(warn).toHaveBeenCalledTimes(1);
     const msg = warn.mock.calls[0][0] as string;
@@ -1348,25 +1348,19 @@ describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#
 // (hosted/MCP): a full copy-paste sample plus a remedy naming the positional and
 // the --summary/--body aliases the sample cannot show.
 describe("requireAddFields — missing --description is self-explanatory (fb#851)", () => {
-  const bodyOf = (fn: () => void): { problems?: Array<{ flag: string; remedy?: string }>; sample?: string } => {
-    try {
-      fn();
-    } catch (e) {
-      return (e as { body: { problems?: Array<{ flag: string; remedy?: string }>; sample?: string } }).body;
-    }
-    throw new Error("expected requireAddFields to throw");
-  };
-
   test("carries a runnable sample and the alternate description spellings", () => {
-    const body = bodyOf(() => requireAddFields(undefined, { type: "bugfix", area: "cli", title: "x" }));
-    const desc = body.problems?.find((p) => p.flag === "--description");
+    // captureThrow, not a local helper: the hand-restated envelope shape is the
+    // exact drift fb#487 documents at the top of this file.
+    const err = captureThrow(() => requireAddFields(undefined, { type: "bugfix", area: "cli", title: "x" }));
+    expect(err.exitCode).toBe(4);
+    const desc = err.body?.problems?.find((p) => p.flag === "--description");
     expect(desc?.remedy).toMatch(/positionally/);
     expect(desc?.remedy).toMatch(/--summary, --body/);
     // The sample is the complete template — every required flag present.
-    expect(body.sample).toMatch(/--type/);
-    expect(body.sample).toMatch(/--area/);
-    expect(body.sample).toMatch(/--title/);
-    expect(body.sample).toMatch(/--description/);
+    expect(err.body?.sample).toMatch(/--type/);
+    expect(err.body?.sample).toMatch(/--area/);
+    expect(err.body?.sample).toMatch(/--title/);
+    expect(err.body?.sample).toMatch(/--description/);
   });
 
   test("a description given positionally satisfies the requirement", () => {

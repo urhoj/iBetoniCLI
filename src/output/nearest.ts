@@ -99,10 +99,12 @@ export const FLAG_SYNONYMS: Record<string, string[]> = {
   type: ["kind"],
   kind: ["type"],
   // Cross-command synonym family (fb#870): the textEdit trio owns bare
-  // --append, while `feedback update` spells it --append-description and
-  // `glossary set` --append-definition. An agent moving between them reaches
-  // for bare --append; the table resolves it only on commands that own one of
-  // the prefixed forms — the trio's real --append is never overridden.
+  // --append, while `dev feedback update` / `dev changelog update` spell it
+  // --append-description and `glossary set` --append-definition. On a command
+  // that owns a prefixed form, closestName's PREFIX pass already answers; this
+  // row is for the SIBLING scan — `ib dev feedback resolve --append` now
+  // reports `acceptedAs: --append-description` instead of a bare
+  // "unknown option".
   append: ["append-description", "append-definition"],
 };
 

@@ -31,6 +31,22 @@ describe("Rich --help wiring — real command tree", () => {
     expect(orphaned).toEqual([]);
   });
 
+  // The drift guard above is Commander → spec only, so a CONDITIONALLY
+  // registered flag (combinator config) can be documented in the spec while the
+  // registration line is gone and everything stays green — the caller then
+  // composes a flag `--help` advertises and gets "unknown option" (fb#849's
+  // --unowned is the second such flag after --allow-big-merge). Pin both.
+  test("conditionally-registered combinator flags are wired, not just spec'd", () => {
+    for (const [path, flag] of [
+      ["ib person merge", "--unowned"],
+      ["ib person duplicates", "--unowned"],
+      ["ib customer merge", "--allow-big-merge"],
+    ] as const) {
+      const longs = commands.get(path)!.options.map((o) => o.long);
+      expect(longs, `${path} is missing ${flag}`).toContain(flag);
+    }
+  });
+
   test("each spec'd command's --help emits the rich formatHelp output", () => {
     for (const spec of COMMAND_SPECS) {
       const cmd = commands.get(spec.command);

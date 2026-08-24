@@ -339,7 +339,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       "List likely-duplicate person pairs for one tenant: same normalized phone (high), same email (high), or same first+last name (medium). Both rows must be older than 1 month. Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib person merge`.",
     permissions: ["company admin on the tenant (system admin for another owner)"],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company; a non-integer value exits 4 client-side)" },
       { name: "unowned", type: "boolean", description: "Scan the UNOWNED class instead — persons whose ownerAsiakasId is 0 or NULL (self-registrations, imports, pre-ownership rows). System admin only; mutually exclusive with --owner (fb#849)" },
     ],
     outputShape:

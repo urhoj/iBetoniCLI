@@ -9701,7 +9701,7 @@ DESCRIPTION
   Permissions: requires company admin on the tenant (system admin for another owner).
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId to scan (default: active company)
+  --owner NUMBER    ownerAsiakasId to scan (default: active company; a non-integer value exits 4 client-side)
   --unowned    Scan the UNOWNED class instead — persons whose ownerAsiakasId is 0 or NULL (self-registrations, imports, pre-ownership rows). System admin only; mutually exclusive with --owner (fb#849)
 
 GLOBAL FLAGS

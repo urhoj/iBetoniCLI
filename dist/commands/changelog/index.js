@@ -277,6 +277,9 @@ export function validateFieldLengths(o) {
  */
 export function resolveChangelogDescription(positional, flag, summary, body) {
     const description = foldAliases([positional, flag, summary, body], "Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match");
+    // On the `add` path requireAddFields gates this first (richer envelope with a
+    // per-flag remedy + sample), so this terse fallback fires only for direct
+    // callers/tests — do not try to keep the two messages in sync.
     if (!description)
         failWith("--description (or --summary/--body, or a positional description) is required", 4);
     return description;
@@ -497,14 +500,14 @@ export function requireAddFields(description, o) {
     for (const f of ["type", "area", "title"])
         if (!has(o[f]))
             problems.push({ flag: `--${f}`, issue: "missing" });
+    // The `sample` on the envelope is the full template; the remedy covers the
+    // alternate spellings the sample cannot show (fb#851 — hosted/MCP callers
+    // compose from the rejection alone, without CLAUDE.md priming).
     if (![description, o.description, o.summary, o.body].some(has))
-        // The `sample` on the envelope is the full template; this remedy covers the
-        // alternate spellings the sample cannot show (fb#851 — hosted/MCP callers
-        // compose from the rejection alone, without CLAUDE.md priming).
         problems.push({
             flag: "--description",
             issue: "missing",
-            remedy: "provide the entry text once: positionally, or as --description (aliases: --summary, --body) — copy the `sample` below and fill in real values",
+            remedy: "provide the entry text once: positionally, or as --description (aliases: --summary, --body) — copy the envelope's `sample` and fill in real values",
         });
     if (problems.length)
         failValidation("ib dev changelog add", problems, {
@@ -600,15 +603,16 @@ function normalizeFeedbackIds(v) {
  *    the note's whole value is that a human wrote it, so only the writer, who is
  *    right here, can say whether it still holds.
  *
+ * `advancesStatus: false` marks the `update --feedback` path — the backend
+ * passes advanceStatus:false there BY DESIGN (update is the link-repair /
+ * correction path, not a report of shipped work; changelogSql.js:332), so the
+ * `feedbackStatus` note states that rule instead of the add path's "only
+ * `open` auto-advances" wording, which contradicted itself on a path where
+ * nothing ever advances (fb#875).
+ *
  * stderr only — the stdout JSON contract is untouched.
  */
-export function warnFeedbackLinkEffects(result, warn = warnNote, 
-// `advances: false` = the `update --feedback` path, where the backend passes
-// advanceStatus:false BY DESIGN (update is the link-repair path, not a report
-// of shipped work — changelogSql.js:332). The add-path note used to render
-// there verbatim and contradicted itself: it cited `open` as auto-advancing
-// on a path where nothing ever advances (fb#875).
-{ advances = true } = {}) {
+export function warnFeedbackLinkEffects(result, warn = warnNote, { advancesStatus = true } = {}) {
     if (!result || typeof result !== "object")
         return;
     const row = result;
@@ -637,7 +641,7 @@ export function warnFeedbackLinkEffects(result, warn = warnNote,
             warn(`[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
                 `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`);
         if (typeof feedbackStatus === "string")
-            warn(advances
+            warn(advancesStatus
                 ? `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
                     `A status set deliberately is preserved (only \`open\` auto-advances, and a REOPENED row does not). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`
                 : `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row stays \`${feedbackStatus}\` — \`update --feedback\` only LINKS, it never advances status (linking is a correction, not a report of shipped work). ` +
@@ -980,7 +984,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             patch.language = updLang;
         const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
         warnIfPatchIgnored(patch, result);
-        warnFeedbackLinkEffects(result, undefined, { advances: false });
+        warnFeedbackLinkEffects(result, warnNote, { advancesStatus: false });
         warnFeedbackUnlinkEffects(result, o.unlink);
         writeJson(result);
     }));

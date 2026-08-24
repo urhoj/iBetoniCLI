@@ -239,10 +239,10 @@ describe("JSON output", () => {
     // fb#858: a name the did-you-mean cannot reach (nothing contains "title")
     // left the caller guessing blind on the next attempt — the note must
     // enumerate the accepted set itself.
-    test("the ignore warning enumerates the accepted columns (fb#858)", () => {
+    test("the ignore warning enumerates the available columns (fb#858)", () => {
       setProjectionColumns(["a", "title"]);
       writeJson({ a: 1, b: 2 });
-      expect(String(stderrSpy.mock.calls.at(-1)![0])).toContain("accepted: a, b");
+      expect(String(stderrSpy.mock.calls.at(-1)![0])).toContain("available: a, b");
     });
 
     test("no matching column exits 4 listing what IS available", () => {
