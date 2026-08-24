@@ -76,22 +76,61 @@ describe("recordFriction", () => {
   // feedback #312: the log file is machine-global but is drained by a
   // per-session stop gate. Without an owner stamp the draining session
   // mis-attributes foreign rows AND deletes them before their own actor sees
-  // them, so every entry records who captured it.
+  // them, so every entry records who captured it. Each harness exports its
+  // session id under its own name; stamping only the Claude var left every
+  // Qwen/Codex capture unclaimed, and nothing ever drained those rows.
   describe("session ownership stamp (sid)", () => {
-    const origSid = process.env.CLAUDE_CODE_SESSION_ID;
+    const SID_ENVS = [
+      "CLAUDE_CODE_SESSION_ID",
+      "QWEN_CODE_SESSION_ID",
+      "CODEX_SESSION_ID",
+    ] as const;
+    const saved = new Map<string, string | undefined>();
+    beforeAll(() => {
+      for (const name of SID_ENVS) {
+        saved.set(name, process.env[name]);
+        delete process.env[name]; // isolate from the runner's own harness
+      }
+    });
     afterAll(() => {
-      if (origSid === undefined) delete process.env.CLAUDE_CODE_SESSION_ID;
-      else process.env.CLAUDE_CODE_SESSION_ID = origSid;
+      for (const name of SID_ENVS) {
+        const v = saved.get(name);
+        if (v === undefined) delete process.env[name];
+        else process.env[name] = v;
+      }
     });
 
     test("stamps the harness session id when one is exported", () => {
       process.env.CLAUDE_CODE_SESSION_ID = "sess-abc-123";
       recordFriction(new Error("boom"), 1);
       expect(lastEntry().sid).toBe("sess-abc-123");
+      delete process.env.CLAUDE_CODE_SESSION_ID;
+    });
+
+    test("stamps the Qwen Code session id when no Claude one is set", () => {
+      process.env.QWEN_CODE_SESSION_ID = "qwen-sess-1";
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBe("qwen-sess-1");
+      delete process.env.QWEN_CODE_SESSION_ID;
+    });
+
+    test("stamps the Codex session id as the last fallback", () => {
+      process.env.CODEX_SESSION_ID = "codex-sess-1";
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBe("codex-sess-1");
+      delete process.env.CODEX_SESSION_ID;
+    });
+
+    test("the Claude id wins when several harness ids are set", () => {
+      process.env.CLAUDE_CODE_SESSION_ID = "cc-1";
+      process.env.QWEN_CODE_SESSION_ID = "qw-1";
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBe("cc-1");
+      delete process.env.CLAUDE_CODE_SESSION_ID;
+      delete process.env.QWEN_CODE_SESSION_ID;
     });
 
     test("stamps null outside an agent session (shell / cron), never a fake owner", () => {
-      delete process.env.CLAUDE_CODE_SESSION_ID;
       recordFriction(new Error("boom"), 1);
       expect(lastEntry().sid).toBeNull();
     });
@@ -100,6 +139,81 @@ describe("recordFriction", () => {
       process.env.CLAUDE_CODE_SESSION_ID = "";
       recordFriction(new Error("boom"), 1);
       expect(lastEntry().sid).toBeNull();
+      delete process.env.CLAUDE_CODE_SESSION_ID;
+    });
+  });
+
+  // Unclaimed rows (sid: null) have no drain — no gate ever fires for a plain
+  // shell, a cron routine, or a harness without a stop hook — and claimed rows
+  // of a session that died without releasing are unreleasable by anyone else.
+  // Both classes expire at capture time instead of accumulating forever.
+  describe("age-out of undrainable rows", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+
+    function seed(rows: Record<string, unknown>[]): void {
+      writeFileSync(
+        frictionPath(),
+        rows.map((r) => JSON.stringify(r)).join("\n") + "\n",
+        { mode: 0o600 }
+      );
+    }
+    function messages(): string[] {
+      return readFileSync(frictionPath(), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => (JSON.parse(l) as Record<string, unknown>).message as string);
+    }
+    const row = (message: string, extra: Record<string, unknown>) => ({
+      argv: message,
+      exitCode: 1,
+      statusCode: 0,
+      code: null,
+      message,
+      ...extra,
+    });
+
+    test("an unclaimed row older than 7 days is dropped on the next write", () => {
+      seed([
+        row("old-unclaimed", { ts: iso(8 * DAY), sid: null }),
+        row("fresh-unclaimed", { ts: iso(1 * DAY), sid: null }),
+      ]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toEqual(["fresh-unclaimed", "trigger"]);
+    });
+
+    test("the pre-rename `at` field is honored too (logged backlog rows)", () => {
+      seed([row("old-at-row", { at: iso(8 * DAY), sid: null })]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toEqual(["trigger"]);
+    });
+
+    test("claimed rows survive past the unclaimed TTL — their own gate drains them", () => {
+      seed([row("claimed-old", { ts: iso(20 * DAY), sid: "sess-live" })]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toContain("claimed-old");
+    });
+
+    test("legacy rows (no sid key) survive the unclaimed TTL — the gate adopts them", () => {
+      seed([row("legacy-row", { ts: iso(20 * DAY) })]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toContain("legacy-row");
+    });
+
+    test("nothing outlives the hard 30-day cap, claimed or not", () => {
+      seed([
+        row("dead-session", { ts: iso(31 * DAY), sid: "sess-dead" }),
+        row("ancient", { ts: iso(40 * DAY), sid: null }),
+        row("young", { ts: iso(1 * DAY), sid: "sess-live" }),
+      ]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toEqual(["young", "trigger"]);
+    });
+
+    test("a row with no parseable timestamp is kept, never silently destroyed", () => {
+      seed([row("no-ts", { ts: "not-a-date", sid: null })]);
+      recordFriction(new Error("trigger"), 1);
+      expect(messages()).toContain("no-ts");
     });
   });
 

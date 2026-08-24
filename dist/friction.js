@@ -21,6 +21,22 @@ import { getEmbeddedCtx } from "./embedded.js";
  */
 const FRICTION_CAP = 300;
 /**
+ * Row lifetimes, enforced at capture time (the only moment guaranteed to run
+ * on every harness — the stop gate only exists on some).
+ *
+ * UNCLAIMED: `sid: null` rows — plain shell, cron, or a harness with no stop
+ * gate. No gate ever fires for them (the gate reports but never deletes rows
+ * it does not own), so nothing else drains them and they accumulate forever
+ * unless expired here. A week is ample for a human or a triage routine to spot
+ * a genuine pattern.
+ *
+ * STALE: hard cap for EVERY row, claimed or not. A session that dies without
+ * releasing leaves its rows unreleasable by anyone else (the gate withholds
+ * foreign rows by design); without a ceiling those leak forever too.
+ */
+const UNCLAIMED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const STALE_ROW_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/**
  * Explicit opt-out for DELIBERATE negative-path invocations (feedback #313).
  *
  * A run of error-message probes files nothing but noise: one reported session
@@ -41,14 +57,27 @@ function frictionDisabled() {
  * `~/.ibetoni/cli-friction.jsonl` per box) but it is drained by a per-session
  * stop gate, so without an owner stamp the draining session both mis-attributes
  * foreign rows to itself AND destroys them before their own actor ever sees
- * them (feedback #312). `CLAUDE_CODE_SESSION_ID` is exported into every child
- * process by the agent harness; `null` when `ib` runs outside one (a shell, a
- * cron routine) — the gate treats a null-owner row as unclaimed and leaves it
- * for a human/cron drain rather than silently adopting it.
+ * them (feedback #312). Each agent harness exports its own session id into
+ * every child process — Claude Code `CLAUDE_CODE_SESSION_ID`, Qwen Code
+ * `QWEN_CODE_SESSION_ID`, Codex `CODEX_SESSION_ID` — so take the first one
+ * present: a session from ANY harness must own (and be able to release) its
+ * rows. Stamping only the Claude var left every Qwen/Codex capture unclaimed,
+ * and no gate ever fired for those rows, so they accumulated forever.
+ * `null` when `ib` runs outside an agent session (a shell, a cron routine) —
+ * the gate reports a null-owner row but never deletes it; the age-out below
+ * eventually clears it, since no gate will ever fire for it either.
  */
 function sessionId() {
-    const sid = process.env.CLAUDE_CODE_SESSION_ID;
-    return typeof sid === "string" && sid.length > 0 ? sid : null;
+    for (const name of [
+        "CLAUDE_CODE_SESSION_ID",
+        "QWEN_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+    ]) {
+        const sid = process.env[name];
+        if (typeof sid === "string" && sid.length > 0)
+            return sid;
+    }
+    return null;
 }
 function frictionDir() {
     return join(homedir(), ".ibetoni");
@@ -125,13 +154,36 @@ export function recordFriction(err, exitCodeOverride, displayed, curatedHint = f
         // keeps the ownership stamp intact — one session must not fold, and thereby
         // adopt, another's row (feedback #312). Unparseable lines are left verbatim:
         // never destroy a row we don't understand.
-        const rows = lines.map((line) => {
+        const parsed = lines.map((line) => {
             try {
                 return { line, obj: JSON.parse(line) };
             }
             catch {
                 return { line, obj: null };
             }
+        });
+        // Age out rows no gate can ever drain (see the TTL constants): unclaimed
+        // rows after UNCLAIMED_TTL_MS, any row after STALE_ROW_TTL_MS. Done here —
+        // before dedupe — so an expired row is never revived by a repeat collapse.
+        // A row with no parseable timestamp is kept: never destroy what we cannot
+        // date (same discipline as the unparseable-line rule above).
+        const now = Date.now();
+        const rows = parsed.filter(({ obj }) => {
+            if (!obj)
+                return true;
+            // `ts` is the current field; `at` is the pre-rename shape some logged
+            // rows still carry — accept both so those rows expire like any other.
+            const raw = typeof obj.ts === "string"
+                ? obj.ts
+                : typeof obj.at === "string"
+                    ? obj.at
+                    : "";
+            const at = Date.parse(raw);
+            if (!Number.isFinite(at))
+                return true;
+            if (now - at >= STALE_ROW_TTL_MS)
+                return false;
+            return obj.sid !== null || now - at < UNCLAIMED_TTL_MS;
         });
         const dup = rows.find(({ obj }) => obj &&
             obj.argv === entry.argv &&
