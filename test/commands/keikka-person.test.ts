@@ -111,7 +111,7 @@ describe("runKeikkaPersonList", () => {
       authEdit: false,
     });
     // Per-source multiplicity preserved: person 5351 holds TWO rows.
-    expect(result.items.filter((i: KeikkaPersonListItem) => i.personId === 5351)).toHaveLength(2);
+    expect(result.items.filter((i) => i.personId === 5351)).toHaveLength(2);
   });
 
   test("--source filters rows by keikkaPersonSourceId", async () => {
@@ -125,7 +125,7 @@ describe("runKeikkaPersonList", () => {
     mockClient.get.mockResolvedValueOnce(RAW_ROWS);
     const result = asCollapsed(await runKeikkaPersonList(mockClient, 9096, { byPerson: true }));
     expect(result.count).toBe(2);
-    const juha = result.items.find((i: KeikkaPersonCollapsedItem) => i.personId === 5351);
+    const juha = result.items.find((i) => i.personId === 5351);
     expect(juha).toMatchObject({
       name: "Juha Urho",
       rowCount: 2,
@@ -136,7 +136,7 @@ describe("runKeikkaPersonList", () => {
       { sourceId: 30, sourceText: "Manuaalinen" },
     ]);
     expect(juha?.contactTypes).toEqual([1, 0]);
-    const matti = result.items.find((i: KeikkaPersonCollapsedItem) => i.personId === 5352);
+    const matti = result.items.find((i) => i.personId === 5352);
     expect(matti?.rowCount).toBe(1);
     // authListPersons rides Matti's only row.
     expect(matti?.auth.listPersons).toBe(true);
