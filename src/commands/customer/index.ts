@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -404,24 +404,24 @@ function allSettingKeys(): Set<string> {
 
 /**
  * Parse --set / --unset comma-separated field lists into a desired-state map
- * (key -> boolean). Validates each key against ALL_FIELD_KEYS and rejects a
- * key requested both ON and OFF. Throws (caller exits 4) on bad input.
+ * (key -> boolean). Validates each key against `valid` and rejects a key
+ * requested both ON and OFF. Throws (caller exits 4) on bad input.
+ * `renderValid` supplies the unknown-key message's allowed-values listing.
  */
-export function parseModuleChanges(
-  setCsv?: string,
-  unsetCsv?: string
+function parseChanges(
+  setCsv: string | undefined,
+  unsetCsv: string | undefined,
+  valid: ReadonlySet<string>,
+  renderValid: () => string
 ): Map<string, boolean> {
   const changes = new Map<string, boolean>();
-  const valid = new Set<string>(ALL_FIELD_KEYS);
   const apply = (csv: string | undefined, value: boolean): void => {
     if (!csv) return;
     for (const raw of csv.split(",")) {
       const key = raw.trim().toLowerCase();
       if (!key) continue;
       if (!valid.has(key)) {
-        throw new Error(
-          `unknown field: ${key}. Valid: ${ALL_FIELD_KEYS.join(", ")}`
-        );
+        throw new Error(`unknown field: ${key}. Valid: ${renderValid()}`);
       }
       if (changes.has(key) && changes.get(key) !== value) {
         throw new Error(`field '${key}' given to both --set and --unset`);
@@ -437,35 +437,24 @@ export function parseModuleChanges(
   return changes;
 }
 
+/** {@link parseChanges} over the module field keys (ALL_FIELD_KEYS). */
+export function parseModuleChanges(
+  setCsv?: string,
+  unsetCsv?: string
+): Map<string, boolean> {
+  return parseChanges(setCsv, unsetCsv, new Set(ALL_FIELD_KEYS), () => ALL_FIELD_KEYS.join(", "));
+}
+
 /**
- * Parse --set/--unset CSV lists into a desired-state map over the FULL setting
- * surface (canonical names case-insensitive, the 8 aliases, and pumppu). Same
- * validation contract as parseModuleChanges but a wider valid set.
+ * {@link parseChanges} over the FULL setting surface (canonical names
+ * case-insensitive, the 8 aliases, and pumppu).
  */
 export function parseSettingChanges(
   setCsv?: string,
   unsetCsv?: string
 ): Map<string, boolean> {
-  const changes = new Map<string, boolean>();
   const valid = allSettingKeys();
-  const apply = (csv: string | undefined, value: boolean): void => {
-    if (!csv) return;
-    for (const raw of csv.split(",")) {
-      const key = raw.trim().toLowerCase();
-      if (!key) continue;
-      if (!valid.has(key)) {
-        throw new Error(`unknown field: ${key}. Valid: ${[...valid].sort().join(", ")}`);
-      }
-      if (changes.has(key) && changes.get(key) !== value) {
-        throw new Error(`field '${key}' given to both --set and --unset`);
-      }
-      changes.set(key, value);
-    }
-  };
-  apply(setCsv, true);
-  apply(unsetCsv, false);
-  if (changes.size === 0) throw new Error("no fields given — pass --set and/or --unset");
-  return changes;
+  return parseChanges(setCsv, unsetCsv, valid, () => [...valid].sort().join(", "));
 }
 
 /** Full settings report (roolit + all setting types by canonical name). */
@@ -826,16 +815,7 @@ export function buildAsiakasCreateBody(
   prh?: PrhCompany
 ): Record<string, unknown> {
   const body: Record<string, unknown> = { ownerAsiakasId };
-  if (prh) {
-    // "Unknown" is prhService's sentinel for a company with no registered
-    // primary name — don't persist it as the customer name (explicit --name wins).
-    if (prh.name && prh.name !== "Unknown") body.asiakasNimi = prh.name;
-    if (prh.businessId) body.yTunnus = prh.businessId;
-    // PRH carries the registered address — persist it as the billing address.
-    if (prh.address?.street) body.laskutusOsoite = prh.address.street;
-    if (prh.address?.postCode) body.laskutusPostinumero = prh.address.postCode;
-    if (prh.address?.city) body.laskutusKaupunki = prh.address.city;
-  }
+  if (prh) applyPrhFlags(body, prh, "yTunnus");
   if (flags.name !== undefined) body.asiakasNimi = flags.name;
   if (flags.ytunnus !== undefined) body.yTunnus = flags.ytunnus;
   // createY takes an `email` input. The proc historically IGNORED it (asiakas has
@@ -848,6 +828,26 @@ export function buildAsiakasCreateBody(
   applyBillingFlags(body, flags);
   if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
   return body;
+}
+
+/**
+ * Overlay PRH registry values onto a body: name, business id, and the
+ * registered address → the laskutus* billing columns. Shared by the create and
+ * update builders so the mapping lives in one place; `ytunnusKey` carries the
+ * one real difference (createY takes `yTunnus`, setData takes `ytunnus`).
+ * "Unknown" is prhService's sentinel for a company with no registered primary
+ * name — never persisted as the customer name (explicit --name wins).
+ */
+function applyPrhFlags(
+  body: Record<string, unknown>,
+  prh: PrhCompany,
+  ytunnusKey: "yTunnus" | "ytunnus"
+): void {
+  if (prh.name && prh.name !== "Unknown") body.asiakasNimi = prh.name;
+  if (prh.businessId) body[ytunnusKey] = prh.businessId;
+  if (prh.address?.street) body.laskutusOsoite = prh.address.street;
+  if (prh.address?.postCode) body.laskutusPostinumero = prh.address.postCode;
+  if (prh.address?.city) body.laskutusKaupunki = prh.address.city;
 }
 
 /**
@@ -930,13 +930,7 @@ export function buildAsiakasUpdateBody(
   // --from-prh refresh: overlay the registry values between the current-record
   // seed and the explicit flags, so name/yTunnus/address are refreshed from PRH
   // but an explicit --flag still wins. (setData's ytunnus key is lowercase.)
-  if (prh) {
-    if (prh.name && prh.name !== "Unknown") body.asiakasNimi = prh.name;
-    if (prh.businessId) body.ytunnus = prh.businessId;
-    if (prh.address?.street) body.laskutusOsoite = prh.address.street;
-    if (prh.address?.postCode) body.laskutusPostinumero = prh.address.postCode;
-    if (prh.address?.city) body.laskutusKaupunki = prh.address.city;
-  }
+  if (prh) applyPrhFlags(body, prh, "ytunnus");
   if (flags.name !== undefined) body.asiakasNimi = flags.name;
   if (flags.ytunnus !== undefined) body.ytunnus = flags.ytunnus;
   if (flags.email !== undefined) body.laskutusEmail = flags.email;
@@ -1111,34 +1105,52 @@ export function registerCustomerCommands(
       )
     );
 
-  const modulesCmd = addAsiakasTargetOption(
-    c.command("modules [asiakasId]")
-  )
-    .option(
-      "--set <keys>"
-    )
-    .option("--unset <keys>");
-  addWriteFlagsToCommand(modulesCmd).action(
-    guarded(async (
-      idStr: string | undefined,
-      opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
-    ) => {
-      const client = await getClient();
-      const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-      if (!opts.set && !opts.unset) {
-        writeJson(await runCustomerModulesReport(client, asiakasId));
-        return;
-      }
-      let changes: Map<string, boolean>;
-      try {
-        changes = parseModuleChanges(opts.set, opts.unset);
-      } catch (validationErr) {
-        failWith(errorMessage(validationErr), 4);
-      }
-      const result = await runCustomerModulesApply(client, asiakasId, changes, opts);
-      writeJson(result);
-    })
-  );
+  // `modules` and `settings` share one registration shape: report when neither
+  // --set nor --unset is given, else parse the CSVs and apply. Only the three
+  // callee functions differ.
+  const registerSetUnsetCommand = (
+    name: "modules" | "settings",
+    fns: {
+      report: (client: ApiClient, asiakasId: number) => Promise<unknown>;
+      parse: (setCsv?: string, unsetCsv?: string) => Map<string, boolean>;
+      apply: (
+        client: ApiClient,
+        asiakasId: number,
+        changes: Map<string, boolean>,
+        flags: WriteFlags
+      ) => Promise<unknown>;
+    }
+  ): void => {
+    const cmd = addAsiakasTargetOption(c.command(`${name} [asiakasId]`))
+      .option("--set <keys>")
+      .option("--unset <keys>");
+    addWriteFlagsToCommand(cmd).action(
+      guarded(async (
+        idStr: string | undefined,
+        opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
+      ) => {
+        const client = await getClient();
+        const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+        if (!opts.set && !opts.unset) {
+          writeJson(await fns.report(client, asiakasId));
+          return;
+        }
+        let changes: Map<string, boolean>;
+        try {
+          changes = fns.parse(opts.set, opts.unset);
+        } catch (validationErr) {
+          failWith(errorMessage(validationErr), 4);
+        }
+        writeJson(await fns.apply(client, asiakasId, changes, opts));
+      })
+    );
+  };
+
+  registerSetUnsetCommand("modules", {
+    report: runCustomerModulesReport,
+    parse: parseModuleChanges,
+    apply: runCustomerModulesApply,
+  });
 
   const operatorCmd = addAsiakasTargetOption(
     c.command("operator [asiakasId]")
@@ -1168,31 +1180,11 @@ export function registerCustomerCommands(
     })
   );
 
-  const settingsCmd = addAsiakasTargetOption(
-    c.command("settings [asiakasId]")
-  )
-    .option("--set <keys>")
-    .option("--unset <keys>");
-  addWriteFlagsToCommand(settingsCmd).action(
-    guarded(async (
-      idStr: string | undefined,
-      opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
-    ) => {
-      const client = await getClient();
-      const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-      if (!opts.set && !opts.unset) {
-        writeJson(await runCustomerSettingsReport(client, asiakasId));
-        return;
-      }
-      let changes: Map<string, boolean>;
-      try {
-        changes = parseSettingChanges(opts.set, opts.unset);
-      } catch (validationErr) {
-        failWith(errorMessage(validationErr), 4);
-      }
-      writeJson(await runCustomerSettingsApply(client, asiakasId, changes, opts));
-    })
-  );
+  registerSetUnsetCommand("settings", {
+    report: runCustomerSettingsReport,
+    parse: parseSettingChanges,
+    apply: runCustomerSettingsApply,
+  });
 
   c.command("search [query]")
     .option("--search <s>")
@@ -1492,13 +1484,8 @@ export async function runCustomerPersonList(
   const raw = await client.get<
     PersonRow[] | { personList?: PersonRow[]; recordset?: PersonRow[]; recordsets?: PersonRow[][] }
   >(`/api/asiakas/person/list/${asiakasId}/${typeId}`);
-  let rows: PersonRow[] = [];
-  if (Array.isArray(raw)) {
-    rows = raw;
-  } else if (raw && typeof raw === "object") {
-    const wrapper = raw as { personList?: PersonRow[]; recordset?: PersonRow[]; recordsets?: PersonRow[][] };
-    rows = wrapper.personList || wrapper.recordset || wrapper.recordsets?.[0] || [];
-  }
+  const rows: PersonRow[] =
+    (!Array.isArray(raw) && raw?.personList) || (unwrapRows(raw) as unknown as PersonRow[]);
   const items: CustomerPersonListItem[] = rows.map((r) => ({
     personId: r.personId,
     name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
