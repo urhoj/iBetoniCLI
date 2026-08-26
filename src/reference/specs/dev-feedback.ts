@@ -87,9 +87,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "50", description: "Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; `truncated: true` says the page was capped (fb#605). Page the rest with --offset." },
       { name: "offset", type: "number", default: "0", description: "Skip N rows — how you reach anything beyond the 200-row cap. `--limit 200`, then `--limit 200 --offset 200`, and so on." },
       { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
-      { name: "unclaimed", type: "boolean", description: "Only items no agent currently holds — the set you should pick from. Includes rows whose claim EXPIRED (the 24h reclamation), not just never-claimed ones. Mutually exclusive with --mine/--claimed-by." },
+      { name: "unclaimed", type: "boolean", description: "Only items no agent currently holds — the set you should pick from. Includes rows whose claim EXPIRED (the 24h reclamation), not just never-claimed ones. Mutually exclusive with --mine/--claimed-by/--held." },
       { name: "mine", type: "boolean", description: "Only items YOU currently hold (shorthand for --claimed-by <your resolved label>)" },
       { name: "claimed-by", type: "string", description: "Only items held by this label, and only while the claim is still LIVE" },
+      { name: "held", type: "boolean", description: "Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes)." },
     ],
     outputShape:
       "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries `changelogLinks: [{changelogId, role}]` — the same shape `get` returns — so a PARTLY-shipped row is visible before you claim it (fb#647).",
@@ -110,6 +111,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "--severity is deploy-gated like the others, but its silent-ignore failure points the WRONG WAY, so this one is CHECKED rather than merely documented: an older backend ignores the param and answers unfiltered, which for `--severity none` returns every active row and reads as 'the whole queue is ungraded'. The CLI compares the rows against what was asked and, on a mismatch, emits a loud stderr warning plus an envelope `hint` saying the results are unfiltered. An EMPTY result is not flagged — a genuinely empty slice and a filtered-out one look identical, so use `ib dev feedback count` (bySeverity/ungraded) to tell them apart.",
       "--oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. `--kind bug --oldest`) to keep breakages ahead of age.",
       "Each row carries claimState (free|held|mine). An expired claim reads as `free` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically.",
+      "--held (fb#886) is deploy-gated with the same CHECKED contract as --severity, because its silent-ignore also points the wrong way: an older backend ignores the param and answers unfiltered, which reads as 'everything is claimed'. On a mismatch (a returned row with no live lease) the CLI emits a loud stderr warning plus an envelope `hint`; filter client-side on claimState there instead.",
       "PARTLY-SHIPPED ROWS (fb#647): a row can carry `changelogLinks` and still be open — that is a fix recorded with `ib dev changelog add --feedback <id> --no-resolve`, which links the shipped half WITHOUT closing the row. Any linked row that is still OPEN or REVIEWED is also named in a one-line stderr note (a closed row always has a `resolves` link, so those are not worth saying). Read the entry (`ib dev changelog get <id>`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.",
     ],
     examples: [
@@ -122,6 +124,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback list --scope cli --oldest",
       "ib dev feedback list --severity none --unresolved --oldest",
       "ib dev feedback list --severity critical --unresolved",
+      "ib dev feedback list --held",
     ],
   },
   {

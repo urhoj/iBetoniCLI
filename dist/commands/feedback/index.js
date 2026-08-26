@@ -163,6 +163,28 @@ function severityFilterIgnored(severity, rows) {
     const matches = (r) => severity === SEVERITY_NONE ? r.severity == null : r.severity === severity;
     return rows.some((r) => !matches(r));
 }
+/**
+ * The `--held` twin of {@link SEVERITY_IGNORED_HINT} (fb#886). An older backend
+ * ignores the unknown query param and answers unfiltered — and for THIS filter
+ * the silent failure points exactly the wrong way: the full active list under a
+ * `--held` lens reads as "every row is being worked on right now", the opposite
+ * of the triage answer the flag exists to give.
+ */
+const HELD_IGNORED_HINT = "⚠ --held was IGNORED by this backend (rows came back that no live lease holds) — " +
+    "the filter is deploy-gated and predates the backend serving --endpoint. These results are " +
+    "UNFILTERED by claim state; do NOT read them as \"everything is claimed\". Filter client-side " +
+    "on claimState, or point --endpoint at a backend that has it.";
+/**
+ * True when `--held` was requested but a returned row has no live lease — i.e.
+ * the backend ignored the param. Judged by the same clock-evaluated predicate
+ * `claimState` is derived from, so an expired lease counts as a violation too.
+ * An empty result proves nothing either way and is not a violation.
+ */
+function heldFilterIgnored(held, rows, me) {
+    if (!held || !rows.length)
+        return false;
+    return rows.some((r) => deriveClaimState(r, me) === "free");
+}
 /** Cap a string at MAX_FREETEXT chars, keeping HEAD+TAIL (elided middle) so an
  * appended update at the tail is never the part that gets cut (fb#714).
  * Non-strings pass through untouched. */
@@ -209,6 +231,7 @@ async function fetchRows(client, params) {
         // stringified boolean shortcut that might drift from that contract.
         unclaimed: params.unclaimed ? "1" : undefined,
         claimedBy: params.claimedBy || undefined,
+        held: params.held ? "1" : undefined,
     });
     const rows = await client.get(`/api/feedback${suffix}`);
     return Array.isArray(rows) ? rows : [];
@@ -357,11 +380,12 @@ export function deriveClaimState(row, me) {
  * unknown value returns an empty list — which reads as "nothing is filed under
  * that kind", not "you typed a kind that does not exist".
  *
- * Claim filters (`--unclaimed` / `--mine` / `--claimed-by`) are mutually
- * exclusive — each answers a different question ("what can I pick up" vs
- * "what do I hold" vs "what does labelX hold") and combining them has no
- * coherent meaning. Every returned row also carries a derived `claimState`
- * (see `deriveClaimState`) regardless of which filter (if any) was used.
+ * Claim filters (`--unclaimed` / `--mine` / `--claimed-by` / `--held`) are
+ * mutually exclusive — each answers a different question ("what can I pick up"
+ * vs "what do I hold" vs "what does labelX hold" vs "what is anyone working on
+ * right now") and combining them has no coherent meaning. Every returned row
+ * also carries a derived `claimState` (see `deriveClaimState`) regardless of
+ * which filter (if any) was used.
  */
 export async function runFeedbackList(client, opts) {
     assertEnum(opts.kind, KINDS, "--kind");
@@ -373,9 +397,10 @@ export async function runFeedbackList(client, opts) {
     // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
     // rather than a bare enum dump.
     assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
-    const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy].filter(Boolean).length;
+    const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean)
+        .length;
     if (claimFilters > 1) {
-        failWith("Use only one of --unclaimed / --mine / --claimed-by", 4);
+        failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
     }
     const me = resolveClaimId(undefined);
     const claimedBy = opts.mine ? me : opts.claimedBy;
@@ -399,6 +424,7 @@ export async function runFeedbackList(client, opts) {
         oldest: opts.oldest,
         unclaimed: opts.unclaimed,
         claimedBy,
+        held: opts.held,
     };
     if (!statuses || statuses.length <= 1) {
         items = await fetchRows(client, {
@@ -432,6 +458,7 @@ export async function runFeedbackList(client, opts) {
         items = merged.slice(offset, offset + limit);
     }
     const severityIgnored = severityFilterIgnored(opts.severity, items);
+    const heldIgnored = heldFilterIgnored(opts.held, items, me);
     items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
     let cut = false;
     if (!opts.full) {
@@ -454,6 +481,10 @@ export async function runFeedbackList(client, opts) {
     if (severityIgnored) {
         warnNote(SEVERITY_IGNORED_HINT);
         hints.push(SEVERITY_IGNORED_HINT);
+    }
+    if (heldIgnored) {
+        warnNote(HELD_IGNORED_HINT);
+        hints.push(HELD_IGNORED_HINT);
     }
     if (hints.length)
         env.hint = hints.join("; ");
@@ -1046,6 +1077,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--unclaimed")
         .option("--mine")
         .option("--claimed-by <label>", "", String)
+        .option("--held")
         .action(jsonAction(getClient, (client, opts) => runFeedbackList(client, opts)));
     // Mirrors `ib glossary lint`: read-only audit, `--strict` exits 1 on any
     // warn-level finding so CI / a scheduled runner can gate on it. Only the

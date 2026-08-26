@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync, writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { recordFriction, frictionPath } from "../src/friction.js";
+import { recordFriction, frictionPath, truncateMessage } from "../src/friction.js";
 import { CliError } from "../src/api/errors.js";
 import { setActiveCommandErrors, writeError } from "../src/output/json.js";
 import {
@@ -293,6 +293,36 @@ describe("recordFriction", () => {
   test("a `displayed` override replaces the raw err.message", () => {
     recordFriction(new Error("error: unknown command 'show'"), 4, "shown text with hint");
     expect(lastEntry().message).toBe("shown text with hint");
+  });
+
+  // fb#877: a bare slice(0, 400) stored a silently-cut prefix that read as the
+  // complete message — the failure mode fb#811 fixed in the stop-gate one layer
+  // down. The cut must announce itself.
+  describe("message truncation carries a marker (#877)", () => {
+    test("a message over the cap is cut on a word boundary and marked", () => {
+      const long = ("word ".repeat(120)).trim(); // 599 chars
+      const out = truncateMessage(long);
+      expect(out.endsWith("… [truncated]")).toBe(true);
+      expect(out.length).toBeLessThanOrEqual(400 + "… [truncated]".length + 1);
+      expect(out).not.toContain("wor …"); // cut lands between words, not inside one
+    });
+
+    test("a message at or under the cap is unchanged — no marker", () => {
+      const exact = "x".repeat(400);
+      expect(truncateMessage(exact)).toBe(exact);
+      expect(truncateMessage("short")).toBe("short");
+    });
+
+    test("no nearby space still cuts hard, marker attached", () => {
+      const unbroken = "y".repeat(500);
+      const out = truncateMessage(unbroken);
+      expect(out).toBe("y".repeat(400) + " … [truncated]");
+    });
+
+    test("recordFriction stores the marked message, not a silent prefix", () => {
+      recordFriction(new Error("long ".repeat(200)), 1);
+      expect(String(lastEntry().message)).toContain("… [truncated]");
+    });
   });
 
   // Fidelity contract (fb#275): the friction log must carry what the caller

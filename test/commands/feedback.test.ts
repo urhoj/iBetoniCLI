@@ -1771,6 +1771,73 @@ describe("ib feedback list — a backend that IGNORES --severity is caught", () 
   });
 });
 
+/**
+ * The --held filter (fb#886) + its deploy-gate detector — the --severity
+ * pattern applied to claim state, because the silent-ignore points the same
+ * wrong way: an older backend answering unfiltered reads as "everything is
+ * claimed".
+ */
+describe("ib feedback list — --held filter", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+  const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  test("emits the literal query string held=1 (the backend's exact truthy set)", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", held: true });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&held=1");
+  });
+
+  test("rides along on the multi-status fan-out too", async () => {
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { held: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200&held=1");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200&held=1");
+  });
+
+  test("THE GAP: an older backend ignoring --held is not read as 'everything is claimed'", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: "someone", claimExpiresAt: FUTURE, status: "open" },
+      { feedbackId: 2, claimedBy: null, claimExpiresAt: null, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", held: true });
+    expect(note()).toMatch(/--held was IGNORED by this backend/);
+    expect(out.hint).toMatch(/UNFILTERED by claim state/);
+  });
+
+  test("an EXPIRED lease counts as a violation — held means live, per claimState", async () => {
+    const PAST = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: "someone", claimExpiresAt: PAST, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", held: true });
+    expect(out.hint).toMatch(/UNFILTERED by claim state/);
+  });
+
+  test("an obedient backend stays silent", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: "a", claimExpiresAt: FUTURE, status: "open" },
+      { feedbackId: 2, claimedBy: "b", claimExpiresAt: FUTURE, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", held: true });
+    expect(note()).not.toMatch(/IGNORED/);
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+
+  test("an EMPTY result is never flagged — it proves nothing either way", async () => {
+    get.mockResolvedValueOnce([]);
+    const out = await runFeedbackList(mockClient, { status: "open", held: true });
+    expect(note()).not.toMatch(/IGNORED/);
+    expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+});
+
 describe("ib feedback lint", () => {
   test("GETs the server-side audit and wraps it in the list envelope", async () => {
     // Thin by design: the value is that the audit runs server-side over the

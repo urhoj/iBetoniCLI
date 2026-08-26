@@ -1,10 +1,13 @@
 import { readFile, writeFile, unlink, mkdir, chmod } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { withFileLock } from "./lock.js";
 // Same-process read cache: one CLI invocation loads the credentials file from
 // several places (tier resolution in bin/ib.ts, then every CLI context), and an
-// invocation never races an external writer — so the parsed file is cached per
-// path and kept in sync by this module's own save/remove/clear.
+// invocation almost never races an external writer — so the parsed file is
+// cached per path and kept in sync by this module's own save/remove/clear.
+// The ONE place that races by nature — the token refresh path (fb#884) — reads
+// through reload() instead, which busts this cache first.
 const fileCache = new Map();
 async function readCredentialsFile(path) {
     const cached = fileCache.get(path);
@@ -21,10 +24,18 @@ async function readCredentialsFile(path) {
     return parsed;
 }
 export function createStore(path) {
+    const load = async (profile = "default") => {
+        const parsed = await readCredentialsFile(path);
+        return parsed?.profiles?.[profile] ?? null;
+    };
     return {
-        async load(profile = "default") {
-            const parsed = await readCredentialsFile(path);
-            return parsed?.profiles?.[profile] ?? null;
+        load,
+        async reload(profile = "default") {
+            fileCache.delete(path);
+            return load(profile);
+        },
+        withLock(fn) {
+            return withFileLock(`${path}.lock`, fn);
         },
         async save(creds, profile = "default") {
             let existing = {

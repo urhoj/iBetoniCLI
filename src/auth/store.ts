@@ -1,6 +1,7 @@
 import { readFile, writeFile, unlink, mkdir, chmod } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { withFileLock } from "./lock.js";
 
 export interface CredentialsProfile {
   jwt: string;
@@ -23,15 +24,29 @@ interface CredentialsFile {
 
 export interface CredentialsStore {
   load(profile?: string): Promise<CredentialsProfile | null>;
+  /**
+   * Read the profile FRESH from disk, bypassing the same-process cache.
+   * For the locked refresh path (fb#884), where another process may have
+   * rotated the credentials since this invocation first loaded them.
+   */
+  reload(profile?: string): Promise<CredentialsProfile | null>;
   save(creds: CredentialsProfile, profile?: string): Promise<void>;
   clear(): Promise<void>;
   remove(profile: string): Promise<void>;
+  /**
+   * Serialize a critical section against OTHER PROCESSES sharing this
+   * credentials file (fb#884: the rotating-refresh-token race). Best-effort —
+   * see lock.ts; `fn` always runs.
+   */
+  withLock<T>(fn: () => Promise<T>): Promise<T>;
 }
 
 // Same-process read cache: one CLI invocation loads the credentials file from
 // several places (tier resolution in bin/ib.ts, then every CLI context), and an
-// invocation never races an external writer — so the parsed file is cached per
-// path and kept in sync by this module's own save/remove/clear.
+// invocation almost never races an external writer — so the parsed file is
+// cached per path and kept in sync by this module's own save/remove/clear.
+// The ONE place that races by nature — the token refresh path (fb#884) — reads
+// through reload() instead, which busts this cache first.
 const fileCache = new Map<string, CredentialsFile | null>();
 
 async function readCredentialsFile(path: string): Promise<CredentialsFile | null> {
@@ -49,10 +64,18 @@ async function readCredentialsFile(path: string): Promise<CredentialsFile | null
 }
 
 export function createStore(path: string): CredentialsStore {
+  const load = async (profile = "default"): Promise<CredentialsProfile | null> => {
+    const parsed = await readCredentialsFile(path);
+    return parsed?.profiles?.[profile] ?? null;
+  };
   return {
-    async load(profile = "default"): Promise<CredentialsProfile | null> {
-      const parsed = await readCredentialsFile(path);
-      return parsed?.profiles?.[profile] ?? null;
+    load,
+    async reload(profile = "default"): Promise<CredentialsProfile | null> {
+      fileCache.delete(path);
+      return load(profile);
+    },
+    withLock<T>(fn: () => Promise<T>): Promise<T> {
+      return withFileLock(`${path}.lock`, fn);
     },
     async save(creds: CredentialsProfile, profile = "default"): Promise<void> {
       let existing: CredentialsFile = {

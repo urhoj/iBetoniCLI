@@ -19,8 +19,15 @@ function fakeJwt(payload: Record<string, unknown>): string {
 function memoryStore(initial: CredentialsProfile | null) {
   const saves: CredentialsProfile[] = [];
   let current = initial;
+  // withLock mirrors the real file lock's guarantee (serialized critical
+  // sections) as a promise-chain mutex, so the fb#884 concurrency tests
+  // exercise the same ordering the production path provides.
+  let chain: Promise<unknown> = Promise.resolve();
   const store: CredentialsStore = {
     async load() {
+      return current;
+    },
+    async reload() {
       return current;
     },
     async save(creds) {
@@ -33,8 +40,21 @@ function memoryStore(initial: CredentialsProfile | null) {
     async remove() {
       /* not used */
     },
+    withLock<T>(fn: () => Promise<T>): Promise<T> {
+      const run = chain.then(fn);
+      chain = run.catch(() => undefined);
+      return run;
+    },
   };
-  return { store, saves, get: () => current };
+  return {
+    store,
+    saves,
+    get: () => current,
+    /** Simulate an EXTERNAL writer (another process) mutating the file. */
+    set: (c: CredentialsProfile | null) => {
+      current = c;
+    },
+  };
 }
 
 function baseProfile(overrides: Partial<CredentialsProfile> = {}): CredentialsProfile {
@@ -182,10 +202,12 @@ describe("refreshAndPersistSession", () => {
       .mockResolvedValueOnce(ok({ access_token: freshJwt, refresh_token: "rotated-1" }));
     const { store, saves } = memoryStore(baseProfile());
 
+    // currentJwt = the STORED jwt, as in production: onRefresh passes the token
+    // the client was built with, which came from this same credentials file.
     const jwt = await refreshAndPersistSession({
       endpoint: "https://api.example.com",
       store,
-      currentJwt: "eyJexpired",
+      currentJwt: baseProfile().jwt,
     });
 
     expect(jwt).toBe(freshJwt);
@@ -204,7 +226,7 @@ describe("refreshAndPersistSession", () => {
     await refreshAndPersistSession({
       endpoint: "https://api.example.com",
       store,
-      currentJwt: "eyJnear-expiry",
+      currentJwt: baseProfile().jwt,
     });
 
     expect(saves).toHaveLength(1);
@@ -231,7 +253,7 @@ describe("refreshAndPersistSession", () => {
     const jwt = await refreshAndPersistSession({
       endpoint: "https://api.example.com",
       store,
-      currentJwt: "eyJexpired",
+      currentJwt: baseProfile().jwt,
       switchFn,
     });
 
@@ -268,7 +290,7 @@ describe("refreshAndPersistSession", () => {
     const jwt = await refreshAndPersistSession({
       endpoint: "https://api.example.com",
       store,
-      currentJwt: "eyJexpired",
+      currentJwt: baseProfile().jwt,
       switchFn,
     });
 
@@ -287,5 +309,111 @@ describe("refreshAndPersistSession", () => {
     });
     expect(jwt).toBe("eyJfresh");
     expect(saves).toHaveLength(0);
+  });
+
+  // fb#884: two concurrent processes both reading the same ROTATING refresh
+  // token and both running the grant trips the server's reuse detection, which
+  // revokes the whole session family. The refresh path is serialized and the
+  // waiter re-reads instead of re-granting.
+  describe("cross-process refresh serialization (fb#884)", () => {
+    const freshExp = 9999999999;
+    const freshJwt = () => fakeJwt({ personId: 10, ownerAsiakasId: 8, exp: freshExp });
+
+    test("two concurrent refreshes fire exactly ONE grant — the waiter reuses the persisted result", async () => {
+      mockFetch
+        .mockResolvedValueOnce(fail(401, { error: "INVALID_TOKEN" }))
+        .mockResolvedValueOnce(ok({ access_token: freshJwt(), refresh_token: "rotated-1" }));
+      const { store, saves } = memoryStore(baseProfile());
+      const args = {
+        endpoint: "https://api.example.com",
+        store,
+        currentJwt: baseProfile().jwt,
+      };
+
+      const [a, b] = await Promise.all([
+        refreshAndPersistSession(args),
+        refreshAndPersistSession(args),
+      ]);
+
+      expect(a).toBe(freshJwt());
+      expect(b).toBe(freshJwt());
+      // Bearer attempt + ONE grant — the second caller made no network call.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(saves).toHaveLength(1);
+    });
+
+    test("short-circuit: credentials already rotated when the lock is acquired — no network at all", async () => {
+      const { store, saves } = memoryStore(baseProfile({ jwt: freshJwt() }));
+      const jwt = await refreshAndPersistSession({
+        endpoint: "https://api.example.com",
+        store,
+        currentJwt: baseProfile().jwt, // the OLD token this invocation started with
+      });
+      expect(jwt).toBe(freshJwt());
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(saves).toHaveLength(0);
+    });
+
+    test("reuse recovery: an unlocked writer persisted a fresh session mid-failure — use it instead of dying", async () => {
+      const { store, set, saves } = memoryStore(baseProfile());
+      mockFetch
+        .mockResolvedValueOnce(fail(401, { error: "INVALID_TOKEN" }))
+        .mockImplementationOnce(async () => {
+          // The reuse-detected grant failure — and by the time it lands, the
+          // OTHER writer (an older ib honouring no lock) has already persisted
+          // its own rotation.
+          set(baseProfile({ jwt: freshJwt(), refreshToken: "rotated-by-other" }));
+          return fail(400, { error: "invalid_grant", error_description: "Refresh token reuse detected; session revoked" });
+        });
+
+      const jwt = await refreshAndPersistSession({
+        endpoint: "https://api.example.com",
+        store,
+        currentJwt: baseProfile().jwt,
+      });
+
+      expect(jwt).toBe(freshJwt());
+      expect(mockFetch).toHaveBeenCalledTimes(2); // no third attempt
+      expect(saves).toHaveLength(0); // the other writer's persist is not re-written
+    });
+
+    test("reuse recovery: only the refresh token rotated underneath — retry the grant ONCE with the newer token", async () => {
+      const { store, set, saves } = memoryStore(baseProfile());
+      mockFetch
+        .mockResolvedValueOnce(fail(401, { error: "INVALID_TOKEN" }))
+        .mockImplementationOnce(async () => {
+          set(baseProfile({ refreshToken: "rotated-2" })); // jwt unchanged
+          return fail(400, { error: "invalid_grant" });
+        })
+        .mockResolvedValueOnce(fail(401, { error: "INVALID_TOKEN" }))
+        .mockResolvedValueOnce(ok({ access_token: freshJwt(), refresh_token: "rotated-3" }));
+
+      const jwt = await refreshAndPersistSession({
+        endpoint: "https://api.example.com",
+        store,
+        currentJwt: baseProfile().jwt,
+      });
+
+      expect(jwt).toBe(freshJwt());
+      const retryGrant = JSON.parse(mockFetch.mock.calls[3][1].body);
+      expect(retryGrant.refresh_token).toBe("rotated-2");
+      expect(saves).toHaveLength(1);
+      expect(saves[0].refreshToken).toBe("rotated-3");
+    });
+
+    test("nothing rotated underneath: the original combined error propagates", async () => {
+      mockFetch
+        .mockResolvedValueOnce(fail(401, { error: "INVALID_TOKEN" }))
+        .mockResolvedValueOnce(fail(400, { error: "invalid_grant" }));
+      const { store, saves } = memoryStore(baseProfile());
+      await expect(
+        refreshAndPersistSession({
+          endpoint: "https://api.example.com",
+          store,
+          currentJwt: baseProfile().jwt,
+        })
+      ).rejects.toThrow(/ib auth login/);
+      expect(saves).toHaveLength(0);
+    });
   });
 });

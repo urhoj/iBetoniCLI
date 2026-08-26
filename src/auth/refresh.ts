@@ -137,6 +137,17 @@ export async function refreshSession(opts: {
  * JWT is switched back before the session continues — no silent tenant flip.
  * Returns the JWT to act with.
  *
+ * SERIALIZED cross-process (fb#884): the whole heal runs under the store's
+ * file lock, and the credentials are re-read FRESH after acquiring it. Two
+ * concurrent `ib` processes used to both read the same rotating refresh token
+ * and both run the grant — the loser tripped the server's reuse detection,
+ * which revokes the ENTIRE session family and bricks unattended automation
+ * until a human browser-login. Under the lock the winner refreshes and the
+ * waiter finds the rotated JWT already on disk (the `creds.jwt !==
+ * opts.currentJwt` short-circuit) and never touches the network. A writer
+ * that does not honour the lock (an older globally-linked `ib`) is caught by
+ * the reuse-recovery re-read in the catch below.
+ *
  * `switchFn` is injectable for tests; defaults to {@link performSwitch}.
  */
 export async function refreshAndPersistSession(opts: {
@@ -145,13 +156,49 @@ export async function refreshAndPersistSession(opts: {
   currentJwt: string;
   switchFn?: typeof performSwitch;
 }): Promise<string> {
+  return opts.store.withLock(() => refreshAndPersistLocked(opts));
+}
+
+/** The locked body of {@link refreshAndPersistSession} — never call directly. */
+async function refreshAndPersistLocked(opts: {
+  endpoint: string;
+  store: CredentialsStore;
+  currentJwt: string;
+  switchFn?: typeof performSwitch;
+}): Promise<string> {
   const doSwitch = opts.switchFn ?? performSwitch;
-  const creds = await opts.store.load();
-  const session = await refreshSession({
-    endpoint: opts.endpoint,
-    currentJwt: opts.currentJwt,
-    storedRefreshToken: creds?.refreshToken || undefined,
-  });
+  let creds = await opts.store.reload();
+  // Another process refreshed while we waited on the lock — its rotated
+  // session is already persisted; running the grant ourselves would present a
+  // CONSUMED token. If this JWT is somehow also bad, the client's single-retry
+  // 401 surfaces cleanly.
+  if (creds?.jwt && creds.jwt !== opts.currentJwt) return creds.jwt;
+
+  let session: RefreshSessionResult;
+  try {
+    session = await refreshSession({
+      endpoint: opts.endpoint,
+      currentJwt: opts.currentJwt,
+      storedRefreshToken: creds?.refreshToken || undefined,
+    });
+  } catch (refreshError) {
+    // Reuse-detection recovery: a concurrent writer that bypassed the lock may
+    // have rotated the credentials underneath us. Re-read ONCE — prefer a
+    // fresher persisted JWT outright, or retry the grant with the rotated
+    // refresh token — before declaring the session dead.
+    const latest = await opts.store.reload();
+    if (latest?.jwt && latest.jwt !== opts.currentJwt) return latest.jwt;
+    if (latest?.refreshToken && latest.refreshToken !== creds?.refreshToken) {
+      session = await refreshSession({
+        endpoint: opts.endpoint,
+        currentJwt: opts.currentJwt,
+        storedRefreshToken: latest.refreshToken,
+      });
+      creds = latest;
+    } else {
+      throw refreshError;
+    }
+  }
   if (!creds) return session.jwt; // creds file vanished mid-run — nothing to persist to
 
   let claims: ReturnType<typeof decodeJwtPayload> | null = null;

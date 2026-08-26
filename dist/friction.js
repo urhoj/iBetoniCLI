@@ -85,6 +85,21 @@ function frictionDir() {
 export function frictionPath() {
     return join(frictionDir(), "cli-friction.jsonl");
 }
+const MSG_CAP = 400;
+/**
+ * fb#877: a bare slice reads as a COMPLETE message — the same silent-cut
+ * failure fb#811 fixed in the workspace stop-gate one layer down. Cut on a
+ * word boundary when one is near, and SAY the cut happened. Unlike the
+ * stop-gate's marker there is no "see …" pointer: this log IS the storage,
+ * so the dropped tail exists nowhere else.
+ */
+export function truncateMessage(message) {
+    if (message.length <= MSG_CAP)
+        return message;
+    const head = message.slice(0, MSG_CAP);
+    const lastSpace = head.lastIndexOf(" ");
+    return `${lastSpace > MSG_CAP - 40 ? head.slice(0, lastSpace) : head} … [truncated]`;
+}
 /**
  * @param curatedHint the error was answered by a remedy the COMMAND owns — a
  *   matching spec ERRORS row, or one attached at the throw site (see
@@ -126,7 +141,7 @@ export function recordFriction(err, exitCodeOverride, displayed, curatedHint = f
         // never files "the error gave no pointer" for a hint that WAS shown
         // (feedback #275: the show→get did-you-mean existed, but the log recorded
         // Commander's bare `unknown command 'show'` and a groomer re-requested it).
-        const message = (displayed ?? errorMessage(err)).slice(0, 400);
+        const message = truncateMessage(displayed ?? errorMessage(err));
         const code = err instanceof CliError && err.body && typeof err.body === "object"
             ? (err.body.code ?? null)
             : null;

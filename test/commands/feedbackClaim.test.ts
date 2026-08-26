@@ -396,6 +396,22 @@ describe("runFeedbackList — claim filters are mutually exclusive", () => {
     ).rejects.toMatchObject({ exitCode: 4 });
     expect((client as never as { get: ReturnType<typeof vi.fn> }).get).not.toHaveBeenCalled();
   });
+
+  // fb#886: --held joins the trio — it is the complement of --unclaimed, so
+  // combining them selects the empty set; combining with --mine/--claimed-by
+  // is a strict subset that --mine/--claimed-by already answer alone.
+  test.each([
+    [{ held: true, unclaimed: true }],
+    [{ held: true, mine: true }],
+    [{ held: true, claimedBy: "someone" }],
+  ])("--held with another claim filter exits 4, before any fetch (%o)", async (combo) => {
+    const client = mockClient();
+    await expect(runFeedbackList(client, combo as never)).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--unclaimed \/ --mine \/ --claimed-by \/ --held/),
+    });
+    expect((client as never as { get: ReturnType<typeof vi.fn> }).get).not.toHaveBeenCalled();
+  });
 });
 
 /**
