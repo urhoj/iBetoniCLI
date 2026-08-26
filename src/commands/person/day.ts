@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, toYyyymmddInt } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
@@ -19,11 +19,6 @@ type Row = Record<string, unknown>;
 function intToDate(n: number): string {
   const s = String(n);
   return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-}
-
-/** date alias/ISO → integer yyyymmdd. */
-function toYyyymmdd(date: string): number {
-  return Number(resolveDate(date)!.replace(/-/g, ""));
 }
 
 export interface StatusRow {
@@ -139,7 +134,7 @@ export async function runPersonDaySet(
   flags: PersonDaySetFlags
 ): Promise<unknown> {
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-  const pvm = toYyyymmdd(date);
+  const pvm = toYyyymmddInt(date);
   // The status lookup (only issued for a non-numeric --status) is keyed on the
   // status name; the day read on person+date. Independent, so run them together —
   // ordered so a bad --status still reports the validation error, not whichever
@@ -195,7 +190,7 @@ export async function runPersonDayClear(
       wouldDelete: current
         ? {
             personPvmId: current.personPvmId,
-            date: intToDate(toYyyymmdd(date)),
+            date: intToDate(toYyyymmddInt(date)),
             status: (current.status as string) ?? null,
           }
         : null,

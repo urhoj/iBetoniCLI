@@ -30,6 +30,14 @@ export function todayHelsinki(now = new Date()) {
     });
     return helsinkiDayFormat.format(now);
 }
+/**
+ * A date flag (alias or ISO `YYYY-MM-DD`) → integer `yyyymmdd`, the day-key
+ * shape the personPvm/driver routes take in URL paths and bodies. Distinct from
+ * `message/daily`'s string-returning `toYyyymmdd`, which validates its input.
+ */
+export function toYyyymmddInt(date) {
+    return Number(resolveDate(date).replace(/-/g, ""));
+}
 /** Shift an ISO `YYYY-MM-DD` by whole days, DST-safe (pure calendar math). */
 export function addDaysISO(iso, days) {
     const d = new Date(`${iso}T00:00:00Z`);

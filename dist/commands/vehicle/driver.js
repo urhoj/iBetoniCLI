@@ -1,14 +1,10 @@
 import { writeJson } from "../../output/json.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, toYyyymmddInt } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { parseId, resolveDateInput } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
-/** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
-function toYyyymmdd(date) {
-    return Number(resolveDate(date).replace(/-/g, ""));
-}
 // ─── day-driver reads (date-keyed fleet views + per-vehicle) ─────────────────
 /**
  * GET /api/cli/driver/board/:yyyymmdd — every grid-eligible vehicle + driver/gap
@@ -16,7 +12,7 @@ function toYyyymmdd(date) {
  * non-assignable legacy row isn't read as a driverless truck (fb#380).
  */
 export async function runVehicleDriverBoard(client, date) {
-    return markPlaceholderVehicles(await client.get(`/api/cli/driver/board/${toYyyymmdd(date)}`));
+    return markPlaceholderVehicles(await client.get(`/api/cli/driver/board/${toYyyymmddInt(date)}`));
 }
 /**
  * GET /api/cli/driver/gaps/:yyyymmdd — vehicles needing a driver that day (the
@@ -25,15 +21,15 @@ export async function runVehicleDriverBoard(client, date) {
  * the board but bare here would be a contract the caller could trip on.
  */
 export async function runVehicleDriverGaps(client, date) {
-    return markPlaceholderVehicles(await client.get(`/api/cli/driver/gaps/${toYyyymmdd(date)}`));
+    return markPlaceholderVehicles(await client.get(`/api/cli/driver/gaps/${toYyyymmddInt(date)}`));
 }
 /** GET /api/cli/driver/available/:yyyymmdd — assignable drivers free + not absent that day. */
 export async function runVehicleDriverAvailable(client, date) {
-    return client.get(`/api/cli/driver/available/${toYyyymmdd(date)}`);
+    return client.get(`/api/cli/driver/available/${toYyyymmddInt(date)}`);
 }
 /** GET /api/cli/driver/who/:vehicleId/:yyyymmdd — the day driver of one vehicle on a date. */
 export async function runVehicleDriverWho(client, vehicleId, date) {
-    return client.get(`/api/cli/driver/who/${vehicleId}/${toYyyymmdd(date)}`);
+    return client.get(`/api/cli/driver/who/${vehicleId}/${toYyyymmddInt(date)}`);
 }
 /**
  * GET /api/cli/driver/history/:vehicleId?from&to — who was the DAY driver of this
@@ -57,7 +53,7 @@ export async function runVehicleDriverHistory(client, vehicleId, opts) {
  * set of affected rows (keikkaIds/palkkiIds/oldPersonId/clearedFromVehicleId + names).
  */
 export async function runVehicleDriverAssign(client, vehicleId, personId, date, flags) {
-    return client.post("/api/cli/driver/assign", { vehicleId, personId, yyyymmdd: toYyyymmdd(date) }, { headers: writeFlagsToHeaders(flags) });
+    return client.post("/api/cli/driver/assign", { vehicleId, personId, yyyymmdd: toYyyymmddInt(date) }, { headers: writeFlagsToHeaders(flags) });
 }
 /**
  * POST /api/cli/driver/clear — remove the DAY driver from a vehicle for one date
@@ -66,7 +62,7 @@ export async function runVehicleDriverAssign(client, vehicleId, personId, date, 
  * be reassigned. Returns the affected keikkaIds/palkkiIds + the displaced driver.
  */
 export async function runVehicleDriverClear(client, vehicleId, date, flags) {
-    return client.post("/api/cli/driver/clear", { vehicleId, yyyymmdd: toYyyymmdd(date) }, { headers: writeFlagsToHeaders(flags) });
+    return client.post("/api/cli/driver/clear", { vehicleId, yyyymmdd: toYyyymmddInt(date) }, { headers: writeFlagsToHeaders(flags) });
 }
 // ─── default (standing) driver — the vehicle.defaultKuski_personId attribute ──
 /**

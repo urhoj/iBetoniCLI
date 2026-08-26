@@ -643,10 +643,8 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("list <personId>")
         .requiredOption("--asiakas <id>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)));
-    addWriteFlagsToCommand(personRole
-        .command("grant <personId>")
-        .requiredOption("--role <name>")
-        .requiredOption("--asiakas <id>", "", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
+    // grant/revoke share the whole registration; only the run fn differs.
+    const roleWriteAction = (run) => guarded(async (personIdStr, opts) => {
         let roleTypeId;
         try {
             roleTypeId = resolveRoleTypeId(opts.role);
@@ -661,30 +659,17 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             failWith("--role must not be empty", 4);
         }
         const client = await getClient();
-        const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-        writeJson(result);
-    }));
-    addWriteFlagsToCommand(personRole
-        .command("revoke <personId>")
-        .requiredOption("--role <name>")
-        .requiredOption("--asiakas <id>", "", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
-        let roleTypeId;
-        try {
-            roleTypeId = resolveRoleTypeId(opts.role);
-        }
-        catch (validationErr) {
-            failWith(errorMessage(validationErr), 4);
-        }
-        // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
-        // must name a real role, so reject the empty-string case rather than POST a
-        // bogus roleTypeId 0 to the backend.
-        if (!roleTypeId) {
-            failWith("--role must not be empty", 4);
-        }
-        const client = await getClient();
-        const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-        writeJson(result);
-    }));
+        writeJson(await run(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts));
+    });
+    for (const [name, run] of [
+        ["grant", runPersonRoleGrant],
+        ["revoke", runPersonRoleRevoke],
+    ]) {
+        addWriteFlagsToCommand(personRole
+            .command(`${name} <personId>`)
+            .requiredOption("--role <name>")
+            .requiredOption("--asiakas <id>", "", (v) => Number(v))).action(roleWriteAction(run));
+    }
     // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
     // then enriches with the LIVE DB description/comment via an authenticated GET
     // (GET /api/asiakasPersonSettings/getAllTypes) — the network/transform logic

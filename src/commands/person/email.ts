@@ -28,35 +28,38 @@ export async function runPersonEmailList(
   return listEnvelope(items, { truncated: false });
 }
 
-/** POST /api/person/addPersonEmail { personId, personEmail }. */
-export async function runPersonEmailAdd(
+/** POST `path` { personId, personEmail } after resolving the person ref. */
+async function postPersonEmail(
   client: ApiClient,
+  path: string,
   person: string,
   email: string,
   flags: WriteFlags
 ): Promise<unknown> {
   const personId = await resolvePersonRef(client, person);
   return client.post(
-    "/api/person/addPersonEmail",
+    path,
     { personId, personEmail: email },
     { headers: writeFlagsToHeaders(flags) }
   );
 }
 
-/** POST /api/person/setMainPersonEmail { personId, personEmail }. */
-export async function runPersonEmailSetMain(
+/** POST /api/person/addPersonEmail { personId, personEmail }. */
+export const runPersonEmailAdd = (
   client: ApiClient,
   person: string,
   email: string,
   flags: WriteFlags
-): Promise<unknown> {
-  const personId = await resolvePersonRef(client, person);
-  return client.post(
-    "/api/person/setMainPersonEmail",
-    { personId, personEmail: email },
-    { headers: writeFlagsToHeaders(flags) }
-  );
-}
+): Promise<unknown> => postPersonEmail(client, "/api/person/addPersonEmail", person, email, flags);
+
+/** POST /api/person/setMainPersonEmail { personId, personEmail }. */
+export const runPersonEmailSetMain = (
+  client: ApiClient,
+  person: string,
+  email: string,
+  flags: WriteFlags
+): Promise<unknown> =>
+  postPersonEmail(client, "/api/person/setMainPersonEmail", person, email, flags);
 
 /** DELETE /api/person/deletePersonEmail/:personId/:email. */
 export async function runPersonEmailRemove(
@@ -86,33 +89,16 @@ export function registerPersonEmailCommands(
       jsonAction(getClient, (client, personRef: string) => runPersonEmailList(client, personRef))
     );
 
-  const addCmd = email
-    .command("add <person> <email>");
-  addWriteFlagsToCommand(addCmd).action(
-    guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      writeJson(
-        await runPersonEmailAdd(await getClient(), personRef, emailAddr, opts)
-      );
-    })
-  );
-
-  const setMainCmd = email
-    .command("set-main <person> <email>");
-  addWriteFlagsToCommand(setMainCmd).action(
-    guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      writeJson(
-        await runPersonEmailSetMain(await getClient(), personRef, emailAddr, opts)
-      );
-    })
-  );
-
-  const removeCmd = email
-    .command("remove <person> <email>");
-  addWriteFlagsToCommand(removeCmd).action(
-    guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      writeJson(
-        await runPersonEmailRemove(await getClient(), personRef, emailAddr, opts)
-      );
-    })
-  );
+  // The three write leaves share one shape: <person> <email> + write flags.
+  for (const [name, run] of [
+    ["add", runPersonEmailAdd],
+    ["set-main", runPersonEmailSetMain],
+    ["remove", runPersonEmailRemove],
+  ] as const) {
+    addWriteFlagsToCommand(email.command(`${name} <person> <email>`)).action(
+      guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
+        writeJson(await run(await getClient(), personRef, emailAddr, opts));
+      })
+    );
+  }
 }

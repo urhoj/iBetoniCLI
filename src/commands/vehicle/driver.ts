@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson } from "../../output/json.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, toYyyymmddInt } from "../../dates.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -20,11 +20,6 @@ interface VehicleDayOpts {
   date?: string;
 }
 
-/** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
-function toYyyymmdd(date: string): number {
-  return Number(resolveDate(date)!.replace(/-/g, ""));
-}
-
 // ─── day-driver reads (date-keyed fleet views + per-vehicle) ─────────────────
 
 /**
@@ -37,7 +32,7 @@ export async function runVehicleDriverBoard(
   date: string
 ): Promise<ListEnvelope<Row>> {
   return markPlaceholderVehicles(
-    await client.get<ListEnvelope<Row>>(`/api/cli/driver/board/${toYyyymmdd(date)}`)
+    await client.get<ListEnvelope<Row>>(`/api/cli/driver/board/${toYyyymmddInt(date)}`)
   );
 }
 
@@ -52,7 +47,7 @@ export async function runVehicleDriverGaps(
   date: string
 ): Promise<ListEnvelope<Row>> {
   return markPlaceholderVehicles(
-    await client.get<ListEnvelope<Row>>(`/api/cli/driver/gaps/${toYyyymmdd(date)}`)
+    await client.get<ListEnvelope<Row>>(`/api/cli/driver/gaps/${toYyyymmddInt(date)}`)
   );
 }
 
@@ -61,7 +56,7 @@ export async function runVehicleDriverAvailable(
   client: ApiClient,
   date: string
 ): Promise<ListEnvelope<Row>> {
-  return client.get<ListEnvelope<Row>>(`/api/cli/driver/available/${toYyyymmdd(date)}`);
+  return client.get<ListEnvelope<Row>>(`/api/cli/driver/available/${toYyyymmddInt(date)}`);
 }
 
 /** GET /api/cli/driver/who/:vehicleId/:yyyymmdd — the day driver of one vehicle on a date. */
@@ -70,7 +65,7 @@ export async function runVehicleDriverWho(
   vehicleId: number,
   date: string
 ): Promise<Row> {
-  return client.get<Row>(`/api/cli/driver/who/${vehicleId}/${toYyyymmdd(date)}`);
+  return client.get<Row>(`/api/cli/driver/who/${vehicleId}/${toYyyymmddInt(date)}`);
 }
 
 export interface VehicleDriverHistoryFilter {
@@ -116,7 +111,7 @@ export async function runVehicleDriverAssign(
 ): Promise<unknown> {
   return client.post(
     "/api/cli/driver/assign",
-    { vehicleId, personId, yyyymmdd: toYyyymmdd(date) },
+    { vehicleId, personId, yyyymmdd: toYyyymmddInt(date) },
     { headers: writeFlagsToHeaders(flags) }
   );
 }
@@ -135,7 +130,7 @@ export async function runVehicleDriverClear(
 ): Promise<unknown> {
   return client.post(
     "/api/cli/driver/clear",
-    { vehicleId, yyyymmdd: toYyyymmdd(date) },
+    { vehicleId, yyyymmdd: toYyyymmddInt(date) },
     { headers: writeFlagsToHeaders(flags) }
   );
 }

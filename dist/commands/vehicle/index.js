@@ -78,14 +78,12 @@ export async function runVehicleStatus(client, vehicleId) {
 export async function runVehicleLocations(client) {
     return client.get("/api/cli/vehicle/locations");
 }
+/** One per-day GPS read; the two exported leaves differ only in the path segment. */
+const gpsDayRead = (kind) => (client, vehicleId, opts) => client.get(`/api/cli/vehicle/${kind}/${vehicleId}${qs({ date: opts.date || undefined })}`);
 /** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
-export async function runVehicleTimeline(client, vehicleId, opts) {
-    return client.get(`/api/cli/vehicle/timeline/${vehicleId}${qs({ date: opts.date || undefined })}`);
-}
+export const runVehicleTimeline = gpsDayRead("timeline");
 /** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
-export async function runVehicleRoute(client, vehicleId, opts) {
-    return client.get(`/api/cli/vehicle/route/${vehicleId}${qs({ date: opts.date || undefined })}`);
-}
+export const runVehicleRoute = gpsDayRead("route");
 /**
  * GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that
  * visited a site. `opts.date` filters the visits to one Europe/Helsinki day

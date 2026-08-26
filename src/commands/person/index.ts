@@ -1005,51 +1005,44 @@ export function registerPersonCommands(
       )
     );
 
-  addWriteFlagsToCommand(
-    personRole
-      .command("grant <personId>")
-      .requiredOption("--role <name>")
-      .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
-  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
-    let roleTypeId: number;
-    try {
-      roleTypeId = resolveRoleTypeId(opts.role);
-    } catch (validationErr) {
-      failWith(errorMessage(validationErr), 4);
-    }
-    // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
-    // must name a real role, so reject the empty-string case rather than POST a
-    // bogus roleTypeId 0 to the backend.
-    if (!roleTypeId) {
-      failWith("--role must not be empty", 4);
-    }
-    const client = await getClient();
-    const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-    writeJson(result);
-  }));
+  // grant/revoke share the whole registration; only the run fn differs.
+  const roleWriteAction = (
+    run: (
+      client: ApiClient,
+      personId: number,
+      asiakasId: number,
+      roleTypeId: number,
+      flags: WriteFlags
+    ) => Promise<unknown>
+  ) =>
+    guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+      let roleTypeId: number;
+      try {
+        roleTypeId = resolveRoleTypeId(opts.role);
+      } catch (validationErr) {
+        failWith(errorMessage(validationErr), 4);
+      }
+      // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
+      // must name a real role, so reject the empty-string case rather than POST a
+      // bogus roleTypeId 0 to the backend.
+      if (!roleTypeId) {
+        failWith("--role must not be empty", 4);
+      }
+      const client = await getClient();
+      writeJson(await run(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts));
+    });
 
-  addWriteFlagsToCommand(
-    personRole
-      .command("revoke <personId>")
-      .requiredOption("--role <name>")
-      .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
-  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
-    let roleTypeId: number;
-    try {
-      roleTypeId = resolveRoleTypeId(opts.role);
-    } catch (validationErr) {
-      failWith(errorMessage(validationErr), 4);
-    }
-    // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
-    // must name a real role, so reject the empty-string case rather than POST a
-    // bogus roleTypeId 0 to the backend.
-    if (!roleTypeId) {
-      failWith("--role must not be empty", 4);
-    }
-    const client = await getClient();
-    const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-    writeJson(result);
-  }));
+  for (const [name, run] of [
+    ["grant", runPersonRoleGrant],
+    ["revoke", runPersonRoleRevoke],
+  ] as const) {
+    addWriteFlagsToCommand(
+      personRole
+        .command(`${name} <personId>`)
+        .requiredOption("--role <name>")
+        .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
+    ).action(roleWriteAction(run));
+  }
 
   // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
   // then enriches with the LIVE DB description/comment via an authenticated GET

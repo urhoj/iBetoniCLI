@@ -147,27 +147,19 @@ export async function runVehicleLocations(
   );
 }
 
+/** One per-day GPS read; the two exported leaves differ only in the path segment. */
+const gpsDayRead =
+  (kind: "timeline" | "route") =>
+  (client: ApiClient, vehicleId: number, opts: VehicleDayFilter): Promise<GpsListEnvelope> =>
+    client.get<GpsListEnvelope>(
+      `/api/cli/vehicle/${kind}/${vehicleId}${qs({ date: opts.date || undefined })}`
+    );
+
 /** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
-export async function runVehicleTimeline(
-  client: ApiClient,
-  vehicleId: number,
-  opts: VehicleDayFilter
-): Promise<GpsListEnvelope> {
-  return client.get<GpsListEnvelope>(
-    `/api/cli/vehicle/timeline/${vehicleId}${qs({ date: opts.date || undefined })}`
-  );
-}
+export const runVehicleTimeline = gpsDayRead("timeline");
 
 /** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
-export async function runVehicleRoute(
-  client: ApiClient,
-  vehicleId: number,
-  opts: VehicleDayFilter
-): Promise<GpsListEnvelope> {
-  return client.get<GpsListEnvelope>(
-    `/api/cli/vehicle/route/${vehicleId}${qs({ date: opts.date || undefined })}`
-  );
-}
+export const runVehicleRoute = gpsDayRead("route");
 
 /**
  * GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that

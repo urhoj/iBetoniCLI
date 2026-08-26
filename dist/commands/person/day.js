@@ -1,7 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, toYyyymmddInt } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
@@ -10,10 +10,6 @@ import { bothInOrder } from "../../parallel.js";
 function intToDate(n) {
     const s = String(n);
     return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-}
-/** date alias/ISO → integer yyyymmdd. */
-function toYyyymmdd(date) {
-    return Number(resolveDate(date).replace(/-/g, ""));
 }
 /** GET /api/personPvm/statusList/:asiakasId — the day-status types for the active company. */
 export async function runPersonDayStatuses(client, opts = {}) {
@@ -90,7 +86,7 @@ export async function resolveStatusId(client, value) {
  */
 export async function runPersonDaySet(client, personId, date, statusValue, flags) {
     const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-    const pvm = toYyyymmdd(date);
+    const pvm = toYyyymmddInt(date);
     // The status lookup (only issued for a non-numeric --status) is keyed on the
     // status name; the day read on person+date. Independent, so run them together —
     // ordered so a bad --status still reports the validation error, not whichever
@@ -137,7 +133,7 @@ export async function runPersonDayClear(client, personId, date, flags) {
             wouldDelete: current
                 ? {
                     personPvmId: current.personPvmId,
-                    date: intToDate(toYyyymmdd(date)),
+                    date: intToDate(toYyyymmddInt(date)),
                     status: current.status ?? null,
                 }
                 : null,
