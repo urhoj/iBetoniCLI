@@ -92,24 +92,19 @@ export async function runGlossaryLookup(client, term) {
             // Enrich the miss with did-you-mean suggestions from the search endpoint.
             let hint = "";
             try {
-                const prefix = term.length > 5 ? term.slice(0, 5) : term;
                 const [full, partial] = await Promise.all([
                     client.get(`/api/cli/glossary${qs({ search: term })}`).catch(() => ({ items: [] })),
                     term.length > 5
-                        ? client.get(`/api/cli/glossary${qs({ search: prefix })}`).catch(() => ({ items: [] }))
+                        ? client.get(`/api/cli/glossary${qs({ search: term.slice(0, 5) })}`).catch(() => ({ items: [] }))
                         : Promise.resolve({ items: [] }),
                 ]);
-                const seen = new Set();
-                const suggestions = [];
-                for (const item of [
-                    ...full.items,
-                    ...partial.items,
-                ]) {
-                    if (!seen.has(item.term)) {
-                        seen.add(item.term);
-                        suggestions.push(item.term);
-                    }
-                }
+                // Set dedups while preserving first-insertion order (full hits first).
+                const suggestions = [
+                    ...new Set([
+                        ...full.items,
+                        ...partial.items,
+                    ].map((i) => i.term)),
+                ];
                 if (suggestions.length > 0) {
                     hint = ` Did you mean: ${suggestions.slice(0, 5).join(", ")}?`;
                 }

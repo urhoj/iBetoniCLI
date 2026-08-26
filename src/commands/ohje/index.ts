@@ -58,6 +58,13 @@ export function isValidHelpId(s: string): boolean {
   return typeof s === "string" && s.length > 0 && s.length <= HELP_ID_MAX;
 }
 
+/** Exit 4 on an invalid helpId — the guard every id-taking action shares. */
+function assertValidHelpId(helpId: string): void {
+  if (!isValidHelpId(helpId)) {
+    failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
+  }
+}
+
 /**
  * GET /api/helps/get/:helpId — the content shown in a HelperIcon modal. The
  * backend returns a recordset (array); we surface the first row, or `null` when
@@ -346,9 +353,7 @@ export function registerOhjeCommands(
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
     .action(guarded(async (helpId: string) => {
-      if (!isValidHelpId(helpId)) {
-        failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
-      }
+      assertValidHelpId(helpId);
       const client = await getClient();
       const result = await runOhjeGet(client, helpId);
       writeJson(result);
@@ -406,9 +411,7 @@ export function registerOhjeCommands(
         all?: boolean;
       }
     ) => {
-      if (!isValidHelpId(helpId)) {
-        failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
-      }
+      assertValidHelpId(helpId);
       const editOp = parseEditOp(opts);
       if (opts.field !== undefined && !editOp) {
         failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
@@ -455,9 +458,7 @@ export function registerOhjeCommands(
     .command("delete <helpId>");
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (helpId: string, opts: WriteFlags) => {
-      if (!isValidHelpId(helpId)) {
-        failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
-      }
+      assertValidHelpId(helpId);
       const client = await getClient();
       writeJson(await runOhjeDelete(client, helpId, opts));
     })
