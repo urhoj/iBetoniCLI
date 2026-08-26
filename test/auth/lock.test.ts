@@ -1,5 +1,5 @@
 import { describe, test, expect, afterAll } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { mkdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -80,5 +80,50 @@ describe("withFileLock (fb#884)", () => {
     const ran = await withFileLock(lockPath, async () => "ok", { pollMs: 10 });
     expect(ran).toBe("ok");
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  // Review finding F1: the ENOENT parent-create branch used to retry from the
+  // TOP of the loop, skipping the deadline and the sleep — a parent that could
+  // never be created busy-looped forever at full CPU, the exact hard outage
+  // the best-effort contract promises not to cause. Every retry path must
+  // route through the deadline.
+  test("an uncreatable parent (path blocked by a FILE) still returns within the cap — never hangs", async () => {
+    const blocker = join(TMP, "blocker");
+    writeFileSync(blocker, "not a directory");
+    const lockPath = join(blocker, "creds.json.lock"); // mkdir can never succeed here
+    const t0 = Date.now();
+    const ran = await withFileLock(lockPath, async () => "ok", { pollMs: 20, capMs: 300 });
+    expect(ran).toBe("ok"); // proceeded unlocked at the cap
+    expect(Date.now() - t0).toBeLessThan(5000); // bounded, not a spin/hang
+  });
+
+  // Review finding F2 (release half): if a waiter stale-broke our lock while we
+  // held past staleMs and a third process acquired a FRESH lock at the same
+  // path, our release must not delete theirs — that would let two processes
+  // into the critical section at once. Identity = the lock dir's mtime,
+  // captured at acquire time and compared before every destructive rm.
+  test("release removes only its OWN lock instance — a foreign fresh lock at the same path survives", async () => {
+    const lockPath = join(TMP, "identity.lock");
+    let releaseGate!: () => void;
+    const held = new Promise<void>((r) => {
+      releaseGate = r;
+    });
+    const run = withFileLock(
+      lockPath,
+      async () => {
+        await held;
+        return "ok";
+      },
+      { pollMs: 10 }
+    );
+    while (!existsSync(lockPath)) await sleep(5); // our lock is up
+    await sleep(10); // ensure the replacement gets a distinct mtime
+    // Simulate the race: someone breaks our lock, a third process acquires.
+    rmSync(lockPath, { recursive: true, force: true });
+    await mkdir(lockPath);
+    releaseGate();
+    expect(await run).toBe("ok");
+    expect(existsSync(lockPath)).toBe(true); // the foreign lock was NOT removed
+    rmSync(lockPath, { recursive: true, force: true });
   });
 });

@@ -246,24 +246,40 @@ function compactRow(
   return { row: out, cut };
 }
 
+/**
+ * The server-side filter set: exactly what rides on the query string. A new
+ * list flag belongs here IF (and only if) the backend filters on it — adding
+ * `--held` required editing three separately-spelled copies of this bag, and
+ * missing one would have been a silent no-op (simplify-review of fb#886).
+ */
+interface FeedbackFilterParams {
+  status?: string;
+  kind?: string;
+  scope?: string;
+  search?: string;
+  severity?: string;
+  complexity?: number | string;
+  maxComplexity?: number;
+  limit?: number;
+  offset?: number;
+  oldest?: boolean;
+  unclaimed?: boolean;
+  claimedBy?: string;
+  held?: boolean;
+}
+
+/** Everything `list` accepts: the server filters plus client-side shaping. */
+export interface FeedbackListOptions extends FeedbackFilterParams {
+  unresolved?: boolean;
+  all?: boolean;
+  full?: boolean;
+  mine?: boolean;
+}
+
 /** Build the query string and GET a page of feedback rows (always an array). */
 async function fetchRows(
   client: ApiClient,
-  params: {
-    status?: string;
-    kind?: string;
-    scope?: string;
-    search?: string;
-    severity?: string;
-    complexity?: number | string;
-    maxComplexity?: number;
-    limit?: number;
-    offset?: number;
-    oldest?: boolean;
-    unclaimed?: boolean;
-    claimedBy?: string;
-    held?: boolean;
-  }
+  params: FeedbackFilterParams
 ): Promise<Record<string, unknown>[]> {
   const suffix = qs({
     status: params.status || undefined,
@@ -480,25 +496,7 @@ export function deriveClaimState(
  */
 export async function runFeedbackList(
   client: ApiClient,
-  opts: {
-    status?: string;
-    kind?: string;
-    scope?: string;
-    search?: string;
-    severity?: string;
-    complexity?: number | string;
-    maxComplexity?: number;
-    limit?: number;
-    offset?: number;
-    unresolved?: boolean;
-    all?: boolean;
-    full?: boolean;
-    oldest?: boolean;
-    unclaimed?: boolean;
-    mine?: boolean;
-    claimedBy?: string;
-    held?: boolean;
-  }
+  opts: FeedbackListOptions
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.kind, KINDS, "--kind");
   assertEnum(opts.scope, SCOPES, "--scope");
@@ -509,9 +507,8 @@ export async function runFeedbackList(
   // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
   // rather than a bare enum dump.
   assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
-  const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean)
-    .length;
-  if (claimFilters > 1) {
+  const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
+  if (claimFilters.length > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
   }
   const me = resolveClaimId(undefined);
@@ -1323,9 +1320,7 @@ export function registerFeedbackCommands(
     .option("--claimed-by <label>", "", String)
     .option("--held")
     .action(
-      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; severity?: string; complexity?: number | string; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; unclaimed?: boolean; mine?: boolean; claimedBy?: string; held?: boolean; }) =>
-        runFeedbackList(client, opts)
-      )
+      jsonAction(getClient, (client, opts: FeedbackListOptions) => runFeedbackList(client, opts))
     );
 
   // Mirrors `ib glossary lint`: read-only audit, `--strict` exits 1 on any

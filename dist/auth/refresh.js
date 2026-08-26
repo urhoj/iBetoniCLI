@@ -89,28 +89,6 @@ export async function refreshSession(opts) {
         throw new Error(`${bearer}; ${grant} — session unrecoverable, run \`ib auth login\``, { cause: grantError });
     }
 }
-/**
- * Full self-heal for a FILE session: {@link refreshSession}, persist the result
- * IMMEDIATELY (the OAuth grant consumes the presented refresh token — a crash
- * before persist would orphan the rotation and trip reuse-detection, revoking
- * the family), then re-assert the persisted active company. The grant re-mints
- * the LOGIN-time company, so if the user has since `auth switch`ed, the fresh
- * JWT is switched back before the session continues — no silent tenant flip.
- * Returns the JWT to act with.
- *
- * SERIALIZED cross-process (fb#884): the whole heal runs under the store's
- * file lock, and the credentials are re-read FRESH after acquiring it. Two
- * concurrent `ib` processes used to both read the same rotating refresh token
- * and both run the grant — the loser tripped the server's reuse detection,
- * which revokes the ENTIRE session family and bricks unattended automation
- * until a human browser-login. Under the lock the winner refreshes and the
- * waiter finds the rotated JWT already on disk (the `creds.jwt !==
- * opts.currentJwt` short-circuit) and never touches the network. A writer
- * that does not honour the lock (an older globally-linked `ib`) is caught by
- * the reuse-recovery re-read in the catch below.
- *
- * `switchFn` is injectable for tests; defaults to {@link performSwitch}.
- */
 export async function refreshAndPersistSession(opts) {
     return opts.store.withLock(() => refreshAndPersistLocked(opts));
 }
@@ -124,13 +102,12 @@ async function refreshAndPersistLocked(opts) {
     // 401 surfaces cleanly.
     if (creds?.jwt && creds.jwt !== opts.currentJwt)
         return creds.jwt;
+    // The one thing that differs between the first attempt and the recovery
+    // retry is WHICH refresh token is presented.
+    const grant = (storedRefreshToken) => refreshSession({ endpoint: opts.endpoint, currentJwt: opts.currentJwt, storedRefreshToken });
     let session;
     try {
-        session = await refreshSession({
-            endpoint: opts.endpoint,
-            currentJwt: opts.currentJwt,
-            storedRefreshToken: creds?.refreshToken || undefined,
-        });
+        session = await grant(creds?.refreshToken || undefined);
     }
     catch (refreshError) {
         // Reuse-detection recovery: a concurrent writer that bypassed the lock may
@@ -141,11 +118,7 @@ async function refreshAndPersistLocked(opts) {
         if (latest?.jwt && latest.jwt !== opts.currentJwt)
             return latest.jwt;
         if (latest?.refreshToken && latest.refreshToken !== creds?.refreshToken) {
-            session = await refreshSession({
-                endpoint: opts.endpoint,
-                currentJwt: opts.currentJwt,
-                storedRefreshToken: latest.refreshToken,
-            });
+            session = await grant(latest.refreshToken);
             creds = latest;
         }
         else {

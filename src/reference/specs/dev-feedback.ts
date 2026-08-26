@@ -99,7 +99,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
     prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),

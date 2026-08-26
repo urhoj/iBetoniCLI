@@ -150,22 +150,20 @@ export async function refreshSession(opts: {
  *
  * `switchFn` is injectable for tests; defaults to {@link performSwitch}.
  */
-export async function refreshAndPersistSession(opts: {
+interface RefreshAndPersistOptions {
   endpoint: string;
   store: CredentialsStore;
   currentJwt: string;
+  /** Injectable for tests; defaults to {@link performSwitch}. */
   switchFn?: typeof performSwitch;
-}): Promise<string> {
+}
+
+export async function refreshAndPersistSession(opts: RefreshAndPersistOptions): Promise<string> {
   return opts.store.withLock(() => refreshAndPersistLocked(opts));
 }
 
 /** The locked body of {@link refreshAndPersistSession} — never call directly. */
-async function refreshAndPersistLocked(opts: {
-  endpoint: string;
-  store: CredentialsStore;
-  currentJwt: string;
-  switchFn?: typeof performSwitch;
-}): Promise<string> {
+async function refreshAndPersistLocked(opts: RefreshAndPersistOptions): Promise<string> {
   const doSwitch = opts.switchFn ?? performSwitch;
   let creds = await opts.store.reload();
   // Another process refreshed while we waited on the lock — its rotated
@@ -174,13 +172,14 @@ async function refreshAndPersistLocked(opts: {
   // 401 surfaces cleanly.
   if (creds?.jwt && creds.jwt !== opts.currentJwt) return creds.jwt;
 
+  // The one thing that differs between the first attempt and the recovery
+  // retry is WHICH refresh token is presented.
+  const grant = (storedRefreshToken?: string) =>
+    refreshSession({ endpoint: opts.endpoint, currentJwt: opts.currentJwt, storedRefreshToken });
+
   let session: RefreshSessionResult;
   try {
-    session = await refreshSession({
-      endpoint: opts.endpoint,
-      currentJwt: opts.currentJwt,
-      storedRefreshToken: creds?.refreshToken || undefined,
-    });
+    session = await grant(creds?.refreshToken || undefined);
   } catch (refreshError) {
     // Reuse-detection recovery: a concurrent writer that bypassed the lock may
     // have rotated the credentials underneath us. Re-read ONCE — prefer a
@@ -189,11 +188,7 @@ async function refreshAndPersistLocked(opts: {
     const latest = await opts.store.reload();
     if (latest?.jwt && latest.jwt !== opts.currentJwt) return latest.jwt;
     if (latest?.refreshToken && latest.refreshToken !== creds?.refreshToken) {
-      session = await refreshSession({
-        endpoint: opts.endpoint,
-        currentJwt: opts.currentJwt,
-        storedRefreshToken: latest.refreshToken,
-      });
+      session = await grant(latest.refreshToken);
       creds = latest;
     } else {
       throw refreshError;

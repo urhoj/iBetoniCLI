@@ -397,9 +397,8 @@ export async function runFeedbackList(client, opts) {
     // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
     // rather than a bare enum dump.
     assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
-    const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean)
-        .length;
-    if (claimFilters > 1) {
+    const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
+    if (claimFilters.length > 1) {
         failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
     }
     const me = resolveClaimId(undefined);

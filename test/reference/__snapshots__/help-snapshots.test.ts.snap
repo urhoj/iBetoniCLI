@@ -3023,7 +3023,7 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries \`changelogLinks: [{changelogId, role}]\` — the same shape \`get\` returns — so a PARTLY-shipped row is visible before you claim it (fb#647).
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
+  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

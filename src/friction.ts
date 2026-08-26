@@ -93,6 +93,8 @@ export function frictionPath(): string {
 }
 
 const MSG_CAP = 400;
+/** How far back from the cap to hunt for a space before giving up on a word boundary. */
+const WORD_BOUNDARY_WINDOW = 40;
 
 /**
  * fb#877: a bare slice reads as a COMPLETE message — the same silent-cut
@@ -105,7 +107,8 @@ export function truncateMessage(message: string): string {
   if (message.length <= MSG_CAP) return message;
   const head = message.slice(0, MSG_CAP);
   const lastSpace = head.lastIndexOf(" ");
-  return `${lastSpace > MSG_CAP - 40 ? head.slice(0, lastSpace) : head} … [truncated]`;
+  const cut = lastSpace > MSG_CAP - WORD_BOUNDARY_WINDOW ? head.slice(0, lastSpace) : head;
+  return `${cut} … [truncated]`;
 }
 
 /**
