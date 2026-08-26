@@ -220,7 +220,6 @@ const REFERENCE_LISTS = [
   ["kayttoika", "/api/betoni/kayttoika/list"],
 ] as const;
 
-export type ReferenceKind = (typeof REFERENCE_LISTS)[number][0];
 
 /**
  * All four concrete reference lists in ONE call.

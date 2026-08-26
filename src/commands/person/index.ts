@@ -1071,7 +1071,6 @@ export function registerPersonCommands(
   registerCombinatorCommands(p, getClient, {
     base: "person-combinator",
     idFields: PERSON_MERGE_ID_FIELDS,
-    entityNoun: "person",
     idLabel: "personId",
     unownedClass: true,
   });

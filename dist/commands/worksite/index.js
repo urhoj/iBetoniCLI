@@ -410,7 +410,6 @@ export function registerWorksiteCommands(parent, getClient) {
     registerCombinatorCommands(w, getClient, {
         base: "tyomaa-combinator",
         idFields: TYOMAA_MERGE_ID_FIELDS,
-        entityNoun: "worksite",
         idLabel: "tyomaaId",
     });
 }

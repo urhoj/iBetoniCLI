@@ -113,8 +113,6 @@ export interface CombinatorCommandsConfig {
   base: string;
   /** Request-body id field names for /merge + /validate. */
   idFields: CombinatorIdFields;
-  /** Entity word in the "<noun> merge is irreversible" guard (customer/person/worksite). */
-  entityNoun: string;
   /** Id word in the flag descriptions and the positive-integer guard, pluralized with a bare "s". */
   idLabel: string;
   /** asiakas combinator only: expose the system-admin `--allow-big-merge` escape hatch. */

@@ -4,6 +4,7 @@ import { resolveDate } from "../../dates.js";
 import { parseId, intFlag, numFlag } from "../../targets.js";
 import { runKeikkaGet } from "../keikka/index.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input) {
     return input === "now" ? new Date().toISOString() : input;
@@ -31,8 +32,7 @@ export async function runWeatherDay(client, opts) {
  */
 export async function runWeatherPumping(client, opts) {
     const start = encodeURIComponent(resolveTime(opts.start));
-    const qs = opts.keikka !== undefined ? `?keikkaId=${opts.keikka}` : "";
-    return client.get(`/api/weather/pumping-period/${opts.lat}/${opts.lng}/${start}/${opts.duration}${qs}`);
+    return client.get(`/api/weather/pumping-period/${opts.lat}/${opts.lng}/${start}/${opts.duration}${qs({ keikkaId: opts.keikka })}`);
 }
 /**
  * POST /api/weather/tyomaa/:tyomaaId — forecast for a worksite by id.

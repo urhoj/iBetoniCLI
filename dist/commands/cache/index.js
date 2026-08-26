@@ -21,7 +21,7 @@ function writeRequestOptions(client, opts) {
     }
     const dryRun = !opts.confirm;
     if (!dryRun)
-        assertWritableEndpoint(client.endpoint, opts.forceProd);
+        assertWritableEndpoint(client.endpoint, !!opts.forceProd);
     const headers = {};
     if (dryRun)
         headers["X-Dry-Run"] = "1";
@@ -80,17 +80,6 @@ function addCacheWriteOptions(cmd) {
         .option("--force-prod")
         .option("--reason <text>");
 }
-/** Commander opts → {@link CacheWriteOpts}. Extra keys on the source (`id`,
- *  `cascade`, `pattern`) are ignored — passing the existing object rather than a
- *  fresh literal keeps TS excess-property checking out of the way. */
-function toCacheWriteOpts(opts) {
-    return {
-        confirm: !!opts.confirm,
-        dryRun: !!opts.dryRun,
-        forceProd: !!opts.forceProd,
-        reason: opts.reason,
-    };
-}
 /**
  * Register `ib cache` subcommands. Inspect verbs (stats/keys) are GETs and
  * developer-gated server-side. Destructive verbs (invalidate/clear/pattern)
@@ -113,13 +102,13 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         // everywhere else. Hidden: the spec documents only `--asiakas`, so `--help`
         // and `reference dump` show one spelling while old scripts keep working.
         .addOption(new Option("--asiakas-id <n>").argParser((v) => Number(v)).hideHelp())
-        .option("--cascade")).action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade }, toCacheWriteOpts(opts))));
-    addCacheWriteOptions(c.command("clear")).action(jsonAction(getClient, (client, opts) => runCacheClear(client, toCacheWriteOpts(opts))));
+        .option("--cascade")).action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade }, opts)));
+    addCacheWriteOptions(c.command("clear")).action(jsonAction(getClient, (client, opts) => runCacheClear(client, opts)));
     // The glob is dual-shaped: positional (canonical) OR `--pattern <glob>` — see
     // {@link resolveGlob} for why that alias exists (fb#645).
     addCacheWriteOptions(c
         .command("pattern [glob]")
-        .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")).action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, resolveGlob(glob, opts.pattern), toCacheWriteOpts(opts))));
+        .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")).action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, resolveGlob(glob, opts.pattern), opts)));
     c.command("entities")
         .action(guarded(() => {
         writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });

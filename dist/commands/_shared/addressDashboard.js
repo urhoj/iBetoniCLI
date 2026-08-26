@@ -124,11 +124,9 @@ export function assembleReport(sections) {
 }
 /**
  * Phase 1: resolve the caller's point (`address` | `tyomaaId` | `sijaintiId`)
- * to `{lat,lng}`. The `source` query fragment returned alongside it is used
- * ONLY by this function's own `tyomaaId`/`sijaintiId` parcel resolve below —
- * phase 2's building/parcel fan-out uses the resolved `{lat,lng}` instead
- * (see {@link runAddressDashboard}), avoiding a redundant server-side
- * re-geocode/re-resolve of the same source.
+ * to `{lat,lng}`. Phase 2's building/parcel fan-out uses the resolved
+ * `{lat,lng}` (see {@link runAddressDashboard}), so the backend never has to
+ * re-resolve the source (re-geocode / re-query) a second time.
  *
  * - `address` — geocode via `POST /api/geocode/getLatLng`.
  * - `tyomaaId` / `sijaintiId` — coordinates aren't carried by the caller, so
@@ -141,7 +139,6 @@ export function assembleReport(sections) {
  */
 async function resolvePoint(client, input) {
     if (input.address !== undefined) {
-        const source = `address=${encodeURIComponent(input.address)}`;
         // Read-over-POST: geocoding an address mutates nothing. `{ read: true }`
         // exempts it from the `--read-only` write-lock AND suppresses the
         // "[ib] write · acting as asiakasId …" acting-as banner (dashboard is read-only).
@@ -151,7 +148,7 @@ async function resolvePoint(client, input) {
             const status = geo?.status ?? "unknown";
             failWith(`could not geocode address (status: ${status})`, 5);
         }
-        return { lat: coords.lat, lng: coords.lng, source };
+        return { lat: coords.lat, lng: coords.lng };
     }
     const source = input.tyomaaId !== undefined
         ? `worksite=${input.tyomaaId}`
@@ -168,7 +165,7 @@ async function resolvePoint(client, input) {
     if (!coords || !Number.isFinite(lat) || !Number.isFinite(lng)) {
         failWith("could not resolve coordinates for the given point", 5);
     }
-    return { lat, lng, source, parcel };
+    return { lat, lng, parcel };
 }
 /**
  * Build a `Record<SectionName, PromiseSettledResult<unknown>>` where every

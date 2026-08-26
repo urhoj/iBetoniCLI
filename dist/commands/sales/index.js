@@ -101,11 +101,11 @@ export function registerSalesCommands(parent, getClient) {
         .alias("show")
         .option("--asiakas <id>", "", (v) => Number(v))
         .option("--ytunnus <y>")
-        .action(guarded(async (idArg, opts) => {
-        const client = await getClient();
-        const id = parseOptionalId(idArg, "saasProspectId");
-        writeJson(await resolveProspect(client, { id, asiakas: opts.asiakas, ytunnus: opts.ytunnus }));
-    }));
+        .action(jsonAction(getClient, (client, idArg, opts) => resolveProspect(client, {
+        id: parseOptionalId(idArg, "saasProspectId"),
+        asiakas: opts.asiakas,
+        ytunnus: opts.ytunnus,
+    })));
     const addCmd = prospect
         .command("add")
         .option("--asiakas <id>", "", (v) => Number(v))

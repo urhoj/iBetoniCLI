@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { failWith, writeJson } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
 /**
@@ -114,15 +114,7 @@ export function registerNotificationCommands(parent, getClient) {
         .requiredOption("--title <text>")
         .requiredOption("--body <text>")
         .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"));
-    addWriteFlagsToCommand(sendCmd).action(guarded(async (opts) => {
-        const result = await runNotificationFcmSend(await getClient(), {
-            person: opts.person,
-            title: opts.title,
-            body: opts.body,
-            data: opts.data,
-        }, opts);
-        writeJson(result);
-    }));
+    addWriteFlagsToCommand(sendCmd).action(jsonAction(getClient, (client, opts) => runNotificationFcmSend(client, { person: opts.person, title: opts.title, body: opts.body, data: opts.data }, opts)));
     const email = n
         .command("email")
         .description("Email channel — send an email to a person or address");
@@ -137,7 +129,9 @@ export function registerNotificationCommands(parent, getClient) {
         if (!opts.body && !opts.html && !opts.htmlBody) {
             failWith("one of --body, --html, or --html-body is required", 4);
         }
-        const brand = opts.fromBrand ?? "betoni";
+        // Commander's default ("betoni", registered on the option) makes fromBrand
+        // always defined here.
+        const brand = opts.fromBrand;
         if (brand !== "betoni" && brand !== "betonijerry") {
             failWith("--from-brand must be 'betoni' or 'betonijerry'", 4);
         }

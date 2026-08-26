@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /**
  * The aggregated operator-inbox rollup returned by `GET /api/cli/inbox`.
  * Counts always present; the per-signal `items` are present only with `--details`.
@@ -43,8 +44,7 @@ export async function runInbox(
   client: ApiClient,
   opts: { details?: boolean } = {}
 ): Promise<InboxRollup> {
-  const qs = opts.details ? "?details=1" : "";
-  return client.get<InboxRollup>(`/api/cli/inbox${qs}`);
+  return client.get<InboxRollup>(`/api/cli/inbox${qs({ details: opts.details ? 1 : undefined })}`);
 }
 
 export function registerInboxCommand(

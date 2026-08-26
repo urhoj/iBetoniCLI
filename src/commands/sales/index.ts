@@ -210,11 +210,13 @@ export function registerSalesCommands(
     .option("--asiakas <id>", "", (v: string) => Number(v))
     .option("--ytunnus <y>")
     .action(
-      guarded(async (idArg: string | undefined, opts: { asiakas?: number; ytunnus?: string }) => {
-        const client = await getClient();
-        const id = parseOptionalId(idArg, "saasProspectId");
-        writeJson(await resolveProspect(client, { id, asiakas: opts.asiakas, ytunnus: opts.ytunnus }));
-      })
+      jsonAction(getClient, (client, idArg: string | undefined, opts: { asiakas?: number; ytunnus?: string }) =>
+        resolveProspect(client, {
+          id: parseOptionalId(idArg, "saasProspectId"),
+          asiakas: opts.asiakas,
+          ytunnus: opts.ytunnus,
+        })
+      )
     );
 
   const addCmd = prospect

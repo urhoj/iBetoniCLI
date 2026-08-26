@@ -6,7 +6,6 @@ import { assertEnum } from "../../targets.js";
 import { qs } from "../../api/query.js";
 import { jsonAction } from "../_shared/action.js";
 export const STATS_DIMS = ["customer", "vehicle", "driver", "worksite", "status", "day"] as const;
-export type StatsDim = (typeof STATS_DIMS)[number];
 
 export interface StatsOptions {
   from?: string;

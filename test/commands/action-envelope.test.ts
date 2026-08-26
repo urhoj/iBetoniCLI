@@ -77,11 +77,12 @@ function declarationText(sf: ts.SourceFile, name: string): string | null {
  * documented Windows/libuv constraint after the OAuth flow), and must pass.
  */
 function routesErrors(arg: ts.Node, sf: ts.SourceFile): boolean {
-  // 1. the shared wrappers
+  // 1. the shared wrappers — threadAction (message chat/resolveThread.ts) is
+  //    the cross-file thread-target tail and wraps `guarded` itself.
   if (
     ts.isCallExpression(arg) &&
     ts.isIdentifier(arg.expression) &&
-    (arg.expression.text === "jsonAction" || arg.expression.text === "guarded")
+    ["jsonAction", "guarded", "threadAction"].includes(arg.expression.text)
   ) {
     return true;
   }

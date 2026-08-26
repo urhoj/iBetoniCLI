@@ -7,8 +7,8 @@ import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { resolveDualString } from "../../targets.js";
 export interface CacheWriteOpts {
-  confirm: boolean;
-  forceProd: boolean;
+  confirm?: boolean;
+  forceProd?: boolean;
   reason?: string;
   /**
    * The CLI-wide preview spelling, accepted here as an explicit no-op — this
@@ -45,7 +45,7 @@ function writeRequestOptions(client: ApiClient, opts: CacheWriteOpts): {
     );
   }
   const dryRun = !opts.confirm;
-  if (!dryRun) assertWritableEndpoint(client.endpoint, opts.forceProd);
+  if (!dryRun) assertWritableEndpoint(client.endpoint, !!opts.forceProd);
   const headers: Record<string, string> = {};
   if (dryRun) headers["X-Dry-Run"] = "1";
   if (!dryRun && opts.forceProd) headers["X-Force-Prod"] = "1";
@@ -124,23 +124,6 @@ function addCacheWriteOptions(cmd: Command): Command {
     .option("--reason <text>");
 }
 
-/** Commander opts → {@link CacheWriteOpts}. Extra keys on the source (`id`,
- *  `cascade`, `pattern`) are ignored — passing the existing object rather than a
- *  fresh literal keeps TS excess-property checking out of the way. */
-function toCacheWriteOpts(opts: {
-  confirm?: boolean;
-  dryRun?: boolean;
-  forceProd?: boolean;
-  reason?: string;
-}): CacheWriteOpts {
-  return {
-    confirm: !!opts.confirm,
-    dryRun: !!opts.dryRun,
-    forceProd: !!opts.forceProd,
-    reason: opts.reason,
-  };
-}
-
 /**
  * Register `ib cache` subcommands. Inspect verbs (stats/keys) are GETs and
  * developer-gated server-side. Destructive verbs (invalidate/clear/pattern)
@@ -177,14 +160,14 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
       runCacheInvalidate(
         client,
         { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade },
-        toCacheWriteOpts(opts)
+        opts
       )
     )
   );
 
   addCacheWriteOptions(c.command("clear")).action(
     jsonAction(getClient, (client, opts: { confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
-      runCacheClear(client, toCacheWriteOpts(opts))
+      runCacheClear(client, opts)
     )
   );
 
@@ -196,7 +179,7 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
       .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")
   ).action(
     jsonAction(getClient, (client, glob: string | undefined, opts: { pattern?: string; confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
-      runCachePattern(client, resolveGlob(glob, opts.pattern), toCacheWriteOpts(opts))
+      runCachePattern(client, resolveGlob(glob, opts.pattern), opts)
     )
   );
 

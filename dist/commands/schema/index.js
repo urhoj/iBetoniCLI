@@ -161,10 +161,7 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
     s.command("query")
         .description("Run one read-only SELECT (or WITH … SELECT) against the live DB — for data-SHAPE questions (COUNT, GROUP BY, histograms). Single statement, no semicolons, hard 1000-row cap; runs under a db_datareader-only login.")
         .requiredOption("--sql <select>", "The SELECT statement to run")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runSchemaQuery(client, opts.sql));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSchemaQuery(client, opts.sql)));
     s.command("dump")
         .action(jsonAction(getClient, runSchemaDump));
     s.command("snapshots")

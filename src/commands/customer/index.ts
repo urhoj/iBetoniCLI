@@ -1397,7 +1397,6 @@ export function registerCustomerCommands(
   registerCombinatorCommands(c, getClient, {
     base: "asiakas-combinator",
     idFields: ASIAKAS_MERGE_ID_FIELDS,
-    entityNoun: "customer",
     idLabel: "asiakasId",
     allowBigMerge: true,
   });

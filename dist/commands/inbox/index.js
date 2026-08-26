@@ -1,4 +1,5 @@
 import { jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /**
  * `ib inbox` — one aggregated rollup of the six open/incomplete operator signals
  * (deploy-pending changelog, unresolved feedback, open support
@@ -8,8 +9,7 @@ import { jsonAction } from "../_shared/action.js";
  * Read-only; developer-gated server-side.
  */
 export async function runInbox(client, opts = {}) {
-    const qs = opts.details ? "?details=1" : "";
-    return client.get(`/api/cli/inbox${qs}`);
+    return client.get(`/api/cli/inbox${qs({ details: opts.details ? 1 : undefined })}`);
 }
 export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
