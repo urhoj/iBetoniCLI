@@ -153,7 +153,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
-    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed"], meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed", "Unknown entity"], meaning: "No entity given, conflicting positional + flag, or unknown entity word", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
     notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment attach", "ib attachment search"],
     examples: ["ib attachment detach 4711 keikka", "ib attachment detach 4711 --keikka 9001", "ib attachment detach 4711 bug-report --dry-run"],

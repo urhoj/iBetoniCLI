@@ -200,7 +200,7 @@ const VEHICLE_FIELDS = [
         },
         optKey: "asiakas",
         field: "asiakasId",
-        parse: asNumber,
+        parse: intFlag("--asiakas"),
         modes: ["create", "update"],
     },
     { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },

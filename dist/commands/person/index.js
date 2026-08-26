@@ -451,7 +451,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             return;
         }
         if (opts.asiakas !== undefined) {
-            writeJson(await runPersonSearch(client, q, opts.limit, parseId(String(opts.asiakas), "asiakasId")));
+            writeJson(await runPersonSearch(client, q, opts.limit, opts.asiakas));
             return;
         }
         if (opts.myCompanies) {
@@ -485,7 +485,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--phone <s>")
         .option("--email <s>")
         .option("--memo <s>")
-        .option("--asiakas <id>", "", Number)
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--global")
         .option("--get-or-create")
         .option("--body <json>")
@@ -614,7 +614,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     addWriteFlagsToCommand(p
         .command("owner <personId>")
         .option("--global")
-        .option("--asiakas <id>", "", Number)).action(guarded(async (personIdStr, opts) => {
+        .option("--asiakas <id>", "", intFlag("--asiakas"))).action(guarded(async (personIdStr, opts) => {
         const hasGlobal = !!opts.global;
         const hasAsiakas = opts.asiakas !== undefined;
         if (hasGlobal === hasAsiakas) {

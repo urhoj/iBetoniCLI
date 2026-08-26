@@ -368,8 +368,11 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--type <t>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (id, opts) => {
         const client = await getClient();
+        // parseId BEFORE resolveGroupAndType (fb#909): a bad id must fail locally
+        // even when --group/--type are NAMES (that branch fetches /types first).
+        const attachmentId = parseId(id, "attachmentId");
         const { groupId, typeId } = await resolveGroupAndType(client, opts);
-        writeJson(await runAttachmentUpdate(client, parseId(id, "attachmentId"), {
+        writeJson(await runAttachmentUpdate(client, attachmentId, {
             fileComment: opts.comment,
             liitaLaskuun: opts.liitaLaskuun,
             attachmentGroupId: groupId, attachmentTypeId: typeId,

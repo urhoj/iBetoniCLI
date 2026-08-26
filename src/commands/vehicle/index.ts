@@ -344,7 +344,7 @@ const VEHICLE_FIELDS: ReadonlyArray<{
     },
     optKey: "asiakas",
     field: "asiakasId",
-    parse: asNumber,
+    parse: intFlag("--asiakas"),
     modes: ["create", "update"],
   },
   { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
@@ -559,11 +559,7 @@ export function registerVehicleCommands(
       "--valid-on <date>"
     )
     .option("--type <id>", "", (val: string) => Number(val))
-    .option(
-      "--asiakas <id>",
-      "",
-      intFlag("--asiakas")
-    )
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(
         getClient,
@@ -594,11 +590,7 @@ export function registerVehicleCommands(
   v.command("get <vehicleId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .option(
-      "--asiakas <id>",
-      "",
-      intFlag("--asiakas")
-    )
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
         runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)
@@ -614,11 +606,7 @@ export function registerVehicleCommands(
 
 
   v.command("types")
-    .option(
-      "--asiakas <id>",
-      "",
-      intFlag("--asiakas")
-    )
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, opts: { asiakas?: number }) =>
         runVehicleTypes(client, opts.asiakas)
@@ -632,11 +620,7 @@ export function registerVehicleCommands(
     .option("--search <s>")
     .addOption(queryAliasOption())
     .option("--limit <n>", "", cappedInt(500))
-    .option(
-      "--asiakas <id>",
-      "",
-      intFlag("--asiakas")
-    )
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; asiakas?: number }) =>
         runVehicleSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, opts.asiakas)

@@ -4,7 +4,7 @@ import { mockApiClient } from "../helpers/mockClient.js";
 // Replace the shared orchestrator with a mock so `runWorksiteDashboard` /
 // `runSijaintiDashboard` can be tested as thin forwarding wrappers (the
 // orchestrator itself — point resolution + the 7-panel fan-out — is already
-// covered by src/commands/_shared/__tests__/addressDashboard.test.ts).
+// covered by test/commands/_shared/addressDashboard.test.ts).
 //
 // PARTIAL mock: `registerDashboardCommand` lives in the same module and must
 // stay REAL — the exactly-one-of guard it registers is what the `runArgv`

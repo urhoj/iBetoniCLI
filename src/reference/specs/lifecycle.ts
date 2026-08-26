@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG } from "./shared.js";
 
 export const LIFECYCLE_SPECS: CommandSpec[] = [
 
@@ -225,6 +225,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
+      ASIAKAS_FLAG_ERR,
       // The required-field half is a CLIENT guard (`create requires: …`) and
       // never reaches the backend, so the two causes need separate rows — as one
       // http row the local half was unreachable (fb#280/fb#668 class). Twin of
@@ -308,9 +309,11 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
+      ASIAKAS_FLAG_ERR,
+      { origin: "client", exit: 4, match: "--reason", meaning: "Missing --reason", remedy: "pass --reason 'why'" },
       apiErr(403, "Not allowed to change this person's owner", "see the authz rules above (developer/self/company-admin)"),
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
-      { origin: "client", exit: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
+      { origin: "client", exit: 4, match: "exactly one of --global", meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
     ],
     examples: [
       "ib person owner 5351 --global --reason 'make self-managing'",

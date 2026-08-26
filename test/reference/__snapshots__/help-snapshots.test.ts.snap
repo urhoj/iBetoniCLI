@@ -150,7 +150,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
-  exit 4 (client-side)  No entity given, or conflicting positional + flag → name the entity once — positional word OR a --<entity> flag
+  exit 4 (client-side)  No entity given, conflicting positional + flag, or unknown entity word → name the entity once — positional word OR a --<entity> flag
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9517,6 +9517,7 @@ OUTPUT (JSON, stdout)
   { personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  A required field is missing (the message names which) → pass the flags the message names — --first and --last are required; email is optional
   exit 4 (client-side)  Both --global and --asiakas given — contradictory owner directives → pass one: --global for a self-managing person (ownerAsiakasId null), or --asiakas <id> to own it
   exit 4 (client-side)  --get-or-create matched an email owned by a company you cannot see, so it can neither reuse nor create → find the owner with \`ib person search --my-companies\`, or create with a different email
@@ -10215,6 +10216,8 @@ OUTPUT (JSON, stdout)
   { personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  Missing --reason       → pass --reason 'why'
   exit 3 (HTTP 403)  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
   exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 4 (client-side)  Bad flags              → provide exactly one of --global / --asiakas and a --reason
@@ -12051,6 +12054,7 @@ OUTPUT (JSON, stdout)
   { vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Validation failed      → fix the field flags
   exit 3 (HTTP 403)  No vehicle-edit access on the target tenant (--asiakas if given, otherwise your active company) → you need an admin/owner/vehicleHandler role on that tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12955,6 +12959,7 @@ OUTPUT (JSON, stdout)
   On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit

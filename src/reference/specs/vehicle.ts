@@ -179,6 +179,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(400, "Validation failed", "fix the field flags"),
       // Matched on the backend's Finnish denyMessage (vehicleRoutes.js
       // `vehicleEdit` → requireCompanyRole denyMessage).
@@ -224,6 +225,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],

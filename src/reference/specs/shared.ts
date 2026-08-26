@@ -80,12 +80,16 @@ export const limitErr = (remedy: string): CommandError => ({
  * the literal "NaN". An argParser throw resolves the RUNNING command's own
  * ERRORS row (fb#385), so every command that carries the guard documents this
  * row; the remedy never varies (unlike limitErr's per-command caps), hence a
- * constant.
+ * constant. `match` is the FULL intFlag message, not the flag name: several
+ * commands carrying this row have OTHER client exit-4 guards whose message
+ * merely MENTIONS --asiakas (person create's --global XOR, person owner's
+ * exactly-one-of), and a bare "--asiakas" substring match shadows those rows
+ * (fb#908 follow-up).
  */
 export const ASIAKAS_FLAG_ERR: CommandError = {
   origin: "client",
   exit: 4,
-  match: "--asiakas",
+  match: "--asiakas must be an integer >= 1",
   meaning: "--asiakas is not an integer >= 1, rejected locally before any request",
   remedy: "pass a positive asiakasId (a company id) — `ib company list` shows the ones you can reach",
 };

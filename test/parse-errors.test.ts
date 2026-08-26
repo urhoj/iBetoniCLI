@@ -446,7 +446,7 @@ describe("unknown leaf + --help → exit 4 (fb#615)", () => {
  * wire. Exit 4 naming the flag — rather than whatever the action would have
  * produced — is what proves the guard fired at parse time, before getClient.
  */
-describe("person/vehicle --asiakas rejects NaN at parse time (fb#892)", () => {
+describe("person/vehicle --asiakas rejects NaN at parse time (fb#892, fb#908)", () => {
   const opts = { token: "", endpoint: "https://example.invalid" };
 
   test.each([
@@ -456,10 +456,16 @@ describe("person/vehicle --asiakas rejects NaN at parse time (fb#892)", () => {
     [["person", "role", "list", "1", "--asiakas", "abc"]],
     [["person", "role", "grant", "1", "--role", "keikkaHandler", "--asiakas", "abc"]],
     [["person", "role", "revoke", "1", "--role", "keikkaHandler", "--asiakas", "abc"]],
+    // fb#908: the WRITE-path sites — a NaN here used to serialize as null and
+    // silently write the wrong owner (person owner releases to GLOBAL).
+    [["person", "create", "--first", "A", "--last", "B", "--asiakas", "abc"]],
+    [["person", "owner", "1", "--asiakas", "abc"]],
     [["vehicle", "list", "--asiakas", "abc"]],
     [["vehicle", "get", "7", "--asiakas", "abc"]],
     [["vehicle", "types", "--asiakas", "abc"]],
     [["vehicle", "search", "kuorma", "--asiakas", "abc"]],
+    [["vehicle", "create", "--reg", "ABC-1", "--asiakas", "abc"]],
+    [["vehicle", "update", "7", "--asiakas", "abc"]],
   ])("ib %j → exit 4, no request", async (argv) => {
     const { exitCode, stderr } = await runArgv(argv as string[], opts);
     expect(exitCode).toBe(4);
@@ -473,8 +479,8 @@ describe("person/vehicle --asiakas rejects NaN at parse time (fb#892)", () => {
  * 4 before any request. The guard sits INSIDE the action (positionals have no
  * argParser), so unlike the fb#892 block a token-shaped value is needed to get
  * past getClient — an empty-payload JWT builds the client, and parseId throws
- * before the first network call. (`update` is absent on purpose: its action
- * runs resolveGroupAndType over the network BEFORE parseId evaluates.)
+ * before the first network call. (`update` is covered too: since fb#909 its
+ * action runs parseId BEFORE the name-valued --group/--type types lookup.)
  */
 describe("attachment id rejects non-integers client-side (fb#893)", () => {
   const opts = { token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln", endpoint: "https://example.invalid" };
@@ -484,6 +490,7 @@ describe("attachment id rejects non-integers client-side (fb#893)", () => {
     [["attachment", "download", "abc"]],
     [["attachment", "attach", "abc"]],
     [["attachment", "detach", "abc", "keikka"]],
+    [["attachment", "update", "abc", "--dry-run"]],
     [["attachment", "delete", "abc", "--reason", "test"]],
   ])("ib %j → exit 4, no request", async (argv) => {
     const { exitCode, stderr } = await runArgv(argv as string[], opts);
