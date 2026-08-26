@@ -1,5 +1,7 @@
 import { CliError } from "../../../api/errors.js";
+import { writeJson } from "../../../output/json.js";
 import { parseOptionalId } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 /**
  * Attach `--tarjous <id>` — the alternative to a raw threadId positional that
  * every thread-targeting leaf in `ib message chat` / `ib message thread`
@@ -15,6 +17,18 @@ export function targetFrom(threadIdStr, opts) {
         thread: parseOptionalId(threadIdStr, "threadId"),
         tarjous: opts.tarjous,
     };
+}
+/**
+ * The action tail every thread-targeted leaf shares: `getClient()`, resolve the
+ * thread from the positional threadId / `--tarjous`, `writeJson` the run result
+ * — with every throw routed through `guarded`.
+ */
+export function threadAction(getClient, run) {
+    return guarded(async (threadIdStr, opts) => {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await run(client, id, opts));
+    });
 }
 /**
  * Resolve a {@link ThreadTarget} to a concrete threadId.

@@ -5,13 +5,13 @@ import { qs } from "../../../api/query.js";
 const STATUSES = ["open", "resolved", "all"];
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
 /**
- * GET /api/messages/support/inbox — developer-only triage queue. Projects the
- * backend `{ items, count, truncated }` into the universal list envelope.
+ * GET /api/messages/support/<view> — projects the backend
+ * `{ items, count, truncated }` into the universal list envelope.
  */
-export async function runSupportInbox(client, opts) {
+async function fetchSupportThreads(client, view, opts) {
     const status = opts.status ?? "open";
     assertEnum(status, STATUSES, "--status");
-    const res = await client.get(`/api/messages/support/inbox${qs({ status, limit: opts.limit })}`);
+    const res = await client.get(`/api/messages/support/${view}${qs({ status, limit: opts.limit })}`);
     const items = Array.isArray(res?.items) ? res.items : [];
     return {
         items,
@@ -20,24 +20,14 @@ export async function runSupportInbox(client, opts) {
         truncated: Boolean(res?.truncated),
     };
 }
+/** GET /api/messages/support/inbox — developer-only triage queue. */
+export const runSupportInbox = (client, opts) => fetchSupportThreads(client, "inbox", opts);
 /**
  * GET /api/messages/support/mine — the CALLER's own company's support threads
  * (operator-facing companion to the developer-only inbox; any member of the
- * owning company may list them). Projects the backend `{ items, count,
- * truncated }` into the universal list envelope.
+ * owning company may list them).
  */
-export async function runSupportMine(client, opts) {
-    const status = opts.status ?? "open";
-    assertEnum(status, STATUSES, "--status");
-    const res = await client.get(`/api/messages/support/mine${qs({ status, limit: opts.limit })}`);
-    const items = Array.isArray(res?.items) ? res.items : [];
-    return {
-        items,
-        nextCursor: null,
-        count: typeof res?.count === "number" ? res.count : items.length,
-        truncated: Boolean(res?.truncated),
-    };
-}
+export const runSupportMine = (client, opts) => fetchSupportThreads(client, "mine", opts);
 /**
  * POST /api/messages/support — open (or append to) a support thread. A REAL
  * write: NOT sent as meta, so the read-only write-lock blocks it. `--dry-run`

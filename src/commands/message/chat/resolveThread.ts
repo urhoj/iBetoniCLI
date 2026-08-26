@@ -1,7 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { CliError } from "../../../api/errors.js";
+import { writeJson } from "../../../output/json.js";
 import { parseOptionalId } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 
 /** How a command targets a thread: a raw id, or a pumppuRequest to resolve. */
 export interface ThreadTarget {
@@ -34,6 +36,22 @@ export function targetFrom(
     thread: parseOptionalId(threadIdStr, "threadId"),
     tarjous: opts.tarjous,
   };
+}
+
+/**
+ * The action tail every thread-targeted leaf shares: `getClient()`, resolve the
+ * thread from the positional threadId / `--tarjous`, `writeJson` the run result
+ * — with every throw routed through `guarded`.
+ */
+export function threadAction<O extends { tarjous?: number }>(
+  getClient: () => Promise<ApiClient>,
+  run: (client: ApiClient, threadId: number, opts: O) => Promise<unknown>
+): (threadIdStr: string | undefined, opts: O) => Promise<void> {
+  return guarded(async (threadIdStr: string | undefined, opts: O) => {
+    const client = await getClient();
+    const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+    writeJson(await run(client, id, opts));
+  });
 }
 
 /** Minimal shape of a /threads/mine row used for resolution. */

@@ -7,7 +7,7 @@ import {
   type WriteFlags,
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
-import { addThreadTargetOption, resolveThreadId, targetFrom } from "./resolveThread.js";
+import { addThreadTargetOption, resolveThreadId, targetFrom, threadAction } from "./resolveThread.js";
 import { parseId, resolveSearchQuery, queryAliasOption } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
@@ -287,27 +287,18 @@ export function registerMessageChatCommands(
     );
 
   addThreadTargetOption(c.command("thread [threadId]"))
-    .action(
-      guarded(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
-        const client = await getClient();
-        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-        writeJson(await runChatThread(client, id));
-      })
-    );
+    .action(threadAction(getClient, (client, id) => runChatThread(client, id)));
 
   addThreadTargetOption(c.command("list [threadId]"))
     .option("--since <iso>")
     .option("--limit <n>", "", Number)
     .option("--deleted")
     .action(
-      guarded(async (
-        threadIdStr: string | undefined,
-        opts: { tarjous?: number; since?: string; limit?: number; deleted?: boolean }
-      ) => {
-        const client = await getClient();
-        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-        writeJson(await runChatList(client, id, opts));
-      })
+      threadAction(
+        getClient,
+        (client, id, opts: { tarjous?: number; since?: string; limit?: number; deleted?: boolean }) =>
+          runChatList(client, id, opts)
+      )
     );
 
   c.command("search [query]")
@@ -319,6 +310,27 @@ export function registerMessageChatCommands(
         runChatSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts)
       )
     );
+
+  // Trimmed, non-empty, ≤4000 chars — the message-body contract send and edit share.
+  const assertMessageBody = (raw: unknown): string => {
+    const body = String(raw ?? "").trim();
+    if (!body) failWith("Message body cannot be empty", 4);
+    if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
+    return body;
+  };
+
+  // The action tail delete/restore share: parse the messageId, resolve the
+  // thread from --thread/--tarjous, writeJson the run result. The id parses
+  // BEFORE getClient() so a bad id stays exit 4 even when logged out.
+  const messageAction = <O extends WriteFlags & { thread?: number; tarjous?: number }>(
+    run: (client: ApiClient, threadId: number, messageId: number, opts: O) => Promise<unknown>
+  ) =>
+    guarded(async (messageIdStr: string, opts: O) => {
+      const messageId = parseId(messageIdStr, "messageId");
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+      writeJson(await run(client, id, messageId, opts));
+    });
 
   const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
     .requiredOption("--body <text>")
@@ -332,9 +344,7 @@ export function registerMessageChatCommands(
         source?: string;
       }
     ) => {
-      const body = String(opts.body ?? "").trim();
-      if (!body) failWith("Message body cannot be empty", 4);
-      if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
+      const body = assertMessageBody(opts.body);
       const source = opts.source ?? process.env.IB_SOURCE ?? "cli";
       if (!["web", "cli", "ai"].includes(source)) {
         failWith(`Invalid --source "${source}" — use web|cli|ai`, 4);
@@ -354,45 +364,26 @@ export function registerMessageChatCommands(
   );
 
   addThreadTargetOption(c.command("mark-read [threadId]"))
-    .action(
-      guarded(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
-        const client = await getClient();
-        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-        writeJson(await runChatMarkRead(client, id));
-      })
-    );
+    .action(threadAction(getClient, (client, id) => runChatMarkRead(client, id)));
 
   const deleteCmd = addThreadTargetOption(
     c.command("delete <messageId>").option("--thread <id>", "", Number)
   );
-  addWriteFlagsToCommand(deleteCmd).action(
-    guarded(async (
-      messageIdStr: string,
-      opts: WriteFlags & { thread?: number; tarjous?: number }
-    ) => {
-      const messageId = parseId(messageIdStr, "messageId");
-      const client = await getClient();
-      const id = await resolveThreadId(client, {
-        thread: opts.thread,
-        tarjous: opts.tarjous,
-      });
-      writeJson(await runChatDelete(client, id, messageId, opts));
-    })
-  );
+  addWriteFlagsToCommand(deleteCmd).action(messageAction(runChatDelete));
 
   const editCmd = addThreadTargetOption(
     c.command("edit <messageId>").option("--thread <id>", "", Number)
   )
     .requiredOption("--body <text>");
+  // Not messageAction: the body guard must stay ahead of getClient(), so a bad
+  // body is exit 4 even when logged out.
   addWriteFlagsToCommand(editCmd).action(
     guarded(async (
       messageIdStr: string,
       opts: WriteFlags & { thread?: number; tarjous?: number; body: string }
     ) => {
       const messageId = parseId(messageIdStr, "messageId");
-      const body = String(opts.body ?? "").trim();
-      if (!body) failWith("Message body cannot be empty", 4);
-      if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
+      const body = assertMessageBody(opts.body);
       const client = await getClient();
       const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
       writeJson(await runChatEdit(client, id, messageId, {
@@ -404,15 +395,5 @@ export function registerMessageChatCommands(
   const restoreCmd = addThreadTargetOption(
     c.command("restore <messageId>").option("--thread <id>", "", Number)
   );
-  addWriteFlagsToCommand(restoreCmd).action(
-    guarded(async (
-      messageIdStr: string,
-      opts: WriteFlags & { thread?: number; tarjous?: number }
-    ) => {
-      const messageId = parseId(messageIdStr, "messageId");
-      const client = await getClient();
-      const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-      writeJson(await runChatRestore(client, id, messageId, opts));
-    })
-  );
+  addWriteFlagsToCommand(restoreCmd).action(messageAction(runChatRestore));
 }

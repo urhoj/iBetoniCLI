@@ -32,17 +32,18 @@ const CONTEXT_TYPES = ["pumppuRequest", "keikka"] as const;
 type Row = Record<string, unknown>;
 
 /**
- * GET /api/messages/support/inbox — developer-only triage queue. Projects the
- * backend `{ items, count, truncated }` into the universal list envelope.
+ * GET /api/messages/support/<view> — projects the backend
+ * `{ items, count, truncated }` into the universal list envelope.
  */
-export async function runSupportInbox(
+async function fetchSupportThreads(
   client: ApiClient,
+  view: "inbox" | "mine",
   opts: { status?: string; limit?: number }
 ): Promise<ListEnvelope<Row>> {
   const status = opts.status ?? "open";
   assertEnum(status, STATUSES, "--status");
   const res = await client.get<{ items?: Row[]; count?: number; truncated?: boolean }>(
-    `/api/messages/support/inbox${qs({ status, limit: opts.limit })}`
+    `/api/messages/support/${view}${qs({ status, limit: opts.limit })}`
   );
   const items = Array.isArray(res?.items) ? res.items : [];
   return {
@@ -53,29 +54,21 @@ export async function runSupportInbox(
   };
 }
 
+/** GET /api/messages/support/inbox — developer-only triage queue. */
+export const runSupportInbox = (
+  client: ApiClient,
+  opts: { status?: string; limit?: number }
+): Promise<ListEnvelope<Row>> => fetchSupportThreads(client, "inbox", opts);
+
 /**
  * GET /api/messages/support/mine — the CALLER's own company's support threads
  * (operator-facing companion to the developer-only inbox; any member of the
- * owning company may list them). Projects the backend `{ items, count,
- * truncated }` into the universal list envelope.
+ * owning company may list them).
  */
-export async function runSupportMine(
+export const runSupportMine = (
   client: ApiClient,
   opts: { status?: string; limit?: number }
-): Promise<ListEnvelope<Row>> {
-  const status = opts.status ?? "open";
-  assertEnum(status, STATUSES, "--status");
-  const res = await client.get<{ items?: Row[]; count?: number; truncated?: boolean }>(
-    `/api/messages/support/mine${qs({ status, limit: opts.limit })}`
-  );
-  const items = Array.isArray(res?.items) ? res.items : [];
-  return {
-    items,
-    nextCursor: null,
-    count: typeof res?.count === "number" ? res.count : items.length,
-    truncated: Boolean(res?.truncated),
-  };
-}
+): Promise<ListEnvelope<Row>> => fetchSupportThreads(client, "mine", opts);
 
 export interface SupportContactInput {
   contextType: string;

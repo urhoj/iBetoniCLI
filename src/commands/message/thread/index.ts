@@ -1,13 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../../api/writeFlags.js";
-import { writeJson } from "../../../output/json.js";
-import { guarded } from "../../_shared/action.js";
-import {
-  addThreadTargetOption,
-  resolveThreadId,
-  targetFrom,
-} from "../chat/resolveThread.js";
+import { addThreadTargetOption, threadAction } from "../chat/resolveThread.js";
 
 // --dry-run on every thread write resolves CLIENT-SIDE: the messages routes
 // honour no X-Dry-Run (messageRoutes.js has no guard), so a dry-run that POSTed
@@ -64,30 +58,24 @@ export function registerMessageThreadCommands(
 
   const archiveCmd = addThreadTargetOption(t.command("archive [threadId]"));
   addWriteFlagsToCommand(archiveCmd).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
-      const client = await getClient();
-      const id = await resolveThreadId(client, targetFrom(idStr, opts));
-      writeJson(await runThreadArchive(client, id, opts));
-    })
+    threadAction(getClient, (client, id, opts: WriteFlags & { tarjous?: number }) =>
+      runThreadArchive(client, id, opts)
+    )
   );
 
   const reopenCmd = addThreadTargetOption(t.command("reopen [threadId]"));
   addWriteFlagsToCommand(reopenCmd).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
-      const client = await getClient();
-      const id = await resolveThreadId(client, targetFrom(idStr, opts));
-      writeJson(await runThreadReopen(client, id, opts));
-    })
+    threadAction(getClient, (client, id, opts: WriteFlags & { tarjous?: number }) =>
+      runThreadReopen(client, id, opts)
+    )
   );
 
   const renameCmd = addThreadTargetOption(t.command("rename [threadId]"))
     .requiredOption("--title <text>");
   addWriteFlagsToCommand(renameCmd).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; title: string }) => {
-      const client = await getClient();
-      const id = await resolveThreadId(client, targetFrom(idStr, opts));
-      writeJson(await runThreadRename(client, id, String(opts.title ?? "").trim(), opts));
-    })
+    threadAction(getClient, (client, id, opts: WriteFlags & { tarjous?: number; title: string }) =>
+      runThreadRename(client, id, String(opts.title ?? "").trim(), opts)
+    )
   );
 
   const p = t
@@ -98,20 +86,18 @@ export function registerMessageThreadCommands(
     .requiredOption("--person <id>", "", Number)
     .option("--role <role>");
   addWriteFlagsToCommand(addCmd).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number; role?: string }) => {
-      const client = await getClient();
-      const id = await resolveThreadId(client, targetFrom(idStr, opts));
-      writeJson(await runThreadParticipantAdd(client, id, Number(opts.person), opts));
-    })
+    threadAction(
+      getClient,
+      (client, id, opts: WriteFlags & { tarjous?: number; person: number; role?: string }) =>
+        runThreadParticipantAdd(client, id, Number(opts.person), opts)
+    )
   );
 
   const remCmd = addThreadTargetOption(p.command("remove [threadId]"))
     .requiredOption("--person <id>", "", Number);
   addWriteFlagsToCommand(remCmd).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number }) => {
-      const client = await getClient();
-      const id = await resolveThreadId(client, targetFrom(idStr, opts));
-      writeJson(await runThreadParticipantRemove(client, id, Number(opts.person), opts));
-    })
+    threadAction(getClient, (client, id, opts: WriteFlags & { tarjous?: number; person: number }) =>
+      runThreadParticipantRemove(client, id, Number(opts.person), opts)
+    )
   );
 }

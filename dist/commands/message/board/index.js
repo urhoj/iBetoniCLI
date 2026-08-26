@@ -104,6 +104,13 @@ export async function runBoardCreate(client, fields, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+/** {@link runBoardGet}, but a missing id exits 5 instead of returning null. */
+async function mustGetBoardMessage(client, messageId) {
+    const current = await runBoardGet(client, messageId);
+    if (!current)
+        failWith(`No board message with id ${messageId}`, 5);
+    return current;
+}
 /**
  * Update a notice (PUT /api/ilmoitustaulu/:messageId). GET-merges the current
  * row (via `/all`) so omitted fields are preserved — the backend overwrites the
@@ -112,9 +119,7 @@ export async function runBoardCreate(client, fields, flags) {
  * Server-side enforces admin (any row) / editor (own rows only).
  */
 export async function runBoardUpdate(client, messageId, fields, flags) {
-    const current = await runBoardGet(client, messageId);
-    if (!current)
-        failWith(`No board message with id ${messageId}`, 5);
+    const current = await mustGetBoardMessage(client, messageId);
     const proposed = buildBoardBody(current, fields);
     if (flags.dryRun)
         return { dryRun: true, messageId, current, proposed };
@@ -130,9 +135,7 @@ export async function runBoardUpdate(client, messageId, fields, flags) {
  * enforces admin (any row) / editor (own rows only).
  */
 export async function runBoardDelete(client, messageId, flags) {
-    const current = await runBoardGet(client, messageId);
-    if (!current)
-        failWith(`No board message with id ${messageId}`, 5);
+    const current = await mustGetBoardMessage(client, messageId);
     if (flags.dryRun)
         return { dryRun: true, messageId, wouldDelete: current };
     return client.delete(`/api/ilmoitustaulu/${messageId}`, {
@@ -177,10 +180,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         .action(guarded(async (raw) => {
         const messageId = parseId(raw, "messageId");
         const client = await getClient();
-        const row = await runBoardGet(client, messageId);
-        if (!row)
-            failWith(`No board message with id ${messageId}`, 5);
-        writeJson(row);
+        writeJson(await mustGetBoardMessage(client, messageId));
     }));
     const createCmd = b
         .command("create")

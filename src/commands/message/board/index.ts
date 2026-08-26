@@ -200,6 +200,13 @@ export async function runBoardCreate(
   });
 }
 
+/** {@link runBoardGet}, but a missing id exits 5 instead of returning null. */
+async function mustGetBoardMessage(client: ApiClient, messageId: number) {
+  const current = await runBoardGet(client, messageId);
+  if (!current) failWith(`No board message with id ${messageId}`, 5);
+  return current;
+}
+
 /**
  * Update a notice (PUT /api/ilmoitustaulu/:messageId). GET-merges the current
  * row (via `/all`) so omitted fields are preserved — the backend overwrites the
@@ -213,8 +220,7 @@ export async function runBoardUpdate(
   fields: BoardFields,
   flags: WriteFlags
 ): Promise<unknown> {
-  const current = await runBoardGet(client, messageId);
-  if (!current) failWith(`No board message with id ${messageId}`, 5);
+  const current = await mustGetBoardMessage(client, messageId);
   const proposed = buildBoardBody(current, fields);
   if (flags.dryRun) return { dryRun: true, messageId, current, proposed };
   return client.put<unknown>(`/api/ilmoitustaulu/${messageId}`, proposed, {
@@ -234,8 +240,7 @@ export async function runBoardDelete(
   messageId: number,
   flags: WriteFlags
 ): Promise<unknown> {
-  const current = await runBoardGet(client, messageId);
-  if (!current) failWith(`No board message with id ${messageId}`, 5);
+  const current = await mustGetBoardMessage(client, messageId);
   if (flags.dryRun) return { dryRun: true, messageId, wouldDelete: current };
   return client.delete<unknown>(`/api/ilmoitustaulu/${messageId}`, {
     headers: writeFlagsToHeaders(flags),
@@ -292,9 +297,7 @@ export function registerMessageBoardCommands(
     .action(guarded(async (raw: string) => {
       const messageId = parseId(raw, "messageId");
       const client = await getClient();
-      const row = await runBoardGet(client, messageId);
-      if (!row) failWith(`No board message with id ${messageId}`, 5);
-      writeJson(row);
+      writeJson(await mustGetBoardMessage(client, messageId));
     }));
 
   const createCmd = b
