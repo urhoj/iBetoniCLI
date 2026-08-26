@@ -18,19 +18,26 @@ export interface SchemaTriggerFilter extends SchemaListFilter {
   table?: string;
 }
 
+/** `indexes` adds a zero-reads filter on top of the trigger-style table filter. */
+export interface SchemaIndexFilter extends SchemaTriggerFilter {
+  unused?: boolean;
+}
+
 type Envelope = ListEnvelope<Record<string, unknown>>;
 type Record_ = Record<string, unknown>;
 
 /**
- * One query-string builder for all five list leaves. `table` is only ever set by
- * `triggers`; `qs` drops undefined, so the other four render unchanged. Key order
- * is part of the asserted URL contract — keep it table, search, limit.
+ * One query-string builder for all six list leaves. `table` is only ever set by
+ * `triggers`/`indexes` and `unused` only by `indexes`; `qs` drops undefined, so
+ * the other leaves render unchanged. Key order is part of the asserted URL
+ * contract — keep it table, search, limit, unused.
  */
-function listQuery(path: string, opts: SchemaTriggerFilter): string {
+function listQuery(path: string, opts: SchemaIndexFilter): string {
   return `${path}${qs({
     table: opts.table || undefined,
     search: opts.search || undefined,
     limit: opts.limit,
+    unused: opts.unused ? 1 : undefined,
   })}`;
 }
 
@@ -49,12 +56,12 @@ function listQuery(path: string, opts: SchemaTriggerFilter): string {
  * a deliberate top-N slice), so a global warning would cry wolf on results that
  * are exactly what was asked for.
  */
-async function getSchemaList(
+async function getSchemaList<E extends Envelope = Envelope>(
   client: ApiClient,
   path: string,
   command: string
-): Promise<Envelope> {
-  const env = await client.get<Envelope>(path);
+): Promise<E> {
+  const env = await client.get<E>(path);
   warnIfTruncated(env, command);
   return env;
 }
@@ -89,26 +96,21 @@ export async function runSchemaTrigger(client: ApiClient, name: string): Promise
 export async function runSchemaRows(client: ApiClient, table: string, opts: SchemaListFilter): Promise<Envelope> {
   return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);
 }
-
-/** `indexes` adds a zero-reads filter on top of the trigger-style table filter. */
-export interface SchemaIndexFilter extends SchemaTriggerFilter {
-  unused?: boolean;
-}
-
 /**
  * Per-index usage statistics (sys.dm_db_index_usage_stats) — the live
  * counterpart of the monthly-generated indexes-performance.md doc. The
  * envelope's extra `statsSince` key is the moment every counter last reset
  * (SQL Server start time); zero reads mean nothing without it.
  */
-export async function runSchemaIndexes(client: ApiClient, opts: SchemaIndexFilter): Promise<Envelope> {
-  const path = `/api/cli/schema/indexes${qs({
-    table: opts.table || undefined,
-    search: opts.search || undefined,
-    limit: opts.limit,
-    unused: opts.unused ? 1 : undefined,
-  })}`;
-  return getSchemaList(client, path, "ib dev schema indexes");
+export async function runSchemaIndexes(
+  client: ApiClient,
+  opts: SchemaIndexFilter
+): Promise<Envelope & { statsSince: string | null }> {
+  return getSchemaList<Envelope & { statsSince: string | null }>(
+    client,
+    listQuery("/api/cli/schema/indexes", opts),
+    "ib dev schema indexes"
+  );
 }
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");

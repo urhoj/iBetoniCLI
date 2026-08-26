@@ -32,6 +32,36 @@ describe("pretty output", () => {
     expect(renderList(noCount)).toContain("(no results)");
   });
 
+  test("renderList surfaces extra scalar envelope keys as a context line", () => {
+    // `schema indexes` carries statsSince, `perf slow` totalCount/environment —
+    // context that changes how the table is read must not be JSON-only.
+    const env = {
+      statsSince: "2026-08-09T04:39:19.553Z",
+      items: [{ id: 1 }, { id: 2 }],
+      nextCursor: null,
+      count: 2,
+    } as unknown as Parameters<typeof renderList>[0];
+    const out = renderList(env);
+    expect(out).toContain("statsSince: 2026-08-09T04:39:19.553Z");
+  });
+
+  test("renderList context line survives an empty page; envelope-own and object keys stay out", () => {
+    // The empty page is where the context matters most: `--unused` finding
+    // nothing is only an answer relative to statsSince.
+    const empty = {
+      statsSince: "2026-08-09T04:39:19.553Z",
+      hint: "should not render",
+      items: [],
+      nextCursor: null,
+      count: 0,
+    } as unknown as Parameters<typeof renderList>[0];
+    const out = renderList(empty);
+    expect(out).toContain("statsSince:");
+    expect(out).toContain("(no results)");
+    expect(out).not.toContain("hint");
+    expect(out).not.toContain("count:");
+  });
+
   test("renderRecord formats a single record", () => {
     const out = renderRecord({ keikkaId: 9001, pvm: "2026-06-01" });
     expect(out).toMatch(/keikkaId.*9001/);

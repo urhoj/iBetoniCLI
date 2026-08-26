@@ -7,7 +7,7 @@ import { apiErr, limitErr } from "./shared.js";
 
 export const DEV_SCHEMA_SPECS: CommandSpec[] = [
 
-  // ─── schema (12) — developer-only SQL introspection ───────────────────────
+  // ─── schema (13) — developer-only SQL introspection ───────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors: CommandError[] = [
@@ -118,7 +118,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         ],
         outputShape:
           "{ items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count, truncated?, hint? }." + truncNote,
-        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass `--limit 1000` whenever you intend to enumerate"), ...devErrors],
+        errors: [limitErr("pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass `--limit 1000` whenever you intend to enumerate"), invalidNameErr, ...devErrors],
         notes: [
           "Trigger bodies carry real business logic here (keikka_after_ins_trig creates keikkaBetoni/toimitus/keikkaPerson rows), so a table's writers are not fully described by its procs alone.",
           "`ib dev schema table <name>` already lists that table's triggers in its `triggers` summary — use this command to search across tables or to filter by name.",
@@ -248,6 +248,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         outputShape:
           "{ statsSince, items: [{ table, index, columns, type:'CLUSTERED'|'NONCLUSTERED'|…, unique, primaryKey?, filter?, seeks, scans, lookups, updates, lastRead, lastWrite, unused? }], nextCursor: null, count, truncated?, hint? }. `primaryKey`/`filter`/`unused` are OMITTED when false — presence is the signal." +
           truncNote,
+        prettyColumns: ["table", "index", "seeks", "scans", "lookups", "updates", "lastRead", "lastWrite"],
         errors: [limitErr("pass a positive integer; max is 1000"), invalidNameErr, ...devErrors],
         notes: [
           "Counters RESET on every SQL Server restart/failover — `statsSince` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.",

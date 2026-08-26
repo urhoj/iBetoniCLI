@@ -236,15 +236,40 @@ function readableColumnCount(n: number): number {
   return k;
 }
 
+/**
+ * ListEnvelope's own keys. Anything ELSE on a list envelope is command-specific
+ * context a run* function chose to surface — `statsSince` on `schema indexes`,
+ * `totalCount`/`environment` on `perf slow`. Scalars among them render as one
+ * dim line above the table: context that changes how the table is READ (zero
+ * counters after a stats reset) must not be JSON-only. `hint` stays out —
+ * warnIfTruncated already voices it on stderr.
+ */
+const ENVELOPE_OWN_KEYS = new Set(["items", "nextCursor", "count", "truncated", "hint"]);
+
+function envelopeContextLine(envelope: object): string | null {
+  const extras = Object.entries(envelope).filter(
+    ([k, v]) => !ENVELOPE_OWN_KEYS.has(k) && v != null && typeof v !== "object"
+  );
+  if (extras.length === 0) return null;
+  return chalk().dim(extras.map(([k, v]) => `${k}: ${String(v)}`).join(" · "));
+}
+
 export function renderList(
   envelope: ListEnvelope<Record<string, unknown>>,
   columns?: readonly string[] | null
 ): string {
+  // Computed before the empty-list return: an empty page can be exactly where
+  // the context matters most (`--unused` finding nothing is only an answer
+  // relative to statsSince).
+  const context = envelopeContextLine(envelope);
   // Guard on the actual array, not `count`: a backend page can report a
   // non-zero/absent `count` (total-count semantics, or an out-of-range cursor)
   // while `items` is empty — trusting `count` here would deref items[0] and
   // crash pretty mode with a raw TypeError.
-  if (envelope.items.length === 0) return chalk().dim("(no results)");
+  if (envelope.items.length === 0) {
+    const empty = chalk().dim("(no results)");
+    return context ? `${context}\n${empty}` : empty;
+  }
   const items = envelope.items;
   // A 1-row list is really a record: keep every column and every character
   // (the hard-wrap below loses nothing). Only a MULTI-row list is a table that
@@ -290,6 +315,7 @@ export function renderList(
   for (const row of rows) table.push(row);
 
   const out: string[] = [];
+  if (context) out.push(context);
   if (folded.length > 0) {
     const label = `all ${items.length} rows`;
     const text = folded

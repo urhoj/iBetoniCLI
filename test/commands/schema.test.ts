@@ -162,15 +162,6 @@ describe("ib schema", () => {
     ).rejects.toBeInstanceOf(CliError);
   });
 
-  /**
-   * fb#641 — the cap must be audible, not just present in the payload.
-   *
-   * These assert through the REAL run* functions rather than the helper, because
-   * the reported failure was a schema list specifically: a caller reading only
-   * `items` got 200 of 535 procs with exit 0 and concluded whole proc families
-   * did not exist. A unit test of warnIfTruncated alone would still pass if a
-   * run* function stopped calling it.
-   */
   test("runSchemaIndexes: bare path when no opts", async () => {
     get().mockResolvedValueOnce({ statsSince: "2026-08-09T04:39:19.553Z", items: [], nextCursor: null, count: 0 });
     await runSchemaIndexes(mockClient, {});
@@ -183,12 +174,24 @@ describe("ib schema", () => {
     expect(get()).toHaveBeenCalledWith("/api/cli/schema/indexes?table=keikka&search=pvm&limit=50&unused=1");
   });
 
+  // Pins the `? 1 : undefined` ternary in listQuery: `unused: opts.unused`
+  // would emit `unused=false`, which the route parses as falsy TODAY but a
+  // stricter future parse would read as the filter being ON.
   test("runSchemaIndexes: unused=false is dropped from the query string", async () => {
     get().mockResolvedValueOnce({ statsSince: null, items: [], nextCursor: null, count: 0 });
     await runSchemaIndexes(mockClient, { unused: false });
     expect(get()).toHaveBeenCalledWith("/api/cli/schema/indexes");
   });
 
+  /**
+   * fb#641 — the cap must be audible, not just present in the payload.
+   *
+   * These assert through the REAL run* functions rather than the helper, because
+   * the reported failure was a schema list specifically: a caller reading only
+   * `items` got 200 of 535 procs with exit 0 and concluded whole proc families
+   * did not exist. A unit test of warnIfTruncated alone would still pass if a
+   * run* function stopped calling it.
+   */
   describe("truncation warning (fb#641)", () => {
     const truncated = { items: [{ name: "a" }], nextCursor: null, count: 200, truncated: true, hint: "capped at 200 rows" };
     let warned: string[];

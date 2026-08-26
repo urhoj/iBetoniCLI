@@ -3838,6 +3838,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

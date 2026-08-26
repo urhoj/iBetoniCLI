@@ -6,15 +6,17 @@ import { qs } from "../../api/query.js";
 import { warnIfTruncated } from "../../api/listCaps.js";
 import { cappedInt } from "../../targets.js";
 /**
- * One query-string builder for all five list leaves. `table` is only ever set by
- * `triggers`; `qs` drops undefined, so the other four render unchanged. Key order
- * is part of the asserted URL contract — keep it table, search, limit.
+ * One query-string builder for all six list leaves. `table` is only ever set by
+ * `triggers`/`indexes` and `unused` only by `indexes`; `qs` drops undefined, so
+ * the other leaves render unchanged. Key order is part of the asserted URL
+ * contract — keep it table, search, limit, unused.
  */
 function listQuery(path, opts) {
     return `${path}${qs({
         table: opts.table || undefined,
         search: opts.search || undefined,
         limit: opts.limit,
+        unused: opts.unused ? 1 : undefined,
     })}`;
 }
 /**
@@ -71,13 +73,7 @@ export async function runSchemaRows(client, table, opts) {
  * (SQL Server start time); zero reads mean nothing without it.
  */
 export async function runSchemaIndexes(client, opts) {
-    const path = `/api/cli/schema/indexes${qs({
-        table: opts.table || undefined,
-        search: opts.search || undefined,
-        limit: opts.limit,
-        unused: opts.unused ? 1 : undefined,
-    })}`;
-    return getSchemaList(client, path, "ib dev schema indexes");
+    return getSchemaList(client, listQuery("/api/cli/schema/indexes", opts), "ib dev schema indexes");
 }
 export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
