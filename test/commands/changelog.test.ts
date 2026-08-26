@@ -540,6 +540,31 @@ describe("changelog add --feedback on an ALREADY-resolved row (fb#880)", () => {
     expect(body).not.toHaveProperty("resolveFeedback");
   });
 
+  test("MIXED CSV: one resolved id demotes the WHOLE call; stderr names the open siblings", async () => {
+    // resolveFeedback is per-request, not per-id: the open fb#830 also links as
+    // a reference and does NOT advance — the note must say so, otherwise the
+    // fired feedbackStatus note blames a "deliberately set" status for what is
+    // actually this demotion (fb#880 review M2).
+    asGet().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/829")
+          ? { feedbackId: 829, status: "applied", resolvedByChangelogId: 1649 }
+          : { feedbackId: 830, status: "open", resolvedByChangelogId: null }
+      )
+    );
+    const cap = captureStderr();
+    try {
+      const body = await addWith(["--feedback", "830,829"]);
+      expect(body.feedbackId).toEqual([830, 829]);
+      expect(body.resolveFeedback).toBe(false);
+      expect(cap.text()).toContain("already resolved by cl#1649");
+      expect(cap.text()).toContain("fb#830");
+      expect(cap.text()).toContain("NOT advanced");
+    } finally {
+      cap.restore();
+    }
+  });
+
   test("--take-resolve re-owns an already-resolved row (no resolveFeedback key)", async () => {
     asGet().mockResolvedValue({ feedbackId: 829, resolvedByChangelogId: 1649 });
     const body = await addWith(["--feedback", "829", "--take-resolve"]);
@@ -1512,6 +1537,28 @@ describe("warnFeedbackLinkEffects — the link stayed with its owner (fb#548)", 
     const warn = vi.fn();
     warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: null }, warn);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  // fb#880 review M1: linkKeptBy fires for the pre-check demotion too (the
+  // caller passed no --no-resolve), so the ADD path must not blame --no-resolve
+  // nor suggest "re-run without" it — that just hits the pre-check again. The
+  // effective re-own on `add` is --take-resolve.
+  test("add path names the fb#880 default and points at --take-resolve, not 'without --no-resolve'", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: 1276 }, warn);
+    const msg = warn.mock.calls[0][0];
+    expect(msg).toMatch(/fb#880/);
+    expect(msg).toMatch(/--take-resolve/);
+    expect(msg).not.toMatch(/re-run without --no-resolve/);
+  });
+
+  test("update path keeps the --no-resolve wording (update has no --take-resolve)", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: 1276 }, warn, { advancesStatus: false });
+    const msg = warn.mock.calls[0][0];
+    expect(msg).toMatch(/--no-resolve left the link there/);
+    expect(msg).toMatch(/re-run without --no-resolve/);
+    expect(msg).not.toMatch(/--take-resolve/);
   });
 });
 

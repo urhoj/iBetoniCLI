@@ -58,8 +58,15 @@ const SEVERITY_FLAG_DESC = "Bug severity — Kriittinen|Korkea|Normaali|Matala (
 // drifts. It already did — fb#633 had to hand-edit both `outputShape`s to add
 // `resolutionPreserved`, and the two copies ended up with different tails.
 // Each leaf still appends its own closing sentence after these.
-const FROM_JSON_NON_PAYLOAD_DESC = "NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve / --take-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve`/`takeResolve` in the file exit 4.";
-const FEEDBACK_LINKS_SHAPE_DESC = "One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist";
+// Parameterized (fb#880 review): --take-resolve exists ONLY on `add`, so the
+// shared from-json prose must not advertise it on `update` (which registers no
+// such flag — following update's help there yields an unknown-option error).
+const fromJsonNonPayloadDesc = (hasTakeResolve) => "NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve" +
+    (hasTakeResolve ? " / --take-resolve" : "") +
+    " (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve`" +
+    (hasTakeResolve ? "/`takeResolve`" : "") +
+    " in the file exit 4.";
+const FEEDBACK_LINKS_SHAPE_DESC = "One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror when a resolved row's link was LEFT in place (--no-resolve, or `add`'s fb#880 default cross-reference); `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist";
 const RESOLUTION_PRESERVED_SHAPE_DESC = "`resolutionPreserved` carries the row's existing hand-written resolution note when the link advanced the status to `applied` but KEPT that note (fb#633) — status and note may now contradict each other, so re-read the row.";
 const SINGLE_LINK_MIRROR_DESC = "For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.";
 /**
@@ -102,8 +109,11 @@ export async function runChangelogAdd(client, body, flags) {
  * changelog entry (resolvedByChangelogId set). `add --feedback` used to
  * silently TAKE the resolves-link from that original fix entry in this case —
  * a trap, because a follow-up entry to a closed row is far more common than an
- * intentional re-resolve. The add action pre-checks with this and defaults
- * such ids to role `references` unless --take-resolve re-owns the link.
+ * intentional re-resolve. The add action pre-checks with this and, if ANY id
+ * is already resolved, sends resolveFeedback:false for the WHOLE request —
+ * resolveFeedback is per-request, not per-id, so every id in the same call
+ * (including still-open ones) links as role `references` and nothing advances,
+ * unless --take-resolve re-owns the link.
  *
  * Fail-open per id (a pre-check must never block the add): a GET that errors
  * simply does not mark its id, and the historical take-the-link behaviour —
@@ -622,11 +632,13 @@ function normalizeFeedbackIds(v) {
  *    — it is the correction path when the FIRST link was wrong — but anyone
  *    following the row afterwards lands on the follow-up instead of the fix, and
  *    the only way to notice was to go and look (fb#366).
- * 1b. LINK KEPT — the mirror of 1: under `--no-resolve` the row was already owned
- *    by another entry, so the link was LEFT there and this entry is a plain
- *    cross-reference. Worth saying precisely because the old behaviour was the
- *    opposite (it took the link and reported a relink, fb#548) — a caller who
- *    remembers that would otherwise go "restore" a link that never moved.
+ * 1b. LINK KEPT — the mirror of 1: the row was already owned by another entry,
+ *    so the link was LEFT there and this entry is a plain cross-reference —
+ *    either because --no-resolve was passed, or because the fb#880 pre-check
+ *    demoted an `add` on an already-resolved row. Worth saying precisely because
+ *    the old behaviour was the opposite (it took the link and reported a relink,
+ *    fb#548) — a caller who remembers that would otherwise go "restore" a link
+ *    that never moved.
  * 2. NOT RESOLVED — the link did not close the row, because its status was set
  *    deliberately (a `reviewed` legal draft awaiting activation) or because
  *    --no-resolve was passed. Worth saying, since linking a row normally DOES
@@ -683,8 +695,11 @@ export function warnFeedbackLinkEffects(result, warn = warnNote, { advancesStatu
             warn(`[ib] note: ${at}that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
                 `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`);
         if (typeof linkKeptBy === "number")
-            warn(`[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
-                `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`);
+            warn(advancesStatus
+                ? `[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — the link was left there (--no-resolve, or the fb#880 cross-reference default for an already-resolved row), and cl#${changelogId} is recorded as a cross-reference only. ` +
+                    `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run with --take-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`
+                : `[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
+                    `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`);
         if (typeof feedbackStatus === "string")
             warn(advancesStatus
                 ? `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
@@ -879,10 +894,20 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             const already = await findAlreadyResolvedFeedback(client, ids);
             if (already.length > 0) {
                 body.resolveFeedback = false;
+                // resolveFeedback is PER-REQUEST: one already-resolved id demotes the
+                // WHOLE call, so any still-open ids in the same CSV also link as
+                // references and are NOT advanced. Name them explicitly — otherwise
+                // the fired feedbackStatus note blames a "deliberately set" status for
+                // what is actually this demotion (fb#880 review M2).
+                const resolvedIds = new Set(already.map((a) => a.feedbackId));
+                const openIds = ids.filter((id) => !resolvedIds.has(id));
                 warnNote(`[ib] note: ${already
                     .map((a) => `fb#${a.feedbackId} is already resolved by cl#${a.resolvedByChangelogId}`)
-                    .join("; ")} — this entry links as a cross-reference (role \`references\`) instead of taking the resolves role. ` +
-                    `To re-resolve deliberately, re-run with --take-resolve.`);
+                    .join("; ")} — resolveFeedback is per-request, so the WHOLE entry links as a cross-reference (role \`references\`) instead of taking the resolves role. ` +
+                    (openIds.length > 0
+                        ? `That also covers the still-open id(s) ${openIds.map((id) => `fb#${id}`).join(", ")} in this call — they link as references and are NOT advanced; resolve them with a separate \`changelog add\`/\`update\` or \`ib dev feedback resolve\`. `
+                        : "") +
+                    `To re-resolve the already-resolved row(s) deliberately, re-run with --take-resolve.`);
             }
         }
         if (o.sentry)
@@ -1095,7 +1120,7 @@ export const CHANGELOG_SPECS = [
     {
         command: "ib dev changelog add",
         aliases: ["ib dev changelog create"],
-        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all. An ALREADY-resolved row keeps its resolver unless --take-resolve is passed (fb#880).",
+        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all. Already-resolved rows keep their resolver unless --take-resolve (fb#880).",
         auth: "any",
         tier: "developer",
         args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
@@ -1158,7 +1183,7 @@ export const CHANGELOG_SPECS = [
             {
                 name: "feedback",
                 type: "string",
-                description: "cliFeedback id(s) to link — a single id or CSV (`541,542`), `fb#` anchors accepted. Role `resolves` (default) advances an `open` row to applied; a deliberately-set status (e.g. `reviewed`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve deliberately re-owns the link (fb#366).",
+                description: "cliFeedback id(s) to link — a single id or CSV (`541,542`), `fb#` anchors accepted. Role `resolves` (default) advances an `open` row to applied; a deliberately-set status (e.g. `reviewed`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve re-owns it (fb#366). resolveFeedback is per-REQUEST: one already-resolved id demotes the WHOLE call.",
             },
             {
                 name: "no-resolve",
@@ -1191,7 +1216,7 @@ export const CHANGELOG_SPECS = [
                 name: "from-json",
                 type: "string",
                 description: "Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a `changelog list` row can be edited and posted straight back. " +
-                    FROM_JSON_NON_PAYLOAD_DESC +
+                    fromJsonNonPayloadDesc(true) +
                     " An unknown or wrong-typed key exits 4 (never silently dropped); the length caps apply to a JSON value exactly as to a flag.",
             },
         ]),
@@ -1248,10 +1273,10 @@ export const CHANGELOG_SPECS = [
             "You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors `ib dev feedback create`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
             "SHELL QUOTING (fb#300): an entry description is prose about code — the text most likely to carry inner double-quotes, which Windows PowerShell splits on. Pass quote-bearing entries via --from-json <file|-> (required --type/--area/--title may come from the JSON); see `ib help shell-quoting`.",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
-            "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
+            "--dry-run is SERVER-side (X-Dry-Run): the backend validates then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s.",
             "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
-            'CROSS-LANE ENTRIES (fb#408): --repo is a CSV and the versioning model has two lanes (coordinated apps vs standalone betonicli/@ibetoni/*), so a change spanning both names both — --repo "puminet5api,betonicli"; each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.',
-            "--feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880); --take-resolve re-owns it (fb#366). Response carries `relinkedFrom`; restore via `ib dev changelog update <thatId> --feedback <id>`.",
+            'CROSS-LANE ENTRIES (fb#408): --repo is a CSV; a change spanning both lanes names both — --repo "puminet5api,betonicli" — each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.',
+            "--feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880) — the response's `linkKeptBy` names the keeping resolver (nothing to restore). --take-resolve re-owns it (fb#366): only then the response carries `relinkedFrom` (restore: `ib dev changelog update <thatId> --feedback <id>`).",
             "DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog add`.",
             "Developer-gated.",
         ],
@@ -1478,7 +1503,7 @@ export const CHANGELOG_SPECS = [
                 name: "from-json",
                 type: "string",
                 description: "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
-                    FROM_JSON_NON_PAYLOAD_DESC +
+                    fromJsonNonPayloadDesc(false) +
                     " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).",
             },
         ]),

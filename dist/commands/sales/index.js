@@ -38,7 +38,10 @@ export async function runProspectList(client, opts = {}) {
         all = all.filter((r) => segmentMatches(r.segment, segmentFilter));
     }
     if (opts.search) {
-        const needle = opts.search.toLowerCase();
+        // `.trim()` matches the Myynti UI (`q.trim().toLowerCase()`,
+        // salesProspectFilters.js) — without it a padded search box and a padded
+        // `--search` disagree, which is exactly the parity fb#817 exists to keep.
+        const needle = opts.search.trim().toLowerCase();
         // Union of the UI's fields (companyName + asiakasNimi, fb#817) and this
         // command's original ones (ytunnus + region), so a name typed into Myynti
         // and a name typed here can never disagree.

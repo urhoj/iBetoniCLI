@@ -5,10 +5,19 @@
  * 1431 -reason test` appeared on 2026-08-11 and again 2026-08-21, different
  * sessions, same mistake — and the did-you-mean hint clearly does not prevent
  * the pattern. Since `ib` registers NO short options of its own (only
- * commander's auto `-h`/`-V`, both single-char), ANY token shaped `-name…`
- * with a multi-character name is a typo of a long flag: today it is ALWAYS
- * rejected as unknown, so rewriting it to `--name…` can only turn a broken
- * invocation into the one the caller meant — never break a working one.
+ * commander's auto `-h`/`-V`, both single-char), a FREE-STANDING token shaped
+ * `-name…` with a multi-character name is overwhelmingly a long-flag typo: it
+ * is rejected as unknown, and rewriting it to `--name…` turns that broken
+ * invocation into the one the caller meant.
+ *
+ * KNOWN RESIDUALS (documented, pinned by test/argv.test.ts, accepted):
+ * 1. A `-word` sitting in a VALUE position (`--title -reason`) used to be
+ *    consumed as a literal value; post-rewrite it parses as a flag. Deliberate
+ *    dash-led literals must use the equals form (`--title=-reason`), which
+ *    starts with `--` and is never rewritten.
+ * 2. Commander's combined-shorts expansion (`-hV`) also matches and becomes
+ *    the unknown `--hV`. Both shapes were vanishingly rare in practice — the
+ *    recurrence this fixes is orders of magnitude more common.
  *
  * Kept deliberately dumb (no command-tree introspection): unknown `--xyz`
  * still lands in the usual unknown-option envelope with the did-you-mean

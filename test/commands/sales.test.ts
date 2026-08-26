@@ -231,6 +231,14 @@ describe("ib sales — segment/search parity with the Myynti UI (fb#817)", () =>
     expect(await ids({ search: "piilonimi" })).toEqual([5]);
   });
 
+  test("--search trims the needle like the Myynti UI does (q.trim())", async () => {
+    // The UI search box trims before matching — a padded box and a padded
+    // --search must agree (fb#817 review A3).
+    expect(await ids({ search: "  piilonimi  " })).toEqual([5]);
+    mockClient.get.mockResolvedValue([row({ saasProspectId: 6, companyName: "Sorvi Oy" })]);
+    expect((await runProspectList(mockClient, { search: "SORVI" })).count).toBe(1);
+  });
+
   test("--search still matches companyName + ytunnus + region", async () => {
     expect((await ids({ search: "pumppu oy" })).length).toBeGreaterThan(0);
     mockClient.get.mockResolvedValue([
