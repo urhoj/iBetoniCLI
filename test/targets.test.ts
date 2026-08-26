@@ -284,7 +284,7 @@ describe("numFlag (fb#371 — lat/lng are route segments, so NaN must not surviv
   });
 });
 
-describe("zeroOneFlag (fb#905 — 0|1 columns: NaN serialized as null would silently flip the flag)", () => {
+describe("zeroOneFlag (fb#905 — 0|1 columns: out-of-range values silently fold to 1 server-side; NaN flies as null)", () => {
   test("accepts exactly 0 and 1", () => {
     expect(zeroOneFlag("--liita-laskuun")("0")).toBe(0);
     expect(zeroOneFlag("--liita-laskuun")("1")).toBe(1);

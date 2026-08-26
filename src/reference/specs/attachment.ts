@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec, CommandError } from "../../output/help.js";
-import { apiErr, limitErr, COMMON_AUTH_ERRORS, ATTACHMENT_ENTITY_FLAGS, ATTACHMENT_ROW, ENTITY_FLAG_NOTE, DEPLOY_NOTE, LIMIT_500_FLAG } from "./shared.js";
+import { apiErr, limitErr, COMMON_AUTH_ERRORS, ATTACHMENT_ENTITY_FLAGS, ATTACHMENT_ROW, ENTITY_FLAG_NOTE, DEPLOY_NOTE, LIMIT_500_FLAG, intParseErr } from "./shared.js";
 
 /**
  * The `<attachmentId>` positional parse-guard row (fb#893): all six id-taking
@@ -23,18 +23,23 @@ const INVALID_ATTACHMENT_ID_ERR: CommandError = {
 
 /**
  * The entity-id flag parse-guard row (fb#905): the `--keikka <id>` …
- * `--message <id>` family registered by addEntityFlags (attach/detach/
- * upload/register) plus the hidden `--asiakas` alias for `--customer` all
- * parse through intFlag now, where a bare `Number` coercer used to send NaN
- * down the wire (or, for detach, fold NaN-vs-NaN into a confusing conflict).
- * One row covers the whole family: the match is the common tail of intFlag's
- * message, and no other client exit-4 message on these commands contains it
- * (`--size` says ">= 0", `--liita-laskuun` has its own wording).
+ * `--message <id>` family registered by addEntityFlags on
+ * list/attach/detach/upload/register, plus the hidden `--asiakas` alias of
+ * `--customer`, all parse through intFlag now, where a bare `Number` coercer
+ * used to send NaN down the wire (or, for detach, fold NaN-vs-NaN into a
+ * confusing conflict). The matches are the FULL per-flag intFlag messages,
+ * derived from ATTACHMENT_ENTITY_FLAGS (the ASIAKAS_FLAG_ERR/fb#908
+ * rationale): a common tail like "must be an integer >= 1" shadows sibling
+ * guards — it demonstrably swallowed limitErr's remedy for `--limit` on
+ * `attachment list`, whose cappedInt emits the same tail.
  */
 const ENTITY_FLAG_PARSE_ERR: CommandError = {
   origin: "client",
   exit: 4,
-  match: "must be an integer >= 1",
+  match: [
+    ...ATTACHMENT_ENTITY_FLAGS.map((f) => `--${f.name} must be an integer >= 1`),
+    "--asiakas must be an integer >= 1",
+  ],
   meaning: "an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request",
   remedy: "pass the entity id as a positive integer",
 };
@@ -140,7 +145,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }",
-    errors: [ENTITY_FLAG_PARSE_ERR, { origin: "client", exit: 4, match: "--size must be an integer >= 0", meaning: "--size is not an integer >= 0, rejected locally before any request", remedy: "pass the file size in bytes as an integer" }, apiErr(403, "fileFolder outside the active company / not a member of the target", "mint via upload-url; check active company"), apiErr(400, "Missing required field / unknown entity", "see required flags"), ...COMMON_AUTH_ERRORS],
+    errors: [ENTITY_FLAG_PARSE_ERR, intParseErr("--size", "pass the file size in bytes as an integer", 0), apiErr(403, "fileFolder outside the active company / not a member of the target", "mint via upload-url; check active company"), apiErr(400, "Missing required field / unknown entity", "see required flags"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the linked entity's timeline (--reason lands in changeTracker.reason).", DEPLOY_NOTE],
     seeAlso: ["ib attachment upload-url", "ib attachment upload"],
     examples: ["ib attachment register --name uuid.jpg --orig-name site.jpg --folder 8/2026 --size 12345 --mime image/jpeg --keikka 9001"],
@@ -172,7 +177,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
     errors: [INVALID_ATTACHMENT_ID_ERR, ENTITY_FLAG_PARSE_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed", "Unknown entity"], meaning: "No entity given, conflicting positional + flag, or unknown entity word", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
-    notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
+    notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name (though it must still parse as an integer >= 1).", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment attach", "ib attachment search"],
     examples: ["ib attachment detach 4711 keikka", "ib attachment detach 4711 --keikka 9001", "ib attachment detach 4711 bug-report --dry-run"],
   },

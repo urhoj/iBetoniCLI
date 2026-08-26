@@ -6,7 +6,7 @@ exports[`parse-time guard → hint pairing > every argParser guard resolves a hi
   > pass the entity id as a positive integer
 
 ib attachment attach --bug-report <id>
-  ! --bugReport must be an integer >= 1
+  ! --bug-report must be an integer >= 1
   > pass the entity id as a positive integer
 
 ib attachment attach --customer <id>
@@ -54,7 +54,7 @@ ib attachment detach --asiakas <id>
   > pass the entity id as a positive integer
 
 ib attachment detach --bug-report <id>
-  ! --bugReport must be an integer >= 1
+  ! --bug-report must be an integer >= 1
   > pass the entity id as a positive integer
 
 ib attachment detach --customer <id>
@@ -102,7 +102,7 @@ ib attachment list --asiakas <id>
   > pass the entity id as a positive integer
 
 ib attachment list --bug-report <id>
-  ! --bugReport must be an integer >= 1
+  ! --bug-report must be an integer >= 1
   > pass the entity id as a positive integer
 
 ib attachment list --customer <id>
@@ -115,7 +115,7 @@ ib attachment list --keikka <id>
 
 ib attachment list --limit <n>
   ! --limit must be an integer >= 1
-  > pass the entity id as a positive integer
+  > pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap
 
 ib attachment list --message <id>
   ! --message must be an integer >= 1
@@ -154,7 +154,7 @@ ib attachment register --asiakas <id>
   > pass the entity id as a positive integer
 
 ib attachment register --bug-report <id>
-  ! --bugReport must be an integer >= 1
+  ! --bug-report must be an integer >= 1
   > pass the entity id as a positive integer
 
 ib attachment register --customer <id>
@@ -214,7 +214,7 @@ ib attachment upload --asiakas <id>
   > pass the entity id as a positive integer
 
 ib attachment upload --bug-report <id>
-  ! --bugReport must be an integer >= 1
+  ! --bug-report must be an integer >= 1
   > pass the entity id as a positive integer
 
 ib attachment upload --customer <id>
@@ -461,6 +461,14 @@ ib jerry check-address --asiakas <id>
   ! --asiakas must be an integer >= 1
   > add --explain, or pass a positive asiakasId
 
+ib jerry check-address --lat <n>
+  ! --lat must be a number
+  > pass the latitude as a number
+
+ib jerry check-address --lng <n>
+  ! --lng must be a number
+  > pass the longitude as a number
+
 ib jerry provider-settings get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -472,6 +480,18 @@ ib jerry provider-settings set --asiakas <id>
 ib jerry request create --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib jerry request create --boom <m>
+  ! --boom must be a number
+  > pass the required boom reach in metres (omit for 0)
+
+ib jerry request create --duration <h>
+  ! --duration must be a number
+  > pass the pump duration in hours
+
+ib jerry request create --line-length <m>
+  ! --line-length must be a number
+  > pass the hose line length in metres
 
 ib jerry request list --limit <n>
   ! --limit must be an integer >= 1
@@ -539,27 +559,27 @@ ib log user --owner <id>
 
 ib message daily get --asiakas <id>
   ! --asiakas must be an integer >= 1
-  > (no hint)
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
 ib message daily grant --box-asiakas <id>
   ! --box-asiakas must be an integer >= 1
-  > (no hint)
+  > pass the dailyMessageBoxAsiakasId of the share row
 
 ib message daily grant --role <typeId>
   ! --role must be an integer >= 1
-  > (no hint)
+  > pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin
 
 ib message daily grant --to <asiakasId>
   ! --to must be an integer >= 1
-  > (no hint)
+  > pass the tenant's asiakasId the role belongs to
 
 ib message daily perm-set --role <typeId>
   ! --role must be an integer >= 1
-  > (no hint)
+  > pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin
 
 ib message daily share --to <asiakasId>
   ! --to must be an integer >= 1
-  > (no hint)
+  > pass the tenant's asiakasId to share with
 
 ib notification fcm send --data <json>
   ! --data must be a JSON object
@@ -685,13 +705,41 @@ ib sales prospect add --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
+ib sales prospect add --tier <n>
+  ! --tier must be an integer >= 1
+  > pass the tier: 1 priority, 2 secondary, 3 long tail
+
 ib sales prospect get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
+ib sales prospect list --tier <n>
+  ! --tier must be an integer >= 1
+  > pass the tier: 1 priority, 2 secondary, 3 long tail
+
 ib sales prospect update --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib sales prospect update --fit-score <n>
+  ! --fit-score must be a number
+  > pass the fit score as a number (1..5)
+
+ib sales prospect update --fleet-pumps <n>
+  ! --fleet-pumps must be an integer >= 0
+  > pass the pump-truck count as an integer
+
+ib sales prospect update --revenue <eur>
+  ! --revenue must be a number
+  > pass the revenue in EUR as a number
+
+ib sales prospect update --revenue-year <y>
+  ! --revenue-year must be an integer >= 1
+  > pass the revenue year as an integer
+
+ib sales prospect update --staff <n>
+  ! --staff must be an integer >= 0
+  > pass the employee count as an integer
 
 ib schema indexes --limit <n>
   ! --limit must be an integer >= 1
@@ -740,6 +788,22 @@ ib sijainti closest --worksite <id>
 ib sijainti create --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib sijainti create --lat <n>
+  ! --lat must be a number
+  > pass the latitude as a number
+
+ib sijainti create --lng <n>
+  ! --lng must be a number
+  > pass the longitude as a number
+
+ib sijainti create --max-distance <n>
+  ! --max-distance must be a number
+  > pass the delivery radius in km as a number
+
+ib sijainti create --type <id>
+  ! --type must be an integer >= 1
+  > pass a sijaintiTypeId — \`ib sijainti types\` lists them
 
 ib sijainti list --limit <n>
   ! --limit must be an integer >= 1

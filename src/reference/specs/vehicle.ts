@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const VEHICLE_SPECS: CommandSpec[] = [
 
@@ -54,7 +54,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
       ASIAKAS_FLAG_ERR,
-      { origin: "client", exit: 4, match: "--type must be an integer >= 1", meaning: "--type is not an integer >= 1, rejected locally before any request", remedy: "pass a vehicleTypeId — `ib vehicle types` lists them" },
+      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
       limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
@@ -181,11 +181,11 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
       ASIAKAS_FLAG_ERR,
-      { origin: "client", exit: 4, match: "--no must be an integer >= 0", meaning: "--no is not an integer >= 0, rejected locally before any request", remedy: "pass the fleet number as an integer" },
-      { origin: "client", exit: 4, match: "--type must be an integer >= 1", meaning: "--type is not an integer >= 1, rejected locally before any request", remedy: "pass a vehicleTypeId — `ib vehicle types` lists them" },
-      { origin: "client", exit: 4, match: "--default-driver must be an integer >= 1", meaning: "--default-driver is not an integer >= 1, rejected locally before any request", remedy: "pass a personId — `ib person search` finds them" },
-      { origin: "client", exit: 4, match: "--capacity must be a number", meaning: "--capacity is not a number, rejected locally before any request", remedy: "pass the capacity in m3 as a number (e.g. 7.5)" },
-      { origin: "client", exit: 4, match: "--puomi must be a number", meaning: "--puomi is not a number, rejected locally before any request", remedy: "pass the boom length in metres as a number" },
+      intParseErr("--no", "pass the fleet number as an integer", 0),
+      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
+      intParseErr("--default-driver", "pass a personId — `ib person search` finds them"),
+      numParseErr("--capacity", "pass the capacity in m3 as a number (e.g. 7.5)"),
+      numParseErr("--puomi", "pass the boom length in metres as a number"),
       apiErr(400, "Validation failed", "fix the field flags"),
       // Matched on the backend's Finnish denyMessage (vehicleRoutes.js
       // `vehicleEdit` → requireCompanyRole denyMessage).
@@ -232,10 +232,10 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
     errors: [
       ASIAKAS_FLAG_ERR,
-      { origin: "client", exit: 4, match: "--no must be an integer >= 0", meaning: "--no is not an integer >= 0, rejected locally before any request", remedy: "pass the fleet number as an integer" },
-      { origin: "client", exit: 4, match: "--type must be an integer >= 1", meaning: "--type is not an integer >= 1, rejected locally before any request", remedy: "pass a vehicleTypeId — `ib vehicle types` lists them" },
-      { origin: "client", exit: 4, match: "--capacity must be a number", meaning: "--capacity is not a number, rejected locally before any request", remedy: "pass the capacity in m3 as a number (e.g. 7.5)" },
-      { origin: "client", exit: 4, match: "--puomi must be a number", meaning: "--puomi is not a number, rejected locally before any request", remedy: "pass the boom length in metres as a number" },
+      intParseErr("--no", "pass the fleet number as an integer", 0),
+      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
+      numParseErr("--capacity", "pass the capacity in m3 as a number (e.g. 7.5)"),
+      numParseErr("--puomi", "pass the boom length in metres as a number"),
       apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
@@ -264,7 +264,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>",
     errors: [
-      { origin: "client", exit: 4, match: "--days must be an integer >= 1", meaning: "--days is not an integer >= 1, rejected locally before any request", remedy: "pass a positive number of days (default 30)" },
+      intParseErr("--days", "pass a positive number of days (default 30)"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle dates expiring", "ib vehicle dates expiring --days 60 --pretty"],
@@ -335,7 +335,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
     errors: [
-      { origin: "client", exit: 4, match: "--days must be an integer >= 1", meaning: "--days is not an integer >= 1, rejected locally before any request", remedy: "pass a positive number of days (omit for all-time)" },
+      intParseErr("--days", "pass a positive number of days (omit for all-time)"),
       { origin: "client", exit: 4, match: "filterType", meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
       { origin: "client", exit: 4, match: "date must be", meaning: "Bad --date", remedy: "YYYY-MM-DD or today/yesterday/tomorrow" },
       apiErr(404, "tyomaa not found / not owned", "verify tyomaaId belongs to the active company"),

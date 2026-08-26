@@ -2,7 +2,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking), so append new commands at the end of the array.
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, ASIAKAS_FLAG_ERR } from "./shared.js";
+import { apiErr, ASIAKAS_FLAG_ERR, intParseErr, numParseErr } from "./shared.js";
 
 export const SALES_SPECS: CommandSpec[] = [
   {
@@ -20,7 +20,7 @@ export const SALES_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ saasProspectId, asiakasId, companyName, ytunnus, status, tier, segment, region, fleetPumps, staffCount, revenueEur, revenueYear, currentSystem, fitScore, analysis, pitchAngle, parked, jerryStatus, analysisUpdatedTime, … }>",
-    errors: [apiErr(403, "Not a system admin", "log in as a system admin")],
+    errors: [intParseErr("--tier", "pass the tier: 1 priority, 2 secondary, 3 long tail"), apiErr(403, "Not a system admin", "log in as a system admin")],
     examples: [
       "ib sales prospect list --brief --pretty",
       "ib sales prospect list --segment pumppu --status ei_aloitettu",
@@ -65,6 +65,7 @@ export const SALES_SPECS: CommandSpec[] = [
     outputShape: "{ saasProspectId }",
     errors: [
       ASIAKAS_FLAG_ERR,
+      intParseErr("--tier", "pass the tier: 1 priority, 2 secondary, 3 long tail"),
       { origin: "client", exit: 4, match: "--asiakas <id> or --name", meaning: "Neither --asiakas nor --name given", remedy: "pass one of them" },
       apiErr(400, "Prospect already exists for this company", "`ib sales prospect get --asiakas <id>`"),
       apiErr(403, "Not a system admin", "log in as a system admin"),
@@ -100,6 +101,11 @@ export const SALES_SPECS: CommandSpec[] = [
     outputShape: "{ success: true, fieldsWritten }  — fieldsWritten is 0 when every key in the payload fell outside the scope's whitelist, so nothing was actually written",
     errors: [
       ASIAKAS_FLAG_ERR,
+      intParseErr("--fleet-pumps", "pass the pump-truck count as an integer", 0),
+      intParseErr("--staff", "pass the employee count as an integer", 0),
+      numParseErr("--revenue", "pass the revenue in EUR as a number"),
+      intParseErr("--revenue-year", "pass the revenue year as an integer"),
+      numParseErr("--fit-score", "pass the fit score as a number (1..5)"),
       { origin: "client", exit: 4, match: ["Pass a saasProspectId", "Ambiguous:"], meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
       { origin: "client", exit: 5, meaning: "No prospect matches", remedy: "`ib sales prospect add` first" },
       apiErr(403, "Not a system admin", "log in as a system admin"),

@@ -157,7 +157,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Name the entity as a positional word (\`detach 4711 keikka\`) OR an attach-style flag (\`detach 4711 --keikka 9001\`) — the flag's id is ignored since detach only needs the entity name.
+  - Name the entity as a positional word (\`detach 4711 keikka\`) OR an attach-style flag (\`detach 4711 --keikka 9001\`) — the flag's id is ignored since detach only needs the entity name (though it must still parse as an integer >= 1).
   - Audited via ChangeTracker on the previously-linked entity's timeline.
   - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
 
@@ -5202,6 +5202,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Empty/whitespace-only --address (an omitted --address is caught locally by the parser, which answers with its own prescriptive envelope) → pass a non-empty street address
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass the latitude as a number
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass the longitude as a number
   exit 4 (client-side)  --boom not a non-negative number → pass metres ≥ 0, or omit for no boom filter
   exit 4 (client-side)  --asiakas without --explain, or not a positive integer → add --explain, or pass a positive asiakasId
   exit 4 (client-side)  --gate without --explain, or an unknown reason name → add --explain; valid reasons are company-gate, provider-dead, no-coords, not-enrolled, radius, boom
@@ -5734,6 +5736,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --boom is not a number, rejected locally before any request → pass the required boom reach in metres (omit for 0)
+  exit 4 (client-side)  --duration is not a number, rejected locally before any request → pass the pump duration in hours
+  exit 4 (client-side)  --line-length is not a number, rejected locally before any request → pass the hose line length in metres
   exit 4 (client-side)  Address missing, or given BOTH positionally and via --address with different values → pass the address exactly once — positional or --address
   exit 4 (client-side)  --m3 is not a number > 0 → pass --m3 as a positive number of cubic metres
   exit 4 (HTTP 400)  Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi → pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address
@@ -7955,6 +7960,7 @@ OUTPUT (JSON, stdout)
   { box: { boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }, message: {...}|null, permissions: {...}[] }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 5 (HTTP 404)  Box not visible for the company → ib message daily list <asiakasId>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
@@ -7994,6 +8000,9 @@ OUTPUT (JSON, stdout)
   { success, dailyMessageBoxAsiakasPermissionsId? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --to is not an integer >= 1, rejected locally before any request → pass the tenant's asiakasId the role belongs to
+  exit 4 (client-side)  --role is not an integer >= 1, rejected locally before any request → pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin
+  exit 4 (client-side)  --box-asiakas is not an integer >= 1, rejected locally before any request → pass the dailyMessageBoxAsiakasId of the share row
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8074,6 +8083,7 @@ OUTPUT (JSON, stdout)
   { success, ... }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --role is not an integer >= 1, rejected locally before any request → pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8228,6 +8238,7 @@ OUTPUT (JSON, stdout)
   { success, dailyMessageBoxAsiakasId? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --to is not an integer >= 1, rejected locally before any request → pass the tenant's asiakasId to share with
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10793,6 +10804,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --tier is not an integer >= 1, rejected locally before any request → pass the tier: 1 priority, 2 secondary, 3 long tail
   exit 4 (client-side)  Neither --asiakas nor --name given → pass one of them
   exit 4 (HTTP 400)  Prospect already exists for this company → \`ib sales prospect get --asiakas <id>\`
   exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
@@ -10859,6 +10871,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ saasProspectId, asiakasId, companyName, ytunnus, status, tier, segment, region, fleetPumps, staffCount, revenueEur, revenueYear, currentSystem, fitScore, analysis, pitchAngle, parked, jerryStatus, analysisUpdatedTime, … }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tier is not an integer >= 1, rejected locally before any request → pass the tier: 1 priority, 2 secondary, 3 long tail
   exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
 
 EXAMPLES
@@ -10910,6 +10923,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --fleet-pumps is not an integer >= 0, rejected locally before any request → pass the pump-truck count as an integer
+  exit 4 (client-side)  --staff is not an integer >= 0, rejected locally before any request → pass the employee count as an integer
+  exit 4 (client-side)  --revenue is not a number, rejected locally before any request → pass the revenue in EUR as a number
+  exit 4 (client-side)  --revenue-year is not an integer >= 1, rejected locally before any request → pass the revenue year as an integer
+  exit 4 (client-side)  --fit-score is not a number, rejected locally before any request → pass the fit score as a number (1..5)
   exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId
   exit 5 (client-side)  No prospect matches    → \`ib sales prospect add\` first
   exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
@@ -11154,6 +11172,10 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a sijaintiTypeId — \`ib sijainti types\` lists them
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass the latitude as a number
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass the longitude as a number
+  exit 4 (client-side)  --max-distance is not a number, rejected locally before any request → pass the delivery radius in km as a number
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (client-side)  --geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status) → supply a fuller --address, or pass --lat/--lng directly and drop --geocode
   exit 4 (client-side)  --geocode passed with no address to resolve → pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng

@@ -3,7 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseOptionalId, intFlag } from "../../targets.js";
+import { parseOptionalId, intFlag, numFlag } from "../../targets.js";
 const BRIEF_OMIT = ["analysis", "pitchAngle"];
 /**
  * Segment filter parity with the Myynti UI (fb#817). puminet4
@@ -114,7 +114,7 @@ export function registerSalesCommands(parent, getClient) {
     prospect
         .command("list")
         .option("--status <s>")
-        .option("--tier <n>", "", (v) => Number(v))
+        .option("--tier <n>", "", intFlag("--tier"))
         .option("--segment <s>")
         .option("--search <text>")
         .option("--brief", "omit analysis + pitchAngle (the two long columns)")
@@ -136,7 +136,7 @@ export function registerSalesCommands(parent, getClient) {
         .option("--name <s>")
         .option("--ytunnus <y>")
         .option("--segment <s>")
-        .option("--tier <n>", "", (v) => Number(v))
+        .option("--tier <n>", "", intFlag("--tier"))
         .option("--region <s>");
     addWriteFlagsToCommand(addCmd).action(guarded(async (opts) => {
         if (opts.asiakas === undefined && !opts.name) {
@@ -160,13 +160,13 @@ export function registerSalesCommands(parent, getClient) {
         .option("--name <s>")
         .option("--segment <s>")
         .option("--region <s>")
-        .option("--fleet-pumps <n>", "", (v) => Number(v))
-        .option("--staff <n>", "", (v) => Number(v))
-        .option("--revenue <eur>", "", (v) => Number(v))
-        .option("--revenue-year <y>", "", (v) => Number(v))
+        .option("--fleet-pumps <n>", "", intFlag("--fleet-pumps", 0))
+        .option("--staff <n>", "", intFlag("--staff", 0))
+        .option("--revenue <eur>", "", numFlag("--revenue"))
+        .option("--revenue-year <y>", "", intFlag("--revenue-year"))
         .option("--current-system <s>")
         .option("--analysis <text>")
-        .option("--fit-score <n>", "", (v) => Number(v))
+        .option("--fit-score <n>", "", numFlag("--fit-score"))
         .option("--pitch <text>")
         // The shell-safe route for long Finnish prose. `--from-json` is NOT part of
         // addWriteFlagsToCommand (that adds only --dry-run/--idempotency-key/--reason),

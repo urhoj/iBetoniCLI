@@ -9,7 +9,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt, queryAliasOption } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, numFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt, queryAliasOption } from "../../targets.js";
 import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -1057,9 +1057,9 @@ export function registerJerryCommands(
       .option("--address <s>")
       .requiredOption("--pump-at <iso>")
       .requiredOption("--m3 <n>", "", Number)
-      .option("--boom <m>", "", Number)
-      .option("--duration <h>", "", Number)
-      .option("--line-length <m>", "", Number)
+      .option("--boom <m>", "", numFlag("--boom"))
+      .option("--duration <h>", "", numFlag("--duration"))
+      .option("--line-length <m>", "", numFlag("--line-length"))
       .option("--notes <s>")
       .option("--asiakas <id>", "", intFlag("--asiakas"))
   ).action(
@@ -1230,8 +1230,8 @@ export function registerJerryCommands(
   // check-address â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("check-address")
     .requiredOption("--address <s>")
-    .option("--lat <n>", "", Number)
-    .option("--lng <n>", "", Number)
+    .option("--lat <n>", "", numFlag("--lat"))
+    .option("--lng <n>", "", numFlag("--lng"))
     .option("--place-id <s>")
     .option("--formatted-address <s>")
     .option("--boom <m>", "", Number)

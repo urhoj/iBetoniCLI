@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
-import type { CommandSpec } from "../../../output/help.js";
+import type { CommandSpec, CommandError } from "../../../output/help.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -479,6 +479,23 @@ const DAILY_AUTH_ERRORS = [
 const DAILY_BOX_ROW =
   "{ boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }";
 
+// Client exit-4 parse-guard rows for the intFlag guards added by fb#905.
+// Local copies rather than an import: specs/shared.js is restricted from
+// command modules (segment modules are pruned from the packed dist; the
+// barrel import would cycle — specs.ts imports MESSAGE_DAILY_SPECS from this
+// very file). Same wording as specs/shared.ts intParseErr.
+const dailyIntParseErr = (flag: string, remedy: string): CommandError => ({
+  origin: "client",
+  exit: 4,
+  match: `${flag} must be an integer >= 1`,
+  meaning: `${flag} is not an integer >= 1, rejected locally before any request`,
+  remedy,
+});
+const DAILY_ASIAKAS_PARSE_ERR = dailyIntParseErr(
+  "--asiakas",
+  "pass a positive asiakasId (a company id) — `ib company list` shows the ones you can reach"
+);
+
 export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
   {
     command: "ib message daily list",
@@ -507,7 +524,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
       { name: "date", type: "date", description: "Date for the message (YYYYMMDD | YYYY-MM-DD | today)" },
     ],
     outputShape: `{ box: ${DAILY_BOX_ROW}, message: {...}|null, permissions: {...}[] }`,
-    errors: [{ http: 404, exit: 5, meaning: "Box not visible for the company", remedy: "ib message daily list <asiakasId>" }, ...DAILY_AUTH_ERRORS],
+    errors: [DAILY_ASIAKAS_PARSE_ERR, { http: 404, exit: 5, meaning: "Box not visible for the company", remedy: "ib message daily list <asiakasId>" }, ...DAILY_AUTH_ERRORS],
     examples: ["ib message daily get 36 --asiakas 8 --date today"],
   },
   {
@@ -582,7 +599,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ success, dailyMessageBoxAsiakasId? }",
-    errors: DAILY_AUTH_ERRORS,
+    errors: [dailyIntParseErr("--to", "pass the tenant's asiakasId to share with"), ...DAILY_AUTH_ERRORS],
     seeAlso: ["ib message daily grant", "ib message daily unshare"],
     examples: ["ib message daily share 36 --to 26"],
   },
@@ -611,7 +628,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ success, dailyMessageBoxAsiakasPermissionsId? }",
-    errors: DAILY_AUTH_ERRORS,
+    errors: [dailyIntParseErr("--to", "pass the tenant's asiakasId the role belongs to"), dailyIntParseErr("--role", "pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin"), dailyIntParseErr("--box-asiakas", "pass the dailyMessageBoxAsiakasId of the share row"), ...DAILY_AUTH_ERRORS],
     seeAlso: ["ib message daily perm-set", "ib message daily revoke"],
     examples: ["ib message daily grant 36 --to 8 --role 8 --box-asiakas 34"],
   },
@@ -639,7 +656,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ success, ... }",
-    errors: DAILY_AUTH_ERRORS,
+    errors: [dailyIntParseErr("--role", "pass an asiakasPersonSettingTypeId — e.g. 8=Pumppari, 2=Admin"), ...DAILY_AUTH_ERRORS],
     examples: ["ib message daily perm-set 111 --role 8 --access edit"],
   },
 ];

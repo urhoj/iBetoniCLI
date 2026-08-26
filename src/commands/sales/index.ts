@@ -9,7 +9,7 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseOptionalId, intFlag } from "../../targets.js";
+import { parseOptionalId, intFlag, numFlag } from "../../targets.js";
 
 /**
  * `ib sales` — the betoni.online SaaS sales pipeline (system-admin CRM behind
@@ -223,7 +223,7 @@ export function registerSalesCommands(
   prospect
     .command("list")
     .option("--status <s>")
-    .option("--tier <n>", "", (v: string) => Number(v))
+    .option("--tier <n>", "", intFlag("--tier"))
     .option("--segment <s>")
     .option("--search <text>")
     .option("--brief", "omit analysis + pitchAngle (the two long columns)")
@@ -251,7 +251,7 @@ export function registerSalesCommands(
     .option("--name <s>")
     .option("--ytunnus <y>")
     .option("--segment <s>")
-    .option("--tier <n>", "", (v: string) => Number(v))
+    .option("--tier <n>", "", intFlag("--tier"))
     .option("--region <s>");
   addWriteFlagsToCommand(addCmd).action(
     guarded(async (opts: WriteFlags & { asiakas?: number; name?: string; ytunnus?: string; segment?: string; tier?: number; region?: string }) => {
@@ -284,13 +284,13 @@ export function registerSalesCommands(
     .option("--name <s>")
     .option("--segment <s>")
     .option("--region <s>")
-    .option("--fleet-pumps <n>", "", (v: string) => Number(v))
-    .option("--staff <n>", "", (v: string) => Number(v))
-    .option("--revenue <eur>", "", (v: string) => Number(v))
-    .option("--revenue-year <y>", "", (v: string) => Number(v))
+    .option("--fleet-pumps <n>", "", intFlag("--fleet-pumps", 0))
+    .option("--staff <n>", "", intFlag("--staff", 0))
+    .option("--revenue <eur>", "", numFlag("--revenue"))
+    .option("--revenue-year <y>", "", intFlag("--revenue-year"))
     .option("--current-system <s>")
     .option("--analysis <text>")
-    .option("--fit-score <n>", "", (v: string) => Number(v))
+    .option("--fit-score <n>", "", numFlag("--fit-score"))
     .option("--pitch <text>")
     // The shell-safe route for long Finnish prose. `--from-json` is NOT part of
     // addWriteFlagsToCommand (that adds only --dry-run/--idempotency-key/--reason),

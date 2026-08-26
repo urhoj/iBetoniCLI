@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, numParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const JERRY_SPECS: CommandSpec[] = [
 
@@ -101,6 +101,9 @@ export const JERRY_SPECS: CommandSpec[] = [
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
     errors: [
       ASIAKAS_FLAG_ERR,
+      numParseErr("--boom", "pass the required boom reach in metres (omit for 0)"),
+      numParseErr("--duration", "pass the pump duration in hours"),
+      numParseErr("--line-length", "pass the hose line length in metres"),
       { origin: "client", exit: 4, match: "address", meaning: "Address missing, or given BOTH positionally and via --address with different values", remedy: "pass the address exactly once — positional or --address" },
       { origin: "client", exit: 4, match: "--m3", meaning: "--m3 is not a number > 0", remedy: "pass --m3 as a positive number of cubic metres" },
       apiErr(400, "Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi", "pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address"),
@@ -410,6 +413,8 @@ export const JERRY_SPECS: CommandSpec[] = [
       "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'company-gate'|'provider-dead'|'no-coords'|'not-enrolled'|'radius'|'boom', detail }], consideredSuppressed?: { [gate]: count } }",
     errors: [
       apiErr(400, "Empty/whitespace-only --address (an omitted --address is caught locally by the parser, which answers with its own prescriptive envelope)", "pass a non-empty street address"),
+      numParseErr("--lat", "pass the latitude as a number"),
+      numParseErr("--lng", "pass the longitude as a number"),
       { origin: "client", exit: 4, match: "--boom", meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
       { origin: "client", exit: 4, match: "--asiakas", meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
       { origin: "client", exit: 4, match: "--gate", meaning: "--gate without --explain, or an unknown reason name", remedy: "add --explain; valid reasons are company-gate, provider-dead, no-coords, not-enrolled, radius, boom" },

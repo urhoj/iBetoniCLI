@@ -27,7 +27,7 @@ const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
 const ENTITY_FLAG_LIST = ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ");
 function addEntityFlags(cmd) {
     for (const e of ENTITY_OPTS) {
-        cmd.option(e.flag, "", intFlag("--" + e.optKey));
+        cmd.option(e.flag, "", intFlag(e.flag.split(" ")[0]));
     }
     // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
     // tenant-scoped commands, but here the canonical spelling is `--customer`

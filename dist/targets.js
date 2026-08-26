@@ -168,9 +168,12 @@ export function numFlag(flag, min = -Infinity, max = Infinity) {
 /**
  * Commander argParser: strictly `0` or `1`; exit 4 otherwise. For the boolean
  * columns the backend stores as 0|1 integers (`liitaLaskuun`), where
- * {@link intFlag} alone would accept 2, 3, … and a bare `Number` coercer turns
- * a typo into NaN, which JSON.stringify serializes as `null` — silently
- * flipping the flag (fb#905).
+ * {@link intFlag} alone would accept 2, 3, … — which the backend's
+ * `!!Number()` coercion then SILENTLY folds to 1 (the true silent-flip class).
+ * A bare `Number` coercer fails differently: a typo becomes NaN, which
+ * JSON.stringify serializes as null — the backend rejects that LOUDLY (400
+ * "liitaLaskuun must be 0, 1, true or false"), but only after the request has
+ * flown (fb#905).
  */
 export function zeroOneFlag(flag) {
     const int = intFlag(flag, 0);

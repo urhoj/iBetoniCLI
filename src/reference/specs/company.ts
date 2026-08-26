@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS, intParseErr } from "./shared.js";
 
 export const COMPANY_SPECS: CommandSpec[] = [
 
@@ -97,8 +97,8 @@ export const COMPANY_SPECS: CommandSpec[] = [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Not an admin/HR of the target company", "use an admin/HR token"),
       apiErr(404, "Unknown profile for that entity, or company/person not found", "run `ib validate list` to see profiles"),
-      { origin: "client", exit: 4, match: "--keikka must be an integer >= 1", meaning: "--keikka is not an integer >= 1, rejected locally before any request", remedy: "pass a keikkaId" },
-      { origin: "client", exit: 4, match: "Company validation needs --profile", meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
+      intParseErr("--keikka", "pass a keikkaId"),
+      { origin: "client", exit: 4, match: ["Company validation needs --profile", "must be a positive integer"], meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
     ],
     notes: [
       "ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.",

@@ -95,6 +95,31 @@ export const ASIAKAS_FLAG_ERR: CommandError = {
 };
 
 /**
+ * Client exit-4 ERRORS rows for the intFlag/numFlag parse guards, in the
+ * limitErr mould — uniform wording for every command carrying a guarded
+ * numeric flag (fb#905 follow-up: ~15 inline copies across four files were
+ * drifting-prone hand templates). `match` is the FULL guard message, per the
+ * ASIAKAS_FLAG_ERR/fb#908 rationale: a bare flag-name substring shadows
+ * sibling rows whose message merely MENTIONS the flag.
+ */
+export const intParseErr = (flag: string, remedy: string, min = 1): CommandError => ({
+  origin: "client",
+  exit: 4,
+  match: `${flag} must be an integer >= ${min}`,
+  meaning: `${flag} is not an integer >= ${min}, rejected locally before any request`,
+  remedy,
+});
+
+/** The float twin of {@link intParseErr}, for numFlag-guarded flags. */
+export const numParseErr = (flag: string, remedy: string): CommandError => ({
+  origin: "client",
+  exit: 4,
+  match: `${flag} must be a number`,
+  meaning: `${flag} is not a number, rejected locally before any request`,
+  remedy,
+});
+
+/**
  * Sandwich the command-specific rows between the universal 401 and 500 rows,
  * preserving their order. Most specs' custom rows (403/404/…) belong BETWEEN
  * the two, which `...COMMON_AUTH_ERRORS` (a trailing spread) cannot express.

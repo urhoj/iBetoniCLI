@@ -11,7 +11,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId, cappedInt, assertPositiveInt, intFlag } from "../../targets.js";
+import { parseId, cappedInt, assertPositiveInt, intFlag, numFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { flattenGeocodeResult, type FlatGeocode } from "../_shared/geocode.js";
 import {
@@ -1146,11 +1146,11 @@ export function registerSijaintiCommands(
     .option("--body <json>")
     .option("--name <n>")
     .option("--address <a>")
-    .option("--type <id>", "", Number)
-    .option("--lat <n>", "", Number)
-    .option("--lng <n>", "", Number)
+    .option("--type <id>", "", intFlag("--type"))
+    .option("--lat <n>", "", numFlag("--lat"))
+    .option("--lng <n>", "", numFlag("--lng"))
     .option("--lyh <s>")
-    .option("--max-distance <n>", "", Number)
+    .option("--max-distance <n>", "", numFlag("--max-distance"))
     .option("--asiakas <id>", "", intFlag("--asiakas"))
     .option("--puomi-min <m>", "", Number)
     .option("--puomi-max <m>", "", Number)

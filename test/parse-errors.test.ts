@@ -519,10 +519,15 @@ describe("attachment id rejects non-integers client-side (fb#893)", () => {
  * create --asiakas, and validate --keikka. All guards fire at parse time
  * (argParser), so tokenless is enough — exit 4 proves no request. Sites
  * already guarded downstream were left as-is (validate --asiakas/--person,
- * sijainti plants, message daily list/add, jerry check-address).
- * `message daily` commands have no spec entry yet, so their envelopes carry
- * no hint — the guard is the point here; the catalog gap is tracked
- * separately.
+ * sijainti plants, message daily list/add).
+ *
+ * Follow-up (post-impl review of a681487): the same-hunk write-body flags the
+ * first pass missed — jerry request create --boom/--duration/--line-length,
+ * check-address --lat/--lng, sales prospect update's profile fields + --tier,
+ * sijainti create --type/--lat/--lng/--max-distance — are guarded here too,
+ * and the message daily specs gained client ERRORS rows (their envelopes now
+ * resolve hints). jerry check-address keeps its --explain half action-level;
+ * only the NaN half moved to parse time.
  */
 describe("leftover bare-Number coercions reject garbage at parse time (fb#905)", () => {
   const opts = { token: "", endpoint: "https://example.invalid" };
@@ -549,6 +554,18 @@ describe("leftover bare-Number coercions reject garbage at parse time (fb#905)",
     [["jerry", "provider-settings", "get", "--asiakas", "abc"]],
     [["sijainti", "create", "--asiakas", "abc"]],
     [["validate", "--keikka", "abc"]],
+    // Follow-up batch (post-impl review):
+    [["attachment", "detach", "1", "--keikka", "abc"]],
+    [["vehicle", "create", "--type", "abc"]],
+    [["sales", "prospect", "list", "--tier", "abc"]],
+    [["sales", "prospect", "update", "1", "--fleet-pumps", "abc"]],
+    [["message", "daily", "grant", "1", "--role", "abc"]],
+    [["message", "daily", "perm-set", "1", "--role", "abc"]],
+    [["fennoa", "purchases", "--asiakas", "abc"]],
+    [["jerry", "request", "create", "--boom", "abc"]],
+    [["jerry", "check-address", "--lat", "abc"]],
+    [["jerry", "provider-settings", "set", "--asiakas", "abc"]],
+    [["sijainti", "create", "--lat", "abc"]],
   ])("ib %j → exit 4, no request", async (argv) => {
     const { exitCode, stderr } = await runArgv(argv as string[], opts);
     expect(exitCode).toBe(4);

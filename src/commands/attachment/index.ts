@@ -66,7 +66,7 @@ type AttachmentUpdateOpts = WriteFlags &
 
 function addEntityFlags(cmd: Command): Command {
   for (const e of ENTITY_OPTS) {
-    cmd.option(e.flag, "", intFlag("--" + e.optKey));
+    cmd.option(e.flag, "", intFlag(e.flag.split(" ")[0]));
   }
   // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
   // tenant-scoped commands, but here the canonical spelling is `--customer`
