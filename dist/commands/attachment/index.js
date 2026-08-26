@@ -23,6 +23,8 @@ const ENTITY_OPTS = [
     { optKey: "message", flag: "--message <id>", entity: "message" },
 ];
 const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
+/** The `--flag` halves of {@link ENTITY_OPTS}, pre-joined for the two exactly/only-one error messages. */
+const ENTITY_FLAG_LIST = ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ");
 function addEntityFlags(cmd) {
     for (const e of ENTITY_OPTS) {
         cmd.option(e.flag, "", (s) => Number(s));
@@ -54,7 +56,7 @@ export function resolveEntityTarget(opts) {
     foldAsiakasAlias(opts);
     const hits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
     if (hits.length !== 1) {
-        failWith(`Exactly one entity flag required (got ${hits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`, 4);
+        failWith(`Exactly one entity flag required (got ${hits.length}): ${ENTITY_FLAG_LIST}`, 4);
     }
     const entityId = Number(opts[hits[0].optKey]);
     assertPositiveInt(entityId, hits[0].flag.split(" ")[0]);
@@ -80,7 +82,7 @@ export function resolveDetachEntity(positional, opts) {
     foldAsiakasAlias(opts);
     const flagHits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
     if (flagHits.length > 1) {
-        failWith(`Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`, 4);
+        failWith(`Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_FLAG_LIST}`, 4);
     }
     const fromFlag = flagHits.length === 1 ? flagHits[0].entity : undefined;
     const fromPositional = positional !== undefined ? normalizeEntityWord(positional) : undefined;

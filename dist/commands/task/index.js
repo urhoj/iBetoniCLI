@@ -50,6 +50,11 @@ function probedEnvelope(rows, requested) {
         env.truncated = true;
     return env;
 }
+/** Clamp `--limit` to [1, cap] and derive the probe-by-one fetch size {@link probedEnvelope} interprets. */
+function probeLimits(limit) {
+    const requested = Math.min(Math.max(limit ?? 50, 1), SERVER_LIST_CAP);
+    return { requested, probe: Math.min(requested + 1, SERVER_LIST_CAP) };
+}
 function parseTaskId(v, cmd) {
     const n = Number(v);
     assertPositiveInt(n, `task ${cmd}: id`);
@@ -59,7 +64,7 @@ function parseTaskId(v, cmd) {
 export async function runTaskList(client, opts) {
     assertEnum(opts.executor, EXECUTORS, "--executor");
     assertEnum(opts.agent, AGENTS, "--agent");
-    const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
+    const { requested, probe } = probeLimits(opts.limit);
     // The boolean flags go out as `1`, not the raw boolean — `qs` would
     // serialise `true` as the literal "true" and change the wire.
     const rows = await client.get(`/api/tasks${qs({
@@ -69,7 +74,7 @@ export async function runTaskList(client, opts) {
         assignee: opts.assignee,
         asiakas: opts.asiakas,
         includeInactive: opts.inactive ? 1 : undefined,
-        limit: Math.min(requested + 1, SERVER_LIST_CAP),
+        limit: probe,
         offset: opts.offset,
     })}`);
     return probedEnvelope(rows, requested);
@@ -213,8 +218,7 @@ export async function runTaskSet(client, id, input, flags) {
 }
 /** GET /api/tasks/:id/log — completion history, newest first. */
 export async function runTaskLog(client, id, opts) {
-    const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
-    const probe = Math.min(requested + 1, SERVER_LIST_CAP);
+    const { requested, probe } = probeLimits(opts.limit);
     const rows = await client.get(`/api/tasks/${id}/log?limit=${probe}`);
     return probedEnvelope(rows, requested);
 }

@@ -39,6 +39,25 @@ export function ownerAsiakasIdFromToken(
 }
 
 /**
+ * The `personId` claim of already-decoded claims, or exit 4 — the personId
+ * sibling of {@link ownerAsiakasIdFromToken}, collapsing the five hand-rolled
+ * `claims.personId ?? failWith(...)` ladders in person/legal. Takes CLAIMS, not
+ * a client: three of the five sites already hold a decoded object for other
+ * reasons. `hint` appends a call-site escape hatch (legal status offers
+ * `--person <id>`); the base message is quoted in specs/person.ts prose and
+ * must not drift.
+ */
+export function personIdFromClaims(
+  claims: { personId?: number },
+  hint?: string
+): number {
+  return (
+    claims.personId ??
+    failWith(`could not resolve personId from the active token${hint ? ` — ${hint}` : ""}`, 4)
+  );
+}
+
+/**
  * Resolve the caller's active ownerAsiakasId — the one shared implementation
  * of the guard previously copied into the log/person/customer/sijainti modules
  * (customer's copy lacked the guard and could leak `undefined` into URLs).

@@ -15,7 +15,7 @@ import {
   type TokenCompanyClaim,
 } from "../../auth/jwt.js";
 import { resolveCallerTier, type CallerTier } from "../../tier.js";
-import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { resolveActiveOwnerAsiakasId, personIdFromClaims } from "../../owner.js";
 import {
   runCombinatorDuplicates,
   runCombinatorMerge,
@@ -456,8 +456,7 @@ export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const token = client.getCurrentToken();
   const claims = decodeJwtPayload(token);
   const impersonating = impersonationFromClaims(claims);
-  const personId =
-    claims.personId ?? failWith("could not resolve personId from the active token", 4);
+  const personId = personIdFromClaims(claims);
   const [profile, available] = await bothInOrder(
     client.get<{
       personId: number; name: string | null; email: string | null; phone: string | null; roles: number[];
@@ -547,10 +546,7 @@ export async function runPersonCompanies(
   client: ApiClient,
   personId?: number
 ): Promise<PersonCompaniesOutput> {
-  const id =
-    personId ??
-    decodeJwtPayload(client.getCurrentToken()).personId ??
-    failWith("could not resolve personId from the active token", 4);
+  const id = personId ?? personIdFromClaims(decodeJwtPayload(client.getCurrentToken()));
   return orLegacy(
     () => client.get<PersonCompaniesOutput>(`/api/cli/person/${id}/companies`),
     () => runPersonCompaniesLegacy(client, id)
@@ -613,9 +609,7 @@ export function runPersonCompaniesAsToken(
   personId?: number
 ): PersonCompaniesTokenOutput {
   const token = client.getCurrentToken();
-  const self =
-    decodeJwtPayload(token).personId ??
-    failWith("could not resolve personId from the active token", 4);
+  const self = personIdFromClaims(decodeJwtPayload(token));
   if (personId !== undefined && personId !== self) {
     failUsage(
       `--as-token reports the ACTIVE token's own claim, so it only works for personId ${self} (the caller); got ${personId}. Drop --as-token to read personId ${personId}'s companies from the backend.`

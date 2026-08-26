@@ -28,6 +28,8 @@ const ENTITY_OPTS: { optKey: string; flag: string; entity: string }[] = [
   { optKey: "message", flag: "--message <id>", entity: "message" },
 ];
 const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
+/** The `--flag` halves of {@link ENTITY_OPTS}, pre-joined for the two exactly/only-one error messages. */
+const ENTITY_FLAG_LIST = ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ");
 
 /**
  * Base options of any attachment command that targets an entity: the universal
@@ -101,7 +103,7 @@ export function resolveEntityTarget(opts: Record<string, unknown>): {
   const hits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
   if (hits.length !== 1) {
     failWith(
-      `Exactly one entity flag required (got ${hits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`,
+      `Exactly one entity flag required (got ${hits.length}): ${ENTITY_FLAG_LIST}`,
       4
     );
   }
@@ -135,7 +137,7 @@ export function resolveDetachEntity(
   const flagHits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
   if (flagHits.length > 1) {
     failWith(
-      `Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`,
+      `Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_FLAG_LIST}`,
       4
     );
   }

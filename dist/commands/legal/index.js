@@ -3,6 +3,7 @@ import { CliError } from "../../api/errors.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
+import { personIdFromClaims } from "../../owner.js";
 import { parseId, cappedInt, assertEnum } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
@@ -431,9 +432,7 @@ export function registerLegalCommands(parent, getClient) {
         .action(guarded(async (opts) => {
         const client = await getClient();
         const claims = decodeJwtPayload(client.getCurrentToken());
-        const personId = opts.person ??
-            claims.personId ??
-            failWith("could not resolve personId from the active token — pass --person <id>", 4);
+        const personId = opts.person ?? personIdFromClaims(claims, "pass --person <id>");
         const owner = opts.owner ?? claims.ownerAsiakasId ?? null;
         writeJson(await runLegalStatus(client, personId, owner));
     }));
@@ -595,8 +594,7 @@ export function registerLegalCommands(parent, getClient) {
         const client = await getClient();
         const claims = decodeJwtPayload(client.getCurrentToken());
         assertDeveloperClaims(claims);
-        const personId = claims.personId ??
-            failWith("could not resolve personId from the active token", 4);
+        const personId = personIdFromClaims(claims);
         writeJson(await runLegalAccept(client, typeName, personId, opts));
     }));
     const typeGroup = legal

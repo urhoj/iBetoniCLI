@@ -23,7 +23,6 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
-  isKnownEntityType,
   runLogTypes,
 } from "./entityTypes.js";
 import { qs } from "../../api/query.js";
@@ -36,7 +35,8 @@ import {
 export type { ChangeItem };
 
 function assertKnownEntityType(entityType: string): void {
-  if (!isKnownEntityType(entityType)) {
+  const info = findEntityType(entityType);
+  if (!info) {
     failWith(
       `unknown entityType '${entityType}'. Valid: ` +
         CHANGE_ENTITY_TYPES.map((e) => e.entityType).join(", ") +
@@ -44,7 +44,6 @@ function assertKnownEntityType(entityType: string): void {
       4
     );
   }
-  const info = findEntityType(entityType)!;
   if (info.deprecated) {
     // Diagnostic on stderr (stdout stays pure JSON data).
     warnNote(`note: entityType '${entityType}' is deprecated — ${info.notes}`);

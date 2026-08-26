@@ -4,16 +4,16 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId, cappedInt, intFlag, addOwnerOption } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
+import { CHANGE_ENTITY_TYPES, findEntityType, runLogTypes, } from "./entityTypes.js";
 import { qs } from "../../api/query.js";
 import { projectChangeRow, } from "./changeRow.js";
 function assertKnownEntityType(entityType) {
-    if (!isKnownEntityType(entityType)) {
+    const info = findEntityType(entityType);
+    if (!info) {
         failWith(`unknown entityType '${entityType}'. Valid: ` +
             CHANGE_ENTITY_TYPES.map((e) => e.entityType).join(", ") +
             ". See `ib log types`.", 4);
     }
-    const info = findEntityType(entityType);
     if (info.deprecated) {
         // Diagnostic on stderr (stdout stays pure JSON data).
         warnNote(`note: entityType '${entityType}' is deprecated — ${info.notes}`);

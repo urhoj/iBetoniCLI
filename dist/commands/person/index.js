@@ -3,7 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, tokenCompanyClaims, } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
-import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { resolveActiveOwnerAsiakasId, personIdFromClaims } from "../../owner.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
@@ -283,7 +283,7 @@ export async function runPersonMe(client) {
     const token = client.getCurrentToken();
     const claims = decodeJwtPayload(token);
     const impersonating = impersonationFromClaims(claims);
-    const personId = claims.personId ?? failWith("could not resolve personId from the active token", 4);
+    const personId = personIdFromClaims(claims);
     const [profile, available] = await bothInOrder(client.get(`/api/cli/person/get/${personId}`), client.get(`/api/company-selection/available`));
     const companies = available.companies || [];
     const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
@@ -323,9 +323,7 @@ const LEGACY_SOURCE_HINT = "backend route /api/cli/person/:personId/companies is
  * quietly narrower.
  */
 export async function runPersonCompanies(client, personId) {
-    const id = personId ??
-        decodeJwtPayload(client.getCurrentToken()).personId ??
-        failWith("could not resolve personId from the active token", 4);
+    const id = personId ?? personIdFromClaims(decodeJwtPayload(client.getCurrentToken()));
     return orLegacy(() => client.get(`/api/cli/person/${id}/companies`), () => runPersonCompaniesLegacy(client, id));
 }
 /**
@@ -365,8 +363,7 @@ async function runPersonCompaniesLegacy(client, personId) {
  */
 export function runPersonCompaniesAsToken(client, personId) {
     const token = client.getCurrentToken();
-    const self = decodeJwtPayload(token).personId ??
-        failWith("could not resolve personId from the active token", 4);
+    const self = personIdFromClaims(decodeJwtPayload(token));
     if (personId !== undefined && personId !== self) {
         failUsage(`--as-token reports the ACTIVE token's own claim, so it only works for personId ${self} (the caller); got ${personId}. Drop --as-token to read personId ${personId}'s companies from the backend.`);
     }

@@ -78,6 +78,12 @@ function probedEnvelope(
   return env;
 }
 
+/** Clamp `--limit` to [1, cap] and derive the probe-by-one fetch size {@link probedEnvelope} interprets. */
+function probeLimits(limit: number | undefined): { requested: number; probe: number } {
+  const requested = Math.min(Math.max(limit ?? 50, 1), SERVER_LIST_CAP);
+  return { requested, probe: Math.min(requested + 1, SERVER_LIST_CAP) };
+}
+
 function parseTaskId(v: string, cmd: string): number {
   const n = Number(v);
   assertPositiveInt(n, `task ${cmd}: id`);
@@ -102,7 +108,7 @@ export async function runTaskList(
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.executor, EXECUTORS, "--executor");
   assertEnum(opts.agent, AGENTS, "--agent");
-  const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
+  const { requested, probe } = probeLimits(opts.limit);
   // The boolean flags go out as `1`, not the raw boolean — `qs` would
   // serialise `true` as the literal "true" and change the wire.
   const rows = await client.get<Record<string, unknown>[]>(
@@ -113,7 +119,7 @@ export async function runTaskList(
       assignee: opts.assignee,
       asiakas: opts.asiakas,
       includeInactive: opts.inactive ? 1 : undefined,
-      limit: Math.min(requested + 1, SERVER_LIST_CAP),
+      limit: probe,
       offset: opts.offset,
     })}`
   );
@@ -300,8 +306,7 @@ export async function runTaskLog(
   id: number,
   opts: { limit?: number }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
-  const probe = Math.min(requested + 1, SERVER_LIST_CAP);
+  const { requested, probe } = probeLimits(opts.limit);
   const rows = await client.get<Record<string, unknown>[]>(`/api/tasks/${id}/log?limit=${probe}`);
   return probedEnvelope(rows, requested);
 }
