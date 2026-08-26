@@ -13,7 +13,7 @@
  * command that threw.
  */
 import type { Command } from "commander";
-import { COMMAND_SPECS, specForPath } from "../reference/specs.js";
+import { COMMAND_SPECS } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
 import type { CommandSpec } from "./help.js";
 import { commandDomains, fullyHiddenDomains, isWriteSpec } from "../reference/commandsList.js";
@@ -54,6 +54,20 @@ export const GROUP_SIBLING_DOMAINS: Record<string, SiblingGroup> = {
   company: { domain: "customer", why: ASIAKAS_PAIR_WHY },
   customer: { domain: "company", why: ASIAKAS_PAIR_WHY },
 };
+
+/**
+ * The spec whose command equals the CANONICAL form of `path` (pass the path as
+ * invoked — a back-compat alias resolves to the command's own spec, so aliased
+ * invocations still get their documented remedies/allowed values). One lookup
+ * shared with program.ts so alias resolution cannot drift between the four
+ * sites that used to spell it inline. Homed here, not in reference/specs.ts —
+ * the packed dist/reference/specs.js must stay pure-JSON data (pack-specs
+ * refuses a function export).
+ */
+export function specForPath(path: string): CommandSpec | undefined {
+  const canonical = canonicalPath(path);
+  return COMMAND_SPECS.find((s) => s.command === canonical);
+}
 
 /** The "where to look next" fragment both enriched envelopes render. */
 function discoverHint(path: string): string {
