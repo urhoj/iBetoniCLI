@@ -12,6 +12,7 @@ import {
   runFeedbackLint,
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
+  resolveClaimId,
   type FeedbackResolveInput,
   type FeedbackUpdateInput,
 } from "../../src/commands/feedback/index.js";
@@ -1835,6 +1836,56 @@ describe("ib feedback list — --held filter", () => {
     const out = await runFeedbackList(mockClient, { status: "open", held: true });
     expect(note()).not.toMatch(/IGNORED/);
     expect(out.hint ?? "").not.toMatch(/UNFILTERED/);
+  });
+});
+
+/**
+ * claimState "mine" under a DERIVED (user@host fallback) identity (fb#901):
+ * every unset-$IB_CLAIM_ID session on a host shares that one label, so "mine"
+ * actively misreports another session's claim as this caller's own.
+ */
+describe("ib feedback list — claimState under a derived identity (fb#901)", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  const savedId = process.env.IB_CLAIM_ID;
+  beforeEach(() => {
+    delete process.env.IB_CLAIM_ID;
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => {
+    errSpy.mockRestore();
+    if (savedId === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = savedId;
+  });
+  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+  const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  test("a row claimed under the fallback label reports 'held', not 'mine', and warns", async () => {
+    const derivedMe = resolveClaimId(undefined);
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: derivedMe, claimExpiresAt: FUTURE, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open" });
+    expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "held" });
+    expect(note()).toMatch(/DERIVED from user@host/);
+  });
+
+  test("an explicit IB_CLAIM_ID still reports 'mine' with no warning", async () => {
+    process.env.IB_CLAIM_ID = "hermes/groom";
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: "hermes/groom", claimExpiresAt: FUTURE, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open" });
+    expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "mine" });
+    expect(note()).not.toMatch(/downgraded/);
+  });
+
+  test("a row held by SOMEONE ELSE under a derived identity is unaffected ('held' either way)", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, claimedBy: "someone-else", claimExpiresAt: FUTURE, status: "open" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open" });
+    expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "held" });
+    expect(note()).not.toMatch(/downgraded/);
   });
 });
 

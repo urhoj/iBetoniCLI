@@ -279,6 +279,42 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
     );
     expect(c.put).toHaveBeenCalledTimes(1);
   });
+
+  test("forwards --ai-confidence/--needs-human-review from the edit-mode flags into the PUT body (fb#907)", async () => {
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      put: vi.fn().mockResolvedValue({ command: "ib keikka list" }),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
+    await runReferenceDetailEdit(
+      c, ["keikka", "list"], "summary",
+      { kind: "append", text: " (cached)" },
+      { reason: "tweak summary", aiConfidence: 95 }, "developer"
+    );
+    expect(c.put).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20keikka%20list",
+      { summary: "Lists orders (cached)", aiConfidence: 95, needsHumanReview: undefined },
+      { headers: { "X-Action-Reason": "tweak summary" } }
+    );
+  });
+
+  test("omitting --ai-confidence in edit mode still resets the score (undefined, not carried over)", async () => {
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      put: vi.fn().mockResolvedValue({ command: "ib keikka list" }),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
+    await runReferenceDetailEdit(
+      c, ["keikka", "list"], "summary",
+      { kind: "append", text: " (cached)" },
+      { reason: "tweak summary" }, "developer"
+    );
+    expect(c.put).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20keikka%20list",
+      { summary: "Lists orders (cached)", aiConfidence: undefined, needsHumanReview: undefined },
+      { headers: { "X-Action-Reason": "tweak summary" } }
+    );
+  });
 });
 
 describe("field caps (fb#284)", () => {

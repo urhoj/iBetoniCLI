@@ -241,7 +241,7 @@ export async function runReferenceDetailEdit(
   commandParts: string[],
   field: DetailEditableField,
   op: TextEditOp,
-  flags: WriteFlags = {},
+  flags: WriteFlags & AssessFlags = {},
   tier: CallerTier = getCallerTier()
 ): Promise<unknown> {
   const command = resolveCommand(commandParts, tier);
@@ -268,5 +268,11 @@ export async function runReferenceDetailEdit(
   if (flags.dryRun) {
     return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field, seamInserted);
   }
-  return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
+  return runReferenceDetailSet(
+    client,
+    commandParts,
+    { [field]: next, aiConfidence: flags.aiConfidence, needsHumanReview: flags.needsHumanReview },
+    flags,
+    tier
+  );
 }

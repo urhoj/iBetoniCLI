@@ -301,6 +301,7 @@ export async function buildProgram(argv) {
             // --reason is required only in EDIT mode (a conditional the spec cannot
             // express), so this one guard stays hand-called.
             requireReason(opts, { allowDryRun: true });
+            assertAiConfidence(opts.aiConfidence);
             try {
                 const client = await getClient();
                 writeJson(await runReferenceDetailEdit(client, commandParts, field, editOp, opts));

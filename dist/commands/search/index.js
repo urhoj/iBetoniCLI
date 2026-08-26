@@ -52,7 +52,7 @@ function projectWorksites(items) {
         id: w.tyomaaId,
         tyomaaId: w.tyomaaId,
         label: w.name ?? w.address ?? null,
-        detail: w.formattedAddress ?? [w.address, w.city].filter(Boolean).join(", ") ?? null,
+        detail: w.formattedAddress || [w.address, w.city].filter(Boolean).join(", ") || null,
     }));
 }
 /**

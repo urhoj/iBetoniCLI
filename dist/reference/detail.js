@@ -177,6 +177,6 @@ export async function runReferenceDetailEdit(client, commandParts, field, op, fl
     if (flags.dryRun) {
         return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field, seamInserted);
     }
-    return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
+    return runReferenceDetailSet(client, commandParts, { [field]: next, aiConfidence: flags.aiConfidence, needsHumanReview: flags.needsHumanReview }, flags, tier);
 }
 //# sourceMappingURL=detail.js.map

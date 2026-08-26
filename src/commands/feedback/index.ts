@@ -583,6 +583,16 @@ export async function runFeedbackList(
 
   items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
 
+  // A DERIVED `me` (user@host fallback — see resolveClaim) is a machine-wide
+  // label shared by every unset-env session on the host: it is not proof this
+  // caller made the claim, just that some unset-env session did. Reporting
+  // "mine" there actively misreports ownership (fb#901) — downgrade to "held"
+  // and warn once, rather than silently mislabeling another session's claim.
+  if (claimIdSource(undefined) === "derived" && items.some((r) => r.claimState === "mine")) {
+    items = items.map((r) => (r.claimState === "mine" ? { ...r, claimState: "held" as const } : r));
+    warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
+  }
+
   let cut = false;
   if (!opts.full) {
     items = items.map((r) => {
