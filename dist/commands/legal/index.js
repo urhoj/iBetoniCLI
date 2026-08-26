@@ -58,7 +58,6 @@ export async function runLegalShow(client, typeName, metaOnly, language) {
  */
 export async function runLegalActive(client, language) {
     const types = await runLegalTypes(client);
-    const suffix = qs({ language: language || undefined });
     const items = await Promise.all(types.items.map(async (t) => {
         const base = {
             typeName: t.typeName,
@@ -66,7 +65,7 @@ export async function runLegalActive(client, language) {
             personSettingTypeId: t.personSettingTypeId,
         };
         try {
-            const doc = await client.get(`/api/legal-documents/current/${encodeURIComponent(t.typeName)}${suffix}`);
+            const doc = await runLegalShow(client, t.typeName, false, language);
             return {
                 ...base,
                 hasActive: true,
@@ -224,8 +223,7 @@ export async function runLegalDiff(client, input) {
     };
 }
 export async function resolveDocumentType(client, typeName) {
-    const types = await client.get("/api/legal-documents/types");
-    const list = Array.isArray(types) ? types : [];
+    const list = (await runLegalTypes(client)).items;
     const t = list.find((x) => x.typeName === typeName);
     if (!t) {
         failWith(`Unknown document type "${typeName}". Valid: ${list.map((x) => x.typeName).join(", ")}`, 5);
@@ -566,20 +564,19 @@ export function registerLegalCommands(parent, getClient) {
             language,
         }, opts));
     }));
-    const activateCmd = legal
-        .command("activate <documentId>");
-    addWriteFlagsToCommand(activateCmd).action(guarded(async (documentIdStr, opts) => {
-        const documentId = parseId(documentIdStr, "documentId");
-        const client = await getClient();
-        writeJson(await runLegalActivate(client, documentId, opts));
-    }));
-    const deleteCmd = legal
-        .command("delete <documentId>");
-    addWriteFlagsToCommand(deleteCmd).action(guarded(async (documentIdStr, opts) => {
-        const documentId = parseId(documentIdStr, "documentId");
-        const client = await getClient();
-        writeJson(await runLegalDelete(client, documentId, opts));
-    }));
+    // activate/delete share the whole registration: one <documentId> + write
+    // flags. The id parses BEFORE getClient() so a bad id stays exit 4 even when
+    // logged out.
+    for (const [name, run] of [
+        ["activate", runLegalActivate],
+        ["delete", runLegalDelete],
+    ]) {
+        addWriteFlagsToCommand(legal.command(`${name} <documentId>`)).action(guarded(async (documentIdStr, opts) => {
+            const documentId = parseId(documentIdStr, "documentId");
+            const client = await getClient();
+            writeJson(await run(client, documentId, opts));
+        }));
+    }
     legal
         .command("acceptances <typeName>")
         // NOT --version: shadowed by the root global -V/--version (enforced by the
