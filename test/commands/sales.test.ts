@@ -246,10 +246,8 @@ describe("ib sales — segment/search parity with the Myynti UI (fb#817)", () =>
       row({ saasProspectId: 10, companyName: "Y", region: "Kainuu" }),
     ]);
     expect((await runProspectList(mockClient, { search: "7777777" })).count).toBe(1);
-    mockClient.get.mockResolvedValue([
-      row({ saasProspectId: 9, companyName: "X", ytunnus: "7777777-7" }),
-      row({ saasProspectId: 10, companyName: "Y", region: "Kainuu" }),
-    ]);
+    // mockResolvedValue persists across calls — no need to re-arm for the next
+    // assertion on the same rows.
     expect((await runProspectList(mockClient, { search: "kainuu" })).count).toBe(1);
   });
 });

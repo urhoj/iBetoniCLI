@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, test, expect, vi, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import { runArgv } from "../../src/runArgv.js";
 import { todayHelsinki } from "../../src/dates.js";
@@ -221,7 +221,7 @@ describe("ib vehicle driver — empty board/gaps disambiguation (fb#776)", () =>
     get().mockResolvedValueOnce(fleet(5)); // vehicle list
     const out = await runVehicleDriverBoard(c, day);
     expect(out.hint).toMatch(/NO vehicle is grid-eligible/);
-    const boardCalls = (c.get as Mock).mock.calls.filter(([p]) =>
+    const boardCalls = c.get.mock.calls.filter(([p]) =>
       String(p).startsWith("/api/cli/driver/board/")
     );
     expect(boardCalls).toHaveLength(1);

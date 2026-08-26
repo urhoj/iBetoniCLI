@@ -202,15 +202,13 @@ export async function runChangelogAdd(
  */
 export async function findAlreadyResolvedFeedback(
   client: ApiClient,
-  ids: number[],
-  fetchRow: (id: number) => Promise<Record<string, unknown>> = (id) =>
-    client.get<Record<string, unknown>>(`/api/feedback/${id}`)
+  ids: number[]
 ): Promise<Array<{ feedbackId: number; resolvedByChangelogId: number }>> {
   const out: Array<{ feedbackId: number; resolvedByChangelogId: number }> = [];
   for (const id of ids) {
     let row: Record<string, unknown> | undefined;
     try {
-      row = await fetchRow(id);
+      row = await client.get<Record<string, unknown>>(`/api/feedback/${id}`);
     } catch {
       continue;
     }
@@ -1028,6 +1026,11 @@ export function registerChangelogCommands(
       cmd: Command
     ) => {
       applyFromJson(cmd, o as Record<string, unknown>);
+      // Fail-fast BEFORE enum/length/date validation: both flags are CLI-only
+      // (nonPayload), and o.feedback may arrive via --from-json, so the earliest
+      // correct point is right after the JSON merge.
+      if (o.takeResolve && o.feedback === undefined) failWith("--take-resolve has no effect without --feedback", 4);
+      if (o.takeResolve && o.resolve === false) failWith("--take-resolve contradicts --no-resolve — pass one or the other", 4);
       // A changelog entry is a permanent record whose prose routinely names flags
       // and identifiers — the text most likely to carry backticks (fb#552).
       warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
@@ -1074,13 +1077,14 @@ export function registerChangelogCommands(
       }
       if (o.sha) body.commitShas = o.sha;
       if (o.vtag) body.versionTag = o.vtag;
-      if (o.feedback !== undefined) body.feedbackId = normalizeFeedbackIds(o.feedback);
+      // normalizeFeedbackIds always yields number[] for a defined input, so the
+      // pre-check can work off this local instead of re-deriving from body.
+      const feedbackIds = o.feedback !== undefined ? normalizeFeedbackIds(o.feedback) : undefined;
+      if (feedbackIds) body.feedbackId = feedbackIds;
       // Only sent when --no-resolve was actually passed: Commander defaults
       // `resolve` to true, and shipping that default would make every add assert a
       // resolve intent it never expressed.
       if (o.resolve === false) body.resolveFeedback = false;
-      if (o.takeResolve && o.feedback === undefined) failWith("--take-resolve has no effect without --feedback", 4);
-      if (o.takeResolve && o.resolve === false) failWith("--take-resolve contradicts --no-resolve — pass one or the other", 4);
       const client = await getClient();
       // fb#880: a follow-up entry to an ALREADY-resolved row used to silently
       // STEAL the resolves-link, demoting the original fix entry. Pre-check the
@@ -1089,9 +1093,8 @@ export function registerChangelogCommands(
       // --no-resolve already forces references so neither needs the pre-check.
       // Fail-open: an id whose pre-check GET errors keeps the old behaviour
       // (the `relinkedFrom` stderr note still fires if it turns out resolved).
-      if (body.feedbackId !== undefined && o.resolve !== false && !o.takeResolve) {
-        const ids = Array.isArray(body.feedbackId) ? body.feedbackId : [body.feedbackId];
-        const already = await findAlreadyResolvedFeedback(client, ids);
+      if (feedbackIds && o.resolve !== false && !o.takeResolve) {
+        const already = await findAlreadyResolvedFeedback(client, feedbackIds);
         if (already.length > 0) {
           body.resolveFeedback = false;
           // resolveFeedback is PER-REQUEST: one already-resolved id demotes the
@@ -1100,7 +1103,7 @@ export function registerChangelogCommands(
           // the fired feedbackStatus note blames a "deliberately set" status for
           // what is actually this demotion (fb#880 review M2).
           const resolvedIds = new Set(already.map((a) => a.feedbackId));
-          const openIds = ids.filter((id) => !resolvedIds.has(id));
+          const openIds = feedbackIds.filter((id) => !resolvedIds.has(id));
           warnNote(
             `[ib] note: ${already
               .map((a) => `fb#${a.feedbackId} is already resolved by cl#${a.resolvedByChangelogId}`)

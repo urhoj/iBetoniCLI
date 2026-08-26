@@ -613,24 +613,30 @@ describe("changelog add --feedback on an ALREADY-resolved row (fb#880)", () => {
 });
 
 describe("findAlreadyResolvedFeedback (fb#880)", () => {
+  // The GET is `/api/feedback/:id`, so the mock keys off the trailing id —
+  // the repo idiom expresses client behaviour via mockApiClient, not DI hooks.
+  const rowById = (rows: Record<number, Record<string, unknown>>) => (url: string) =>
+    Promise.resolve(rows[Number(String(url).split("/").pop())]);
+
   test("returns only the ids whose row carries a numeric resolvedByChangelogId", async () => {
-    const rows: Record<number, Record<string, unknown>> = {
-      1: { resolvedByChangelogId: 100 },
-      2: { resolvedByChangelogId: null },
-      3: { status: "open" },
-    };
-    const out = await findAlreadyResolvedFeedback(client, [1, 2, 3], (id) =>
-      Promise.resolve(rows[id])
+    asGet().mockImplementation(
+      rowById({
+        1: { resolvedByChangelogId: 100 },
+        2: { resolvedByChangelogId: null },
+        3: { status: "open" },
+      })
     );
+    const out = await findAlreadyResolvedFeedback(client, [1, 2, 3]);
     expect(out).toEqual([{ feedbackId: 1, resolvedByChangelogId: 100 }]);
   });
 
   test("a fetch rejection for one id does not block the others (fail-open)", async () => {
-    const out = await findAlreadyResolvedFeedback(client, [1, 2], (id) =>
-      id === 1
+    asGet().mockImplementation((url: string) =>
+      Number(String(url).split("/").pop()) === 1
         ? Promise.reject(new Error("boom"))
         : Promise.resolve({ resolvedByChangelogId: 200 })
     );
+    const out = await findAlreadyResolvedFeedback(client, [1, 2]);
     expect(out).toEqual([{ feedbackId: 2, resolvedByChangelogId: 200 }]);
   });
 });
