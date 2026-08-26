@@ -1,9 +1,24 @@
-import { describe, test, expect, afterAll } from "vitest";
+import { describe, test, expect, afterAll, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { mkdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withFileLock } from "../../src/auth/lock.js";
+
+// fb#897: forces mkdir to reject ENOENT for the one test below that needs an
+// OS-independent repro of the F1 busy-loop bug — every other test keeps the
+// real fs behaviour via importOriginal.
+let forceMkdirEnoent = false;
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    mkdir: (...args: Parameters<typeof actual.mkdir>) =>
+      forceMkdirEnoent
+        ? Promise.reject(Object.assign(new Error("forced ENOENT"), { code: "ENOENT" }))
+        : actual.mkdir(...args),
+  };
+});
 
 const TMP = mkdtempSync(join(tmpdir(), "ib-lock-"));
 afterAll(() => {
@@ -87,7 +102,15 @@ describe("withFileLock (fb#884)", () => {
   // never be created busy-looped forever at full CPU, the exact hard outage
   // the best-effort contract promises not to cause. Every retry path must
   // route through the deadline.
-  test("an uncreatable parent (path blocked by a FILE) still returns within the cap — never hangs", async () => {
+  //
+  // fb#897: this repro is Windows-only — a parent path blocked by a FILE
+  // throws ENOENT from fs.mkdir on Windows, but ENOTDIR on POSIX/ubuntu (CI),
+  // which routes through lock.ts's unrelated `code !== "EEXIST"` branch and
+  // returns immediately, already correct before the fix. So this test alone
+  // passes identically against pre-fix and post-fix code on Linux CI — zero
+  // regression protection there. Kept as Windows-specific defense-in-depth;
+  // the OS-independent guard is the forced-ENOENT test right below it.
+  test("an uncreatable parent (path blocked by a FILE) still returns within the cap — never hangs [Windows-only guard]", async () => {
     const blocker = join(TMP, "blocker");
     writeFileSync(blocker, "not a directory");
     const lockPath = join(blocker, "creds.json.lock"); // mkdir can never succeed here
@@ -95,6 +118,23 @@ describe("withFileLock (fb#884)", () => {
     const ran = await withFileLock(lockPath, async () => "ok", { pollMs: 20, capMs: 300 });
     expect(ran).toBe("ok"); // proceeded unlocked at the cap
     expect(Date.now() - t0).toBeLessThan(5000); // bounded, not a spin/hang
+  });
+
+  // fb#897: OS-independent twin of the test above — forces the exact ENOENT
+  // code the F1 fix guards against (real Windows fs.mkdir semantics; POSIX's
+  // real ENOTDIR never reaches this branch), so it actually fails against the
+  // pre-fix "retry from the top" code on every platform, including ubuntu CI.
+  test("mkdir persistently rejecting ENOENT still returns within the cap — never hangs (OS-independent)", async () => {
+    const lockPath = join(TMP, "forced-enoent-parent", "creds.json.lock");
+    forceMkdirEnoent = true;
+    try {
+      const t0 = Date.now();
+      const ran = await withFileLock(lockPath, async () => "ok", { pollMs: 20, capMs: 300 });
+      expect(ran).toBe("ok"); // proceeded unlocked at the cap
+      expect(Date.now() - t0).toBeLessThan(5000); // bounded, not a spin/hang
+    } finally {
+      forceMkdirEnoent = false;
+    }
   });
 
   // Review finding F2 (release half): if a waiter stale-broke our lock while we
