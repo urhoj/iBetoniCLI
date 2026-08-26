@@ -1,5 +1,6 @@
-import { CliError, exitCodeFromStatus } from "../api/errors.js";
+import { CliError } from "../api/errors.js";
 import { createStore, defaultCredentialsPath } from "./store.js";
+import { postJson } from "./http.js";
 import { failWith } from "../output/json.js";
 import { getEmbeddedCtx } from "../embedded.js";
 
@@ -67,24 +68,18 @@ export function assertPersistedSwitchAllowed(readOnly: boolean): void {
  * yields HTTP 400 "newAsiakasId is required".
  */
 export async function performSwitch(opts: SwitchOptions): Promise<SwitchResult> {
-  const res = await fetch(`${opts.endpoint}/api/company-selection/switch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.jwt}`,
-    },
-    body: JSON.stringify({ newAsiakasId: opts.toAsiakasId }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new CliError(
-      `Company switch failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`,
-      res.status,
-      detail || null,
-      exitCodeFromStatus(res.status)
-    );
+  const body = (await postJson(
+    opts.endpoint,
+    "/api/company-selection/switch",
+    opts.jwt,
+    { newAsiakasId: opts.toAsiakasId },
+    "Company switch"
+  )) as SwitchResponseBody;
+  // Guard the persisted fields (the impersonate flows do the same): a 2xx body
+  // without a token must never reach store.save as `jwt: undefined`.
+  if (!body.token) {
+    throw new CliError("Company switch failed: response missing token", 0, body, 1);
   }
-  const body = (await res.json()) as SwitchResponseBody;
   return {
     jwt: body.token,
     ownerAsiakasId: body.ownerAsiakasId,

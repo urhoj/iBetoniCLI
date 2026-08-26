@@ -1,39 +1,10 @@
-import { CliError, errorMessage, exitCodeFromStatus } from "../api/errors.js";
+import { CliError } from "../api/errors.js";
+import { postJson } from "./http.js";
 import type { CredentialsProfile } from "./store.js";
 import type { DecodedClaims } from "./jwt.js";
 
 /** Reserved profile name under which the admin login is stashed during impersonation. */
 export const IMPERSONATOR_PROFILE = "_impersonator";
-
-async function postJson(
-  endpoint: string,
-  path: string,
-  jwt: string,
-  body: Record<string, unknown>,
-  label: string,
-): Promise<unknown> {
-  let res: Response;
-  try {
-    res = await fetch(`${endpoint}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    const detail = errorMessage(e);
-    throw new CliError(`Network error: ${detail}`, 0, null, 7);
-  }
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new CliError(
-      `${label} failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`,
-      res.status,
-      detail || null,
-      exitCodeFromStatus(res.status),
-    );
-  }
-  return res.json().catch(() => ({}));
-}
 
 /** Mint a 10-minute impersonation JWT for the target (by personId OR email). */
 export async function performImpersonate(opts: {
