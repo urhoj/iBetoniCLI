@@ -1,6 +1,6 @@
 import { test, it, expect, vi, beforeEach, describe } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
-import { captureActionError } from "../helpers/stderr.js";
+import { captureActionError, captureStderr } from "../helpers/stderr.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -242,7 +242,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects, warnFeedbackUnlinkEffects, requireAddFields } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects, warnFeedbackUnlinkEffects, requireAddFields, findAlreadyResolvedFeedback } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -502,6 +502,111 @@ describe("changelog add --no-resolve (fb#441/fb#517)", () => {
       expect([...keys.keys()]).not.toContain("resolve");
       expect([...keys.keys()]).not.toContain("no-resolve");
     }
+  });
+});
+
+describe("changelog add --feedback on an ALREADY-resolved row (fb#880)", () => {
+  /** Run `changelog add` through the real Commander tree and return the POSTed body. */
+  async function addWith(args: string[]): Promise<Record<string, unknown>> {
+    asPost().mockResolvedValue({ changelogId: 1201 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", ...args],
+      { from: "user" }
+    );
+    return asPost().mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  test("already-resolved row -> links as references (resolveFeedback:false), stderr names the resolver", async () => {
+    // The trap this fixes: a follow-up entry to a closed row used to silently
+    // TAKE the resolves-link, demoting the original fix entry.
+    asGet().mockResolvedValue({ feedbackId: 829, status: "applied", resolvedByChangelogId: 1649 });
+    const cap = captureStderr();
+    try {
+      const body = await addWith(["--feedback", "829"]);
+      expect(body.feedbackId).toEqual([829]);
+      expect(body.resolveFeedback).toBe(false);
+      expect(cap.text()).toContain("already resolved by cl#1649");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("open row -> keeps auto-resolve (no resolveFeedback key)", async () => {
+    asGet().mockResolvedValue({ feedbackId: 830, status: "open", resolvedByChangelogId: null });
+    const body = await addWith(["--feedback", "830"]);
+    expect(body).not.toHaveProperty("resolveFeedback");
+  });
+
+  test("--take-resolve re-owns an already-resolved row (no resolveFeedback key)", async () => {
+    asGet().mockResolvedValue({ feedbackId: 829, resolvedByChangelogId: 1649 });
+    const body = await addWith(["--feedback", "829", "--take-resolve"]);
+    expect(body.feedbackId).toEqual([829]);
+    expect(body).not.toHaveProperty("resolveFeedback");
+  });
+
+  test("a pre-check GET failure fails OPEN -> keeps auto-resolve", async () => {
+    asGet().mockRejectedValue(new Error("feedback endpoint down"));
+    const body = await addWith(["--feedback", "831"]);
+    expect(body).not.toHaveProperty("resolveFeedback");
+  });
+
+  test("--take-resolve without --feedback exits 4", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const { exitCode } = await captureActionError(() => program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", "--take-resolve"],
+      { from: "user" }
+    ));
+    expect(exitCode).toBe(4);
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("--take-resolve with --no-resolve exits 4", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const { exitCode } = await captureActionError(() => program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", "--feedback", "829", "--take-resolve", "--no-resolve"],
+      { from: "user" }
+    ));
+    expect(exitCode).toBe(4);
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("`takeResolve` is NOT an accepted --from-json key (fb#631 parity with resolve)", () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const add = program.commands.find((c) => c.name() === "changelog")!
+      .commands.find((c) => c.name() === "add")!;
+    expect([...payloadKeyMap(add).keys()]).not.toContain("takeResolve");
+    expect([...payloadKeyMap(add).keys()]).not.toContain("take-resolve");
+  });
+});
+
+describe("findAlreadyResolvedFeedback (fb#880)", () => {
+  test("returns only the ids whose row carries a numeric resolvedByChangelogId", async () => {
+    const rows: Record<number, Record<string, unknown>> = {
+      1: { resolvedByChangelogId: 100 },
+      2: { resolvedByChangelogId: null },
+      3: { status: "open" },
+    };
+    const out = await findAlreadyResolvedFeedback(client, [1, 2, 3], (id) =>
+      Promise.resolve(rows[id])
+    );
+    expect(out).toEqual([{ feedbackId: 1, resolvedByChangelogId: 100 }]);
+  });
+
+  test("a fetch rejection for one id does not block the others (fail-open)", async () => {
+    const out = await findAlreadyResolvedFeedback(client, [1, 2], (id) =>
+      id === 1
+        ? Promise.reject(new Error("boom"))
+        : Promise.resolve({ resolvedByChangelogId: 200 })
+    );
+    expect(out).toEqual([{ feedbackId: 2, resolvedByChangelogId: 200 }]);
   });
 });
 

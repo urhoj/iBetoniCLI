@@ -102,7 +102,7 @@ const SEVERITY_FLAG_DESC =
 // `resolutionPreserved`, and the two copies ended up with different tails.
 // Each leaf still appends its own closing sentence after these.
 const FROM_JSON_NON_PAYLOAD_DESC =
-  "NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve` in the file exit 4.";
+  "NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve / --take-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve`/`takeResolve` in the file exit 4.";
 const FEEDBACK_LINKS_SHAPE_DESC =
   "One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist";
 const RESOLUTION_PRESERVED_SHAPE_DESC =
@@ -176,6 +176,38 @@ export async function runChangelogAdd(
   return client.post<unknown>("/api/changelog", body, {
     headers: writeFlagsToHeaders(flags),
   });
+}
+
+/**
+ * fb#880: the subset of `ids` whose cliFeedback row is ALREADY resolved by a
+ * changelog entry (resolvedByChangelogId set). `add --feedback` used to
+ * silently TAKE the resolves-link from that original fix entry in this case —
+ * a trap, because a follow-up entry to a closed row is far more common than an
+ * intentional re-resolve. The add action pre-checks with this and defaults
+ * such ids to role `references` unless --take-resolve re-owns the link.
+ *
+ * Fail-open per id (a pre-check must never block the add): a GET that errors
+ * simply does not mark its id, and the historical take-the-link behaviour —
+ * with its `relinkedFrom` stderr note — remains the backstop for it.
+ */
+export async function findAlreadyResolvedFeedback(
+  client: ApiClient,
+  ids: number[],
+  fetchRow: (id: number) => Promise<Record<string, unknown>> = (id) =>
+    client.get<Record<string, unknown>>(`/api/feedback/${id}`)
+): Promise<Array<{ feedbackId: number; resolvedByChangelogId: number }>> {
+  const out: Array<{ feedbackId: number; resolvedByChangelogId: number }> = [];
+  for (const id of ids) {
+    let row: Record<string, unknown> | undefined;
+    try {
+      row = await fetchRow(id);
+    } catch {
+      continue;
+    }
+    const resolver = row?.resolvedByChangelogId;
+    if (typeof resolver === "number") out.push({ feedbackId: id, resolvedByChangelogId: resolver });
+  }
+  return out;
 }
 
 export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | boolean | undefined>): Promise<ListEnvelope<Row>> {
@@ -610,7 +642,7 @@ const CHANGELOG_FROM_JSON: FromJsonConfig = {
   // loudly rejected as unknown (fb#541). No capability is lost — --no-resolve is a
   // valueless flag, so it has no shell-quoting problem and every caller that needs
   // --from-json for its prose can still pass --no-resolve on argv alongside it.
-  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve"]),
+  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve", "takeResolve"]),
   readShapeAliases: READ_SHAPE_KEY_ALIASES,
   numericFields: new Set([]),
   // fb#576: --feedback is now CSV (a single id or several); csvFields is the
@@ -966,6 +998,7 @@ export function registerChangelogCommands(
       .option("--bump-level <l>", "", "patch")
       .option("--feedback <ids>", "", intCsvFlag("--feedback"))
       .option("--no-resolve")
+      .option("--take-resolve")
       .option("--sentry <ref>")
       .option("--source <s>")
       .option("--date <d>")
@@ -976,7 +1009,7 @@ export function registerChangelogCommands(
   ).action(
     guarded(async (
       description: string | undefined,
-      o: Record<string, string> & WriteFlags & { feedback?: number[]; resolve?: boolean; vtag?: string; bumpLevel?: string; fromJson?: string },
+      o: Record<string, string> & WriteFlags & { feedback?: number[]; resolve?: boolean; takeResolve?: boolean; vtag?: string; bumpLevel?: string; fromJson?: string },
       cmd: Command
     ) => {
       applyFromJson(cmd, o as Record<string, unknown>);
@@ -1031,12 +1064,35 @@ export function registerChangelogCommands(
       // `resolve` to true, and shipping that default would make every add assert a
       // resolve intent it never expressed.
       if (o.resolve === false) body.resolveFeedback = false;
+      if (o.takeResolve && o.feedback === undefined) failWith("--take-resolve has no effect without --feedback", 4);
+      if (o.takeResolve && o.resolve === false) failWith("--take-resolve contradicts --no-resolve — pass one or the other", 4);
+      const client = await getClient();
+      // fb#880: a follow-up entry to an ALREADY-resolved row used to silently
+      // STEAL the resolves-link, demoting the original fix entry. Pre-check the
+      // rows and default to role `references` instead; --take-resolve restores
+      // the deliberate re-own. Open rows keep the historical auto-resolve, and
+      // --no-resolve already forces references so neither needs the pre-check.
+      // Fail-open: an id whose pre-check GET errors keeps the old behaviour
+      // (the `relinkedFrom` stderr note still fires if it turns out resolved).
+      if (body.feedbackId !== undefined && o.resolve !== false && !o.takeResolve) {
+        const ids = Array.isArray(body.feedbackId) ? body.feedbackId : [body.feedbackId];
+        const already = await findAlreadyResolvedFeedback(client, ids);
+        if (already.length > 0) {
+          body.resolveFeedback = false;
+          warnNote(
+            `[ib] note: ${already
+              .map((a) => `fb#${a.feedbackId} is already resolved by cl#${a.resolvedByChangelogId}`)
+              .join("; ")} — this entry links as a cross-reference (role \`references\`) instead of taking the resolves role. ` +
+              `To re-resolve deliberately, re-run with --take-resolve.`
+          );
+        }
+      }
       if (o.sentry) body.sentryIssue = normalizeSentryRef(o.sentry);
       if (o.source) body.source = o.source;
       const addLang = normalizeLanguage(o.language);
       if (addLang) body.language = addLang;
       body.bumpLevel = o.bumpLevel || "patch";
-      const added = await runChangelogAdd(await getClient(), body, o);
+      const added = await runChangelogAdd(client, body, o);
       warnFeedbackLinkEffects(added);
       writeJson(added);
     })
@@ -1259,7 +1315,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     command: "ib dev changelog add",
     aliases: ["ib dev changelog create"],
     description:
-      "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all.",
+      "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all. An ALREADY-resolved row keeps its resolver unless --take-resolve is passed (fb#880).",
     auth: "any",
     tier: "developer",
     args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
@@ -1323,13 +1379,19 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "feedback",
         type: "string",
         description:
-          "cliFeedback id(s) to link — a single id or CSV (`541,542`), `fb#` anchors accepted. Role `resolves` (default) advances an `open` row to applied; a deliberately-set status (e.g. `reviewed`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row TAKES it (the correction path, stderr names the displaced entry; hand-written notes preserved, fb#366).",
+          "cliFeedback id(s) to link — a single id or CSV (`541,542`), `fb#` anchors accepted. Role `resolves` (default) advances an `open` row to applied; a deliberately-set status (e.g. `reviewed`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve deliberately re-owns the link (fb#366).",
       },
       {
         name: "no-resolve",
         type: "boolean",
         description:
           "Record the link(s) with role `references` instead of `resolves`: no status change, an already-resolved row keeps its resolver (fb#548). Applies to EVERY id in the list; for a mixed entry, add the resolving ids here and cross-reference the rest with a second `changelog update … --no-resolve`.",
+      },
+      {
+        name: "take-resolve",
+        type: "boolean",
+        description:
+          "Force role `resolves` on an ALREADY-resolved row — the deliberate re-own / correction path (fb#366). Without it, such a row links as a cross-reference (fb#880). Conflicts with --no-resolve.",
       },
       {
         name: "sentry",
@@ -1414,7 +1476,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
       "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
       'CROSS-LANE ENTRIES (fb#408): --repo is a CSV and the versioning model has two lanes (coordinated apps vs standalone betonicli/@ibetoni/*), so a change spanning both names both — --repo "puminet5api,betonicli"; each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.',
-      "--feedback on an ALREADY-resolved row TAKES the link (the correction path): the response carries `relinkedFrom` and stderr names the displaced entry — restore it with `ib dev changelog update <thatId> --feedback <id>` (fb#366).",
+      "--feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880); --take-resolve re-owns it (fb#366). Response carries `relinkedFrom`; restore via `ib dev changelog update <thatId> --feedback <id>`.",
       "DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog add`.",
       "Developer-gated.",
     ],

@@ -2206,7 +2206,7 @@ exports[`Help snapshots — contract stability > help for ib dev changelog add m
   (also: ib dev changelog create)
 
 DESCRIPTION
-  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from \`open\`; a status set deliberately (e.g. \`reviewed\`) is preserved, and --no-resolve links without touching the status at all.
+  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from \`open\`; a status set deliberately (e.g. \`reviewed\`) is preserved, and --no-resolve links without touching the status at all. An ALREADY-resolved row keeps its resolver unless --take-resolve is passed (fb#880).
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -2230,13 +2230,14 @@ FLAGS
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
-  --feedback STRING    cliFeedback id(s) to link — a single id or CSV (\`541,542\`), \`fb#\` anchors accepted. Role \`resolves\` (default) advances an \`open\` row to applied; a deliberately-set status (e.g. \`reviewed\`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row TAKES it (the correction path, stderr names the displaced entry; hand-written notes preserved, fb#366).
+  --feedback STRING    cliFeedback id(s) to link — a single id or CSV (\`541,542\`), \`fb#\` anchors accepted. Role \`resolves\` (default) advances an \`open\` row to applied; a deliberately-set status (e.g. \`reviewed\`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve deliberately re-owns the link (fb#366).
   --no-resolve    Record the link(s) with role \`references\` instead of \`resolves\`: no status change, an already-resolved row keeps its resolver (fb#548). Applies to EVERY id in the list; for a mixed entry, add the resolving ids here and cross-reference the rest with a second \`changelog update … --no-resolve\`.
+  --take-resolve    Force role \`resolves\` on an ALREADY-resolved row — the deliberate re-own / correction path (fb#366). Without it, such a row links as a cross-reference (fb#880). Conflicts with --no-resolve.
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en), default en
-  --from-json STRING    Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a \`changelog list\` row can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. An unknown or wrong-typed key exits 4 (never silently dropped); the length caps apply to a JSON value exactly as to a flag.
+  --from-json STRING    Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a \`changelog list\` row can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve / --take-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\`/\`takeResolve\` in the file exit 4. An unknown or wrong-typed key exits 4 (never silently dropped); the length caps apply to a JSON value exactly as to a flag.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -2266,7 +2267,7 @@ NOTES
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)
   - CROSS-LANE ENTRIES (fb#408): --repo is a CSV and the versioning model has two lanes (coordinated apps vs standalone betonicli/@ibetoni/*), so a change spanning both names both — --repo "puminet5api,betonicli"; each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.
-  - --feedback on an ALREADY-resolved row TAKES the link (the correction path): the response carries \`relinkedFrom\` and stderr names the displaced entry — restore it with \`ib dev changelog update <thatId> --feedback <id>\` (fb#366).
+  - --feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880); --take-resolve re-owns it (fb#366). Response carries \`relinkedFrom\`; restore via \`ib dev changelog update <thatId> --feedback <id>\`.
   - DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with \`ib dev feedback get <id>\` after linking; full per-flag matrix: \`ib reference detail get dev changelog add\`.
   - Developer-gated.
 
@@ -2556,7 +2557,7 @@ FLAGS
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
-  --from-json STRING    Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. Pass them alongside the file. (\`unlink\` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).
+  --from-json STRING    Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve / --take-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\`/\`takeResolve\` in the file exit 4. Pass them alongside the file. (\`unlink\` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -10777,8 +10778,8 @@ DESCRIPTION
 FLAGS
   --status STRING    ei_aloitettu | analysoitu | kontaktoitu | tapaaminen | tarjous | voitettu | havitty | ei_sovellu
   --tier NUMBER    1 priority · 2 secondary · 3 long tail
-  --segment STRING    pumppu | betoni | all | muu
-  --search STRING    Case-insensitive substring over companyName + ytunnus + region
+  --segment STRING    pumppu | betoni | all | muu. SAME semantics as the Myynti UI buckets (fb#817): pumppu/betoni mean value-OR-all, muu means value-OR-unset (the not-yet-typed bucket). Any other value is an exact match.
+  --search STRING    Case-insensitive substring over companyName + asiakasNimi + ytunnus + region (union of the Myynti UI's fields and this command's, fb#817)
   --brief    Omit analysis + pitchAngle — the full list is ~60 KB of narrative
 
 GLOBAL FLAGS
@@ -12197,6 +12198,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - driverPersonId/driverName come from personPvm (the live day-driver source).
   - needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap). Workload (keikkaCount/m3) does NOT affect it.
+  - GRID-ELIGIBLE (fb#776) = showInGrid set AND the day inside the vehicle's firstDate..lastDate window — a vehicle past its lastDate never reaches the board, so an EMPTY board means nothing qualifies that day, not 'no data'; the empty envelope's \`hint\` carries the counts.
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
   - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.
@@ -12420,6 +12422,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - A driverless vehicle is NOT a gap unless it uses the no-driver bar — so an empty gaps list alongside a board full of driverless vehicles is expected, not a contradiction. keikkaCount/m3 are informational and do NOT affect needsDriver.
+  - EMPTY LIST DISAMBIGUATED (fb#776): the envelope \`hint\` says WHICH case holds — every grid-eligible vehicle already has a driver, vs NO vehicle is grid-eligible that day (usually an expired lastDate window — check \`ib vehicle list\`).
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
   - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Pair with \`ib vehicle driver available <date>\` to find drivers to fill these. Deploy-gated.

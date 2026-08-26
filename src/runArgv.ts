@@ -4,6 +4,7 @@ import { resolveCallerTier } from "./tier.js";
 import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
 import { getGlobalOptions } from "./globals.js";
 import { setListColumns, setProjectionColumns } from "./output/json.js";
+import { normalizeSingleDashLongFlags } from "./argv.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -34,7 +35,10 @@ export async function runArgv(
   argv: string[],
   opts: RunArgvOpts
 ): Promise<RunArgvResult> {
-  const program = await buildProgram(argv);
+  // Same single-dash long-flag normalization as the bin path (fb#856), so the
+  // embedded runner accepts exactly the argv a real shell would.
+  const normArgv = normalizeSingleDashLongFlags(argv);
+  const program = await buildProgram(normArgv);
   const parserHooks = enableParserThrow(program);
 
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint
@@ -66,7 +70,7 @@ export async function runArgv(
 
   await runEmbedded(ctx, async () => {
     try {
-      await program.parseAsync(["node", "ib", ...argv]);
+      await program.parseAsync(["node", "ib", ...normArgv]);
     } catch (err) {
       handleParseRejection(err, parserHooks);
     }

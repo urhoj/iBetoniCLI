@@ -6,6 +6,22 @@ import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { parseOptionalId } from "../../targets.js";
 const BRIEF_OMIT = ["analysis", "pitchAngle"];
 /**
+ * Segment filter parity with the Myynti UI (fb#817). puminet4
+ * salesProspectFilters.js treats the buckets as UNIONS, not exact matches:
+ * 'pumppu'/'betoni' mean value-OR-all, and 'muu' doubles as the not-yet-typed
+ * bucket (unset OR muu). Exact equality here used to return a different set
+ * than the UI for the same filter name — `--segment muu` missed every row
+ * still NULL, which is precisely the bucket that filter exists to surface.
+ * Any other value (e.g. an explicit `all`) stays an exact match.
+ */
+function segmentMatches(segment, filter) {
+    if (filter === "pumppu" || filter === "betoni")
+        return segment === filter || segment === "all";
+    if (filter === "muu")
+        return !segment || segment === "muu";
+    return segment === filter;
+}
+/**
  * GET /api/admin/sales-prospects, shaped CLIENT-SIDE. The route deliberately
  * takes no query params (one fetch, filter locally — see the route comment), so
  * every option here is applied after the fetch.
@@ -17,11 +33,16 @@ export async function runProspectList(client, opts = {}) {
         all = all.filter((r) => r.status === opts.status);
     if (opts.tier !== undefined)
         all = all.filter((r) => r.tier === opts.tier);
-    if (opts.segment)
-        all = all.filter((r) => r.segment === opts.segment);
+    if (opts.segment) {
+        const segmentFilter = opts.segment;
+        all = all.filter((r) => segmentMatches(r.segment, segmentFilter));
+    }
     if (opts.search) {
         const needle = opts.search.toLowerCase();
-        all = all.filter((r) => [r.companyName, r.ytunnus, r.region].some((v) => String(v ?? "").toLowerCase().includes(needle)));
+        // Union of the UI's fields (companyName + asiakasNimi, fb#817) and this
+        // command's original ones (ytunnus + region), so a name typed into Myynti
+        // and a name typed here can never disagree.
+        all = all.filter((r) => [r.companyName, r.asiakasNimi, r.ytunnus, r.region].some((v) => String(v ?? "").toLowerCase().includes(needle)));
     }
     if (opts.brief) {
         all = all.map((r) => {

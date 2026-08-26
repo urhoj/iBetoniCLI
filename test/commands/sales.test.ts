@@ -190,3 +190,58 @@ describe("ib sales — runProspectList filters and --brief projection (fb#819)",
     }
   });
 });
+
+describe("ib sales — segment/search parity with the Myynti UI (fb#817)", () => {
+  beforeEach(() => {
+    mockClient.get.mockReset();
+  });
+
+  // Segments chosen so each bucket is unambiguous: 'all' must fold into BOTH
+  // pumppu and betoni, and the unset row must surface under 'muu'.
+  const ROWS: SalesProspect[] = [
+    row({ saasProspectId: 1, segment: "pumppu", companyName: "Pumppu Oy" }),
+    row({ saasProspectId: 2, segment: "betoni", companyName: "Betoni Oy" }),
+    row({ saasProspectId: 3, segment: "all", companyName: "Molemmat Oy" }),
+    row({ saasProspectId: 4, segment: "muu", companyName: "Muu Oy" }),
+    row({ saasProspectId: 5, segment: null, companyName: "Ei Segmenttia Oy", asiakasNimi: "Piilonimi" }),
+  ];
+
+  const ids = async (opts: Parameters<typeof runProspectList>[1]) => {
+    mockClient.get.mockResolvedValue(ROWS);
+    return (await runProspectList(mockClient, opts)).items.map((r) => r.saasProspectId);
+  };
+
+  test("--segment pumppu is pumppu OR all (UI union)", async () => {
+    expect(await ids({ segment: "pumppu" })).toEqual([1, 3]);
+  });
+
+  test("--segment betoni is betoni OR all (UI union)", async () => {
+    expect(await ids({ segment: "betoni" })).toEqual([2, 3]);
+  });
+
+  test("--segment muu is muu OR unset — the not-yet-typed bucket (UI union)", async () => {
+    expect(await ids({ segment: "muu" })).toEqual([4, 5]);
+  });
+
+  test("an explicit non-bucket value stays an exact match", async () => {
+    expect(await ids({ segment: "all" })).toEqual([3]);
+  });
+
+  test("--search matches asiakasNimi (the UI's field the CLI previously lacked)", async () => {
+    expect(await ids({ search: "piilonimi" })).toEqual([5]);
+  });
+
+  test("--search still matches companyName + ytunnus + region", async () => {
+    expect((await ids({ search: "pumppu oy" })).length).toBeGreaterThan(0);
+    mockClient.get.mockResolvedValue([
+      row({ saasProspectId: 9, companyName: "X", ytunnus: "7777777-7" }),
+      row({ saasProspectId: 10, companyName: "Y", region: "Kainuu" }),
+    ]);
+    expect((await runProspectList(mockClient, { search: "7777777" })).count).toBe(1);
+    mockClient.get.mockResolvedValue([
+      row({ saasProspectId: 9, companyName: "X", ytunnus: "7777777-7" }),
+      row({ saasProspectId: 10, companyName: "Y", region: "Kainuu" }),
+    ]);
+    expect((await runProspectList(mockClient, { search: "kainuu" })).count).toBe(1);
+  });
+});

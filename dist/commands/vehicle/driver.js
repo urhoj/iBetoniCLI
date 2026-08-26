@@ -6,13 +6,48 @@ import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
 // ─── day-driver reads (date-keyed fleet views + per-vehicle) ─────────────────
+async function fetchDriverBoard(client, date) {
+    return markPlaceholderVehicles(await client.get(`/api/cli/driver/board/${toYyyymmddInt(date)}`));
+}
+/**
+ * What "grid-eligible" MEANS — the compound rule the board/gaps help used to
+ * name without defining (fb#776). A vehicle whose lastDate has passed never
+ * reaches the board, which is exactly the case an empty list must expose.
+ */
+const GRID_ELIGIBLE_DEF = "grid-eligible = the vehicle's showInGrid is set AND the date falls inside its firstDate..lastDate window";
+/**
+ * Empty-state disambiguation for `board`/`gaps` (fb#776). An empty list
+ * conflates two very different situations — 'every grid-eligible vehicle
+ * already has a driver' (nothing to do) and 'no vehicle is grid-eligible on
+ * this date' (the question could not be asked) — and a cold-start agent read
+ * the second as the first. The counts alone resolve it, so the envelope's
+ * `hint` carries them; stdout shape is otherwise untouched. Fail-safe: the
+ * extra fetches must never break the command they annotate — on any failure
+ * the hint degrades to the bare definition. `knownBoardCount` lets `board`
+ * pass its own (zero) count instead of re-fetching.
+ */
+async function emptyDayHint(client, date, knownBoardCount) {
+    try {
+        const boardCount = knownBoardCount ?? (await fetchDriverBoard(client, date)).items.length;
+        if (boardCount > 0)
+            return `no gaps: all ${boardCount} grid-eligible vehicles already have a driver on ${date} — nothing to fill (${GRID_ELIGIBLE_DEF})`;
+        const fleet = await client.get("/api/cli/vehicle/list");
+        return `no rows: NO vehicle is grid-eligible on ${date}, though the fleet has ${fleet?.count ?? 0} vehicles — ${GRID_ELIGIBLE_DEF}. A vehicle whose lastDate has passed silently leaves the board; check \`ib vehicle list\` for closed windows`;
+    }
+    catch {
+        return `no rows — ${GRID_ELIGIBLE_DEF}. To tell 'everything eligible already has a driver' from 'nothing is eligible on this date', pair \`ib vehicle driver board ${date}\` with \`ib vehicle list\``;
+    }
+}
 /**
  * GET /api/cli/driver/board/:yyyymmdd — every grid-eligible vehicle + driver/gap
  * + keikka load for a day. Sentinel rows are stamped `placeholder: true` so a
  * non-assignable legacy row isn't read as a driverless truck (fb#380).
  */
 export async function runVehicleDriverBoard(client, date) {
-    return markPlaceholderVehicles(await client.get(`/api/cli/driver/board/${toYyyymmddInt(date)}`));
+    const env = await fetchDriverBoard(client, date);
+    if (env.items.length === 0)
+        env.hint = await emptyDayHint(client, date, 0);
+    return env;
 }
 /**
  * GET /api/cli/driver/gaps/:yyyymmdd — vehicles needing a driver that day (the
@@ -21,7 +56,10 @@ export async function runVehicleDriverBoard(client, date) {
  * the board but bare here would be a contract the caller could trip on.
  */
 export async function runVehicleDriverGaps(client, date) {
-    return markPlaceholderVehicles(await client.get(`/api/cli/driver/gaps/${toYyyymmddInt(date)}`));
+    const env = markPlaceholderVehicles(await client.get(`/api/cli/driver/gaps/${toYyyymmddInt(date)}`));
+    if (env.items.length === 0)
+        env.hint = await emptyDayHint(client, date);
+    return env;
 }
 /** GET /api/cli/driver/available/:yyyymmdd — assignable drivers free + not absent that day. */
 export async function runVehicleDriverAvailable(client, date) {

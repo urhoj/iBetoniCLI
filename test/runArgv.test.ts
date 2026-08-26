@@ -45,4 +45,13 @@ describe("runArgv", () => {
     expect(b.stdout).not.toBe("");
     expect(a.stdout).not.toEqual(b.stdout);
   });
+  // fb#856: a single-dash long flag is normalized to double-dash before
+  // Commander parses, so the recurrent '-columns'/'-reason' typo resolves.
+  test("single-dash long flag resolves like its double-dash form", async () => {
+    const r = await runArgv(["help", "-columns", "id"], { token: "t", endpoint: "http://127.0.0.1:9" });
+    expect(r.exitCode).toBe(0);
+    const env = JSON.parse(r.stdout.trim());
+    expect(env.count).toBeGreaterThan(0);
+    for (const item of env.items) expect(Object.keys(item)).toEqual(["id"]);
+  });
 });

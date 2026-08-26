@@ -12,6 +12,7 @@ import { resolveAuth } from "../auth/resolve.js";
 import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
+import { normalizeSingleDashLongFlags } from "../argv.js";
 
 // Start the credentials read BEFORE the module-loading program build — the two
 // are independent, so the file IO overlaps the imports instead of serializing
@@ -20,7 +21,10 @@ import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 const authPromise = resolveAuth({ credentialsPath: defaultCredentialsPath() }).catch(() => null);
 
 // The argv hint lets buildProgram import ONLY the invoked domain's modules.
-const program = await buildProgram(process.argv.slice(2));
+// Single-dash long flags are normalized FIRST (fb#856) so the hint and the
+// parse both see the corrected argv.
+const argv = normalizeSingleDashLongFlags(process.argv.slice(2));
+const program = await buildProgram(argv);
 
 // Throw-instead-of-exit for the parser (usage errors become the JSON envelope
 // in handleParseRejection; help/version pass through) + capture its stderr.
@@ -55,7 +59,7 @@ try {
   setCallerTier("standard");
 }
 
-await program.parseAsync(process.argv).catch((err) => {
+await program.parseAsync(["node", "ib", ...argv]).catch((err) => {
   // The preAction hook above never fired (no action ran), so the output mode is
   // still the JSON default — set it here or `--pretty` is a silent no-op on
   // every usage error. Commander consumes ROOT options before subcommand

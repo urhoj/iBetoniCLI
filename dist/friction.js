@@ -31,8 +31,12 @@ const FRICTION_CAP = 300;
  * a genuine pattern.
  *
  * STALE: hard cap for EVERY row, claimed or not. A session that dies without
- * releasing leaves its rows unreleasable by anyone else (the gate withholds
- * foreign rows by design); without a ceiling those leak forever too.
+ * releasing leaves its rows foreign to every other session, and nothing
+ * GUARANTEES release — some gates adopt a foreign row once its owner has been
+ * quiet long enough to be presumed dead (the workspace stop-gate does, after
+ * 24 h, fb#885), but a harness gate need not implement that and betonicli run
+ * standalone has no gate at all, so this TTL is the only backstop every
+ * harness can rely on (fb#887).
  */
 const UNCLAIMED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_ROW_TTL_MS = 30 * 24 * 60 * 60 * 1000;

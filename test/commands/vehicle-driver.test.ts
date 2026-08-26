@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, type Mock } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import { runArgv } from "../../src/runArgv.js";
 import { todayHelsinki } from "../../src/dates.js";
@@ -34,7 +34,6 @@ describe("ib vehicle driver reads", () => {
     await runVehicleDriverGaps(c, "2026-06-10");
     expect(c.get).toHaveBeenCalledWith("/api/cli/driver/gaps/20260610");
   });
-
   test("available hits the available path", async () => {
     get().mockResolvedValueOnce(LIST);
     await runVehicleDriverAvailable(c, "2026-06-10");
@@ -179,5 +178,67 @@ describe("ib vehicle driver — date positional OR --date (fb#393)", () => {
   test("board: a same-day pair written two ways is NOT a conflict", async () => {
     const r = await runArgv(["vehicle", "driver", "board", "today", "--date", todayHelsinki()], opts);
     expect(r.exitCode).not.toBe(4);
+  });
+});
+
+/**
+ * fb#776: an EMPTY board/gaps list conflates 'everything eligible already has
+ * a driver' with 'nothing is grid-eligible on this date'. The envelope's
+ * `hint` must say which, and define grid-eligibility, so the caller needs no
+ * second command. Non-empty lists carry no hint.
+ */
+describe("ib vehicle driver — empty board/gaps disambiguation (fb#776)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const day = "2026-08-20";
+  const fleet = (count: number) => ({ items: [], nextCursor: null, count });
+  const boardRows = (n: number) => ({
+    items: Array.from({ length: n }, (_, i) => ({ vehicleId: i + 1, hasDriver: true })),
+    nextCursor: null,
+    count: n,
+  });
+
+  test("gaps empty BUT board non-empty -> 'all eligible already have a driver'", async () => {
+    get().mockResolvedValueOnce(LIST); // gaps
+    get().mockResolvedValueOnce(boardRows(2)); // board (for the count)
+    const out = await runVehicleDriverGaps(c, day);
+    expect(out.hint).toMatch(/all 2 grid-eligible vehicles already have a driver/);
+    expect(out.hint).toMatch(/showInGrid/);
+  });
+
+  test("gaps empty AND board empty -> 'NO vehicle is grid-eligible' + fleet count", async () => {
+    get().mockResolvedValueOnce(LIST); // gaps
+    get().mockResolvedValueOnce(LIST); // board
+    get().mockResolvedValueOnce(fleet(22)); // vehicle list (for the fleet count)
+    const out = await runVehicleDriverGaps(c, day);
+    expect(out.hint).toMatch(/NO vehicle is grid-eligible on 2026-08-20/);
+    expect(out.hint).toMatch(/22 vehicles/);
+    expect(out.hint).toMatch(/lastDate/);
+  });
+
+  test("board empty reuses its own zero count (no second board fetch)", async () => {
+    get().mockResolvedValueOnce(LIST); // board
+    get().mockResolvedValueOnce(fleet(5)); // vehicle list
+    const out = await runVehicleDriverBoard(c, day);
+    expect(out.hint).toMatch(/NO vehicle is grid-eligible/);
+    const boardCalls = (c.get as Mock).mock.calls.filter(([p]) =>
+      String(p).startsWith("/api/cli/driver/board/")
+    );
+    expect(boardCalls).toHaveLength(1);
+  });
+
+  test("non-empty gaps carries no hint", async () => {
+    get().mockResolvedValueOnce(boardRows(1)); // gaps with one row
+    const out = await runVehicleDriverGaps(c, day);
+    expect(out.hint).toBeUndefined();
+    expect(c.get).toHaveBeenCalledTimes(1); // no disambiguation fetches
+  });
+
+  test("a disambiguation fetch failure degrades to the bare definition, never throws", async () => {
+    get().mockResolvedValueOnce(LIST); // gaps empty
+    get().mockRejectedValueOnce(new Error("board exploded")); // board fetch fails
+    const out = await runVehicleDriverGaps(c, day);
+    expect(out.hint).toMatch(/grid-eligible/);
+    expect(out.hint).toMatch(/showInGrid/);
   });
 });

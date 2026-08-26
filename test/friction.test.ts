@@ -145,8 +145,10 @@ describe("recordFriction", () => {
 
   // Unclaimed rows (sid: null) have no drain — no gate ever fires for a plain
   // shell, a cron routine, or a harness without a stop hook — and claimed rows
-  // of a session that died without releasing are unreleasable by anyone else.
-  // Both classes expire at capture time instead of accumulating forever.
+  // of a dead session are foreign to every other session with no guaranteed
+  // release (some gates adopt them after a quiet period, fb#885 — but a gate
+  // need not, and standalone betonicli has none). Both classes expire at
+  // capture time instead of accumulating forever (fb#887).
   describe("age-out of undrainable rows", () => {
     const DAY = 24 * 60 * 60 * 1000;
     const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
