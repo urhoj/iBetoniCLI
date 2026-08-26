@@ -55,7 +55,11 @@ import { SALES_SPECS } from "./specs/sales.js";
 
 export { COMMON_AUTH_ERRORS } from "./specs/shared.js";
 
-const BASE_COMMAND_SPECS: CommandSpec[] = [
+/**
+ * The canonical catalogue of every `ib` subcommand. Summaries and details are
+ * DB-served via `/api/cli/command-catalog` (`ib reference detail get`).
+ */
+export const COMMAND_SPECS: CommandSpec[] = [
   ...ATTACHMENT_SPECS,
   ...AUTH_SPECS,
   ...COMPANY_SPECS,
@@ -88,10 +92,3 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   ...TASK_SPECS,
   ...SALES_SPECS,
 ];
-
-/**
- * The canonical catalogue of every `ib` subcommand. Summaries and details are
- * now DB-served via `/api/cli/command-catalog` (`ib reference detail get`); the
- * source-backed tiers have been removed.
- */
-export const COMMAND_SPECS: CommandSpec[] = BASE_COMMAND_SPECS;

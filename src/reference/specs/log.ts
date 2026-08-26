@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE } from "./shared.js";
+import { apiErr, limitErr, authErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG } from "./shared.js";
 
 export const LOG_SPECS: CommandSpec[] = [
 
@@ -18,8 +18,8 @@ export const LOG_SPECS: CommandSpec[] = [
       { name: "entityId", type: "number", description: "The entity's id (see entityIdMeaning in `ib log types`)" },
     ],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      OWNER_ASIAKAS_FLAG,
+      LIMIT_500_FLAG,
       { name: "field", type: "string", description: "Filter by changeTracker fieldName (client-side)" },
     ],
     outputShape:
@@ -48,7 +48,7 @@ export const LOG_SPECS: CommandSpec[] = [
     permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
     flags: [
       { name: "entity-type", type: "string", description: "Filter to one entityType" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "limit", type: "number", default: "100", description: "Max rows (server cap 500)" },
     ],
     outputShape:
@@ -71,7 +71,7 @@ export const LOG_SPECS: CommandSpec[] = [
       { name: "to", type: "date", description: "Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
       { name: "entity-type", type: "string", description: "Filter to one entityType" },
       { name: "person", type: "number", description: "Filter to one actor personId (a non-integer value exits 4 client-side)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
     ],
     outputShape:
@@ -100,7 +100,7 @@ export const LOG_SPECS: CommandSpec[] = [
       { name: "entity-type", type: "string", description: "keikka or palkki", required: true },
       { name: "from", type: "date", description: "Entity-date window start (or today/yesterday/tomorrow)", required: true },
       { name: "to", type: "date", description: "Entity-date window end (or today/yesterday/tomorrow)", required: true },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
     ],
     outputShape:
@@ -121,7 +121,7 @@ export const LOG_SPECS: CommandSpec[] = [
       { name: "personId", type: "number", required: false, description: "Whose changes (omit = yourself; others need admin)" },
     ],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
     ],
     outputShape:

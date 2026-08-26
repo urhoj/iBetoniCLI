@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE } from "./shared.js";
+import { apiErr, limitErr, authErrors, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const VEHICLE_SPECS: CommandSpec[] = [
 
@@ -15,12 +15,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
     seeAlso: ["ib vehicle types"],
     flags: [
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      LIMIT_500_FLAG,
       {
         name: "deleted",
         type: "boolean",
@@ -141,8 +136,8 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
     args: [{ name: "query", type: "string", required: false, description: "substring to match (reg-no, name, or fleet number) — or pass --search" }],
     flags: [
-      { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      SEARCH_ALIAS_FLAG,
+      LIMIT_500_FLAG,
       {
         name: "asiakas",
         type: "number",
@@ -345,8 +340,8 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "vehicleId", type: "number", description: "vehicleId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      OWNER_ASIAKAS_FLAG,
+      LIMIT_500_FLAG,
       { name: "field", type: "string", description: "Filter by fieldName (e.g. vehicleRegNo)" },
     ],
     outputShape:

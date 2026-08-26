@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, ASIAKAS_TARGET_FLAG } from "./shared.js";
+import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -208,11 +208,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     permissions: ["auth.page.asiakas.read"],
     args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
     flags: [
-      {
-        name: "search",
-        type: "string",
-        description: "Search query (alias for the <query> positional)",
-      },
+      SEARCH_ALIAS_FLAG,
       {
         name: "limit",
         type: "number",
@@ -334,7 +330,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "asiakasId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "asiakasId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "allow-big-merge", type: "boolean", description: "System-admin: permit a merge above the safety row cap" },
     ],
     writeFlags: true,
@@ -350,8 +346,8 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
-      "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
+      MERGE_DRY_RUN_FIRST_NOTE,
+      MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / tyomaa / person / sijainti / stat / lasku rows and the change history; caches are invalidated server-side.",
     ],
     seeAlso: ["ib customer duplicates", "ib customer delete"],

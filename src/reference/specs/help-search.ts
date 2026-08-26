@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS } from "./shared.js";
+import { COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const HELP_SEARCH_SPECS: CommandSpec[] = [
 
@@ -27,7 +27,7 @@ export const HELP_SEARCH_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "query", type: "string", required: false, description: "Search string (or pass --search)" }],
     flags: [
-      { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+      SEARCH_ALIAS_FLAG,
       { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti" },
       { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
       { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },

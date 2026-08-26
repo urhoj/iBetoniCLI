@@ -296,3 +296,33 @@ export const ASIAKAS_TARGET_FLAG: CommandFlag = {
   type: "number",
   description: "Target asiakasId (alias for the positional)",
 };
+/** The write-safety `--reason` spelled REQUIRED (the v1.0.1 lifecycle rows). */
+export const REASON_REQUIRED_FLAG: CommandFlag = {
+  name: "reason",
+  type: "string",
+  description: "Audit-log reason (X-Action-Reason); REQUIRED",
+};
+/** The standard list `--limit`: default 100, server cap 500. */
+export const LIMIT_500_FLAG: CommandFlag = {
+  name: "limit",
+  type: "number",
+  default: "100",
+  description: "Max rows (capped at 500)",
+};
+/** Cross-tenant `--owner` list scope, validated client-side. */
+export const OWNER_ASIAKAS_FLAG: CommandFlag = {
+  name: "owner",
+  type: "number",
+  description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)",
+};
+/** The `--search` alias every `<query>`-positional search command offers. */
+export const SEARCH_ALIAS_FLAG: CommandFlag = {
+  name: "search",
+  type: "string",
+  description: "Search query (alias for the <query> positional)",
+};
+/** The two safety notes every combinator `merge` spec states verbatim. */
+export const MERGE_DRY_RUN_FIRST_NOTE =
+  "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.";
+export const MERGE_VALIDATE_READONLY_NOTE =
+  "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.";

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const KEIKKA_SPECS: CommandSpec[] = [
 
@@ -257,7 +257,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "query", type: "string", required: false, description: "Full-text search string (phone, keikkaId, worksite name/number, invoice ref) — or pass --search" }],
     flags: [
-      { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+      SEARCH_ALIAS_FLAG,
       { name: "limit", type: "number", description: "Max hits (client-side; backend caps at 100)" },
     ],
     outputShape:
@@ -279,8 +279,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "keikkaId", type: "number", description: "keikkaId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      OWNER_ASIAKAS_FLAG,
+      LIMIT_500_FLAG,
       { name: "field", type: "string", description: "Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)" },
     ],
     outputShape:

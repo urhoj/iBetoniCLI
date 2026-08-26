@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
 
 export const PERSON_SPECS: CommandSpec[] = [
 
@@ -31,12 +31,7 @@ export const PERSON_SPECS: CommandSpec[] = [
         description:
           "List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).",
       },
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      LIMIT_500_FLAG,
     ],
     outputShape:
       "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
@@ -108,11 +103,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
     flags: [
-      {
-        name: "search",
-        type: "string",
-        description: "Search query (alias for the <query> positional)",
-      },
+      SEARCH_ALIAS_FLAG,
       {
         name: "limit",
         type: "number",
@@ -319,8 +310,8 @@ export const PERSON_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "personId", type: "number", description: "personId whose audit trail to fetch" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      OWNER_ASIAKAS_FLAG,
+      LIMIT_500_FLAG,
       { name: "field", type: "string", description: "Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)" },
     ],
     outputShape:
@@ -364,7 +355,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "personId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "personId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
       { name: "unowned", type: "boolean", description: "Merge within the UNOWNED class — BOTH persons must have ownerAsiakasId 0 or NULL (self-registrations, imports, pre-ownership rows: where duplicates actually accumulate). System admin only; mutually exclusive with --owner (fb#849)" },
     ],
     writeFlags: true,
@@ -380,8 +371,8 @@ export const PERSON_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
-      "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
+      MERGE_DRY_RUN_FIRST_NOTE,
+      MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.",
       "Both persons must share one owner class: a tenant id, or (--unowned) the unowned class where owner 0 and NULL count as equal. Deploy-gated: an older backend 400s on --unowned.",
     ],

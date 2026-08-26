@@ -1,6 +1,6 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
-import { visibleSpecs, getCallerTier } from "../tier.js";
+import { isHiddenAtTier, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders } from "../api/writeFlags.js";
 import { applyTextEdit, textEditDryRunEnvelope } from "../textEdit.js";
 import { qs } from "../api/query.js";
@@ -15,7 +15,7 @@ function resolveCommand(commandParts, tier) {
     // arrives as separate args or one quoted string.
     const path = commandParts.join(" ").trim().replace(/\s+/g, " ").replace(/^(?:ib\s+)+/i, "");
     const command = `ib ${path}`.trim();
-    const visible = visibleSpecs(COMMAND_SPECS, tier).some((s) => s.command === command);
+    const visible = COMMAND_SPECS.some((s) => s.command === command && !isHiddenAtTier(s, tier));
     if (!visible) {
         throw new CliError(`unknown command: ${command}. Use \`ib commands\` for valid paths.`, 0, null, 5);
     }
@@ -131,10 +131,8 @@ export async function runReferenceDetailSet(client, commandParts, body, flags = 
  * orphan. Each finding carries the ready-to-run prune command.
  */
 export async function runReferenceDetailLint(client) {
-    const { items } = await runReferenceDetailList(client);
-    const live = new Set(COMMAND_SPECS.map((s) => s.command));
+    const { items } = await runReferenceDetailList(client, { orphans: true });
     const orphans = items
-        .filter((row) => !live.has(row.command))
         .map((row) => ({
         command: row.command,
         severity: "warn",

@@ -2,8 +2,19 @@
 // (src/reference/specs.ts) spreads every segment in a fixed sequence; order
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
-import type { CommandSpec } from "../../output/help.js";
-import { clearNote, apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
+import type { CommandSpec, CommandFlag } from "../../output/help.js";
+import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG } from "./shared.js";
+
+/** The `--tarjous` thread-target alias every thread-addressed leaf repeats. */
+const TARJOUS_THREAD_FLAG: CommandFlag = {
+  name: "tarjous",
+  type: "number",
+  description: "Resolve the thread from this pumppuRequestId",
+};
+
+/** The authorization note every `message thread` lifecycle leaf states. */
+const MANAGER_GATED_NOTE =
+  "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.";
 
 export const MESSAGE_SPECS: CommandSpec[] = [
   // ─── message chat (9) ────────────────────────────────────────────────────
@@ -39,7 +50,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
     ],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
     ],
     outputShape:
       "{ thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }",
@@ -63,7 +74,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
     ],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "since", type: "string", description: "Only messages created after this ISO timestamp" },
       { name: "limit", type: "number", default: "100", description: "Max messages (server max 500)" },
       { name: "deleted", type: "boolean", description: "Include soft-deleted messages (your own; all for developers)" },
@@ -95,7 +106,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
     ],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "Message text (max 4000 chars)" },
       { name: "source", type: "string", description: "Provenance: web|cli|ai (default: IB_SOURCE env or cli)" },
     ],
@@ -133,7 +144,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
     ],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
     ],
     mutates: true,
     outputShape: "{ lastReadAt }",
@@ -189,7 +200,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     args: [{ name: "messageId", type: "number", required: true, description: "Message id to edit (the message PK)" }],
     flags: [
       { name: "thread", type: "number", description: "Thread id the message belongs to" },
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "New message text (max 4000 chars)" },
     ],
     writeFlags: true,
@@ -225,7 +236,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     args: [{ name: "messageId", type: "number", required: true, description: "Message id to restore (the message PK)" }],
     flags: [
       { name: "thread", type: "number", description: "Thread id the message belongs to" },
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -254,7 +265,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "query", type: "string", required: false, description: "Body substring to search for (min 2 chars) — or pass --search" }],
     flags: [
-      { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+      SEARCH_ALIAS_FLAG,
       { name: "limit", type: "number", default: "50", description: "Max results (server max 200)" },
     ],
     outputShape:
@@ -289,8 +300,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Read a thread's messages with `ib message chat list <threadId>` and reply with `ib message chat send <threadId> --body ...` (a support thread is a normal messageThread admins can read).",
@@ -342,8 +352,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body" },
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Exactly one of --keikka / --tarjous selects the context; --keikka wins if both are passed.",
@@ -374,8 +383,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "threadId must be a positive number" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the threadId via `ib message support inbox`"),
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib message support inbox", "ib message chat list"],
     examples: [
@@ -391,7 +399,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -402,7 +410,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      MANAGER_GATED_NOTE,
       "Archived thread is read-only — send/edit/restore return 409 until reopened.",
       "Idempotent: archiving an already-archived thread returns alreadyArchived:true (no error).",
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldArchive:{...} } and never POSTs — works under --read-only.",
@@ -421,7 +429,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -432,7 +440,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      MANAGER_GATED_NOTE,
       "Idempotent: reopening an already-open thread returns alreadyOpen:true (no error).",
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldReopen:{...} } and never POSTs — works under --read-only.",
       "Deploy-gated: the reopen route must be deployed to the target backend.",
@@ -450,7 +458,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "title", type: "string", required: true, description: 'New thread title (max 200 chars; "" clears)' },
     ],
     writeFlags: true,
@@ -463,7 +471,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      MANAGER_GATED_NOTE,
       'Pass --title "" to clear the title (sets messageThread.title = NULL). ' + clearNote("--title"),
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRename:{...} } and never PATCHes — works under --read-only.",
       "Deploy-gated: requires the messageThread.title migration (2026-06-21-messageThread-title.sql) to run on the DB BEFORE the rename route deploys — otherwise the backend 500s on missing column.",
@@ -481,7 +489,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "person", type: "number", required: true, description: "personId to add" },
       { name: "role", type: "string", description: "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)" },
     ],
@@ -497,7 +505,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      MANAGER_GATED_NOTE,
       "Privacy gate: the added person must be a member of the thread's owning company (asiakasPerson JOIN). Cross-company adds are blocked at 403.",
       "Idempotent: re-adding a participant who left reactivates the row (sets leftAt = NULL) and updates role.",
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldAdd:{...} } and never POSTs — works under --read-only.",
@@ -517,7 +525,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
     flags: [
-      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      TARJOUS_THREAD_FLAG,
       { name: "person", type: "number", required: true, description: "personId to remove" },
     ],
     writeFlags: true,
@@ -529,7 +537,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      MANAGER_GATED_NOTE,
       "Soft-remove: sets leftAt = now (the row is kept for audit). removed:false when the participant had already left.",
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRemove:{...} } and never DELETEs — works under --read-only.",
       "Deploy-gated: the participants route must be deployed to the target backend.",

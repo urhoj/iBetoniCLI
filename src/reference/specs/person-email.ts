@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, COMMON_AUTH_ERRORS, permErrors } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS, permErrors, REASON_REQUIRED_FLAG } from "./shared.js";
 
 export const PERSON_EMAIL_SPECS: CommandSpec[] = [
   {
@@ -61,7 +61,7 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "alternative email to add (<=250 chars)" },
     ],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -86,7 +86,7 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "the person's email to promote to primary (primary or alternative)" },
     ],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -114,7 +114,7 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "alternative email to remove" },
     ],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",

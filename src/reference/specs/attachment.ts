@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, COMMON_AUTH_ERRORS, ATTACHMENT_ENTITY_FLAGS, ATTACHMENT_ROW, ENTITY_FLAG_NOTE, DEPLOY_NOTE } from "./shared.js";
+import { apiErr, limitErr, COMMON_AUTH_ERRORS, ATTACHMENT_ENTITY_FLAGS, ATTACHMENT_ROW, ENTITY_FLAG_NOTE, DEPLOY_NOTE, LIMIT_500_FLAG } from "./shared.js";
 
 export const ATTACHMENT_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
@@ -15,7 +15,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
       ...ATTACHMENT_ENTITY_FLAGS,
       { name: "group", type: "string", description: "Filter by group (NAME or id — `ib attachment types`)" },
       { name: "type", type: "string", description: "Filter by type (NAME or id — `ib attachment types`)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      LIMIT_500_FLAG,
     ],
     outputShape: `ListEnvelope<${ATTACHMENT_ROW}>`,
     errors: [limitErr("pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap"), apiErr(403, "Not a member of the target entity's company", "check the active company (ib auth whoami)"), ...COMMON_AUTH_ERRORS],
@@ -196,7 +196,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     args: [{ name: "text", type: "string", required: false, description: "Search text; omit to list all (or combine with --missing)" }],
     flags: [
       { name: "missing", type: "boolean", description: "Only attachments with NO linked entity" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      LIMIT_500_FLAG,
     ],
     outputShape: `ListEnvelope<${ATTACHMENT_ROW}>`,
     errors: [limitErr("pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap"), ...COMMON_AUTH_ERRORS],

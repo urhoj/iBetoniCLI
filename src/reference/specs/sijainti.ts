@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, SIJAINTI_PUBLIC_403_MATCH, GEOCODE_CLIENT_ERR, puomiErr, GEOCODE_NO_ADDRESS_ERR } from "./shared.js";
+import { apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, SIJAINTI_PUBLIC_403_MATCH, GEOCODE_CLIENT_ERR, puomiErr, GEOCODE_NO_ADDRESS_ERR, REASON_REQUIRED_FLAG, LIMIT_500_FLAG } from "./shared.js";
 
 export const SIJAINTI_SPECS: CommandSpec[] = [
 
@@ -16,7 +16,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     flags: [
       { name: "type", type: "string", description: "Filter by sijaintiTypeId or type name (case-insensitive; exact selite match wins, else unique substring — see `ib sijainti types`)" },
       { name: "search", type: "string", description: "Case-insensitive substring over name/address/typeName (client-side scan up to 500 rows; newer backends also pre-filter server-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      LIMIT_500_FLAG,
       { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
       { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
       { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
@@ -66,7 +66,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     flags: [
       { name: "asiakas", type: "number", description: "Only this company's plants (numeric asiakasId; client-side filter on ownerAsiakasId)" },
       { name: "search", type: "string", description: "Case-insensitive substring over name/address (same semantics as `list --search`)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      LIMIT_500_FLAG,
     ],
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)",
@@ -326,7 +326,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     permissions: ["auth.page.sijainnit.delete"],
     args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to soft-delete" }],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -344,7 +344,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     permissions: ["auth.page.sijainnit.edit"],
     args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to restore" }],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

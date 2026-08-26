@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_TARGET_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const JERRY_SPECS: CommandSpec[] = [
 
@@ -92,7 +92,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "line-length", type: "number", description: "Hose line length m (linjanPituus)" },
       { name: "notes", type: "string", description: "Free-text description shown to providers (kuvaus)" },
       { name: "asiakas", type: "number", description: "Customer asiakasId (omit → your private BetoniJerry account)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -123,7 +123,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     description:
       "Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason.",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -162,7 +162,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       "Reverse a prior decline as a provider (POST /api/pumppuRequests/:id/undecline). The request returns to your Avoimet tab and is offerable again. Idempotent (no-op success if you had not declined). No customer notification. Requires provider role + --reason.",
     permissions: ["provider company (isPumppuToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you previously declined" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -190,7 +190,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "extra-notes", type: "string", description: "Free-text notes shown to the customer" },
       { name: "cancellation-terms", type: "string", description: "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)" },
       { name: "maintains-order-info", type: "string", description: "Override provider default (true|false); omit to inherit" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -221,7 +221,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "offerId", type: "number", description: "pumppuOfferId you own" },
     ],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -245,7 +245,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "offerId", type: "number", description: "pumppuOfferId to accept" },
     ],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -271,7 +271,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     flags: [
       { name: "scheduled-at", type: "string", description: "Scheduled keikka start (REQUIRED; future ISO datetime)" },
       { name: "pumppu", type: "number", description: "vehicleId to pin to the keikka (must be yours)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -306,7 +306,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "your pumppuOfferId" },
     ],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -329,7 +329,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "your DRAFT pumppuOfferId" },
     ],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -494,7 +494,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
       { name: "email", type: "string", description: "Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; " + clearHint("--email") + " and fall back to it." },
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -547,7 +547,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "query", type: "string", required: false, description: "name search (min 2 chars) — or pass --search" }],
     flags: [
-      { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+      SEARCH_ALIAS_FLAG,
     ],
     outputShape: "ListEnvelope<{ asiakasId, name }>",
     errors: [
@@ -591,7 +591,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
       ASIAKAS_TARGET_FLAG,
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -620,7 +620,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
       ASIAKAS_TARGET_FLAG,
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -914,7 +914,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -929,7 +929,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -944,7 +944,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -966,7 +966,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     flags: [
       { name: "days", type: "number", description: "Valid for N more days from now; mutually exclusive with --until. Omit BOTH for the backend default of 14 days" },
       { name: "until", type: "string", description: "Absolute new expiry (ISO date/datetime); mutually exclusive with --days" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -988,7 +988,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    flags: [REASON_REQUIRED_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",

@@ -32,11 +32,6 @@ import { listEnvelope } from "../api/envelopes.js";
  */
 export const isWriteSpec = (s: CommandSpec): boolean => s.mutates ?? !!s.writeFlags;
 
-type ResolvedDomainFilter =
-  | { kind: "none" }
-  | { kind: "domain"; domain: string }
-  | { kind: "subgroup"; relativePrefix: string };
-
 function commandRelativePath(command: string): string {
   return command.replace(/^ib\s+/, "");
 }
@@ -51,23 +46,6 @@ function nestedSubgroupPrefixes(specs: CommandSpec[]): Map<string, Set<string>> 
     bySubgroup.set(subgroup, prefixes);
   }
   return bySubgroup;
-}
-
-function resolveDomainFilter(
-  specs: CommandSpec[],
-  domain: string | undefined,
-  tier: CallerTier
-): ResolvedDomainFilter {
-  if (!domain) return { kind: "none" };
-  if (commandDomains(specs).includes(domain)) return { kind: "domain", domain };
-
-  const prefixes = nestedSubgroupPrefixes(specs).get(domain);
-  if (prefixes?.size === 1) {
-    return { kind: "subgroup", relativePrefix: [...prefixes][0] };
-  }
-
-  assertKnownDomain(specs, domain, tier);
-  return { kind: "none" };
 }
 
 /**
@@ -86,18 +64,18 @@ export function specMatcherForToken(
   token: string,
   tier: CallerTier = getCallerTier()
 ): (spec: CommandSpec) => boolean {
-  const filter = resolveDomainFilter(specs, token, tier);
-  if (filter.kind === "subgroup") {
-    const prefix = filter.relativePrefix;
-    return (s) => {
-      const rel = commandRelativePath(s.command);
-      return rel === prefix || rel.startsWith(`${prefix} `);
-    };
+  if (token && !commandDomains(specs).includes(token)) {
+    const prefixes = nestedSubgroupPrefixes(specs).get(token);
+    if (prefixes?.size === 1) {
+      const prefix = [...prefixes][0];
+      return (s) => {
+        const rel = commandRelativePath(s.command);
+        return rel === prefix || rel.startsWith(`${prefix} `);
+      };
+    }
+    assertKnownDomain(specs, token, tier); // unknown token → exit-4 throw
   }
-  // "domain" (or the unreachable "none": token is defined and resolveDomainFilter
-  // throws on an unknown token before returning "none").
-  const domain = filter.kind === "domain" ? filter.domain : token;
-  return (s) => domainOf(s.command) === domain;
+  return (s) => domainOf(s.command) === token;
 }
 
 /** `<name:type>` (required) / `[name:type]` (optional) — mirrors formatHelp's USAGE rule
@@ -215,7 +193,7 @@ export function assertKnownDomain(
     const suggest = commandDomains(visible);
     // Did-you-mean when the unknown token is really a nested subgroup addressed
     // by its bare leaf name (e.g. `changelog` → `dev changelog`). `ib commands
-    // <sub>` already resolves these in resolveDomainFilter; this covers the
+    // <sub>` already resolves these in specMatcherForToken; this covers the
     // callers that hit the validator directly (`ib reference dump <sub>`, and
     // subgroups that live under more than one domain). Tier-filtered so a
     // developer-only subgroup is never suggested to a standard caller.

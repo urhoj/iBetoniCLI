@@ -7,7 +7,7 @@
 import type { ApiClient } from "../api/client.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
-import { type CallerTier, visibleSpecs, getCallerTier } from "../tier.js";
+import { type CallerTier, isHiddenAtTier, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
 import type { AssessFlags } from "../assess.js";
 import { applyTextEdit, textEditDryRunEnvelope, type TextEditOp } from "../textEdit.js";
@@ -24,7 +24,7 @@ function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // arrives as separate args or one quoted string.
   const path = commandParts.join(" ").trim().replace(/\s+/g, " ").replace(/^(?:ib\s+)+/i, "");
   const command = `ib ${path}`.trim();
-  const visible = visibleSpecs(COMMAND_SPECS, tier).some((s) => s.command === command);
+  const visible = COMMAND_SPECS.some((s) => s.command === command && !isHiddenAtTier(s, tier));
   if (!visible) {
     throw new CliError(`unknown command: ${command}. Use \`ib commands\` for valid paths.`, 0, null, 5);
   }
@@ -215,10 +215,8 @@ export interface CatalogLintFinding {
 export async function runReferenceDetailLint(
   client: ApiClient
 ): Promise<{ items: CatalogLintFinding[]; count: number }> {
-  const { items } = await runReferenceDetailList(client);
-  const live = new Set(COMMAND_SPECS.map((s) => s.command));
+  const { items } = await runReferenceDetailList(client, { orphans: true });
   const orphans: CatalogLintFinding[] = items
-    .filter((row) => !live.has(row.command))
     .map((row) => ({
       command: row.command,
       severity: "warn",

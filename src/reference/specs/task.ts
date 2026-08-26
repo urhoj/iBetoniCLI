@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { EXECUTORS as TASK_EXECUTORS, AGENTS as TASK_AGENTS } from "../../commands/task/index.js";
-import { clearNote, apiErr, limitErr } from "./shared.js";
+import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS } from "./shared.js";
 
 export const TASK_SPECS: CommandSpec[] = [
   // ─── task (6) ────────────────────────────────────────────────────────────
@@ -33,8 +33,7 @@ export const TASK_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "--executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     examples: [
       "ib task list --due",

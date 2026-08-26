@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, PERSON_SCOPE_404_REMEDY } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG } from "./shared.js";
 
 export const LIFECYCLE_SPECS: CommandSpec[] = [
 
@@ -14,7 +14,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.asiakas.edit"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -34,7 +34,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -54,7 +54,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -94,7 +94,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.tyomaa.edit"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -161,7 +161,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -178,7 +178,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -218,7 +218,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
       { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -263,7 +263,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "memo", type: "string", description: "personMemo — free-text note/comment" },
       { name: "body", type: "json", description: "Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -301,7 +301,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     flags: [
       { name: "global", type: "boolean", description: "Make the person global (ownerAsiakasId=null)" },
       { name: "asiakas", type: "number", description: "Set owner to this asiakasId" },
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -324,7 +324,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.person.edit"],
     args: [{ name: "personId", type: "number", description: "personId to delete" }],
     flags: [
-      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

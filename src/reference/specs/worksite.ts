@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE } from "./shared.js";
+import { clearHint, clearNote, apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
 
 export const WORKSITE_SPECS: CommandSpec[] = [
 
@@ -19,12 +19,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
         type: "number",
         description: "Filter by parent asiakasId",
       },
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      LIMIT_500_FLAG,
       { name: "cursor", type: "string", description: "Pagination cursor" },
     ],
     outputShape:
@@ -192,11 +187,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.tyomaa.read"],
     args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
     flags: [
-      {
-        name: "search",
-        type: "string",
-        description: "Search query (alias for the <query> positional)",
-      },
+      SEARCH_ALIAS_FLAG,
       {
         name: "limit",
         type: "number",
@@ -260,8 +251,8 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      OWNER_ASIAKAS_FLAG,
+      LIMIT_500_FLAG,
       { name: "field", type: "string", description: "Filter by fieldName" },
     ],
     outputShape:
@@ -307,7 +298,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "tyomaaId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "tyomaaId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
+      OWNER_ASIAKAS_FLAG,
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
@@ -322,8 +313,8 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
-      "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
+      MERGE_DRY_RUN_FIRST_NOTE,
+      MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / person / grid rows and the change history; caches are invalidated server-side.",
     ],
     seeAlso: ["ib worksite duplicates", "ib worksite delete"],

@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS } from "../../commands/feedback/index.js";
-import { apiErr } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
 
 export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   // ─── feedback (5) ────────────────────────────────────────────────────────
@@ -42,8 +42,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "unknown option", meaning: "unknown option — when the rejected token is not a flag name anybody would type (`->`, `--`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702)", remedy: "Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
@@ -101,8 +100,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.",
@@ -384,8 +382,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(500, "Backend error", "retry with --verbose"),
+      ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib dev feedback count", "ib dev feedback count --scope cli", "ib dev feedback count --kind legal"],
   },
