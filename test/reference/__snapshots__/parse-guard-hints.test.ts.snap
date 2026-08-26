@@ -137,6 +137,10 @@ ib dev changelog update --unlink <ids>
   ! --unlink must be an integer >= 1 (got "abc")
   > (no hint)
 
+ib dev schema indexes --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; max is 1000
+
 ib dev schema procs --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue (dbo holds ~535 procs) — pass \`--limit 1000\` whenever you intend to enumerate
@@ -372,6 +376,10 @@ ib reference detail list --limit <n>
 ib reference detail list --stalest <n>
   ! --stalest must be an integer >= 1
   > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+
+ib schema indexes --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; max is 1000
 
 ib schema procs --limit <n>
   ! --limit must be an integer >= 1

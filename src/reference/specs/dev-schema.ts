@@ -7,7 +7,7 @@ import { apiErr, limitErr } from "./shared.js";
 
 export const DEV_SCHEMA_SPECS: CommandSpec[] = [
 
-  // ─── schema (11) — developer-only SQL introspection ───────────────────────
+  // ─── schema (12) — developer-only SQL introspection ───────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors: CommandError[] = [
@@ -220,6 +220,43 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         examples: [
           "ib dev schema query --sql \"SELECT COUNT(*) AS n FROM person\"",
           "ib dev schema query --sql \"SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId\"",
+        ],
+      },
+      {
+        command: "ib dev schema indexes",
+        description:
+          "Per-index USAGE statistics for dbo tables — seeks/scans/lookups/updates and last-touch timestamps from sys.dm_db_index_usage_stats. The live answer to \"which indexes are dead weight\" and \"does anything actually read this table\", previously only available from the monthly-generated indexes-performance.md. Developer-only.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        flags: [
+          { name: "table", type: "string", description: "Only indexes on this table (exact name)" },
+          { name: "search", type: "string", description: "Filter by index OR table name substring" },
+          {
+            name: "limit",
+            type: "number",
+            default: "200",
+            description:
+              "Max rows (max 1000). dbo holds several hundred indexes, so a default whole-DB read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate.",
+          },
+          {
+            name: "unused",
+            type: "boolean",
+            description:
+              "Only indexes with ZERO reads since statsSince (filtered server-side, so the row limit is spent on the interesting rows)",
+          },
+        ],
+        outputShape:
+          "{ statsSince, items: [{ table, index, columns, type:'CLUSTERED'|'NONCLUSTERED'|…, unique, primaryKey?, filter?, seeks, scans, lookups, updates, lastRead, lastWrite, unused? }], nextCursor: null, count, truncated?, hint? }. `primaryKey`/`filter`/`unused` are OMITTED when false — presence is the signal." +
+          truncNote,
+        errors: [limitErr("pass a positive integer; max is 1000"), invalidNameErr, ...devErrors],
+        notes: [
+          "Counters RESET on every SQL Server restart/failover — `statsSince` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.",
+          "An `unused` index with high `updates` is pure write cost — the strongest drop candidate. `lastRead`/`lastWrite` are the most recent seek/scan/lookup and update timestamps within the window.",
+        ],
+        examples: [
+          "ib dev schema indexes --table keikka",
+          "ib dev schema indexes --unused --limit 1000",
+          "ib dev schema indexes --search sijainti",
         ],
       },
     ];

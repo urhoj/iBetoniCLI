@@ -13,6 +13,7 @@ import {
   runSchemaTrigger,
   runSchemaSnapshots,
   runSchemaQuery,
+  runSchemaIndexes,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -170,6 +171,24 @@ describe("ib schema", () => {
    * did not exist. A unit test of warnIfTruncated alone would still pass if a
    * run* function stopped calling it.
    */
+  test("runSchemaIndexes: bare path when no opts", async () => {
+    get().mockResolvedValueOnce({ statsSince: "2026-08-09T04:39:19.553Z", items: [], nextCursor: null, count: 0 });
+    await runSchemaIndexes(mockClient, {});
+    expect(get()).toHaveBeenCalledWith("/api/cli/schema/indexes");
+  });
+
+  test("runSchemaIndexes: table + search + limit + unused query string", async () => {
+    get().mockResolvedValueOnce({ statsSince: null, items: [], nextCursor: null, count: 0 });
+    await runSchemaIndexes(mockClient, { table: "keikka", search: "pvm", limit: 50, unused: true });
+    expect(get()).toHaveBeenCalledWith("/api/cli/schema/indexes?table=keikka&search=pvm&limit=50&unused=1");
+  });
+
+  test("runSchemaIndexes: unused=false is dropped from the query string", async () => {
+    get().mockResolvedValueOnce({ statsSince: null, items: [], nextCursor: null, count: 0 });
+    await runSchemaIndexes(mockClient, { unused: false });
+    expect(get()).toHaveBeenCalledWith("/api/cli/schema/indexes");
+  });
+
   describe("truncation warning (fb#641)", () => {
     const truncated = { items: [{ name: "a" }], nextCursor: null, count: 200, truncated: true, hint: "capped at 200 rows" };
     let warned: string[];
@@ -190,6 +209,7 @@ describe("ib schema", () => {
       ["views", runSchemaViews, "ib dev schema views"],
       ["triggers", runSchemaTriggers, "ib dev schema triggers"],
       ["snapshots", runSchemaSnapshots, "ib dev schema snapshots"],
+      ["indexes", runSchemaIndexes, "ib dev schema indexes"],
     ])("%s: a truncated page warns and names its own command", async (_name, run, command) => {
       get().mockResolvedValueOnce(truncated);
       const env = await run(mockClient, {});

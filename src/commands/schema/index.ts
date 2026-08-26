@@ -89,6 +89,27 @@ export async function runSchemaTrigger(client: ApiClient, name: string): Promise
 export async function runSchemaRows(client: ApiClient, table: string, opts: SchemaListFilter): Promise<Envelope> {
   return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);
 }
+
+/** `indexes` adds a zero-reads filter on top of the trigger-style table filter. */
+export interface SchemaIndexFilter extends SchemaTriggerFilter {
+  unused?: boolean;
+}
+
+/**
+ * Per-index usage statistics (sys.dm_db_index_usage_stats) — the live
+ * counterpart of the monthly-generated indexes-performance.md doc. The
+ * envelope's extra `statsSince` key is the moment every counter last reset
+ * (SQL Server start time); zero reads mean nothing without it.
+ */
+export async function runSchemaIndexes(client: ApiClient, opts: SchemaIndexFilter): Promise<Envelope> {
+  const path = `/api/cli/schema/indexes${qs({
+    table: opts.table || undefined,
+    search: opts.search || undefined,
+    limit: opts.limit,
+    unused: opts.unused ? 1 : undefined,
+  })}`;
+  return getSchemaList(client, path, "ib dev schema indexes");
+}
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");
 }
@@ -204,6 +225,11 @@ export function registerSchemaCommands(
   listOpt(s.command("triggers"))
     .option("--table <name>", "Only triggers whose parent table is <name>")
     .action(jsonAction(getClient, runSchemaTriggers));
+
+  listOpt(s.command("indexes"))
+    .option("--table <name>", "Only indexes on this table (exact name)")
+    .option("--unused", "Only indexes with zero reads (seeks+scans+lookups) since statsSince")
+    .action(jsonAction(getClient, runSchemaIndexes));
 
   listOpt(s.command("rows <table>"))
     .description("Sample rows from a reference lookup table (allowlisted, developer-only)")

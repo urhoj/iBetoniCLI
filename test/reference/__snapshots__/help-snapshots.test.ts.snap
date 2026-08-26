@@ -3496,6 +3496,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev schema indexes matches snapshot 1`] = `
+"USAGE
+  ib dev schema indexes [flags]
+
+DESCRIPTION
+  Per-index USAGE statistics for dbo tables — seeks/scans/lookups/updates and last-touch timestamps from sys.dm_db_index_usage_stats. The live answer to "which indexes are dead weight" and "does anything actually read this table", previously only available from the monthly-generated indexes-performance.md. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --table STRING    Only indexes on this table (exact name)
+  --search STRING    Filter by index OR table name substring
+  --limit NUMBER    Max rows (max 1000). dbo holds several hundred indexes, so a default whole-DB read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate. (default: 200)
+  --unused    Only indexes with ZERO reads since statsSince (filtered server-side, so the row limit is spent on the interesting rows)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { statsSince, items: [{ table, index, columns, type:'CLUSTERED'|'NONCLUSTERED'|…, unique, primaryKey?, filter?, seeks, scans, lookups, updates, lastRead, lastWrite, unused? }], nextCursor: null, count, truncated?, hint? }. \`primaryKey\`/\`filter\`/\`unused\` are OMITTED when false — presence is the signal. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Counters RESET on every SQL Server restart/failover — \`statsSince\` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.
+  - An \`unused\` index with high \`updates\` is pure write cost — the strongest drop candidate. \`lastRead\`/\`lastWrite\` are the most recent seek/scan/lookup and update timestamps within the window.
+
+EXAMPLES
+  ib dev schema indexes --table keikka
+  ib dev schema indexes --unused --limit 1000
+  ib dev schema indexes --search sijainti
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev schema proc matches snapshot 1`] = `
 "USAGE
   ib dev schema proc <name> [flags]
