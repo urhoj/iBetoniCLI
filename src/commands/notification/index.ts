@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { failWith, writeJson } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { assertEnum } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import {
   type WriteFlags,
@@ -215,10 +216,8 @@ export function registerNotificationCommands(
       }
       // Commander's default ("betoni", registered on the option) makes fromBrand
       // always defined here.
-      const brand = opts.fromBrand;
-      if (brand !== "betoni" && brand !== "betonijerry") {
-        failWith("--from-brand must be 'betoni' or 'betonijerry'", 4);
-      }
+      assertEnum(opts.fromBrand, ["betoni", "betonijerry"], "--from-brand");
+      const brand = opts.fromBrand as "betoni" | "betonijerry";
       const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
       const result = await runNotificationEmailSend(
         await getClient(),

@@ -2,7 +2,7 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { failUsage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { jsonAction } from "../_shared/action.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, assertEnum } from "../../targets.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 /** The shared-grade / shared-attribute sentinel used by both betoni entities. */
 const SHARED_ASIAKAS_ID = 0;
@@ -125,12 +125,10 @@ const REFERENCE_LISTS = [
  * 2-hour TTL server-side.
  */
 export async function runReference(client, opts = {}) {
+    assertEnum(opts.kind, REFERENCE_LISTS.map(([k]) => k), "--kind");
     const wanted = opts.kind
         ? REFERENCE_LISTS.filter(([k]) => k === opts.kind)
         : REFERENCE_LISTS;
-    if (opts.kind && wanted.length === 0) {
-        failUsage(`--kind must be one of: ${REFERENCE_LISTS.map(([k]) => k).join(", ")}`);
-    }
     const results = await Promise.all(wanted.map(([, path]) => client.get(path)));
     return Object.fromEntries(wanted.map(([kind], i) => [kind, results[i] ?? []]));
 }

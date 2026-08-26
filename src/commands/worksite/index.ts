@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
+import { todayHelsinki } from "../../dates.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption } from "../../targets.js";
@@ -175,16 +176,14 @@ export async function runWorksiteCreate(
 }
 
 /**
- * Format today's date as YYYYMMDD (no separators), in local time. Used as the
- * default `yyyymmdd` URL segment for /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd
- * when the caller doesn't supply one.
+ * Today as YYYYMMDD (no separators) in Europe/Helsinki — the timezone every
+ * date flag in this CLI is documented to use (a host-local build was off by one
+ * on a UTC runner between 22:00–24:00 Helsinki). Used as the default `yyyymmdd`
+ * URL segment for /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd when the
+ * caller doesn't supply one.
  */
 function todayYyyymmdd(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}${m}${day}`;
+  return todayHelsinki().replace(/-/g, "");
 }
 
 /** Typed convenience fields for `worksite update`, mapped to backend column names. */

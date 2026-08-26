@@ -13,8 +13,7 @@ function resolveCommand(commandParts, tier) {
     // ("ib ib vehicle driver available" → exit 5). Strip any leading `ib` token(s) and
     // collapse whitespace so the list→get round-trip just works, whether the path
     // arrives as separate args or one quoted string.
-    const path = commandParts.join(" ").trim().replace(/\s+/g, " ").replace(/^(?:ib\s+)+/i, "");
-    const command = `ib ${path}`.trim();
+    const command = normalizeCommandKey(commandParts);
     const visible = COMMAND_SPECS.some((s) => s.command === command && !isHiddenAtTier(s, tier));
     if (!visible) {
         throw new CliError(`unknown command: ${command}. Use \`ib commands\` for valid paths.`, 0, null, 5);

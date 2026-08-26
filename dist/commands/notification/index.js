@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { failWith, writeJson } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { assertEnum } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
@@ -131,10 +132,8 @@ export function registerNotificationCommands(parent, getClient) {
         }
         // Commander's default ("betoni", registered on the option) makes fromBrand
         // always defined here.
+        assertEnum(opts.fromBrand, ["betoni", "betonijerry"], "--from-brand");
         const brand = opts.fromBrand;
-        if (brand !== "betoni" && brand !== "betonijerry") {
-            failWith("--from-brand must be 'betoni' or 'betonijerry'", 4);
-        }
         const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
         const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, opts);
         writeJson(result);

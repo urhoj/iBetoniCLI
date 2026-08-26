@@ -8,7 +8,7 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
-import { parseId, addAsiakasTargetOption, resolveAsiakasTarget } from "../../../targets.js";
+import { parseId, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
 
 type Row = Record<string, unknown>;
@@ -450,9 +450,7 @@ export function registerMessageDailyCommands(
       .requiredOption("--access <mode>")
   ).action(
     guarded(async (idStr: string, opts: { role: number; access: string } & WriteFlags) => {
-      if (opts.access !== "read" && opts.access !== "edit") {
-        failWith('--access must be "read" or "edit"', 4);
-      }
+      assertEnum(opts.access, ["read", "edit"], "--access");
       const client = await getClient();
       writeJson(
         await runDailyPermSet(

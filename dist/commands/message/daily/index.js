@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
-import { parseId, addAsiakasTargetOption, resolveAsiakasTarget } from "../../../targets.js";
+import { parseId, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
@@ -273,9 +273,7 @@ export function registerMessageDailyCommands(parent, getClient) {
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
         .requiredOption("--role <typeId>", "", Number)
         .requiredOption("--access <mode>")).action(guarded(async (idStr, opts) => {
-        if (opts.access !== "read" && opts.access !== "edit") {
-            failWith('--access must be "read" or "edit"', 4);
-        }
+        assertEnum(opts.access, ["read", "edit"], "--access");
         const client = await getClient();
         writeJson(await runDailyPermSet(client, {
             dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
