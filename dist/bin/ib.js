@@ -18,9 +18,10 @@ const program = await buildProgram(process.argv.slice(2));
 // in handleParseRejection; help/version pass through) + capture its stderr.
 const parserHooks = enableParserThrow(program);
 program.hook("preAction", (_thisCommand, actionCommand) => {
-    if (getGlobalOptions(program).pretty)
+    const globals = getGlobalOptions(program);
+    if (globals.pretty)
         setOutputMode("pretty");
-    if (getGlobalOptions(program).stats)
+    if (globals.stats)
         enableStats();
     // Which command is running — attached to every request as X-Ib-Command
     // (command NAMES only) for the /systemmap live-activity stream.
@@ -31,10 +32,9 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
     // AFTER applySpecErrors, which seeds the spec's own prettyColumns: an
     // explicit --columns is the caller's override and must win. It is also a
     // real output projection (fb#451) — writeJson applies it in both modes.
-    const cols = getGlobalOptions(program).columns;
-    if (cols) {
-        setListColumns(cols);
-        setProjectionColumns(cols);
+    if (globals.columns) {
+        setListColumns(globals.columns);
+        setProjectionColumns(globals.columns);
     }
 });
 // Resolve the caller's visibility tier from the session token BEFORE parse so

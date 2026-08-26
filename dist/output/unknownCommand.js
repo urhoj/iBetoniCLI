@@ -1,4 +1,4 @@
-import { COMMAND_SPECS } from "../reference/specs.js";
+import { COMMAND_SPECS, specForPath } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
 import { commandDomains, fullyHiddenDomains, isWriteSpec } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
@@ -15,6 +15,13 @@ export const GROUP_SIBLING_DOMAINS = {
     company: { domain: "customer", why: ASIAKAS_PAIR_WHY },
     customer: { domain: "company", why: ASIAKAS_PAIR_WHY },
 };
+/** The "where to look next" fragment both enriched envelopes render. */
+function discoverHint(path) {
+    const domain = path.split(" ")[1]; // token after `ib`, e.g. legal
+    return domain
+        ? `\`${path} --help\` or \`ib commands ${domain}\``
+        : "`ib --help` or `ib commands`";
+}
 /**
  * The sibling group's `ib <domain> <token>` command, when the pair is declared
  * in {@link GROUP_SIBLING_DOMAINS} AND that command actually exists and is
@@ -171,10 +178,7 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     const group = commandPath(cmd);
     const available = visibleSubcommands(cmd, tier);
     const didYouMean = closestName(unknownToken, available);
-    const domain = group.split(" ")[1]; // token after `ib`, e.g. legal
-    const discover = domain
-        ? `\`${group} --help\` or \`ib commands ${domain}\``
-        : "`ib --help` or `ib commands`";
+    const discover = discoverHint(group);
     const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
     const availableStr = available.length > 0
         ? `Available ${cmd.name()} subcommands: ${available.join(", ")}. `
@@ -399,7 +403,7 @@ export function excessPositionals(cmd) {
  */
 function commandSurface(cmd) {
     const command = commandPath(cmd);
-    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
+    const spec = specForPath(command);
     return {
         command,
         spec,
@@ -663,10 +667,7 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
         ? null
         : siblingsAcceptingSynonym(canonicalPath(command), unknownOption, tier);
     const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
-    const domain = command.split(" ")[1]; // token after `ib`, e.g. customer
-    const discover = domain
-        ? `\`${command} --help\` or \`ib commands ${domain}\``
-        : "`ib --help` or `ib commands`";
+    const discover = discoverHint(command);
     const parts = [];
     if (redirect)
         parts.push(redirect);

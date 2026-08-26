@@ -54,6 +54,19 @@ import { TASK_SPECS } from "./specs/task.js";
 import { SALES_SPECS } from "./specs/sales.js";
 
 export { COMMON_AUTH_ERRORS } from "./specs/shared.js";
+import { canonicalPath } from "./aliasPaths.js";
+
+/**
+ * The spec whose command equals the CANONICAL form of `path` (pass the path as
+ * invoked — a back-compat alias resolves to the command's own spec, so aliased
+ * invocations still get their documented remedies/allowed values). One lookup
+ * shared by program.ts and unknownCommand.ts so alias resolution cannot drift
+ * between the four sites that used to spell it inline.
+ */
+export function specForPath(path: string): CommandSpec | undefined {
+  const canonical = canonicalPath(path);
+  return COMMAND_SPECS.find((s) => s.command === canonical);
+}
 
 /**
  * The canonical catalogue of every `ib` subcommand. Summaries and details are

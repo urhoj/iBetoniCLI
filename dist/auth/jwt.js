@@ -128,7 +128,7 @@ export function decodeJwtPayload(jwt) {
     const companyList = companies.map(({ asiakasId, roles }) => ({ asiakasId, roles }));
     const claims = {
         personId: finite(expanded.personId ?? expanded.sub),
-        ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
+        ownerAsiakasId: owner,
         ownerAsiakasName: expanded.ownerAsiakasName,
         email: expanded.email,
         issuedFor: expanded.issuedFor,

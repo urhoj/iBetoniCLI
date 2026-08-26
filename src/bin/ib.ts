@@ -27,8 +27,9 @@ const program = await buildProgram(process.argv.slice(2));
 const parserHooks = enableParserThrow(program);
 
 program.hook("preAction", (_thisCommand, actionCommand) => {
-  if (getGlobalOptions(program).pretty) setOutputMode("pretty");
-  if (getGlobalOptions(program).stats) enableStats();
+  const globals = getGlobalOptions(program);
+  if (globals.pretty) setOutputMode("pretty");
+  if (globals.stats) enableStats();
   // Which command is running — attached to every request as X-Ib-Command
   // (command NAMES only) for the /systemmap live-activity stream.
   setAmbientCommandPath(commandPathOf(actionCommand));
@@ -38,10 +39,9 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
   // AFTER applySpecErrors, which seeds the spec's own prettyColumns: an
   // explicit --columns is the caller's override and must win. It is also a
   // real output projection (fb#451) — writeJson applies it in both modes.
-  const cols = getGlobalOptions(program).columns;
-  if (cols) {
-    setListColumns(cols);
-    setProjectionColumns(cols);
+  if (globals.columns) {
+    setListColumns(globals.columns);
+    setProjectionColumns(globals.columns);
   }
 });
 

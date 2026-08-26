@@ -5,33 +5,36 @@ import { closestName } from "./nearest.js";
 import { buildValidationEnvelope } from "./validationEnvelope.js";
 import { getEmbeddedCtx } from "../embedded.js";
 import { recordFriction } from "../friction.js";
-let outputMode = "json";
 /**
- * ERRORS rows of the command currently executing, set by the bin preAction
- * hook from its CommandSpec. Lets `writeError` echo the command's OWN
- * documented remedy into the envelope `hint` (feedback #25) instead of only
- * the generic per-status hint. `null` = no spec context (tests, spec-less
- * commands) → generic hints only.
+ * Per-run output state — the four fields an embedded run must not share with a
+ * concurrent one. Every read and write goes through {@link state}: the active
+ * EmbeddedCtx when one is installed (each field is required there, so an
+ * embedded run can never fall through to — or leak into — the module copy),
+ * else this module-level fallback for the normal one-shot CLI process.
+ *
+ * - `activeCommandErrors`: ERRORS rows of the command currently executing, set
+ *   by the bin preAction hook from its CommandSpec. Lets `writeError` echo the
+ *   command's OWN documented remedy into the envelope `hint` (feedback #25)
+ *   instead of only the generic per-status hint. `null` = no spec context
+ *   (tests, spec-less commands) → generic hints only.
+ * - `listColumns`: columns the running command's list table should show under
+ *   `--pretty`: the CommandSpec's `prettyColumns` (set by `applySpecErrors`),
+ *   overridden by the global `--columns`. `null` = let `renderList` pick.
+ * - `projectionColumns`: columns the caller EXPLICITLY requested via the global
+ *   `--columns` flag — a real client-side output projection applied by
+ *   {@link writeJson} in BOTH JSON and `--pretty` modes (fb#451: the flag used
+ *   to be a pretty-table-only pick, silently a no-op in JSON mode — exactly
+ *   where AI callers live). Kept SEPARATE from `listColumns`, which is also
+ *   seeded from the spec's `prettyColumns` — a presentation DEFAULT that must
+ *   never narrow the JSON contract.
  */
-let activeCommandErrors = null;
-/**
- * Columns the running command's list table should show under `--pretty`: the
- * CommandSpec's `prettyColumns` (set by `applySpecErrors`), overridden by the
- * global `--columns`. `null` = let `renderList` pick. Ctx-aware for the same
- * reason as {@link activeCommandErrors} — an embedded run must not leak its
- * selection into a concurrent one.
- */
-let listColumns = null;
-/**
- * Columns the caller EXPLICITLY requested via the global `--columns` flag — a
- * real client-side output projection applied by {@link writeJson} in BOTH JSON
- * and `--pretty` modes (fb#451: the flag used to be a pretty-table-only pick,
- * silently a no-op in JSON mode — exactly where AI callers live). Kept
- * SEPARATE from {@link listColumns}, which is also seeded from the spec's
- * `prettyColumns` — a presentation DEFAULT that must never narrow the JSON
- * contract. Ctx-aware for the same reason as the rest.
- */
-let projectionColumns = null;
+const moduleState = {
+    outputMode: "json",
+    activeCommandErrors: null,
+    listColumns: null,
+    projectionColumns: null,
+};
+const state = () => getEmbeddedCtx() ?? moduleState;
 function emitStdout(line) {
     const ctx = getEmbeddedCtx();
     if (ctx)
@@ -47,25 +50,13 @@ function emitStderr(line) {
         process.stderr.write(line);
 }
 export function setActiveCommandErrors(rows) {
-    const ctx = getEmbeddedCtx();
-    if (ctx)
-        ctx.activeCommandErrors = rows;
-    else
-        activeCommandErrors = rows;
+    state().activeCommandErrors = rows;
 }
 export function setListColumns(cols) {
-    const ctx = getEmbeddedCtx();
-    if (ctx)
-        ctx.listColumns = cols;
-    else
-        listColumns = cols;
+    state().listColumns = cols;
 }
 export function setProjectionColumns(cols) {
-    const ctx = getEmbeddedCtx();
-    if (ctx)
-        ctx.projectionColumns = cols;
-    else
-        projectionColumns = cols;
+    state().projectionColumns = cols;
 }
 const isRow = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 /**
@@ -184,20 +175,15 @@ export function applyColumnsProjection(value, cols) {
     return projected;
 }
 export function setOutputMode(m) {
-    const ctx = getEmbeddedCtx();
-    if (ctx)
-        ctx.outputMode = m;
-    else
-        outputMode = m;
+    state().outputMode = m;
 }
 export function writeJson(value) {
-    const projection = getEmbeddedCtx()?.projectionColumns ?? projectionColumns;
+    const projection = state().projectionColumns;
     if (projection)
         value = applyColumnsProjection(value, projection);
-    const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
-    if (mode === "pretty") {
+    if (state().outputMode === "pretty") {
         if (isListEnvelope(value)) {
-            const cols = getEmbeddedCtx()?.listColumns ?? listColumns;
+            const cols = state().listColumns;
             emitStdout(renderList(value, cols) + "\n");
             return;
         }
@@ -218,11 +204,10 @@ export function writeJson(value) {
  * does not move.
  */
 export function writeErrorEnvelope(env, exitCode) {
-    const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
-    emitStderr((mode === "pretty" ? renderError(env, exitCode) : JSON.stringify(env)) + "\n");
+    emitStderr((state().outputMode === "pretty" ? renderError(env, exitCode) : JSON.stringify(env)) + "\n");
 }
 export function writeError(err) {
-    const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
+    const activeErrors = state().activeCommandErrors;
     if (err instanceof CliError) {
         const body = err.body && typeof err.body === "object"
             ? err.body

@@ -179,7 +179,7 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
 
   const claims: DecodedClaims = {
     personId: finite(expanded.personId ?? expanded.sub),
-    ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
+    ownerAsiakasId: owner,
     ownerAsiakasName: expanded.ownerAsiakasName as string | undefined,
     email: expanded.email as string | undefined,
     issuedFor: expanded.issuedFor as "cli" | "mcp" | "web" | undefined,

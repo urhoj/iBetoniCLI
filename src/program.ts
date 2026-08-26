@@ -26,12 +26,11 @@ import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence, type CommandSpec } from "./output/help.js";
-import { COMMAND_SPECS } from "./reference/specs.js";
-import { canonicalPath } from "./reference/aliasPaths.js";
+import { COMMAND_SPECS, specForPath } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
-import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
+import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
@@ -496,8 +495,7 @@ export function applySpecErrors(actionCommand: Command): void {
  * per-status hint on every aliased path.
  */
 function specFor(cmd: Command): CommandSpec | undefined {
-  const path = canonicalPath(commandPath(cmd));
-  return COMMAND_SPECS.find((s) => s.command === path);
+  return specForPath(commandPath(cmd));
 }
 
 /**
@@ -577,8 +575,7 @@ export function assertNoEatenEmptyString(program: Command, actionCommand: Comman
  * same envelope, same exit 4 as the in-action call it replaces.
  */
 export function enforceSpecReasonPolicy(actionCommand: Command): void {
-  const path = canonicalPath(commandPath(actionCommand));
-  const spec = COMMAND_SPECS.find((s) => s.command === path);
+  const spec = specForPath(commandPath(actionCommand));
   if (!spec?.reasonPolicy) return;
   requireReason(actionCommand.opts(), {
     allowDryRun: spec.reasonPolicy === "unless-dry-run",
@@ -861,7 +858,7 @@ export function handleParseRejection(
         // Look the spec up by canonical path (so an alias still gets its allowed
         // values + sample), but keep `path` as INVOKED for the envelope — the
         // caller should see back the command they actually ran.
-        const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(path));
+        const spec = specForPath(path);
         const problems: FlagProblem[] = missing.map((f) => ({
           flag: longFlag(f),
           issue: "missing",
@@ -907,14 +904,12 @@ export function handleParseRejection(
         }
       }
     }
-    const genericHint =
-      "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands";
     return emitUsageEnvelope(err, {
       success: false,
       error: detail,
       code: "USAGE",
       statusCode: 0,
-      hint: genericHint,
+      hint: USAGE_HINT,
     });
   }
   const message = errorMessage(err);

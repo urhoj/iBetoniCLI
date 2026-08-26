@@ -131,10 +131,24 @@ export async function createCliContext(opts) {
         }
         throw e;
     }
-    // Decode the active token (free, no network) so the client can announce the
-    // write target on the first mutation. For an ephemeral switch the switch
-    // response already names the company; otherwise decode the base token.
-    // Best-effort — a malformed token must not break the client.
+    // Decode the active token once (free, no network; best-effort — a malformed
+    // token must not break the client) for two derived facts:
+    // - actingAs: what the client announces on the first mutation. For an
+    //   ephemeral switch the switch response already names the company; otherwise
+    //   the base token's ownerAsiakasId claim does.
+    // - isImpersonating: a JWT carrying `imp` must NOT use the standard refresh
+    //   path — /api/auth/refresh-token re-derives DB claims and DROPS imp/imp_sid
+    //   + the 10-min cap, silently escalating a 10-minute impersonation into a
+    //   permanent login as the target. Auto-refresh is disabled for these
+    //   sessions: a 401 surfaces cleanly and the user re-runs
+    //   `ib auth impersonate` (or `ib auth impersonate --extend`).
+    let claims = null;
+    try {
+        claims = decodeJwtPayload(auth.token);
+    }
+    catch {
+        // Undecodable token — no acting-as diagnostic; treated as a normal session.
+    }
     let actingAs;
     if (eph.switched && eph.ownerAsiakasId) {
         actingAs = {
@@ -142,33 +156,13 @@ export async function createCliContext(opts) {
             ownerAsiakasName: eph.ownerAsiakasName,
         };
     }
-    else {
-        try {
-            const claims = decodeJwtPayload(auth.token);
-            if (claims.ownerAsiakasId) {
-                actingAs = {
-                    ownerAsiakasId: claims.ownerAsiakasId,
-                    ownerAsiakasName: claims.ownerAsiakasName,
-                };
-            }
-        }
-        catch {
-            // Undecodable token — skip the acting-as diagnostic.
-        }
+    else if (claims?.ownerAsiakasId) {
+        actingAs = {
+            ownerAsiakasId: claims.ownerAsiakasId,
+            ownerAsiakasName: claims.ownerAsiakasName,
+        };
     }
-    // An impersonation session (JWT carries `imp`) must NOT use the standard
-    // refresh path: /api/auth/refresh-token re-derives DB claims and DROPS
-    // imp/imp_sid + the 10-min cap, silently escalating a 10-minute impersonation
-    // into a permanent login as the target. Disable auto-refresh for these
-    // sessions — a 401 surfaces cleanly and the user re-runs `ib auth impersonate`
-    // (or `ib auth impersonate --extend`).
-    let isImpersonating = false;
-    try {
-        isImpersonating = decodeJwtPayload(auth.token).imp !== undefined;
-    }
-    catch {
-        // Undecodable token — treat as a normal session.
-    }
+    const isImpersonating = claims?.imp !== undefined;
     const client = createApiClient({
         endpoint,
         token: eph.token,
