@@ -174,8 +174,7 @@ export async function runJerryCounts(client, provider) {
  * provider side that has gone quiet is visible as a shape, not a single number.
  */
 export async function runJerryStats(client, weeks) {
-    const qs = weeks === undefined ? "" : `?weeks=${weeks}`;
-    return client.get(`/api/admin/jerry-searches/weekly${qs}`);
+    return client.get(`/api/admin/jerry-searches/weekly${qs({ weeks })}`);
 }
 /** Exclusion reasons `--explain` can report, in gate-priority order. */
 export const CHECK_ADDRESS_GATES = [
@@ -664,19 +663,20 @@ export function registerJerryCommands(parent, getClient) {
         const client = await getClient();
         writeJson(await runJerryRequestCreate(client, body, opts));
     }));
-    // cancel / decline / undecline are the same registration: one <requestId>,
-    // write flags, --reason required. Only the run fn differs.
-    const registerRequestLifecycle = (name, run) => {
-        addWriteFlagsToCommand(request.command(`${name} <requestId>`)).action(guarded(async (idStr, opts) => {
+    // Request-lifecycle leaves (cancel/decline/undecline here, the admin
+    // expire/cancel/resend/delete below) are the same registration: one
+    // <requestId>, write flags. Only the parent group and the run fn differ.
+    const registerRequestAction = (parent, name, run) => {
+        addWriteFlagsToCommand(parent.command(`${name} <requestId>`)).action(guarded(async (idStr, opts) => {
             const client = await getClient();
             writeJson(await run(client, parseId(idStr, "requestId"), opts));
         }));
     };
-    registerRequestLifecycle("cancel", runJerryRequestCancel);
+    registerRequestAction(request, "cancel", runJerryRequestCancel);
     // decline is the only member that also sends --reason in the BODY (it is
     // shown to the customer).
-    registerRequestLifecycle("decline", (client, id, opts) => runJerryRequestDecline(client, id, opts.reason, opts));
-    registerRequestLifecycle("undecline", runJerryRequestUndecline);
+    registerRequestAction(request, "decline", (client, id, opts) => runJerryRequestDecline(client, id, opts.reason, opts));
+    registerRequestAction(request, "undecline", runJerryRequestUndecline);
     // offer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");
     addWriteFlagsToCommand(offer
@@ -853,30 +853,27 @@ export function registerJerryCommands(parent, getClient) {
         .option("--due")
         .option("--search <text>")
         .action(jsonAction(getClient, (client, opts) => runJerryOnboardingList(client, opts)));
+    // Option-name → body-key map (only `notes` renames, to `muistiinpanot`);
+    // entry order is the emitted key order.
+    const PROSPECT_FIELDS = {
+        tier: "tier",
+        malli: "malli",
+        kanava: "kanava",
+        alue: "alue",
+        status: "status",
+        notes: "muistiinpanot",
+        outreachName: "outreachName",
+        outreachEmail: "outreachEmail",
+        outreachPhone: "outreachPhone",
+        companyType: "companyType",
+        parkedUntil: "parkedUntil",
+    };
     const pickProspectFields = (o) => {
         const out = {};
-        if (o.tier !== undefined)
-            out.tier = o.tier;
-        if (o.malli !== undefined)
-            out.malli = o.malli;
-        if (o.kanava !== undefined)
-            out.kanava = o.kanava;
-        if (o.alue !== undefined)
-            out.alue = o.alue;
-        if (o.status !== undefined)
-            out.status = o.status;
-        if (o.notes !== undefined)
-            out.muistiinpanot = o.notes;
-        if (o.outreachName !== undefined)
-            out.outreachName = o.outreachName;
-        if (o.outreachEmail !== undefined)
-            out.outreachEmail = o.outreachEmail;
-        if (o.outreachPhone !== undefined)
-            out.outreachPhone = o.outreachPhone;
-        if (o.companyType !== undefined)
-            out.companyType = o.companyType;
-        if (o.parkedUntil !== undefined)
-            out.parkedUntil = o.parkedUntil;
+        for (const [opt, key] of Object.entries(PROSPECT_FIELDS)) {
+            if (o[opt] !== undefined)
+                out[key] = o[opt];
+        }
         return out;
     };
     addWriteFlagsToCommand(onboarding
@@ -982,15 +979,10 @@ export function registerJerryCommands(parent, getClient) {
     adminRequest
         .command("offers <requestId>")
         .action(jsonAction(getClient, (client, idStr) => runJerryAdminRequestOffers(client, parseId(idStr, "requestId"))));
-    const adminReqAction = (name, run) => addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`))
-        .action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await run(client, parseId(idStr, "requestId"), opts));
-    }));
-    adminReqAction("expire", runJerryAdminRequestExpire);
-    adminReqAction("cancel", runJerryAdminRequestCancel);
-    adminReqAction("resend", runJerryAdminRequestResend);
-    adminReqAction("delete", runJerryAdminRequestDelete);
+    registerRequestAction(adminRequest, "expire", runJerryAdminRequestExpire);
+    registerRequestAction(adminRequest, "cancel", runJerryAdminRequestCancel);
+    registerRequestAction(adminRequest, "resend", runJerryAdminRequestResend);
+    registerRequestAction(adminRequest, "delete", runJerryAdminRequestDelete);
     // extend needs --days/--until, so it is registered outside adminReqAction.
     addWriteFlagsToCommand(adminRequest
         .command("extend <requestId>")
