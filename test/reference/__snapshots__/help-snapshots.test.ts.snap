@@ -119,7 +119,7 @@ DESCRIPTION
 
 ARGUMENTS
   <attachmentId> NUMBER    attachments.attachmentId (required)
-  <entity> STRING    keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer (omit when using a --<entity> flag instead) (optional)
+  <entity> STRING    keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer|message (omit when using a --<entity> flag instead) (optional)
 
 FLAGS
   --keikka NUMBER    Target keikkaId

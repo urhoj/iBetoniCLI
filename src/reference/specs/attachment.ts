@@ -170,7 +170,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     auth: "any",
     args: [
       { name: "attachmentId", type: "number", description: "attachments.attachmentId" },
-      { name: "entity", type: "string", required: false, description: "keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer (omit when using a --<entity> flag instead)" },
+      { name: "entity", type: "string", required: false, description: "keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer|message (omit when using a --<entity> flag instead)" },
     ],
     flags: [...ATTACHMENT_ENTITY_FLAGS],
     writeFlags: true,
