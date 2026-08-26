@@ -7,7 +7,7 @@ import { resolveActiveOwnerAsiakasId, personIdFromClaims } from "../../owner.js"
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
-import { parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, queryAliasOption, } from "../../targets.js";
+import { intFlag, parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, queryAliasOption, } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
@@ -376,7 +376,6 @@ export function runPersonCompaniesAsToken(client, personId) {
         hint: "a SNAPSHOT taken when the token was minted (mintedAt; null on compact/short-shape tokens, which are signed without iat) — a company added or role granted since is absent until the token is re-minted (ib company switch / re-login).",
     };
 }
-/**
 /** person-combinator request-body id fields (see puminet5api personCombinatorRoutes). */
 const PERSON_MERGE_ID_FIELDS = {
     mainField: "mainPersonId",
@@ -416,21 +415,21 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     registerPersonActivityCommand(p, getClient);
     p.command("list")
         .option("--role <role>")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--owned")
         .option("--limit <n>", "", cappedInt(500))
         .action(jsonAction(getClient, (client, opts) => runPersonList(client, opts)));
     p.command("get <personId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, idStr, opts) => runPersonGet(client, parseId(idStr, "personId"), opts.asiakas)));
     p.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
         .option("--my-companies")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--all-companies")
         .action(guarded(async (query, opts) => {
         // The three scope flags name three DIFFERENT result sets; silently
@@ -638,7 +637,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .description("Manage a person's per-company roles (asiakasPersonSettings)");
     personRole
         .command("list <personId>")
-        .requiredOption("--asiakas <id>", "", (v) => Number(v))
+        .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)));
     // grant/revoke share the whole registration; only the run fn differs.
     const roleWriteAction = (run) => guarded(async (personIdStr, opts) => {
@@ -665,7 +664,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         addWriteFlagsToCommand(personRole
             .command(`${name} <personId>`)
             .requiredOption("--role <name>")
-            .requiredOption("--asiakas <id>", "", (v) => Number(v))).action(roleWriteAction(run));
+            .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))).action(roleWriteAction(run));
     }
     // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
     // then enriches with the LIVE DB description/comment via an authenticated GET

@@ -2,7 +2,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
+import { parseId, intFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -382,7 +382,7 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--grid-only")
         .option("--valid-on <date>")
         .option("--type <id>", "", (val) => Number(val))
-        .option("--asiakas <id>", "", (val) => Number(val))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, opts) => runVehicleList(client, {
         limit: opts.limit,
         cursor: opts.cursor,
@@ -395,12 +395,12 @@ export function registerVehicleCommands(parent, getClient) {
     v.command("get <vehicleId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .option("--asiakas <id>", "", (val) => Number(val))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)));
     v.command("status <vehicleId>")
         .action(jsonAction(getClient, (client, idStr) => runVehicleStatus(client, parseId(idStr, "vehicleId"))));
     v.command("types")
-        .option("--asiakas <id>", "", (val) => Number(val))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, opts) => runVehicleTypes(client, opts.asiakas)));
     v.command("locations")
         .action(jsonAction(getClient, runVehicleLocations));
@@ -408,7 +408,7 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--search <s>")
         .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
-        .option("--asiakas <id>", "", (val) => Number(val))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, query, opts) => runVehicleSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, opts.asiakas)));
     v.command("timeline <vehicleId>")
         .option("--date <date>", "", "today")

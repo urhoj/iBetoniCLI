@@ -6,7 +6,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { assertPositiveInt, cappedInt } from "../../targets.js";
+import { assertPositiveInt, cappedInt, parseId } from "../../targets.js";
 import { qs } from "../../api/query.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
@@ -294,7 +294,7 @@ export function registerAttachmentCommands(parent, getClient) {
     a.command("get <attachmentId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .action(jsonAction(getClient, (client, id) => runAttachmentGet(client, Number(id))));
+        .action(jsonAction(getClient, (client, id) => runAttachmentGet(client, parseId(id, "attachmentId"))));
     a.command("types")
         .action(jsonAction(getClient, runAttachmentTypes));
     a.command("search [text]")
@@ -304,7 +304,7 @@ export function registerAttachmentCommands(parent, getClient) {
     a.command("download <attachmentId>")
         .option("--out <path>")
         .option("--force")
-        .action(jsonAction(getClient, (client, id, opts) => runAttachmentDownload(client, Number(id), opts.out, !!opts.force)));
+        .action(jsonAction(getClient, (client, id, opts) => runAttachmentDownload(client, parseId(id, "attachmentId"), opts.out, !!opts.force)));
     const uploadCmd = a
         .command("upload <file>")
         .option("--comment <text>")
@@ -352,13 +352,13 @@ export function registerAttachmentCommands(parent, getClient) {
     const attachCmd = a
         .command("attach <attachmentId>");
     addEntityFlags(attachCmd);
-    addWriteFlagsToCommand(attachCmd).action(jsonAction(getClient, (client, id, opts) => runAttachmentAttach(client, Number(id), opts, opts)));
+    addWriteFlagsToCommand(attachCmd).action(jsonAction(getClient, (client, id, opts) => runAttachmentAttach(client, parseId(id, "attachmentId"), opts, opts)));
     const detachCmd = a
         .command("detach <attachmentId> [entity]");
     addEntityFlags(detachCmd);
     addWriteFlagsToCommand(detachCmd).action(guarded(async (id, entity, opts) => {
         const entityWord = resolveDetachEntity(entity, opts);
-        writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, opts));
+        writeJson(await runAttachmentDetach(await getClient(), parseId(id, "attachmentId"), entityWord, opts));
     }));
     const updateCmd = a
         .command("update <attachmentId>")
@@ -369,7 +369,7 @@ export function registerAttachmentCommands(parent, getClient) {
     addWriteFlagsToCommand(updateCmd).action(guarded(async (id, opts) => {
         const client = await getClient();
         const { groupId, typeId } = await resolveGroupAndType(client, opts);
-        writeJson(await runAttachmentUpdate(client, Number(id), {
+        writeJson(await runAttachmentUpdate(client, parseId(id, "attachmentId"), {
             fileComment: opts.comment,
             liitaLaskuun: opts.liitaLaskuun,
             attachmentGroupId: groupId, attachmentTypeId: typeId,
@@ -378,7 +378,7 @@ export function registerAttachmentCommands(parent, getClient) {
     const deleteCmd = a
         .command("delete <attachmentId>");
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (id, opts) => {
-        writeJson(await runAttachmentDelete(await getClient(), Number(id), opts));
+        writeJson(await runAttachmentDelete(await getClient(), parseId(id, "attachmentId"), opts));
     }));
 }
 //# sourceMappingURL=index.js.map
