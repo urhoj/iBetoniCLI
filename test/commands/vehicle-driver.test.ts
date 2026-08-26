@@ -191,7 +191,12 @@ describe("ib vehicle driver — empty board/gaps disambiguation (fb#776)", () =>
   beforeEach(() => vi.clearAllMocks());
 
   const day = "2026-08-20";
-  const fleet = (count: number) => ({ items: [], nextCursor: null, count });
+  const fleet = (count: number, truncated?: boolean) => ({
+    items: [],
+    nextCursor: null,
+    count,
+    ...(truncated ? { truncated: true } : {}),
+  });
   const boardRows = (n: number) => ({
     items: Array.from({ length: n }, (_, i) => ({ vehicleId: i + 1, hasDriver: true })),
     nextCursor: null,
@@ -214,6 +219,20 @@ describe("ib vehicle driver — empty board/gaps disambiguation (fb#776)", () =>
     expect(out.hint).toMatch(/NO vehicle is grid-eligible on 2026-08-20/);
     expect(out.hint).toMatch(/22 vehicles/);
     expect(out.hint).toMatch(/lastDate/);
+    const fleetCall = c.get.mock.calls.find(([p]) => String(p).startsWith("/api/cli/vehicle/list"));
+    expect(fleetCall?.[0]).toBe("/api/cli/vehicle/list?limit=500");
+  });
+
+  // fb#918: the default backend limit (100) undercounts fleets bigger than
+  // that — the fetch now asks for the route's max (500) explicitly, and when
+  // even that is truncated the wording says "at least N" rather than lying
+  // that N is the whole fleet.
+  test("fleet fetch truncated at 500 -> hint says 'at least 500 vehicles'", async () => {
+    get().mockResolvedValueOnce(LIST); // gaps
+    get().mockResolvedValueOnce(LIST); // board
+    get().mockResolvedValueOnce(fleet(500, true)); // vehicle list, capped + truncated
+    const out = await runVehicleDriverGaps(c, day);
+    expect(out.hint).toMatch(/at least 500 vehicles/);
   });
 
   test("board empty reuses its own zero count (no second board fetch)", async () => {

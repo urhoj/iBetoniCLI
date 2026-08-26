@@ -56,8 +56,9 @@ async function emptyDayHint(
     const boardCount = knownBoardCount ?? (await fetchDriverBoard(client, date)).items.length;
     if (boardCount > 0)
       return `no gaps: all ${boardCount} grid-eligible vehicles already have a driver on ${date} — nothing to fill (${GRID_ELIGIBLE_DEF})`;
-    const fleet = await client.get<ListEnvelope<Row>>("/api/cli/vehicle/list");
-    return `no rows: NO vehicle is grid-eligible on ${date}, though the fleet has ${fleet?.count ?? 0} vehicles — ${GRID_ELIGIBLE_DEF}. A vehicle whose lastDate has passed silently leaves the board; check \`ib vehicle list\` for closed windows`;
+    const fleet = await client.get<ListEnvelope<Row>>(`/api/cli/vehicle/list${qs({ limit: 500 })}`);
+    const fleetCount = fleet?.truncated ? `at least ${fleet?.count ?? 0}` : `${fleet?.count ?? 0}`;
+    return `no rows: NO vehicle is grid-eligible on ${date}, though the fleet has ${fleetCount} vehicles — ${GRID_ELIGIBLE_DEF}. A vehicle whose lastDate has passed silently leaves the board; check \`ib vehicle list\` for closed windows`;
   } catch {
     return `no rows — ${GRID_ELIGIBLE_DEF}. To tell 'everything eligible already has a driver' from 'nothing is eligible on this date', pair \`ib vehicle driver board ${date}\` with \`ib vehicle list\``;
   }
