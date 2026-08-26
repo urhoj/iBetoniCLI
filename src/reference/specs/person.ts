@@ -430,7 +430,6 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     reasonPolicy: "always",
-    mutates: true,
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
@@ -460,7 +459,6 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     reasonPolicy: "always",
-    mutates: true,
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [

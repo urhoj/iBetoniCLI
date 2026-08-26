@@ -292,13 +292,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         }
         // Reset per response, so a later uncapped read cannot inherit an earlier
         // page's truncation flag.
-        lastListMeta = res.headers.get("X-Result-Truncated") === "1"
-            ? {
-                truncated: true,
-                limit: Number(res.headers.get("X-Result-Limit")) || undefined,
-                maxLimit: Number(res.headers.get("X-Result-Limit-Max")) || undefined,
-            }
-            : null;
+        lastListMeta = res.headers.get("X-Result-Truncated") === "1" ? { truncated: true } : null;
         const contentType = res.headers.get("content-type") || "";
         // Guard the body parse: a non-OK response can carry an empty or malformed
         // body even with a JSON content-type — don't let a SyntaxError escape the

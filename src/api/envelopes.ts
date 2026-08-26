@@ -72,8 +72,6 @@ export function cappedListEnvelope<T>(
 /** Structural mirror of the client's ListMeta, kept here so envelopes.ts stays a leaf. */
 export interface ListMetaLike {
   truncated?: boolean;
-  limit?: number;
-  maxLimit?: number;
 }
 
 export function toListEnvelope<T>(raw: unknown): ListEnvelope<T> {

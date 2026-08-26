@@ -457,7 +457,6 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, proposed: {...} } on --dry-run`,
     errors: BOARD_AUTH_ERRORS,
@@ -490,7 +489,6 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, messageId, current, proposed } on --dry-run`,
     errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
@@ -506,7 +504,6 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     flags: [],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     dryRunKind: "client",
     outputShape:
       "204 no content · { dryRun: true, messageId, wouldDelete: {...} } on --dry-run",

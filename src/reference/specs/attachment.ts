@@ -171,7 +171,6 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     reasonPolicy: "always",
     reasonDetail: "(blob deletion is irreversible)",
-    mutates: true,
     outputShape: "{ ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }",
     errors: [{ origin: "client", exit: 4, meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["ALWAYS preview with --dry-run first.", "Audited via ChangeTracker with your --reason.", DEPLOY_NOTE],

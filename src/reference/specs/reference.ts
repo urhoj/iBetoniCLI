@@ -155,7 +155,6 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       "Write summary and/or detail for one command in the command-catalog (developer only)",
     tier: "developer",
     auth: "any",
-    mutates: true,
     writeFlags: true,
     dryRunKind: "server",
     args: [
@@ -221,7 +220,6 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       "Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)",
     tier: "developer",
     auth: "any",
-    mutates: true,
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",

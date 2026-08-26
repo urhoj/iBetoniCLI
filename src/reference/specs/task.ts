@@ -68,7 +68,6 @@ export const TASK_SPECS: CommandSpec[] = [
     tier: "developer",
     writeFlags: true,
     dryRunKind: "server",
-    mutates: true,
     flags: [
       { name: "title", type: "string", description: "Task title, max 200 chars (required)" },
       { name: "executor", type: "string", description: "human | ai (required)", allowed: [...TASK_EXECUTORS] },
@@ -108,7 +107,6 @@ export const TASK_SPECS: CommandSpec[] = [
     tier: "developer",
     writeFlags: true,
     dryRunKind: "server",
-    mutates: true,
     args: [{ name: "id", type: "number", description: "taskId" }],
     flags: [
       { name: "notes", type: "string", description: "Result summary stored on the log row" },
@@ -138,7 +136,6 @@ export const TASK_SPECS: CommandSpec[] = [
     tier: "developer",
     writeFlags: true,
     dryRunKind: "server",
-    mutates: true,
     args: [{ name: "id", type: "number", description: "taskId" }],
     flags: [
       { name: "title", type: "string", description: "New title" },

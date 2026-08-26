@@ -30,7 +30,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath, specForPath } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -439,21 +439,11 @@ export function assertNoEatenEmptyString(program, actionCommand) {
     if (!rawArgs?.length)
         return;
     // Every option name legal ANYWHERE in this argv: the command's own plus the
-    // root globals (which Commander accepts at any position).
-    const optionNames = new Set();
-    for (const cmd of [actionCommand, program]) {
-        for (const o of cmd.options) {
-            if (o.long)
-                optionNames.add(o.long);
-            if (o.short)
-                optionNames.add(o.short);
-        }
-    }
-    const opts = actionCommand.opts();
-    for (const o of actionCommand.options) {
-        const value = opts[o.attributeName()];
-        if (typeof value !== "string" || !optionNames.has(value))
-            continue;
+    // root globals (which Commander accepts at any position). Deliberately NOT
+    // the whole parent chain the excess-arguments hint scans — intermediate
+    // GROUP commands declare no options today, and this guard must stay narrow.
+    const optionNames = optionNamesIn([actionCommand, program]);
+    for (const { option: o, value } of optionsHoldingFlagName(actionCommand, optionNames)) {
         const spellings = [o.long, o.short].filter((s) => !!s);
         const adjacent = rawArgs.some((tok, i) => spellings.includes(tok) && rawArgs[i + 1] === value);
         if (!adjacent)

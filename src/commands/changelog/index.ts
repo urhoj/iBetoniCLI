@@ -1359,7 +1359,6 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ]),
     writeFlags: true,
     dryRunKind: "server",
-    mutates: true,
     outputShape:
       "{ changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldCreate, validation }. " +
       FEEDBACK_LINKS_SHAPE_DESC +
@@ -1654,7 +1653,6 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
     ]),
     writeFlags: true,
-    mutates: true,
     dryRunKind: "client",
     outputShape:
       "entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldUpdate: { id, patch } }. " +
@@ -1735,7 +1733,6 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     args: [{ name: "changelogId", type: "number", description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)" }],
     flags: [],
     writeFlags: true,
-    mutates: true,
     dryRunKind: "client",
     outputShape: "{ deleted: true } | { dryRun, wouldDelete }",
     errors: [
@@ -1831,7 +1828,6 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    mutates: true,
     outputShape: "{ released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease, validation }",
     errors: [
       { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },

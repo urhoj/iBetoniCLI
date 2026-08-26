@@ -216,7 +216,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
       {
@@ -275,7 +274,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}",
     errors: [
       { origin: "client", exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
@@ -295,7 +293,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}",
     errors: [
       { origin: "client", exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
@@ -341,7 +338,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
     errors: [
       { origin: "client", exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
@@ -374,7 +370,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
     errors: [
       { origin: "client", exit: 4, meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
@@ -406,7 +401,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    mutates: true,
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
     errors: [
       { origin: "client", exit: 4, meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },

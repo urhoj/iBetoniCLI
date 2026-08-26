@@ -48,10 +48,6 @@ function errorMessageFromBody(parsed: unknown, status: number, contentType = "")
 /** Truncation metadata a list route reports out of band (fb#605). */
 export interface ListMeta {
   truncated: true;
-  /** The limit the server actually applied after clamping. */
-  limit?: number;
-  /** The route's hard cap, so a client can say "you asked for N, the max is M". */
-  maxLimit?: number;
 }
 
 interface ApiClientOptions {
@@ -437,13 +433,7 @@ export function createApiClient({
 
     // Reset per response, so a later uncapped read cannot inherit an earlier
     // page's truncation flag.
-    lastListMeta = res.headers.get("X-Result-Truncated") === "1"
-      ? {
-          truncated: true,
-          limit: Number(res.headers.get("X-Result-Limit")) || undefined,
-          maxLimit: Number(res.headers.get("X-Result-Limit-Max")) || undefined,
-        }
-      : null;
+    lastListMeta = res.headers.get("X-Result-Truncated") === "1" ? { truncated: true } : null;
 
     const contentType = res.headers.get("content-type") || "";
     // Guard the body parse: a non-OK response can carry an empty or malformed

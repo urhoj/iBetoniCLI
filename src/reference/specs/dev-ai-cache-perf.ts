@@ -270,7 +270,6 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
         description: "Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.",
         permissions: DEV_PERMS,
         tier: "developer",
-        mutates: true,
         writeFlags: true,
         dryRunKind: "client",
         flags: [{ name: "env", type: "string", description: "Environment buffer to clear (default: backend's current env)" }],

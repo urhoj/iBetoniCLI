@@ -449,24 +449,15 @@ export function dateFlagSuggestion(cmd, excess) {
     return null;
 }
 /**
- * The flag whose parsed value is another flag NAME — the signature of an
- * empty-string argument the shell ate, and the discriminator between the two
- * causes of an excess positional.
- *
- * Windows PowerShell DROPS a bare `""`, so `--email "" --asiakas 1380` reaches
- * the parser as `--email --asiakas` with `1380` stranded as a surplus
- * positional (fb#634). `assertNoEatenEmptyString` in program.ts detects the same
- * signature, but it is a preAction hook and Commander throws
- * `excessArguments` during PARSE — so on this path it never runs, and the hint
- * had to name both causes at once and let the caller guess (fb#726).
- *
- * Names are collected up the `.parent` chain because a root global is a legal
- * value-shaped token here too. `opts()` on a command that never parsed (a
- * direct call in a test) is simply empty, which disables the check.
+ * Names (long + short) of every option declared on `commands`. Shared by the
+ * two eaten-empty-string detectors, which pass DIFFERENT scopes on purpose:
+ * the preAction guard scans [actionCommand, program] (the two places Commander
+ * accepts options on a parsed invocation), the excess-arguments hint below
+ * walks the whole `.parent` chain.
  */
-function eatenEmptyStringFlag(cmd) {
+export function optionNamesIn(commands) {
     const names = new Set();
-    for (let c = cmd; c; c = c.parent) {
+    for (const c of commands) {
         for (const o of c.options) {
             if (o.long)
                 names.add(o.long);
@@ -474,14 +465,40 @@ function eatenEmptyStringFlag(cmd) {
                 names.add(o.short);
         }
     }
+    return names;
+}
+/**
+ * The options of `cmd` whose PARSED string value is one of `names` — the shared
+ * core of both eaten-empty-string detectors (fb#634): Windows PowerShell DROPS
+ * a bare `""`, so `--email "" --next` reaches the parser as `--email --next`
+ * and the flag's value IS another flag name. `opts()` on a command that never
+ * parsed (a direct call in a test) is simply empty, which disables the check.
+ */
+export function optionsHoldingFlagName(cmd, names) {
     const opts = cmd.opts();
+    const hits = [];
     for (const o of cmd.options) {
         const value = opts[o.attributeName()];
-        if (typeof value === "string" && names.has(value)) {
-            return o.long ?? o.short ?? o.attributeName();
-        }
+        if (typeof value === "string" && names.has(value))
+            hits.push({ option: o, value });
     }
-    return null;
+    return hits;
+}
+/**
+ * The flag whose parsed value is another flag NAME, for the excess-positional
+ * hint: `--email "" --asiakas 1380` reaches the parser as `--email --asiakas`
+ * with `1380` stranded as a surplus positional (fb#634).
+ * `assertNoEatenEmptyString` in program.ts detects the same signature over the
+ * shared core above, but it is a preAction hook and Commander throws
+ * `excessArguments` during PARSE — so on this path it never runs, and the hint
+ * had to name both causes at once and let the caller guess (fb#726).
+ */
+function eatenEmptyStringFlag(cmd) {
+    const chain = [];
+    for (let c = cmd; c; c = c.parent)
+        chain.push(c);
+    const hit = optionsHoldingFlagName(cmd, optionNamesIn(chain))[0];
+    return hit ? hit.option.long ?? hit.option.short ?? hit.option.attributeName() : null;
 }
 /**
  * Why the surplus positional exists, in one sentence — the applicable cause
