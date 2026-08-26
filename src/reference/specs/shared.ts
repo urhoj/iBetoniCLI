@@ -73,6 +73,24 @@ export const limitErr = (remedy: string): CommandError => ({
 });
 
 /**
+ * The `--asiakas` parse-guard row, the cross-tenant scope flag's twin of
+ * {@link limitErr}. Since fb#892 the person/vehicle `--asiakas` flags parse
+ * through `intFlag`, so a non-numeric value fails locally at exit 4 with
+ * exactly `--asiakas must be an integer >= 1` instead of reaching the wire as
+ * the literal "NaN". An argParser throw resolves the RUNNING command's own
+ * ERRORS row (fb#385), so every command that carries the guard documents this
+ * row; the remedy never varies (unlike limitErr's per-command caps), hence a
+ * constant.
+ */
+export const ASIAKAS_FLAG_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "--asiakas",
+  meaning: "--asiakas is not an integer >= 1, rejected locally before any request",
+  remedy: "pass a positive asiakasId (a company id) — `ib company list` shows the ones you can reach",
+};
+
+/**
  * Sandwich the command-specific rows between the universal 401 and 500 rows,
  * preserving their order. Most specs' custom rows (403/404/…) belong BETWEEN
  * the two, which `...COMMON_AUTH_ERRORS` (a trailing spread) cannot express.
@@ -286,6 +304,7 @@ export const SYSADMIN_403: CommandError = apiErr(403, "Not a system admin", "use
 export const ROLE_NAME_CLIENT_ERROR: CommandError = {
   origin: "client",
   exit: 4,
+  match: ["unknown role", "names TWO different roles"],
   meaning: "unknown or ambiguous role name — rejected by the CLI before any request",
   remedy:
     "pass an exact role name; the error names your options and `ib person role explain <name>` describes one. \"tarjousAdmin\" is not a role name — it denotes TWO (fb#418)",

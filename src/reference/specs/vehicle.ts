@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const VEHICLE_SPECS: CommandSpec[] = [
 
@@ -53,6 +53,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
+      ASIAKAS_FLAG_ERR,
       limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
@@ -85,6 +86,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(404, "Vehicle not found", "verify vehicleId (and --asiakas if it belongs to another company)"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
@@ -126,7 +128,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       },
     ],
     outputShape: "ListEnvelope<{ vehicleTypeId, name }>",
-    errors: [VEHICLE_ASIAKAS_403, ...permErrors("auth.page.vehicle.read")],
+    errors: [ASIAKAS_FLAG_ERR, VEHICLE_ASIAKAS_403, ...permErrors("auth.page.vehicle.read")],
     examples: ["ib vehicle types", "ib vehicle types --pretty", "ib vehicle types --asiakas 1380"],
   },
   {
@@ -149,6 +151,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
+      ASIAKAS_FLAG_ERR,
       limitErr("pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),

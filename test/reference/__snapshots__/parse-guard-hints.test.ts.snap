@@ -309,6 +309,14 @@ ib person duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib person get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
 ib person list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
@@ -336,6 +344,22 @@ ib person notify --data <json>
 ib person notify --data <json>
   ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
   > received: abc
+
+ib person role grant --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person role list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person role revoke --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person search --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
 ib person search --limit <n>
   ! --limit must be an integer >= 1
@@ -437,6 +461,14 @@ ib task set --assignee <personId>
   ! --assignee must be an integer >= 1
   > provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
 
+ib vehicle get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib vehicle list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
 ib vehicle list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
@@ -449,9 +481,17 @@ ib vehicle log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib vehicle search --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
 ib vehicle search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
+
+ib vehicle types --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
 ib weather day --lat <n>
   ! --lat must be a number

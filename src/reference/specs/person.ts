@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
 
 export const PERSON_SPECS: CommandSpec[] = [
 
@@ -36,6 +36,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
     errors: [
+      ASIAKAS_FLAG_ERR,
       limitErr("pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap"),
       apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
       ...permErrors("auth.page.person.read"),
@@ -68,6 +69,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, name, email, phone, roles:number[] }",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       // `match` is load-bearing, not decoration: permErrors below contributes a
       // second 403 row and neither carries a match, so `matchHttpRow` would fall
@@ -139,6 +141,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     errors: authErrors(
       limitErr("pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it"),
+      ASIAKAS_FLAG_ERR,
       // ONE 403 row on purpose. Splitting the three causes used to leave two
       // permanently unreachable, because hintForError served the FIRST row at a
       // status (the dead-row trap of feedback #280/#289). Splitting is now
@@ -174,7 +177,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
-    errors: permErrors("company role access on the tenant"),
+    errors: [ASIAKAS_FLAG_ERR, ...permErrors("company role access on the tenant")],
     examples: ["ib person role list 5351 --asiakas 26"],
   },
   {
@@ -193,6 +196,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
       ROLE_NAME_CLIENT_ERROR,
+      ASIAKAS_FLAG_ERR,
       apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
       apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
@@ -221,6 +225,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
     errors: [
       ROLE_NAME_CLIENT_ERROR,
+      ASIAKAS_FLAG_ERR,
       apiErr(400, "Unknown role", "use a name from ROLE_TYPEID_BY_NAME"),
       apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,

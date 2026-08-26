@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { assembleReport, runAddressDashboard } from "../addressDashboard.js";
-import { CliError } from "../../../api/errors.js";
-import type { ApiClient } from "../../../api/client.js";
+import { assembleReport, runAddressDashboard } from "../../../src/commands/_shared/addressDashboard.js";
+import { CliError } from "../../../src/api/errors.js";
+import type { ApiClient } from "../../../src/api/client.js";
 
 // ─── assembleReport ─────────────────────────────────────────────────────────
 

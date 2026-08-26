@@ -9,7 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
+import { parseId, intFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -562,7 +562,7 @@ export function registerVehicleCommands(
     .option(
       "--asiakas <id>",
       "",
-      (val: string) => Number(val)
+      intFlag("--asiakas")
     )
     .action(
       jsonAction(
@@ -597,7 +597,7 @@ export function registerVehicleCommands(
     .option(
       "--asiakas <id>",
       "",
-      (val: string) => Number(val)
+      intFlag("--asiakas")
     )
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
@@ -617,7 +617,7 @@ export function registerVehicleCommands(
     .option(
       "--asiakas <id>",
       "",
-      (val: string) => Number(val)
+      intFlag("--asiakas")
     )
     .action(
       jsonAction(getClient, (client, opts: { asiakas?: number }) =>
@@ -635,7 +635,7 @@ export function registerVehicleCommands(
     .option(
       "--asiakas <id>",
       "",
-      (val: string) => Number(val)
+      intFlag("--asiakas")
     )
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; asiakas?: number }) =>

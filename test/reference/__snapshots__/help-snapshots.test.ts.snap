@@ -38,6 +38,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 3 (HTTP 403)  No membership on attachment or target → check active company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -85,6 +86,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 4 (client-side)  Missing --reason       → pass --reason 'why'
   exit 4 (HTTP 400)  Missing X-Action-Reason header → pass --reason
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company
@@ -145,6 +147,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 4 (client-side)  No entity given, or conflicting positional + flag → name the entity once — positional word OR a --<entity> flag
@@ -189,6 +192,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId, file (absolute path), bytes, fileType }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 4 (client-side)  Output file exists     → pass --force or --out <other path>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -230,6 +234,7 @@ OUTPUT (JSON, stdout)
   { attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight } & { fileFolder, blobUrl }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 5 (HTTP 404)  Attachment not found (or deleted) → verify attachmentId
   exit 3 (HTTP 403)  No membership in the owner company or any keikka party → check the active company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -470,6 +475,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
   exit 3 (HTTP 403)  Not owner company / missing manager role / liitaLaskuun without lasku-admin → use an account with lasku or asiakas admin role on the owner company
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -9917,6 +9923,7 @@ OUTPUT (JSON, stdout)
   { personId, name, email, phone, roles:number[] }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 3 (HTTP 403)  Not a member of the --asiakas company → cross-tenant person reads need membership of the target company, or sysadmin/developer. Check what you can reach with \`ib company list\`.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -9957,6 +9964,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
   exit 4 (HTTP 400)  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10244,6 +10252,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME
   exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10280,6 +10289,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check company role access on the tenant
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10319,6 +10329,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Unknown role           → use a name from ROLE_TYPEID_BY_NAME
   exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10357,6 +10368,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 3 (HTTP 403)  Permission denied (page permission, or no access to the requested scope) → check auth.page.person.read; --asiakas on another tenant and --all-companies additionally require sysadmin/developer
   exit 5 (HTTP 404)  --all-companies route not deployed on this backend → check \`ib version\`; drop --all-companies and use --asiakas <id> or --my-companies meanwhile
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -12542,6 +12554,7 @@ OUTPUT (JSON, stdout)
   { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId (and --asiakas if it belongs to another company)
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12583,6 +12596,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12737,6 +12751,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12849,6 +12864,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleTypeId, name }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read

@@ -270,6 +270,12 @@ describe("parse-time guard errors resolve the command's own ERRORS remedy", () =
     expect(parsed.error).toBe("--limit must be an integer >= 1");
     expect(String(parsed.hint)).toMatch(/must be integers/);
   });
+
+  test("--asiakas is answered by the flag's own ERRORS row (fb#892)", async () => {
+    const parsed = await envelopeFor(["person", "list", "--asiakas", "abc"]);
+    expect(parsed.error).toBe("--asiakas must be an integer >= 1");
+    expect(String(parsed.hint)).toMatch(/pass a positive asiakasId/);
+  });
 });
 
 test("unknown legal subcommand → enriched envelope (#1)", async () => {
@@ -428,5 +434,70 @@ describe("unknown leaf + --help → exit 4 (fb#615)", () => {
     const { exitCode, stdout } = await runArgv(["glossary"], opts);
     expect(exitCode).toBe(0);
     expect(stdout).toMatch(/glossary/i);
+  });
+});
+
+/**
+ * fb#892 — the person/vehicle cross-tenant `--asiakas` flags coerced with a
+ * bare `Number`, so a typo flowed into qs() as the literal "NaN" (a backend
+ * failure or a silent empty result). They now parse through `intFlag`;
+ * asserted end-to-end (same shape as the fb#371 block) because the failure
+ * mode being guarded against is exactly a bare coercer silently reaching the
+ * wire. Exit 4 naming the flag — rather than whatever the action would have
+ * produced — is what proves the guard fired at parse time, before getClient.
+ */
+describe("person/vehicle --asiakas rejects NaN at parse time (fb#892)", () => {
+  const opts = { token: "", endpoint: "https://example.invalid" };
+
+  test.each([
+    [["person", "list", "--asiakas", "abc"]],
+    [["person", "get", "1", "--asiakas", "abc"]],
+    [["person", "search", "matti", "--asiakas", "abc"]],
+    [["person", "role", "list", "1", "--asiakas", "abc"]],
+    [["person", "role", "grant", "1", "--role", "keikkaHandler", "--asiakas", "abc"]],
+    [["person", "role", "revoke", "1", "--role", "keikkaHandler", "--asiakas", "abc"]],
+    [["vehicle", "list", "--asiakas", "abc"]],
+    [["vehicle", "get", "7", "--asiakas", "abc"]],
+    [["vehicle", "types", "--asiakas", "abc"]],
+    [["vehicle", "search", "kuorma", "--asiakas", "abc"]],
+  ])("ib %j → exit 4, no request", async (argv) => {
+    const { exitCode, stderr } = await runArgv(argv as string[], opts);
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/--asiakas must be an integer/);
+  });
+});
+
+/**
+ * fb#893 — attachment ids coerced with bare `Number(id)`, so a typo became a
+ * backend 404/500; they now parse through `parseId` and fail client-side exit
+ * 4 before any request. The guard sits INSIDE the action (positionals have no
+ * argParser), so unlike the fb#892 block a token-shaped value is needed to get
+ * past getClient — an empty-payload JWT builds the client, and parseId throws
+ * before the first network call. (`update` is absent on purpose: its action
+ * runs resolveGroupAndType over the network BEFORE parseId evaluates.)
+ */
+describe("attachment id rejects non-integers client-side (fb#893)", () => {
+  const opts = { token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln", endpoint: "https://example.invalid" };
+
+  test.each([
+    [["attachment", "get", "abc"]],
+    [["attachment", "download", "abc"]],
+    [["attachment", "attach", "abc"]],
+    [["attachment", "detach", "abc", "keikka"]],
+    [["attachment", "delete", "abc", "--reason", "test"]],
+  ])("ib %j → exit 4, no request", async (argv) => {
+    const { exitCode, stderr } = await runArgv(argv as string[], opts);
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/invalid attachmentId: "abc"/);
+  });
+
+  test("the envelope carries the invalid-id row's remedy, not a sibling exit-4 row's (fb#385)", async () => {
+    // download ALSO documents a matchless client exit-4 row ("Output file
+    // exists"); without the `match: "attachmentId"` on the new row, the
+    // fallback would hand its --force remedy to a bad id.
+    const { stderr } = await runArgv(["attachment", "download", "abc"], opts);
+    const env = JSON.parse(stderr);
+    expect(String(env.hint)).toMatch(/attachmentId must be a positive integer/);
+    expect(String(env.hint)).not.toMatch(/--force/);
   });
 });

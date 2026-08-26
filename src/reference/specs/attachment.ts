@@ -2,8 +2,24 @@
 // (src/reference/specs.ts) spreads every segment in a fixed sequence; order
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
-import type { CommandSpec } from "../../output/help.js";
+import type { CommandSpec, CommandError } from "../../output/help.js";
 import { apiErr, limitErr, COMMON_AUTH_ERRORS, ATTACHMENT_ENTITY_FLAGS, ATTACHMENT_ROW, ENTITY_FLAG_NOTE, DEPLOY_NOTE, LIMIT_500_FLAG } from "./shared.js";
+
+/**
+ * The `<attachmentId>` positional parse-guard row (fb#893): all six id-taking
+ * commands parse through `parseId`, so a malformed id exits 4 client-side with
+ * `invalid attachmentId: "…" — expected a positive integer` instead of a
+ * backend 404/500. Carries a `match` so the failure never inherits an
+ * unrelated matchless exit-4 row's remedy (fb#385 hint resolution), e.g.
+ * download's "Output file exists".
+ */
+const INVALID_ATTACHMENT_ID_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "attachmentId",
+  meaning: "invalid <attachmentId> positional, rejected locally before any request",
+  remedy: "attachmentId must be a positive integer — verify it with `ib attachment list` or `ib attachment search`",
+};
 
 export const ATTACHMENT_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
@@ -31,7 +47,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     args: [{ name: "attachmentId", type: "number", description: "attachments.attachmentId" }],
     flags: [],
     outputShape: `${ATTACHMENT_ROW} & { fileFolder, blobUrl }`,
-    errors: [apiErr(404, "Attachment not found (or deleted)", "verify attachmentId"), apiErr(403, "No membership in the owner company or any keikka party", "check the active company"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(404, "Attachment not found (or deleted)", "verify attachmentId"), apiErr(403, "No membership in the owner company or any keikka party", "check the active company"), ...COMMON_AUTH_ERRORS],
     notes: ["blobUrl expires in 1h — fetch it promptly; re-run get for a fresh one.", "Remote contexts (exec/MCP): fetch blobUrl yourself — `download` is denied there.", DEPLOY_NOTE],
     seeAlso: ["ib attachment download", "ib attachment list"],
     examples: ["ib attachment get 4711"],
@@ -46,7 +62,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
       { name: "force", type: "boolean", description: "Overwrite an existing file" },
     ],
     outputShape: "{ ok: true, attachmentId, file (absolute path), bytes, fileType }",
-    errors: [apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, meaning: "Output file exists", remedy: "pass --force or --out <other path>" }, ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: "Refusing to overwrite", meaning: "Output file exists", remedy: "pass --force or --out <other path>" }, ...COMMON_AUTH_ERRORS],
     notes: ["Remote callers: use `ib attachment get` and fetch blobUrl yourselves.", DEPLOY_NOTE],
     seeAlso: ["ib attachment get"],
     examples: ["ib attachment download 4711", "ib attachment download 4711 --out C:\\temp\\site.jpg --force"],
@@ -120,7 +136,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }",
-    errors: [apiErr(404, "Attachment not found", "verify attachmentId"), apiErr(403, "No membership on attachment or target", "check active company"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(404, "Attachment not found", "verify attachmentId"), apiErr(403, "No membership on attachment or target", "check active company"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the target entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment detach", "ib attachment list"],
     examples: ["ib attachment attach 4711 --vehicle 53", "ib attachment attach 4711 --keikka 9002 --dry-run"],
@@ -137,7 +153,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
-    errors: [apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed"], meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
     notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment attach", "ib attachment search"],
     examples: ["ib attachment detach 4711 keikka", "ib attachment detach 4711 --keikka 9001", "ib attachment detach 4711 bug-report --dry-run"],
@@ -156,7 +172,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }",
-    errors: [apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["Comment changes are audited via ChangeTracker.", DEPLOY_NOTE],
     seeAlso: ["ib attachment types", "ib attachment get"],
     examples: ["ib attachment update 4711 --comment \"hyväksytty\"", "ib attachment update 4711 --group laskutus --liita-laskuun 1"],
@@ -172,7 +188,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     reasonDetail: "(blob deletion is irreversible)",
     outputShape: "{ ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }",
-    errors: [{ origin: "client", exit: 4, meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, { origin: "client", exit: 4, match: "--reason", meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["ALWAYS preview with --dry-run first.", "Audited via ChangeTracker with your --reason.", DEPLOY_NOTE],
     seeAlso: ["ib attachment get", "ib attachment detach"],
     examples: ["ib attachment delete 4711 --dry-run --reason preview", "ib attachment delete 4711 --reason \"duplicate upload\""],

@@ -8,7 +8,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { assertPositiveInt, cappedInt } from "../../targets.js";
+import { assertPositiveInt, cappedInt, parseId } from "../../targets.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -440,7 +440,7 @@ export function registerAttachmentCommands(
   a.command("get <attachmentId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .action(jsonAction(getClient, (client, id: string) => runAttachmentGet(client, Number(id))));
+    .action(jsonAction(getClient, (client, id: string) => runAttachmentGet(client, parseId(id, "attachmentId"))));
 
   a.command("types")
     .action(jsonAction(getClient, runAttachmentTypes));
@@ -459,7 +459,7 @@ export function registerAttachmentCommands(
     .option("--force")
     .action(
       jsonAction(getClient, (client, id: string, opts: { out?: string; force?: boolean }) =>
-        runAttachmentDownload(client, Number(id), opts.out, !!opts.force)
+        runAttachmentDownload(client, parseId(id, "attachmentId"), opts.out, !!opts.force)
       )
     );
 
@@ -529,7 +529,7 @@ export function registerAttachmentCommands(
   addEntityFlags(attachCmd);
   addWriteFlagsToCommand(attachCmd).action(
     jsonAction(getClient, (client, id: string, opts: AttachmentEntityOpts) =>
-      runAttachmentAttach(client, Number(id), opts, opts)
+      runAttachmentAttach(client, parseId(id, "attachmentId"), opts, opts)
     )
   );
 
@@ -539,7 +539,7 @@ export function registerAttachmentCommands(
   addWriteFlagsToCommand(detachCmd).action(
     guarded(async (id: string, entity: string | undefined, opts: AttachmentEntityOpts) => {
       const entityWord = resolveDetachEntity(entity, opts);
-      writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, opts));
+      writeJson(await runAttachmentDetach(await getClient(), parseId(id, "attachmentId"), entityWord, opts));
     })
   );
 
@@ -553,7 +553,7 @@ export function registerAttachmentCommands(
     guarded(async (id: string, opts: AttachmentUpdateOpts) => {
       const client = await getClient();
       const { groupId, typeId } = await resolveGroupAndType(client, opts);
-      writeJson(await runAttachmentUpdate(client, Number(id), {
+      writeJson(await runAttachmentUpdate(client, parseId(id, "attachmentId"), {
         fileComment: opts.comment,
         liitaLaskuun: opts.liitaLaskuun,
         attachmentGroupId: groupId, attachmentTypeId: typeId,
@@ -564,7 +564,7 @@ export function registerAttachmentCommands(
   const deleteCmd = a
     .command("delete <attachmentId>");
   addWriteFlagsToCommand(deleteCmd).action(guarded(async (id: string, opts: WriteFlags) => {
-    writeJson(await runAttachmentDelete(await getClient(), Number(id), opts));
+    writeJson(await runAttachmentDelete(await getClient(), parseId(id, "attachmentId"), opts));
   }));
 }
 

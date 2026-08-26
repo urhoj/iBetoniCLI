@@ -29,6 +29,7 @@ import {
   type RawChangeRow,
 } from "../log/changeRow.js";
 import {
+  intFlag,
   parseId,
   parseOptionalId,
   resolveSearchQuery,
@@ -625,7 +626,6 @@ export function runPersonCompaniesAsToken(
   };
 }
 
-/**
 /** person-combinator request-body id fields (see puminet5api personCombinatorRoutes). */
 const PERSON_MERGE_ID_FIELDS = {
   mainField: "mainPersonId",
@@ -677,7 +677,7 @@ export function registerPersonCommands(
 
   p.command("list")
     .option("--role <role>")
-    .option("--asiakas <id>", "", (v: string) => Number(v))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .option(
       "--owned"
     )
@@ -687,7 +687,7 @@ export function registerPersonCommands(
   p.command("get <personId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .option("--asiakas <id>", "", (v: string) => Number(v))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
         runPersonGet(client, parseId(idStr, "personId"), opts.asiakas)
@@ -704,7 +704,7 @@ export function registerPersonCommands(
     .option(
       "--asiakas <id>",
       "",
-      (v: string) => Number(v)
+      intFlag("--asiakas")
     )
     .option(
       "--all-companies"
@@ -992,7 +992,7 @@ export function registerPersonCommands(
 
   personRole
     .command("list <personId>")
-    .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
+    .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, personIdStr: string, opts: { asiakas: number }) =>
         runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)
@@ -1034,7 +1034,7 @@ export function registerPersonCommands(
       personRole
         .command(`${name} <personId>`)
         .requiredOption("--role <name>")
-        .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
+        .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
     ).action(roleWriteAction(run));
   }
 
