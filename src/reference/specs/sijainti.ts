@@ -364,7 +364,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     flags: [
       { name: "jerry", type: "boolean", description: "Return ONLY the BetoniJerry-eligible types (useJerry=1). Since fb#608 every row carries `useJerry`, so the unfiltered call already answers which types are eligible — this flag is now a convenience, not the only way to find out." },
     ],
-    outputShape: "ListEnvelope<{ sijaintiTypeId, selite, useJerry }> — `useJerry` is the column --jerry filters on (fb#608); before it was surfaced, learning the eligible set meant running the command twice and diffing the id sets. NOTE: sijaintitypes.isPublic is deliberately NOT reported — cross-tenant visibility is per ROW (dbo.sijainti.isPublic), not per type, so a type-level flag cannot answer 'is this location public'.",
+    outputShape: "ListEnvelope<{ sijaintiTypeId, selite, useJerry }> — `useJerry` is the column --jerry filters on (fb#608); before it was surfaced, learning the eligible set meant running the command twice and diffing the id sets. NOTE: publicity is deliberately NOT part of this output — cross-tenant visibility is per ROW (dbo.sijainti.isPublic), not per type; the old type-level sijaintitypes.isPublic was dropped 2026-08-26 (fb#640), so a type-level flag cannot answer 'is this location public'.",
     errors: permErrors("auth.page.sijainnit.read"),
     examples: ["ib sijainti types", "ib sijainti types --jerry"],
   },

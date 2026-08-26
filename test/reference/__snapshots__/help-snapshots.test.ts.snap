@@ -11561,7 +11561,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiTypeId, selite, useJerry }> — \`useJerry\` is the column --jerry filters on (fb#608); before it was surfaced, learning the eligible set meant running the command twice and diffing the id sets. NOTE: sijaintitypes.isPublic is deliberately NOT reported — cross-tenant visibility is per ROW (dbo.sijainti.isPublic), not per type, so a type-level flag cannot answer 'is this location public'.
+  ListEnvelope<{ sijaintiTypeId, selite, useJerry }> — \`useJerry\` is the column --jerry filters on (fb#608); before it was surfaced, learning the eligible set meant running the command twice and diffing the id sets. NOTE: publicity is deliberately NOT part of this output — cross-tenant visibility is per ROW (dbo.sijainti.isPublic), not per type; the old type-level sijaintitypes.isPublic was dropped 2026-08-26 (fb#640), so a type-level flag cannot answer 'is this location public'.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
