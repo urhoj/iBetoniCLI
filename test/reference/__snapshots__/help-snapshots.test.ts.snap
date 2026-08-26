@@ -10949,6 +10949,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Scoped to the ACTIVE company only — the echoed \`scope.asiakasId\` names which tenant was queried, so a 0-row result reads as "none in THIS company", not "none scheduled anywhere". For a cross-tenant rollup, use \`ib stats --all\` instead (a different aggregate shape, not a keikka list).
+  - \`tila\` is the numeric keikkaTilaId — legend at \`ib keikka list --help\` or \`ib glossary lookup tila\`. For labelled names instead of raw ids, use \`ib stats --by customer|vehicle|worksite\` rather than resolving each id yourself.
 
 SEE ALSO
   ib stats
@@ -10984,6 +10985,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Scoped to the ACTIVE company only — the echoed \`scope.asiakasId\` names which tenant was queried, so a 0-row result reads as "none in THIS company", not "none scheduled anywhere". For a cross-tenant rollup, use \`ib stats --all\` instead (a different aggregate shape, not a keikka list).
+  - \`tila\` is the numeric keikkaTilaId — legend at \`ib keikka list --help\` or \`ib glossary lookup tila\`. For labelled names instead of raw ids, use \`ib stats --by customer|vehicle|worksite\` rather than resolving each id yourself.
 
 SEE ALSO
   ib stats
@@ -11023,6 +11025,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Scoped to the ACTIVE company only — the echoed \`scope.asiakasId\` names which tenant was queried, so a 0-row result reads as "none in THIS company", not "none scheduled anywhere". For a cross-tenant rollup, use \`ib stats --all\` instead (a different aggregate shape, not a keikka list).
+  - \`tila\` is the numeric keikkaTilaId — legend at \`ib keikka list --help\` or \`ib glossary lookup tila\`. For labelled names instead of raw ids, use \`ib stats --by customer|vehicle|worksite\` rather than resolving each id yourself.
 
 SEE ALSO
   ib stats

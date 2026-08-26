@@ -12,6 +12,12 @@ import { permErrors } from "./shared.js";
 const SCHEDULE_SCOPE_NOTE =
   "Scoped to the ACTIVE company only — the echoed `scope.asiakasId` names which tenant was queried, so a 0-row result reads as \"none in THIS company\", not \"none scheduled anywhere\". For a cross-tenant rollup, use `ib stats --all` instead (a different aggregate shape, not a keikka list).";
 
+// fb#778: rows are id-only (asiakasId/tyomaaId/vehicleId/tila), so presenting a
+// result costs one resolve call per distinct id plus a lookup for what a tila
+// value means — neither is discoverable from this command's own help.
+const SCHEDULE_TILA_NOTE =
+  "`tila` is the numeric keikkaTilaId — legend at `ib keikka list --help` or `ib glossary lookup tila`. For labelled names instead of raw ids, use `ib stats --by customer|vehicle|worksite` rather than resolving each id yourself.";
+
 export const SCHEDULE_SPECS: CommandSpec[] = [
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
@@ -24,7 +30,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule today", "ib schedule today --pretty"],
   },
@@ -37,7 +43,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule day 2026-06-01", "ib schedule day tomorrow"],
   },
@@ -51,7 +57,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule week 2026-06-01", "ib schedule week today"],
   },
