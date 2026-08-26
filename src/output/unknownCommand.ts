@@ -796,8 +796,9 @@ export function prosePrefixHint(token: string, availableOptions: string[]): stri
  *
  * The test is SHAPE, not content: a real flag is `-x` / `--some-flag`, so a
  * dash-led token whose body does not start with a letter cannot be one anybody
- * typed. That keeps single-dash typos (`-reason`) on the did-you-mean path
- * where they belong.
+ * typed. That keeps short-flag typos (`-x`) on the did-you-mean path where
+ * they belong — multi-char single-dash tokens like `-reason` never reach here,
+ * since fb#856's argv normalization rewrites them to `--reason` upstream.
  *
  * Gated on the command actually owning `--from-json` — a remedy naming a flag
  * the command does not have is worse than no remedy.
@@ -846,7 +847,9 @@ export function buildUnknownOptionEnvelope(
   // named would be arbitrary, and claiming the capability lives elsewhere is
   // false when the command previews by default under another spelling (fb#646).
   // Suppressed when `didYouMean` fired: a near-spelling on this command
-  // (`-reason` → `--reason`) is the better answer, same as the guards below.
+  // (`--reson` → `--reason`) is the better answer, same as the guards below.
+  // (Multi-char single-dash typos like `-reason` never get here — fb#856's
+  // argv normalization rewrites them to double-dash upstream.)
   //
   // ALSO suppressed by `redirect`, which every other guard in this chain already
   // honours. Without it a curated redirect on a trio flag rendered BOTH its
@@ -861,8 +864,10 @@ export function buildUnknownOptionEnvelope(
   // A curated redirect is hand-written for this exact command+flag, so it wins;
   // the derived sibling list is the general case behind it. Also suppressed when
   // `didYouMean` fired (fb#443/#449): the flag exists on THIS command under a
-  // near spelling (e.g. the single-dash `-reason` typo), which beats redirecting
-  // the caller to a sibling — same principle as the `viaSynonym` guard below.
+  // near spelling (e.g. `--reson` → `--reason`; single-dash multi-char typos
+  // are intercepted upstream by fb#856's argv normalization), which beats
+  // redirecting the caller to a sibling — same principle as the `viaSynonym`
+  // guard below.
   const acceptedLiteral =
     redirect || didYouMean || idiomHint
       ? []

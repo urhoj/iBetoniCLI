@@ -232,6 +232,13 @@ describe("sibling-command flag redirect (#308)", () => {
 // lead with the same-command correction, never a sibling redirect: `-reason` on
 // `jerry admin enable` (which owns --reason) led with "belongs to a sibling
 // command: ib jerry request create…", sending the caller to the wrong command.
+//
+// NOTE (post-fb#856): via the CLI this exact input shape is intercepted BEFORE
+// Commander parses — normalizeSingleDashLongFlags rewrites `-reason` to
+// `--reason`, so it resolves outright instead of reaching this envelope. These
+// tests call buildUnknownOptionEnvelope directly, which remains correct: the
+// envelope must still behave for any dash-led token that does arrive (e.g.
+// single-char shorts, programmatic callers).
 describe("single-dash typo on an owned flag (fb#443/#449)", () => {
   test("the reported case: jerry admin enable -reason → did-you-mean only, no sibling redirect", () => {
     const env = buildUnknownOptionEnvelope(leafByPath("jerry", "admin", "enable"), "-reason");
