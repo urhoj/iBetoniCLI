@@ -16,6 +16,21 @@ import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
+/**
+ * Unwrap a `{ <key>: Row[] }` response into the list envelope. `extra`
+ * (`{ truncated }`) is appended only when the caller supplies it — the
+ * provider-list branch deliberately emits NO truncated key, while the two
+ * admin lists always report the backend's boolean.
+ */
+const keyedListEnvelope = (
+  data: unknown,
+  key: string,
+  extra?: { truncated?: boolean }
+): ListEnvelope<Row> => {
+  const rows = (data as Record<string, unknown> | null | undefined)?.[key];
+  return listEnvelope(Array.isArray(rows) ? (rows as Row[]) : [], extra);
+};
+
 // â”€â”€â”€ request reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
@@ -53,8 +68,7 @@ export async function runJerryRequestList(
     const data = await client.get<{ requests?: unknown }>(
       `/api/pumppuRequests/provider-list${qs({ tab })}`
     );
-    const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
-    return listEnvelope(items);
+    return keyedListEnvelope(data, "requests");
   }
   if (opts.open) {
     return toListEnvelope<Row>(await client.get<unknown>("/api/pumppuRequests/open"));
@@ -804,8 +818,7 @@ export async function runJerryAdminRequests(
       limit: opts.limit,
     })}`
   );
-  const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
-  return listEnvelope(items, { truncated: !!data?.truncated });
+  return keyedListEnvelope(data, "requests", { truncated: !!data?.truncated });
 }
 
 /** Bucket modes for the request rollup. */
@@ -901,8 +914,7 @@ export async function runJerryAdminSearches(
       limit: opts.limit,
     })}`
   );
-  const items = Array.isArray(data?.rows) ? (data.rows as Row[]) : [];
-  return listEnvelope(items, { truncated: !!data?.truncated });
+  return keyedListEnvelope(data, "rows", { truncated: !!data?.truncated });
 }
 
 /**

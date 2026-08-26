@@ -306,10 +306,15 @@ function buildCreateBody(input) {
  * POST /api/feedback — file a proposal / trouble report. `meta: true` exempts it
  * from the read-only write-lock. `--dry-run` prints the payload and never POSTs.
  */
+/**
+ * The group's client-side --dry-run echo — create/resolve/update all emit this
+ * exact shape (documented contract), so it is pinned in one place.
+ */
+const wouldSend = (method, path, body) => ({ dryRun: true, wouldSend: { method, path, body } });
 export async function runFeedbackCreate(client, input) {
     const body = buildCreateBody(input);
     if (input.dryRun) {
-        return { dryRun: true, wouldSend: { method: "POST", path: "/api/feedback", body } };
+        return wouldSend("POST", "/api/feedback", body);
     }
     return client.post("/api/feedback", body, { meta: true });
 }
@@ -735,7 +740,7 @@ export async function runFeedbackResolve(client, id, input) {
     if (input.note !== undefined)
         body.resolution = input.note;
     if (input.dryRun) {
-        return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
+        return wouldSend("PUT", `/api/feedback/${id}`, body);
     }
     const row = await putWithClaimAdvisory(client, id, body);
     const out = input.full ? { ...row } : compactAck(row);
@@ -813,7 +818,7 @@ export async function runFeedbackUpdate(client, id, input) {
         failWith("Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --reason", 4);
     }
     if (input.dryRun) {
-        return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
+        return wouldSend("PUT", `/api/feedback/${id}`, body);
     }
     const row = await putWithClaimAdvisory(client, id, body);
     return input.full ? row : compactUpdateAck(row);

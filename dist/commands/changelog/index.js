@@ -386,6 +386,27 @@ export function normalizeSeverity(severity) {
         return undefined;
     return SEVERITY_SYNONYMS[v.toLowerCase()] ?? v;
 }
+/**
+ * Normalize the five enum-ish flags in place — shared by `add` and `update`.
+ * Guarded assignments serve both: every normalizer maps undefined → undefined,
+ * and nothing downstream iterates the object's keys (requireAddFields,
+ * validateEnums, validateFieldLengths and the body/patch builds all read named
+ * keys and test !== undefined), so leaving an absent key absent is equivalent
+ * to assigning it undefined on the `add` path while staying a correct partial
+ * patch on the `update` path.
+ */
+function normalizeChangelogEnums(o) {
+    if (o.type !== undefined)
+        o.type = normalizeType(o.type);
+    if (o.severity !== undefined)
+        o.severity = normalizeSeverity(o.severity);
+    if (o.area !== undefined)
+        o.area = normalizeEnumFlag(o.area);
+    if (o.bumpLevel !== undefined)
+        o.bumpLevel = normalizeEnumFlag(o.bumpLevel);
+    if (o.source !== undefined)
+        o.source = normalizeEnumFlag(o.source);
+}
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
 export function normalizeLanguage(lang) {
     if (lang === undefined)
@@ -760,11 +781,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // A changelog entry is a permanent record whose prose routinely names flags
         // and identifiers — the text most likely to carry backticks (fb#552).
         warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
-        o.type = normalizeType(o.type);
-        o.severity = normalizeSeverity(o.severity);
-        o.area = normalizeEnumFlag(o.area);
-        o.bumpLevel = normalizeEnumFlag(o.bumpLevel);
-        o.source = normalizeEnumFlag(o.source);
+        normalizeChangelogEnums(o);
         requireAddFields(description, o);
         validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity);
         o.sha = resolveShaAlias(o.sha, o.commit);
@@ -907,16 +924,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--from-json <file>")).action(guarded(async (idStr, o, cmd) => {
         const id = parseRefId(idStr, "changelog", "update");
         applyFromJson(cmd, o);
-        if (o.type !== undefined)
-            o.type = normalizeType(o.type);
-        if (o.severity !== undefined)
-            o.severity = normalizeSeverity(o.severity);
-        if (o.area !== undefined)
-            o.area = normalizeEnumFlag(o.area);
-        if (o.bumpLevel !== undefined)
-            o.bumpLevel = normalizeEnumFlag(o.bumpLevel);
-        if (o.source !== undefined)
-            o.source = normalizeEnumFlag(o.source);
+        normalizeChangelogEnums(o);
         validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
         // --summary/--body are aliases for --description (feedback #205/#278); fold
         // them in before the patch build so the loop below picks them up. Several may

@@ -7,6 +7,16 @@ import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, c
 import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+/**
+ * Unwrap a `{ <key>: Row[] }` response into the list envelope. `extra`
+ * (`{ truncated }`) is appended only when the caller supplies it — the
+ * provider-list branch deliberately emits NO truncated key, while the two
+ * admin lists always report the backend's boolean.
+ */
+const keyedListEnvelope = (data, key, extra) => {
+    const rows = data?.[key];
+    return listEnvelope(Array.isArray(rows) ? rows : [], extra);
+};
 // â”€â”€â”€ request reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
  * Tabs the provider lifecycle view (`--provider`) accepts — mirrors the
@@ -28,8 +38,7 @@ export async function runJerryRequestList(client, opts) {
     if (opts.provider) {
         const tab = opts.tab || "avoimet";
         const data = await client.get(`/api/pumppuRequests/provider-list${qs({ tab })}`);
-        const items = Array.isArray(data?.requests) ? data.requests : [];
-        return listEnvelope(items);
+        return keyedListEnvelope(data, "requests");
     }
     if (opts.open) {
         return toListEnvelope(await client.get("/api/pumppuRequests/open"));
@@ -492,8 +501,7 @@ export async function runJerryAdminRequests(client, opts) {
         providerId: opts.provider,
         limit: opts.limit,
     })}`);
-    const items = Array.isArray(data?.requests) ? data.requests : [];
-    return listEnvelope(items, { truncated: !!data?.truncated });
+    return keyedListEnvelope(data, "requests", { truncated: !!data?.truncated });
 }
 /** Bucket modes for the request rollup. */
 export const REQUEST_STATS_GROUPS = ["week", "month", "status"];
@@ -544,8 +552,7 @@ export async function runJerryAdminSearches(client, opts) {
         q: opts.search || opts.q || undefined,
         limit: opts.limit,
     })}`);
-    const items = Array.isArray(data?.rows) ? data.rows : [];
-    return listEnvelope(items, { truncated: !!data?.truncated });
+    return keyedListEnvelope(data, "rows", { truncated: !!data?.truncated });
 }
 /**
  * BetoniJerry conversion funnel (GET /api/admin/jerry-searches/funnel). System-admin only.
