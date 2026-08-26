@@ -194,6 +194,12 @@ describe("ib betoni reference", () => {
 
   test("an unknown --kind exits 4 instead of silently returning nothing", async () => {
     await expect(runReference(client, { kind: "bogus" })).rejects.toMatchObject({ exitCode: 4 });
+  });
+
+  test("an EMPTY --kind ('--kind=') also exits 4 — no longer silently returns all lists", async () => {
+    // Pre-assertEnum behavior treated a falsy kind as absent; an explicitly
+    // provided empty value is now rejected like any other invalid enum value.
+    await expect(runReference(client, { kind: "" })).rejects.toMatchObject({ exitCode: 4 });
     expect(client.get).not.toHaveBeenCalled();
   });
 

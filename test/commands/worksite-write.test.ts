@@ -9,6 +9,7 @@ import {
   buildWorksiteUpdateBody,
 } from "../../src/commands/worksite/index.js";
 import { ownerAsiakasIdFromToken } from "../../src/owner.js";
+import { todayHelsinki } from "../../src/dates.js";
 import type { CliError } from "../../src/api/errors.js";
 import { decodeJwtPayload } from "../../src/auth/jwt.js";
 vi.mock("../../src/auth/jwt.js", () => ({
@@ -74,10 +75,10 @@ describe("ib worksite create/update", () => {
       .calls[1];
     const url = lastCall[0] as string;
     expect(url).toMatch(/^\/api\/tyomaa\/set\/1349\/5151\/\d{8}$/);
-    const today = new Date();
-    const expected = `${today.getFullYear()}${String(
-      today.getMonth() + 1
-    ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    // Expected date via the SAME Helsinki wall-clock production uses — a
+    // host-local `new Date()` here asserted the pre-fix behavior and failed
+    // spuriously on UTC CI runners between ~21:00–24:00 UTC.
+    const expected = todayHelsinki().replace(/-/g, "");
     expect(url.endsWith(expected)).toBe(true);
   });
 
