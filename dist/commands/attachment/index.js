@@ -6,7 +6,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { assertPositiveInt, cappedInt, parseId } from "../../targets.js";
+import { assertPositiveInt, cappedInt, intFlag, parseId, zeroOneFlag } from "../../targets.js";
 import { qs } from "../../api/query.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
@@ -27,13 +27,13 @@ const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
 const ENTITY_FLAG_LIST = ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ");
 function addEntityFlags(cmd) {
     for (const e of ENTITY_OPTS) {
-        cmd.option(e.flag, "", (s) => Number(s));
+        cmd.option(e.flag, "", intFlag("--" + e.optKey));
     }
     // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
     // tenant-scoped commands, but here the canonical spelling is `--customer`
     // (mirrors backend ENTITY_COLUMNS) — so the majority guess failed on every
     // attachment command. Hidden: the spec documents only `--customer`.
-    cmd.addOption(new Option("--asiakas <id>").argParser((s) => Number(s)).hideHelp());
+    cmd.addOption(new Option("--asiakas <id>").argParser(intFlag("--asiakas")).hideHelp());
     return cmd;
 }
 /**
@@ -329,7 +329,7 @@ export function registerAttachmentCommands(parent, getClient) {
         .requiredOption("--name <fileName>")
         .requiredOption("--orig-name <name>")
         .requiredOption("--folder <fileFolder>")
-        .requiredOption("--size <bytes>", "", (s) => Number(s))
+        .requiredOption("--size <bytes>", "", intFlag("--size", 0))
         .requiredOption("--mime <mime>")
         .option("--comment <text>")
         .option("--group <g>")
@@ -363,7 +363,7 @@ export function registerAttachmentCommands(parent, getClient) {
     const updateCmd = a
         .command("update <attachmentId>")
         .option("--comment <text>")
-        .option("--liita-laskuun <0|1>", "", (s) => Number(s))
+        .option("--liita-laskuun <0|1>", "", zeroOneFlag("--liita-laskuun"))
         .option("--group <g>")
         .option("--type <t>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (id, opts) => {

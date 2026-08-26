@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
-import { parseId, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
+import { parseId, intFlag, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
@@ -210,7 +210,7 @@ export function registerMessageDailyCommands(parent, getClient) {
     d.command("get <boxId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .requiredOption("--asiakas <id>", "", Number)
+        .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--date <date>")
         .action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)));
     // content + metadata writes ───────────────────────────────────────────────────
@@ -254,14 +254,14 @@ export function registerMessageDailyCommands(parent, getClient) {
     // sharing + per-role ACL ─────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("share <boxId>")
-        .requiredOption("--to <asiakasId>", "", Number)).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)));
+        .requiredOption("--to <asiakasId>", "", intFlag("--to"))).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)));
     addWriteFlagsToCommand(d
         .command("unshare <dailyMessageBoxAsiakasId>")).action(jsonAction(getClient, (client, idStr, opts) => runDailyUnshare(client, parseId(idStr, "permissionId"), opts)));
     addWriteFlagsToCommand(d
         .command("grant <boxId>")
-        .requiredOption("--to <asiakasId>", "", Number)
-        .requiredOption("--role <typeId>", "", Number)
-        .requiredOption("--box-asiakas <id>", "", Number)).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGrant(client, {
+        .requiredOption("--to <asiakasId>", "", intFlag("--to"))
+        .requiredOption("--role <typeId>", "", intFlag("--role"))
+        .requiredOption("--box-asiakas <id>", "", intFlag("--box-asiakas"))).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGrant(client, {
         boxId: parseId(boxIdStr, "boxId"),
         asiakasId: opts.to,
         asiakasPersonSettingTypeId: opts.role,
@@ -271,7 +271,7 @@ export function registerMessageDailyCommands(parent, getClient) {
         .command("revoke <dailyMessageBoxAsiakasPermissionsId>")).action(jsonAction(getClient, (client, idStr, opts) => runDailyRevoke(client, parseId(idStr, "permissionId"), opts)));
     addWriteFlagsToCommand(d
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
-        .requiredOption("--role <typeId>", "", Number)
+        .requiredOption("--role <typeId>", "", intFlag("--role"))
         .requiredOption("--access <mode>")).action(guarded(async (idStr, opts) => {
         assertEnum(opts.access, ["read", "edit"], "--access");
         const client = await getClient();

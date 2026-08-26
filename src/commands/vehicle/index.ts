@@ -9,7 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, intFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
+import { parseId, intFlag, numFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -290,9 +290,6 @@ export interface VehicleWriteFields {
  * intentionally excluded — they are carried through unchanged and are not
  * settable from the CLI.
  */
-/** Parse `<n>` as a number — the coercion every numeric vehicle flag uses. */
-const asNumber = (s: string): number => Number(s);
-
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
  * `VehicleWriteFields` key each maps to. `create` and `update` expose
@@ -316,24 +313,24 @@ const VEHICLE_FIELDS: ReadonlyArray<{
 }> = [
   { flag: "--reg <s>", description: "Registration number (vehicleRegNo)", optKey: "reg", field: "vehicleRegNo", modes: ["create", "update"] },
   { flag: "--name <s>", description: "Display name (vehicleNimi)", optKey: "name", field: "vehicleNimi", modes: ["create", "update"] },
-  { flag: "--no <n>", description: "Fleet number (vehicleNo)", optKey: "no", field: "vehicleNo", parse: asNumber, modes: ["create", "update"] },
+  { flag: "--no <n>", description: "Fleet number (vehicleNo)", optKey: "no", field: "vehicleNo", parse: intFlag("--no", 0), modes: ["create", "update"] },
   {
     flag: "--type <n>",
     description: { create: "vehicleTypeId (see `ib vehicle types`)", update: "vehicleTypeId" },
     optKey: "type",
     field: "vehicleTypeId",
-    parse: asNumber,
+    parse: intFlag("--type"),
     modes: ["create", "update"],
   },
   { flag: "--memo <s>", description: "Free-text memo", optKey: "memo", field: "memo", modes: ["create", "update"] },
-  { flag: "--default-driver <pid>", description: "Default driver personId", optKey: "defaultDriver", field: "defaultKuski_personId", parse: asNumber, modes: ["create"] },
-  { flag: "--capacity <m3>", description: "Concrete capacity in m3 (vehicleM3)", optKey: "capacity", field: "vehicleM3", parse: asNumber, modes: ["create", "update"] },
+  { flag: "--default-driver <pid>", description: "Default driver personId", optKey: "defaultDriver", field: "defaultKuski_personId", parse: intFlag("--default-driver"), modes: ["create"] },
+  { flag: "--capacity <m3>", description: "Concrete capacity in m3 (vehicleM3)", optKey: "capacity", field: "vehicleM3", parse: numFlag("--capacity"), modes: ["create", "update"] },
   {
     flag: "--puomi <m>",
     description: "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
     optKey: "puomi",
     field: "vehiclePuomi",
-    parse: asNumber,
+    parse: numFlag("--puomi"),
     modes: ["create", "update"],
   },
   {
@@ -558,7 +555,7 @@ export function registerVehicleCommands(
     .option(
       "--valid-on <date>"
     )
-    .option("--type <id>", "", (val: string) => Number(val))
+    .option("--type <id>", "", intFlag("--type"))
     .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(
@@ -672,9 +669,7 @@ export function registerVehicleCommands(
     );
   dates
     .command("expiring")
-    .option("--days <n>", "", (s: string) =>
-      Number(s)
-    )
+    .option("--days <n>", "", intFlag("--days"))
     .action(
       jsonAction(getClient, (client, opts: { days?: number }) =>
         runVehicleDatesExpiring(client, opts.days)
@@ -690,7 +685,7 @@ export function registerVehicleCommands(
     );
 
   v.command("visits <filterType> <id>")
-    .option("--days <n>", "", (val: string) => Number(val))
+    .option("--days <n>", "", intFlag("--days"))
     .option(
       "--date <d>"
     )

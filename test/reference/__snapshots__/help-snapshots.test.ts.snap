@@ -39,6 +39,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
+  exit 4 (client-side)  an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request → pass the entity id as a positive integer
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 3 (HTTP 403)  No membership on attachment or target → check active company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -148,6 +149,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
+  exit 4 (client-side)  an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request → pass the entity id as a positive integer
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 4 (client-side)  No entity given, conflicting positional + flag, or unknown entity word → name the entity once — positional word OR a --<entity> flag
@@ -285,6 +287,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request → pass the entity id as a positive integer
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap
   exit 3 (HTTP 403)  Not a member of the target entity's company → check the active company (ib auth whoami)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -349,6 +352,8 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request → pass the entity id as a positive integer
+  exit 4 (client-side)  --size is not an integer >= 0, rejected locally before any request → pass the file size in bytes as an integer
   exit 3 (HTTP 403)  fileFolder outside the active company / not a member of the target → mint via upload-url; check active company
   exit 4 (HTTP 400)  Missing required field / unknown entity → see required flags
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -476,6 +481,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  invalid <attachmentId> positional, rejected locally before any request → attachmentId must be a positive integer — verify it with \`ib attachment list\` or \`ib attachment search\`
+  exit 4 (client-side)  --liita-laskuun is not 0 or 1, rejected locally before any request → pass 0 (not invoice-linked) or 1 (invoice-linked)
   exit 3 (HTTP 403)  Not owner company / missing manager role / liitaLaskuun without lasku-admin → use an account with lasku or asiakas admin role on the owner company
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -535,6 +541,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request → pass the entity id as a positive integer
   exit 4 (client-side)  File unreadable / bad entity flags → check the path and pass exactly one entity flag
   exit 6 (client-side)  Azure PUT failed       → re-run; SAS expires in 1h
   exit 3 (HTTP 403)  Not a member of the target entity's company → check active company
@@ -3969,6 +3976,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ id, supplierName, invoiceNumber, dueDate, totalDue, totalGross, paymentStatus, approvalStatus, ... }> & { summary: { count, totalDue, overdueCount, overdueTotal, oldestDueDate }, fetchedAt, asiakasId, months, cached? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --months is not an integer >= 1, rejected locally before any request → pass a positive number of months (default 6, max 12)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a system admin     → requires isSystemAdmin
   exit 4 (HTTP 424)  Fennoa credentials missing for the target company → add apiKeys rows (ownerAsiakasId + apiKeySourceId 16, USER/KEY) or use --asiakas 8
@@ -5593,6 +5602,7 @@ OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5632,6 +5642,7 @@ OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, offerNotificationEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Invalid field / contact not in company → check jerryPersonId belongs to the company; offerNotificationEmail must be a valid address
   exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5722,6 +5733,7 @@ OUTPUT (JSON, stdout)
   { pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  Address missing, or given BOTH positionally and via --address with different values → pass the address exactly once — positional or --address
   exit 4 (client-side)  --m3 is not a number > 0 → pass --m3 as a positive number of cubic metres
   exit 4 (HTTP 400)  Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi → pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address
@@ -10780,6 +10792,7 @@ OUTPUT (JSON, stdout)
   { saasProspectId }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  Neither --asiakas nor --name given → pass one of them
   exit 4 (HTTP 400)  Prospect already exists for this company → \`ib sales prospect get --asiakas <id>\`
   exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
@@ -10813,6 +10826,7 @@ OUTPUT (JSON, stdout)
   { saasProspectId, asiakasId, companyName, status, analysis, … }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId
   exit 5 (client-side)  No prospect matches    → \`ib sales prospect list --search <name>\`
 
@@ -10895,6 +10909,7 @@ OUTPUT (JSON, stdout)
   { success: true, fieldsWritten }  — fieldsWritten is 0 when every key in the payload fell outside the scope's whitelist, so nothing was actually written
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  No reference given, or ambiguous match → pass the saasProspectId
   exit 5 (client-side)  No prospect matches    → \`ib sales prospect add\` first
   exit 3 (HTTP 403)  Not a system admin     → log in as a system admin
@@ -11135,6 +11150,7 @@ OUTPUT (JSON, stdout)
   { sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (client-side)  --geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status) → supply a fuller --address, or pass --lat/--lng directly and drop --geocode
   exit 4 (client-side)  --geocode passed with no address to resolve → pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng
@@ -12000,6 +12016,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not an admin/HR of the target company → use an admin/HR token
   exit 5 (HTTP 404)  Unknown profile for that entity, or company/person not found → run \`ib validate list\` to see profiles
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a keikkaId
   exit 4 (client-side)  Missing --profile for company validation, or a non-positive --asiakas/--person → pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run \`ib validate list\`
 
 NOTES
@@ -12055,6 +12072,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --no is not an integer >= 0, rejected locally before any request → pass the fleet number as an integer
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a vehicleTypeId — \`ib vehicle types\` lists them
+  exit 4 (client-side)  --default-driver is not an integer >= 1, rejected locally before any request → pass a personId — \`ib person search\` finds them
+  exit 4 (client-side)  --capacity is not a number, rejected locally before any request → pass the capacity in m3 as a number (e.g. 7.5)
+  exit 4 (client-side)  --puomi is not a number, rejected locally before any request → pass the boom length in metres as a number
   exit 4 (HTTP 400)  Validation failed      → fix the field flags
   exit 3 (HTTP 403)  No vehicle-edit access on the target tenant (--asiakas if given, otherwise your active company) → you need an admin/owner/vehicleHandler role on that tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12087,6 +12109,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 1, rejected locally before any request → pass a positive number of days (default 30)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -12641,6 +12664,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a vehicleTypeId — \`ib vehicle types\` lists them
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12960,6 +12984,10 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --no is not an integer >= 0, rejected locally before any request → pass the fleet number as an integer
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a vehicleTypeId — \`ib vehicle types\` lists them
+  exit 4 (client-side)  --capacity is not a number, rejected locally before any request → pass the capacity in m3 as a number (e.g. 7.5)
+  exit 4 (client-side)  --puomi is not a number, rejected locally before any request → pass the boom length in metres as a number
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
@@ -12997,6 +13025,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 1, rejected locally before any request → pass a positive number of days (omit for all-time)
   exit 4 (client-side)  Invalid filterType     → use tyomaa or sijainti
   exit 4 (client-side)  Bad --date             → YYYY-MM-DD or today/yesterday/tomorrow
   exit 5 (HTTP 404)  tyomaa not found / not owned → verify tyomaaId belongs to the active company

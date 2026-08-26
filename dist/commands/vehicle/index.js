@@ -2,7 +2,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, intFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
+import { parseId, intFlag, numFlag, resolveSearchQuery, cappedInt, assertEnum, queryAliasOption } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -157,8 +157,6 @@ export async function runVehicleDatesExpiring(client, days) {
  * intentionally excluded — they are carried through unchanged and are not
  * settable from the CLI.
  */
-/** Parse `<n>` as a number — the coercion every numeric vehicle flag uses. */
-const asNumber = (s) => Number(s);
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
  * `VehicleWriteFields` key each maps to. `create` and `update` expose
@@ -172,24 +170,24 @@ const asNumber = (s) => Number(s);
 const VEHICLE_FIELDS = [
     { flag: "--reg <s>", description: "Registration number (vehicleRegNo)", optKey: "reg", field: "vehicleRegNo", modes: ["create", "update"] },
     { flag: "--name <s>", description: "Display name (vehicleNimi)", optKey: "name", field: "vehicleNimi", modes: ["create", "update"] },
-    { flag: "--no <n>", description: "Fleet number (vehicleNo)", optKey: "no", field: "vehicleNo", parse: asNumber, modes: ["create", "update"] },
+    { flag: "--no <n>", description: "Fleet number (vehicleNo)", optKey: "no", field: "vehicleNo", parse: intFlag("--no", 0), modes: ["create", "update"] },
     {
         flag: "--type <n>",
         description: { create: "vehicleTypeId (see `ib vehicle types`)", update: "vehicleTypeId" },
         optKey: "type",
         field: "vehicleTypeId",
-        parse: asNumber,
+        parse: intFlag("--type"),
         modes: ["create", "update"],
     },
     { flag: "--memo <s>", description: "Free-text memo", optKey: "memo", field: "memo", modes: ["create", "update"] },
-    { flag: "--default-driver <pid>", description: "Default driver personId", optKey: "defaultDriver", field: "defaultKuski_personId", parse: asNumber, modes: ["create"] },
-    { flag: "--capacity <m3>", description: "Concrete capacity in m3 (vehicleM3)", optKey: "capacity", field: "vehicleM3", parse: asNumber, modes: ["create", "update"] },
+    { flag: "--default-driver <pid>", description: "Default driver personId", optKey: "defaultDriver", field: "defaultKuski_personId", parse: intFlag("--default-driver"), modes: ["create"] },
+    { flag: "--capacity <m3>", description: "Concrete capacity in m3 (vehicleM3)", optKey: "capacity", field: "vehicleM3", parse: numFlag("--capacity"), modes: ["create", "update"] },
     {
         flag: "--puomi <m>",
         description: "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
         optKey: "puomi",
         field: "vehiclePuomi",
-        parse: asNumber,
+        parse: numFlag("--puomi"),
         modes: ["create", "update"],
     },
     {
@@ -381,7 +379,7 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--deleted")
         .option("--grid-only")
         .option("--valid-on <date>")
-        .option("--type <id>", "", (val) => Number(val))
+        .option("--type <id>", "", intFlag("--type"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, opts) => runVehicleList(client, {
         limit: opts.limit,
@@ -431,13 +429,13 @@ export function registerVehicleCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, idStr) => runVehicleDatesList(client, parseId(idStr, "vehicleId"))));
     dates
         .command("expiring")
-        .option("--days <n>", "", (s) => Number(s))
+        .option("--days <n>", "", intFlag("--days"))
         .action(jsonAction(getClient, (client, opts) => runVehicleDatesExpiring(client, opts.days)));
     v.command("route <vehicleId>")
         .option("--date <date>", "", "today")
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
     v.command("visits <filterType> <id>")
-        .option("--days <n>", "", (val) => Number(val))
+        .option("--days <n>", "", intFlag("--days"))
         .option("--date <d>")
         .action(jsonAction(getClient, (client, filterType, idStr, opts) => runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
         days: opts.days,

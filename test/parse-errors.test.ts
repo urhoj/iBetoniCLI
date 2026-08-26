@@ -508,3 +508,50 @@ describe("attachment id rejects non-integers client-side (fb#893)", () => {
     expect(String(env.hint)).not.toMatch(/--force/);
   });
 });
+
+/**
+ * fb#905 — the leftover bare-Number coercions from the fb#892/fb#893 defect
+ * class: vehicle write fields (--no/--type/--default-driver via intFlag,
+ * --capacity/--puomi via numFlag) and the --type/--days read filters, the
+ * attachment entity-flag family + --size + --liita-laskuun (zeroOneFlag),
+ * sales prospect --asiakas ×3, message daily get/share/grant, fennoa
+ * --months/--asiakas, jerry request/provider-settings --asiakas, sijainti
+ * create --asiakas, and validate --keikka. All guards fire at parse time
+ * (argParser), so tokenless is enough — exit 4 proves no request. Sites
+ * already guarded downstream were left as-is (validate --asiakas/--person,
+ * sijainti plants, message daily list/add, jerry check-address).
+ * `message daily` commands have no spec entry yet, so their envelopes carry
+ * no hint — the guard is the point here; the catalog gap is tracked
+ * separately.
+ */
+describe("leftover bare-Number coercions reject garbage at parse time (fb#905)", () => {
+  const opts = { token: "", endpoint: "https://example.invalid" };
+
+  test.each([
+    [["vehicle", "list", "--type", "abc"]],
+    [["vehicle", "dates", "expiring", "--days", "abc"]],
+    [["vehicle", "visits", "tyomaa", "1", "--days", "abc"]],
+    [["vehicle", "create", "--no", "abc"]],
+    [["vehicle", "create", "--capacity", "abc"]],
+    [["vehicle", "update", "7", "--puomi", "abc"]],
+    [["attachment", "attach", "1", "--keikka", "abc"]],
+    [["attachment", "register", "--size", "abc"]],
+    [["attachment", "update", "1", "--liita-laskuun", "abc"]],
+    [["attachment", "update", "1", "--liita-laskuun", "2"]],
+    [["sales", "prospect", "get", "--asiakas", "abc"]],
+    [["sales", "prospect", "add", "--asiakas", "abc"]],
+    [["sales", "prospect", "update", "1", "--asiakas", "abc"]],
+    [["message", "daily", "get", "1", "--asiakas", "abc"]],
+    [["message", "daily", "share", "1", "--to", "abc"]],
+    [["message", "daily", "grant", "1", "--to", "abc"]],
+    [["fennoa", "purchases", "--months", "abc"]],
+    [["jerry", "request", "create", "--asiakas", "abc"]],
+    [["jerry", "provider-settings", "get", "--asiakas", "abc"]],
+    [["sijainti", "create", "--asiakas", "abc"]],
+    [["validate", "--keikka", "abc"]],
+  ])("ib %j → exit 4, no request", async (argv) => {
+    const { exitCode, stderr } = await runArgv(argv as string[], opts);
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/must be (an integer|a number|0 or 1)/);
+  });
+});

@@ -2,7 +2,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking), so append new commands at the end of the array.
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr } from "./shared.js";
+import { apiErr, ASIAKAS_FLAG_ERR } from "./shared.js";
 
 export const SALES_SPECS: CommandSpec[] = [
   {
@@ -40,7 +40,8 @@ export const SALES_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ saasProspectId, asiakasId, companyName, status, analysis, … }",
     errors: [
-      { origin: "client", exit: 4, meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
+      ASIAKAS_FLAG_ERR,
+      { origin: "client", exit: 4, match: ["Pass a saasProspectId", "Ambiguous:"], meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
       { origin: "client", exit: 5, meaning: "No prospect matches", remedy: "`ib sales prospect list --search <name>`" },
     ],
     examples: ["ib sales prospect get --asiakas 27", "ib sales prospect get --ytunnus 1869376-5 --pretty"],
@@ -63,7 +64,8 @@ export const SALES_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ saasProspectId }",
     errors: [
-      { origin: "client", exit: 4, meaning: "Neither --asiakas nor --name given", remedy: "pass one of them" },
+      ASIAKAS_FLAG_ERR,
+      { origin: "client", exit: 4, match: "--asiakas <id> or --name", meaning: "Neither --asiakas nor --name given", remedy: "pass one of them" },
       apiErr(400, "Prospect already exists for this company", "`ib sales prospect get --asiakas <id>`"),
       apiErr(403, "Not a system admin", "log in as a system admin"),
     ],
@@ -97,7 +99,8 @@ export const SALES_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ success: true, fieldsWritten }  — fieldsWritten is 0 when every key in the payload fell outside the scope's whitelist, so nothing was actually written",
     errors: [
-      { origin: "client", exit: 4, meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
+      ASIAKAS_FLAG_ERR,
+      { origin: "client", exit: 4, match: ["Pass a saasProspectId", "Ambiguous:"], meaning: "No reference given, or ambiguous match", remedy: "pass the saasProspectId" },
       { origin: "client", exit: 5, meaning: "No prospect matches", remedy: "`ib sales prospect add` first" },
       apiErr(403, "Not a system admin", "log in as a system admin"),
     ],

@@ -3,7 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseOptionalId } from "../../targets.js";
+import { parseOptionalId, intFlag } from "../../targets.js";
 const BRIEF_OMIT = ["analysis", "pitchAngle"];
 /**
  * Segment filter parity with the Myynti UI (fb#817). puminet4
@@ -123,7 +123,7 @@ export function registerSalesCommands(parent, getClient) {
         .command("get [saasProspectId]")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--ytunnus <y>")
         .action(jsonAction(getClient, (client, idArg, opts) => resolveProspect(client, {
         id: parseOptionalId(idArg, "saasProspectId"),
@@ -132,7 +132,7 @@ export function registerSalesCommands(parent, getClient) {
     })));
     const addCmd = prospect
         .command("add")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--name <s>")
         .option("--ytunnus <y>")
         .option("--segment <s>")
@@ -155,7 +155,7 @@ export function registerSalesCommands(parent, getClient) {
     }));
     const updateCmd = prospect
         .command("update [saasProspectId]")
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--ytunnus <y>")
         .option("--name <s>")
         .option("--segment <s>")

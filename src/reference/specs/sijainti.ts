@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, SIJAINTI_PUBLIC_403_MATCH, GEOCODE_CLIENT_ERR, puomiErr, GEOCODE_NO_ADDRESS_ERR, REASON_REQUIRED_FLAG, LIMIT_500_FLAG } from "./shared.js";
+import { apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, SIJAINTI_PUBLIC_403_MATCH, GEOCODE_CLIENT_ERR, puomiErr, GEOCODE_NO_ADDRESS_ERR, REASON_REQUIRED_FLAG, LIMIT_500_FLAG } from "./shared.js";
 
 export const SIJAINTI_SPECS: CommandSpec[] = [
 
@@ -164,6 +164,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(400, "Validation failed", "fix --body fields"),
       // CLIENT-side, not a backend 400 (fb#668 follow-up). `--geocode` is
       // resolved entirely in the CLI: applyGeocodeToBody geocodes FIRST and

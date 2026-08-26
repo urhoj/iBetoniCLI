@@ -21,6 +21,24 @@ const INVALID_ATTACHMENT_ID_ERR: CommandError = {
   remedy: "attachmentId must be a positive integer — verify it with `ib attachment list` or `ib attachment search`",
 };
 
+/**
+ * The entity-id flag parse-guard row (fb#905): the `--keikka <id>` …
+ * `--message <id>` family registered by addEntityFlags (attach/detach/
+ * upload/register) plus the hidden `--asiakas` alias for `--customer` all
+ * parse through intFlag now, where a bare `Number` coercer used to send NaN
+ * down the wire (or, for detach, fold NaN-vs-NaN into a confusing conflict).
+ * One row covers the whole family: the match is the common tail of intFlag's
+ * message, and no other client exit-4 message on these commands contains it
+ * (`--size` says ">= 0", `--liita-laskuun` has its own wording).
+ */
+const ENTITY_FLAG_PARSE_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "must be an integer >= 1",
+  meaning: "an entity id flag (--keikka/--vehicle/…/--message, or the hidden --asiakas alias of --customer) is not an integer >= 1, rejected locally before any request",
+  remedy: "pass the entity id as a positive integer",
+};
+
 export const ATTACHMENT_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
   {
@@ -34,7 +52,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
       LIMIT_500_FLAG,
     ],
     outputShape: `ListEnvelope<${ATTACHMENT_ROW}>`,
-    errors: [limitErr("pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap"), apiErr(403, "Not a member of the target entity's company", "check the active company (ib auth whoami)"), ...COMMON_AUTH_ERRORS],
+    errors: [ENTITY_FLAG_PARSE_ERR, limitErr("pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap"), apiErr(403, "Not a member of the target entity's company", "check the active company (ib auth whoami)"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "No SAS URLs in list rows — use `ib attachment get` for a download URL.", DEPLOY_NOTE],
     seeAlso: ["ib attachment get", "ib attachment types", "ib attachment search"],
     examples: ["ib attachment list --keikka 9001", "ib attachment list --vehicle 53 --group kuva", "ib attachment list --request 1234"],
@@ -82,7 +100,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }",
-    errors: [{ origin: "client", exit: 4, meaning: "File unreadable / bad entity flags", remedy: "check the path and pass exactly one entity flag" }, { origin: "client", exit: 6, meaning: "Azure PUT failed", remedy: "re-run; SAS expires in 1h" }, apiErr(403, "Not a member of the target entity's company", "check active company"), ...COMMON_AUTH_ERRORS],
+    errors: [ENTITY_FLAG_PARSE_ERR, { origin: "client", exit: 4, match: ["Cannot read file", "max 500 MB", "Exactly one entity flag"], meaning: "File unreadable / bad entity flags", remedy: "check the path and pass exactly one entity flag" }, { origin: "client", exit: 6, meaning: "Azure PUT failed", remedy: "re-run; SAS expires in 1h" }, apiErr(403, "Not a member of the target entity's company", "check active company"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "No image compression — the file uploads as-is (the web UI compresses to ~1MB).", "Remote contexts: use upload-url + PUT yourself + register.", DEPLOY_NOTE],
     seeAlso: ["ib attachment upload-url", "ib attachment register", "ib attachment types"],
     examples: [
@@ -122,7 +140,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }",
-    errors: [apiErr(403, "fileFolder outside the active company / not a member of the target", "mint via upload-url; check active company"), apiErr(400, "Missing required field / unknown entity", "see required flags"), ...COMMON_AUTH_ERRORS],
+    errors: [ENTITY_FLAG_PARSE_ERR, { origin: "client", exit: 4, match: "--size must be an integer >= 0", meaning: "--size is not an integer >= 0, rejected locally before any request", remedy: "pass the file size in bytes as an integer" }, apiErr(403, "fileFolder outside the active company / not a member of the target", "mint via upload-url; check active company"), apiErr(400, "Missing required field / unknown entity", "see required flags"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the linked entity's timeline (--reason lands in changeTracker.reason).", DEPLOY_NOTE],
     seeAlso: ["ib attachment upload-url", "ib attachment upload"],
     examples: ["ib attachment register --name uuid.jpg --orig-name site.jpg --folder 8/2026 --size 12345 --mime image/jpeg --keikka 9001"],
@@ -136,7 +154,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }",
-    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(404, "Attachment not found", "verify attachmentId"), apiErr(403, "No membership on attachment or target", "check active company"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, ENTITY_FLAG_PARSE_ERR, apiErr(404, "Attachment not found", "verify attachmentId"), apiErr(403, "No membership on attachment or target", "check active company"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the target entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment detach", "ib attachment list"],
     examples: ["ib attachment attach 4711 --vehicle 53", "ib attachment attach 4711 --keikka 9002 --dry-run"],
@@ -153,7 +171,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
-    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed", "Unknown entity"], meaning: "No entity given, conflicting positional + flag, or unknown entity word", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, ENTITY_FLAG_PARSE_ERR, apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, match: ["entity to unlink", "Conflicting entity", "entity flag allowed", "Unknown entity"], meaning: "No entity given, conflicting positional + flag, or unknown entity word", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
     notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
     seeAlso: ["ib attachment attach", "ib attachment search"],
     examples: ["ib attachment detach 4711 keikka", "ib attachment detach 4711 --keikka 9001", "ib attachment detach 4711 bug-report --dry-run"],
@@ -172,7 +190,7 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }",
-    errors: [INVALID_ATTACHMENT_ID_ERR, apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
+    errors: [INVALID_ATTACHMENT_ID_ERR, { origin: "client", exit: 4, match: "--liita-laskuun must be", meaning: "--liita-laskuun is not 0 or 1, rejected locally before any request", remedy: "pass 0 (not invoice-linked) or 1 (invoice-linked)" }, apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["Comment changes are audited via ChangeTracker.", DEPLOY_NOTE],
     seeAlso: ["ib attachment types", "ib attachment get"],
     examples: ["ib attachment update 4711 --comment \"hyväksytty\"", "ib attachment update 4711 --group laskutus --liita-laskuun 1"],

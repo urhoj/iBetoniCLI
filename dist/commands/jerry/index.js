@@ -650,7 +650,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--duration <h>", "", Number)
         .option("--line-length <m>", "", Number)
         .option("--notes <s>")
-        .option("--asiakas <id>", "", Number)).action(guarded(async (addressPositional, opts) => {
+        .option("--asiakas <id>", "", intFlag("--asiakas"))).action(guarded(async (addressPositional, opts) => {
         const osoite = resolveAddress(addressPositional, opts.address);
         const maaraM3 = Number(opts.m3);
         if (!Number.isFinite(maaraM3) || maaraM3 <= 0) {
@@ -761,7 +761,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--boom <m>", "", Number)
         .option("--explain")
         .option("--gate <csv>", "", (v) => v.split(",").map((g) => g.trim()).filter(Boolean))
-        .option("--asiakas <id>", "", Number)
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(guarded(async (opts) => {
         // Reject a NaN --boom (e.g. Commander coercing "abc" â†’ NaN) so the probe
         // fails loudly instead of silently dropping the boom filter the operator
@@ -804,7 +804,7 @@ export function registerJerryCommands(parent, getClient) {
     ps.command("get")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .option("--asiakas <id>", "", Number)
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, opts) => runJerryProviderSettingsGet(client, opts.asiakas)));
     addWriteFlagsToCommand(ps
         .command("set")
@@ -816,7 +816,7 @@ export function registerJerryCommands(parent, getClient) {
         // majority spelling and unambiguous here, since this is the only address
         // the command sets (same shape as `ib customer update --email`).
         .option("--email <email>")
-        .option("--asiakas <id>", "", Number)).action(guarded(async (opts) => {
+        .option("--asiakas <id>", "", intFlag("--asiakas"))).action(guarded(async (opts) => {
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
         if (!parsed && opts.email === undefined) {
             failWith("provider-settings set requires a body via --body, --from-json or --email", 4);

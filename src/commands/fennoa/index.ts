@@ -8,6 +8,7 @@ import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import { jsonAction } from "../_shared/action.js";
+import { intFlag } from "../../targets.js";
 interface PurchaseInvoiceRow {
   id: number;
   supplierName: string | null;
@@ -72,8 +73,8 @@ export function registerFennoaCommands(parent: Command, getClient: () => Promise
   fennoa
     .command("purchases")
     .option("--all")
-    .option("--months <n>", "", (v: string) => Number(v))
-    .option("--asiakas <id>", "", (v: string) => Number(v))
+    .option("--months <n>", "", intFlag("--months"))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .option("--refresh")
     .action(
       jsonAction(getClient, (client, opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) =>

@@ -1151,7 +1151,7 @@ export function registerSijaintiCommands(
     .option("--lng <n>", "", Number)
     .option("--lyh <s>")
     .option("--max-distance <n>", "", Number)
-    .option("--asiakas <id>", "", Number)
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .option("--puomi-min <m>", "", Number)
     .option("--puomi-max <m>", "", Number)
     .option("--public")

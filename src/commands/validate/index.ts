@@ -4,7 +4,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { assertPositiveInt } from "../../targets.js";
+import { assertPositiveInt, intFlag } from "../../targets.js";
 // Static: program.ts registers the keikka domain on every invocation anyway, so
 // the dynamic import bought nothing and hid the edge from the module graph.
 import { runKeikkaValidate } from "../keikka/index.js";
@@ -66,7 +66,7 @@ export function registerValidateCommands(
     .option("--asiakas <id>", "", Number)
     .option("--person <id>", "", Number)
     .option("--profile <p>")
-    .option("--keikka <id>", "", Number)
+    .option("--keikka <id>", "", intFlag("--keikka"))
     .action(
       guarded(async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }) => {
         const client = await getClient();

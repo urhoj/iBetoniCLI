@@ -8,7 +8,7 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
-import { parseId, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
+import { parseId, intFlag, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
 
 type Row = Record<string, unknown>;
@@ -308,7 +308,7 @@ export function registerMessageDailyCommands(
   d.command("get <boxId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .requiredOption("--asiakas <id>", "", Number)
+    .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
     .option("--date <date>")
     .action(
       jsonAction(getClient, (client, boxIdStr: string, opts: { asiakas: number; date?: string }) =>
@@ -397,7 +397,7 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("share <boxId>")
-      .requiredOption("--to <asiakasId>", "", Number)
+      .requiredOption("--to <asiakasId>", "", intFlag("--to"))
   ).action(
     jsonAction(getClient, (client, boxIdStr: string, opts: { to: number } & WriteFlags) =>
       runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)
@@ -416,9 +416,9 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("grant <boxId>")
-      .requiredOption("--to <asiakasId>", "", Number)
-      .requiredOption("--role <typeId>", "", Number)
-      .requiredOption("--box-asiakas <id>", "", Number)
+      .requiredOption("--to <asiakasId>", "", intFlag("--to"))
+      .requiredOption("--role <typeId>", "", intFlag("--role"))
+      .requiredOption("--box-asiakas <id>", "", intFlag("--box-asiakas"))
   ).action(
     jsonAction(getClient, (client, boxIdStr: string, opts: { to: number; role: number; boxAsiakas: number } & WriteFlags) =>
       runDailyGrant(
@@ -446,7 +446,7 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
-      .requiredOption("--role <typeId>", "", Number)
+      .requiredOption("--role <typeId>", "", intFlag("--role"))
       .requiredOption("--access <mode>")
   ).action(
     guarded(async (idStr: string, opts: { role: number; access: string } & WriteFlags) => {

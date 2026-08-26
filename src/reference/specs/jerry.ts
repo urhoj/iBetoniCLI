@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const JERRY_SPECS: CommandSpec[] = [
 
@@ -100,6 +100,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
     errors: [
+      ASIAKAS_FLAG_ERR,
       { origin: "client", exit: 4, match: "address", meaning: "Address missing, or given BOTH positionally and via --address with different values", remedy: "pass the address exactly once — positional or --address" },
       { origin: "client", exit: 4, match: "--m3", meaning: "--m3 is not a number > 0", remedy: "pass --m3 as a positive number of cubic metres" },
       apiErr(400, "Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi", "pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address"),
@@ -479,6 +480,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy }",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -501,6 +503,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, offerNotificationEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
+      ASIAKAS_FLAG_ERR,
       apiErr(400, "Invalid field / contact not in company", "check jerryPersonId belongs to the company; offerNotificationEmail must be a valid address"),
       apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,

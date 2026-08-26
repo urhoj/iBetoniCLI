@@ -9,6 +9,7 @@ import {
   parseRefId,
   resolveDateInput,
   resolveSearchQuery,
+  zeroOneFlag,
 } from "../src/targets.js";
 import { todayHelsinki } from "../src/dates.js";
 
@@ -279,6 +280,26 @@ describe("numFlag (fb#371 — lat/lng are route segments, so NaN must not surviv
     );
     expect(errorOf(() => numFlag("--puomi-min", 0, 999.99)("abc"))?.message).toBe(
       "--puomi-min must be a number in 0..999.99"
+    );
+  });
+});
+
+describe("zeroOneFlag (fb#905 — 0|1 columns: NaN serialized as null would silently flip the flag)", () => {
+  test("accepts exactly 0 and 1", () => {
+    expect(zeroOneFlag("--liita-laskuun")("0")).toBe(0);
+    expect(zeroOneFlag("--liita-laskuun")("1")).toBe(1);
+    expect(zeroOneFlag("--liita-laskuun")(" 1 ")).toBe(1);
+  });
+
+  test("rejects non-integers like intFlag, and integers > 1 with its own message", () => {
+    for (const bad of ["abc", "", "2", "99", "-1", "1.5"]) {
+      expect(exitCodeOf(() => zeroOneFlag("--liita-laskuun")(bad))).toBe(4);
+    }
+    expect(errorOf(() => zeroOneFlag("--liita-laskuun")("abc"))?.message).toBe(
+      "--liita-laskuun must be an integer >= 0"
+    );
+    expect(errorOf(() => zeroOneFlag("--liita-laskuun")("2"))?.message).toBe(
+      "--liita-laskuun must be 0 or 1"
     );
   });
 });

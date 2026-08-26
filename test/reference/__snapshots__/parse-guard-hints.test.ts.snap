@@ -1,13 +1,261 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`parse-time guard → hint pairing > every argParser guard resolves a hint that answers its own message 1`] = `
-"ib attachment list --limit <n>
+"ib attachment attach --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --bug-report <id>
+  ! --bugReport must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --customer <id>
+  ! --customer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --message <id>
+  ! --message must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --offer <id>
+  ! --offer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --person <id>
+  ! --person must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --request <id>
+  ! --request must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --tuote <id>
+  ! --tuote must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment attach --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --bug-report <id>
+  ! --bugReport must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --customer <id>
+  ! --customer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --message <id>
+  ! --message must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --offer <id>
+  ! --offer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --person <id>
+  ! --person must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --request <id>
+  ! --request must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --tuote <id>
+  ! --tuote must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment detach --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --bug-report <id>
+  ! --bugReport must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --customer <id>
+  ! --customer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; this command caps at 500, so narrow by entity rather than raising the cap
+  > pass the entity id as a positive integer
+
+ib attachment list --message <id>
+  ! --message must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --offer <id>
+  ! --offer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --person <id>
+  ! --person must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --request <id>
+  ! --request must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --tuote <id>
+  ! --tuote must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment list --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --bug-report <id>
+  ! --bugReport must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --customer <id>
+  ! --customer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --message <id>
+  ! --message must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --offer <id>
+  ! --offer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --person <id>
+  ! --person must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --request <id>
+  ! --request must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --size <bytes>
+  ! --size must be an integer >= 0
+  > pass the file size in bytes as an integer
+
+ib attachment register --tuote <id>
+  ! --tuote must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment register --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass the entity id as a positive integer
 
 ib attachment search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500, so narrow the search term rather than raising the cap
+
+ib attachment update --liita-laskuun <0|1>
+  ! --liita-laskuun must be an integer >= 0
+  > pass 0 (not invoice-linked) or 1 (invoice-linked)
+
+ib attachment upload --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --bug-report <id>
+  ! --bugReport must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --customer <id>
+  ! --customer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --message <id>
+  ! --message must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --offer <id>
+  ! --offer must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --person <id>
+  ! --person must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --request <id>
+  ! --request must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --tuote <id>
+  ! --tuote must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass the entity id as a positive integer
+
+ib attachment upload --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass the entity id as a positive integer
 
 ib auth switch --to <asiakasId>
   ! --to must be an integer >= 1
@@ -165,6 +413,14 @@ ib dev schema views --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
+ib fennoa purchases --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib fennoa purchases --months <n>
+  ! --months must be an integer >= 1
+  > pass a positive number of months (default 6, max 12)
+
 ib jerry admin onboarding events --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this only keeps the newest N client-side and sets \`truncated\` — OMIT \`--limit\` to keep every event
@@ -200,6 +456,22 @@ ib jerry admin request list --provider <id>
 ib jerry admin searches list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 500, so narrow the window with \`--from\` / \`--to\` rather than raising the cap
+
+ib jerry check-address --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > add --explain, or pass a positive asiakasId
+
+ib jerry provider-settings get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib jerry provider-settings set --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib jerry request create --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
 ib jerry request list --limit <n>
   ! --limit must be an integer >= 1
@@ -264,6 +536,30 @@ ib log user --limit <n>
 ib log user --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib message daily get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
+ib message daily grant --box-asiakas <id>
+  ! --box-asiakas must be an integer >= 1
+  > (no hint)
+
+ib message daily grant --role <typeId>
+  ! --role must be an integer >= 1
+  > (no hint)
+
+ib message daily grant --to <asiakasId>
+  ! --to must be an integer >= 1
+  > (no hint)
+
+ib message daily perm-set --role <typeId>
+  ! --role must be an integer >= 1
+  > (no hint)
+
+ib message daily share --to <asiakasId>
+  ! --to must be an integer >= 1
+  > (no hint)
 
 ib notification fcm send --data <json>
   ! --data must be a JSON object
@@ -385,6 +681,18 @@ ib reference detail list --stalest <n>
   ! --stalest must be an integer >= 1
   > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
 
+ib sales prospect add --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib sales prospect get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib sales prospect update --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
 ib schema indexes --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000
@@ -428,6 +736,10 @@ ib sijainti closest --type <id>
 ib sijainti closest --worksite <id>
   ! --worksite must be an integer >= 1
   > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib sijainti create --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
 ib sijainti list --limit <n>
   ! --limit must be an integer >= 1
@@ -477,9 +789,37 @@ ib task set --assignee <personId>
   ! --assignee must be an integer >= 1
   > provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
 
+ib validate --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass a keikkaId
+
 ib vehicle create --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib vehicle create --capacity <m3>
+  ! --capacity must be a number
+  > pass the capacity in m3 as a number (e.g. 7.5)
+
+ib vehicle create --default-driver <pid>
+  ! --default-driver must be an integer >= 1
+  > pass a personId — \`ib person search\` finds them
+
+ib vehicle create --no <n>
+  ! --no must be an integer >= 0
+  > pass the fleet number as an integer
+
+ib vehicle create --puomi <m>
+  ! --puomi must be a number
+  > pass the boom length in metres as a number
+
+ib vehicle create --type <n>
+  ! --type must be an integer >= 1
+  > pass a vehicleTypeId — \`ib vehicle types\` lists them
+
+ib vehicle dates expiring --days <n>
+  ! --days must be an integer >= 1
+  > pass a positive number of days (default 30)
 
 ib vehicle get --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -492,6 +832,10 @@ ib vehicle list --asiakas <id>
 ib vehicle list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
+
+ib vehicle list --type <id>
+  ! --type must be an integer >= 1
+  > pass a vehicleTypeId — \`ib vehicle types\` lists them
 
 ib vehicle log --limit <n>
   ! --limit must be an integer >= 1
@@ -516,6 +860,26 @@ ib vehicle types --asiakas <id>
 ib vehicle update --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib vehicle update --capacity <m3>
+  ! --capacity must be a number
+  > pass the capacity in m3 as a number (e.g. 7.5)
+
+ib vehicle update --no <n>
+  ! --no must be an integer >= 0
+  > pass the fleet number as an integer
+
+ib vehicle update --puomi <m>
+  ! --puomi must be a number
+  > pass the boom length in metres as a number
+
+ib vehicle update --type <n>
+  ! --type must be an integer >= 1
+  > pass a vehicleTypeId — \`ib vehicle types\` lists them
+
+ib vehicle visits --days <n>
+  ! --days must be an integer >= 1
+  > pass a positive number of days (omit for all-time)
 
 ib weather day --lat <n>
   ! --lat must be a number

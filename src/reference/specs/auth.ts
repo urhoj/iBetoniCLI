@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr } from "./shared.js";
+import { apiErr, ASIAKAS_FLAG_ERR } from "./shared.js";
 
 export const AUTH_SPECS: CommandSpec[] = [
   // ─── auth (6) ────────────────────────────────────────────────────────────
@@ -233,6 +233,8 @@ export const AUTH_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ id, supplierName, invoiceNumber, dueDate, totalDue, totalGross, paymentStatus, approvalStatus, ... }> & { summary: { count, totalDue, overdueCount, overdueTotal, oldestDueDate }, fetchedAt, asiakasId, months, cached? }",
     errors: [
+      { origin: "client", exit: 4, match: "--months must be an integer >= 1", meaning: "--months is not an integer >= 1, rejected locally before any request", remedy: "pass a positive number of months (default 6, max 12)" },
+      ASIAKAS_FLAG_ERR,
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Not a system admin", "requires isSystemAdmin"),
       apiErr(424, "Fennoa credentials missing for the target company", "add apiKeys rows (ownerAsiakasId + apiKeySourceId 16, USER/KEY) or use --asiakas 8"),

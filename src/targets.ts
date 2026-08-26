@@ -117,7 +117,11 @@ export function intFlag(
   hint?: string
 ): (value: string) => number {
   return (value: string) => {
-    const n = Number((value ?? "").trim());
+    const trimmed = (value ?? "").trim();
+    // Empty is rejected explicitly (like numFlag): Number("") is 0, which a
+    // min=0 flag would otherwise accept as a plausible value rather than the
+    // obvious input error it is.
+    const n = trimmed === "" ? NaN : Number(trimmed);
     if (!Number.isSafeInteger(n) || n < min) {
       failWith(`${flag} must be an integer >= ${min}`, 4, hint);
     }
@@ -188,6 +192,22 @@ export function numFlag(
     if (!Number.isFinite(n) || n < min || n > max) {
       failWith(`${flag} must be a number${range}`, 4);
     }
+    return n;
+  };
+}
+
+/**
+ * Commander argParser: strictly `0` or `1`; exit 4 otherwise. For the boolean
+ * columns the backend stores as 0|1 integers (`liitaLaskuun`), where
+ * {@link intFlag} alone would accept 2, 3, … and a bare `Number` coercer turns
+ * a typo into NaN, which JSON.stringify serializes as `null` — silently
+ * flipping the flag (fb#905).
+ */
+export function zeroOneFlag(flag: string): (value: string) => number {
+  const int = intFlag(flag, 0);
+  return (value: string) => {
+    const n = int(value);
+    if (n > 1) failWith(`${flag} must be 0 or 1`, 4);
     return n;
   };
 }

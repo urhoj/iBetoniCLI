@@ -1,6 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import { jsonAction } from "../_shared/action.js";
+import { intFlag } from "../../targets.js";
 /** GET open purchase invoices (payables) → ListEnvelope + summary. */
 export async function runFennoaPurchases(client, opts) {
     const res = await client.get(`/api/admin/fennoa/purchase-invoices${qs({
@@ -24,8 +25,8 @@ export function registerFennoaCommands(parent, getClient) {
     fennoa
         .command("purchases")
         .option("--all")
-        .option("--months <n>", "", (v) => Number(v))
-        .option("--asiakas <id>", "", (v) => Number(v))
+        .option("--months <n>", "", intFlag("--months"))
+        .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--refresh")
         .action(jsonAction(getClient, (client, opts) => runFennoaPurchases(client, opts)));
 }

@@ -97,7 +97,8 @@ export const COMPANY_SPECS: CommandSpec[] = [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Not an admin/HR of the target company", "use an admin/HR token"),
       apiErr(404, "Unknown profile for that entity, or company/person not found", "run `ib validate list` to see profiles"),
-      { origin: "client", exit: 4, meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
+      { origin: "client", exit: 4, match: "--keikka must be an integer >= 1", meaning: "--keikka is not an integer >= 1, rejected locally before any request", remedy: "pass a keikkaId" },
+      { origin: "client", exit: 4, match: "Company validation needs --profile", meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
     ],
     notes: [
       "ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.",

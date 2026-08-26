@@ -8,7 +8,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { assertPositiveInt, cappedInt, parseId } from "../../targets.js";
+import { assertPositiveInt, cappedInt, intFlag, parseId, zeroOneFlag } from "../../targets.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -66,13 +66,13 @@ type AttachmentUpdateOpts = WriteFlags &
 
 function addEntityFlags(cmd: Command): Command {
   for (const e of ENTITY_OPTS) {
-    cmd.option(e.flag, "", (s: string) => Number(s));
+    cmd.option(e.flag, "", intFlag("--" + e.optKey));
   }
   // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
   // tenant-scoped commands, but here the canonical spelling is `--customer`
   // (mirrors backend ENTITY_COLUMNS) — so the majority guess failed on every
   // attachment command. Hidden: the spec documents only `--customer`.
-  cmd.addOption(new Option("--asiakas <id>").argParser((s: string) => Number(s)).hideHelp());
+  cmd.addOption(new Option("--asiakas <id>").argParser(intFlag("--asiakas")).hideHelp());
   return cmd;
 }
 
@@ -497,7 +497,7 @@ export function registerAttachmentCommands(
     .requiredOption("--name <fileName>")
     .requiredOption("--orig-name <name>")
     .requiredOption("--folder <fileFolder>")
-    .requiredOption("--size <bytes>", "", (s: string) => Number(s))
+    .requiredOption("--size <bytes>", "", intFlag("--size", 0))
     .requiredOption("--mime <mime>")
     .option("--comment <text>")
     .option("--group <g>")
@@ -546,7 +546,7 @@ export function registerAttachmentCommands(
   const updateCmd = a
     .command("update <attachmentId>")
     .option("--comment <text>")
-    .option("--liita-laskuun <0|1>", "", (s: string) => Number(s))
+    .option("--liita-laskuun <0|1>", "", zeroOneFlag("--liita-laskuun"))
     .option("--group <g>")
     .option("--type <t>");
   addWriteFlagsToCommand(updateCmd).action(

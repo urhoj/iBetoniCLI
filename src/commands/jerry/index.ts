@@ -1061,7 +1061,7 @@ export function registerJerryCommands(
       .option("--duration <h>", "", Number)
       .option("--line-length <m>", "", Number)
       .option("--notes <s>")
-      .option("--asiakas <id>", "", Number)
+      .option("--asiakas <id>", "", intFlag("--asiakas"))
   ).action(
     guarded(async (
       addressPositional: string | undefined,
@@ -1241,7 +1241,7 @@ export function registerJerryCommands(
       "",
       (v: string) => v.split(",").map((g) => g.trim()).filter(Boolean)
     )
-    .option("--asiakas <id>", "", Number)
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       guarded(async (opts: {
         address: string;
@@ -1304,7 +1304,7 @@ export function registerJerryCommands(
   ps.command("get")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .option("--asiakas <id>", "", Number)
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       jsonAction(getClient, (client, opts: { asiakas?: number }) =>
         runJerryProviderSettingsGet(client, opts.asiakas)
@@ -1326,7 +1326,7 @@ export function registerJerryCommands(
       // majority spelling and unambiguous here, since this is the only address
       // the command sets (same shape as `ib customer update --email`).
       .option("--email <email>")
-      .option("--asiakas <id>", "", Number)
+      .option("--asiakas <id>", "", intFlag("--asiakas"))
   ).action(guarded(async (opts: WriteOpts & { body?: string; fromJson?: string; email?: string; asiakas?: number }) => {
     const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) as Row | null;
     if (!parsed && opts.email === undefined) {
