@@ -44,15 +44,11 @@ const SOURCES = ["human", "routine"];
 // needing a backend route touches both.
 const REPO_FLAG_DESC = "Repo(s) this entry ships in (CSV). Every token is resolved on its own, so a cross-lane change names BOTH repos — `--repo \"puminet5api,betonicli\"` — instead of demoting one to a --files path. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
 const AREA_FLAG_DESC = "Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
-const AREA_SCOPE_REMEDIES = {
-    app: "use --scope app when filing feedback; --area accepts technical layers only",
-    bsg2: "use --scope bsg2 when filing feedback; --area accepts technical layers only",
-    impeccable: "use --scope impeccable when filing feedback; --area accepts technical layers only",
-    jerry: "use --scope jerry when filing feedback; --area accepts technical layers only",
-    ops: "use --scope ops when filing feedback; --area accepts technical layers only",
-    other: "use --scope other when filing feedback; --area accepts technical layers only",
-    security: "use --scope security when filing feedback; --area accepts technical layers only",
-};
+// Scope-shaped values agents predictably pass to --area (`ib dev feedback
+// --scope` accepts these). The remedy string is built from the key at the call
+// site. No `jerry` entry: AREA_REPO_REMEDIES below also carries `jerry` and
+// wins the remedy ternary, so a scope remedy for it would be unreachable.
+const AREA_SCOPE_VALUES = new Set(["app", "bsg2", "impeccable", "ops", "other", "security"]);
 // Named once and used by both the Commander options and the specs, so the
 // "these two --severity flags are different scales" warning cannot survive on
 // one surface and go missing on the other (feedback #359).
@@ -181,8 +177,8 @@ export function validateEnums(type, area, bumpLevel, source, severity, commandPa
     if (type !== undefined && !TYPES.includes(type))
         problems.push({ flag: "--type", issue: "invalid", got: type, allowed: TYPES, synonyms: TYPE_SYNONYMS });
     if (area !== undefined && !AREAS.includes(area)) {
-        const repo = AREA_REPO_REMEDIES[area.toLowerCase()];
-        const scope = AREA_SCOPE_REMEDIES[area.toLowerCase()];
+        const lower = area.toLowerCase();
+        const repo = AREA_REPO_REMEDIES[lower];
         problems.push({
             flag: "--area",
             issue: "invalid",
@@ -192,8 +188,8 @@ export function validateEnums(type, area, bumpLevel, source, severity, commandPa
                 ? {
                     remedy: `--area is the technical layer, not the repo — pass --repo ${repo} and pick the layer from the allowed values`,
                 }
-                : scope
-                    ? { remedy: scope }
+                : AREA_SCOPE_VALUES.has(lower)
+                    ? { remedy: `use --scope ${lower} when filing feedback; --area accepts technical layers only` }
                     : {}),
         });
     }
