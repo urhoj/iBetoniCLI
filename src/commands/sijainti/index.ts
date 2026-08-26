@@ -485,26 +485,42 @@ export async function runSijaintiSetJerry(
   radius?: number,
   boom?: { min?: number; max?: number }
 ): Promise<unknown> {
-  const current = await client.get<Record<string, unknown>>(
-    `/api/geocode/sijainti/get/${sijaintiId}`
-  );
-  const body: Record<string, unknown> = {
-    ...current,
-    sijaintiId,
-    jerryActiveUntil: on ? JERRY_ACTIVE_SENTINEL : null,
-  };
-  if (on) {
-    if (radius !== undefined) {
-      body.maxDeliveryDistance = radius;
-    } else if (!Number(current.maxDeliveryDistance)) {
-      body.maxDeliveryDistance = DEFAULT_JERRY_RADIUS_KM;
+  return patchSijainti(client, sijaintiId, flags, (current) => {
+    const patch: Record<string, unknown> = {
+      jerryActiveUntil: on ? JERRY_ACTIVE_SENTINEL : null,
+    };
+    if (on) {
+      if (radius !== undefined) {
+        patch.maxDeliveryDistance = radius;
+      } else if (!Number(current.maxDeliveryDistance)) {
+        patch.maxDeliveryDistance = DEFAULT_JERRY_RADIUS_KM;
+      }
     }
-  }
-  // Per-sijainti boom range (m) — the betonijerry matching filter since
-  // 2026-07 (vehicle fleet booms are no longer consulted). Only set when
-  // given; the GET+merge otherwise preserves the stored bounds.
-  if (boom?.min !== undefined) body.puomiMin = boom.min;
-  if (boom?.max !== undefined) body.puomiMax = boom.max;
+    // Per-sijainti boom range (m) — the betonijerry matching filter since
+    // 2026-07 (vehicle fleet booms are no longer consulted). Only set when
+    // given; the GET+merge otherwise preserves the stored bounds.
+    if (boom?.min !== undefined) patch.puomiMin = boom.min;
+    if (boom?.max !== undefined) patch.puomiMax = boom.max;
+    return patch;
+  });
+}
+
+/**
+ * Read-merge-write against /api/geocode/updateSijainti: GET the current flat
+ * record, overlay `patch(current)`, POST the merged body. set-jerry and
+ * set-public both go through here — there is no partial-update route, and
+ * sijainti_save assigns most columns directly, so a sparse body would NULL the
+ * untouched fields. (runSijaintiUpdate has its own merge on purpose: it must
+ * also strip lat/lng/placeId.)
+ */
+async function patchSijainti(
+  client: ApiClient,
+  sijaintiId: number,
+  flags: WriteFlags,
+  patch: (current: Record<string, unknown>) => Record<string, unknown>
+): Promise<unknown> {
+  const current = await runSijaintiGet(client, sijaintiId);
+  const body: Record<string, unknown> = { ...current, sijaintiId, ...patch(current) };
   return client.post<unknown>("/api/geocode/updateSijainti", body, {
     headers: writeFlagsToHeaders(flags),
   });
@@ -535,17 +551,7 @@ export async function runSijaintiSetPublic(
   on: boolean,
   flags: WriteFlags
 ): Promise<unknown> {
-  const current = await client.get<Record<string, unknown>>(
-    `/api/geocode/sijainti/get/${sijaintiId}`
-  );
-  const body: Record<string, unknown> = {
-    ...current,
-    sijaintiId,
-    isPublic: on,
-  };
-  return client.post<unknown>("/api/geocode/updateSijainti", body, {
-    headers: writeFlagsToHeaders(flags),
-  });
+  return patchSijainti(client, sijaintiId, flags, () => ({ isPublic: on }));
 }
 
 /**
@@ -934,16 +940,14 @@ function parseDistanceToken(token: string): { lat: number; lng: number } | numbe
 }
 
 /**
- * Resolve a distance endpoint token to coordinates. Accepts "lat,lng" or a
- * bare sijaintiId (resolved via runSijaintiGet → its lat/lng). Throws a
- * validation error (caller exits 4) on a malformed token or a sijainti with
- * no coordinates.
+ * Resolve a parsed distance endpoint ({lat,lng} passes through; a sijaintiId is
+ * resolved via runSijaintiGet → its lat/lng). Exits 4 on a sijainti with no
+ * coordinates.
  */
 async function resolveDistancePoint(
   client: ApiClient,
-  token: string
+  parsed: { lat: number; lng: number } | number
 ): Promise<{ lat: number; lng: number }> {
-  const parsed = parseDistanceToken(token);
   if (typeof parsed === "object") return parsed;
   const row = (await runSijaintiGet(client, parsed)) as { lat?: number; lng?: number };
   if (typeof row.lat !== "number" || typeof row.lng !== "number") {
@@ -968,13 +972,12 @@ export async function runSijaintiDistance(
   from: { lat: number; lng: number };
   to: { lat: number; lng: number };
 }> {
-  // Validate tokens synchronously before issuing any network calls so that a
-  // malformed token rejects immediately without touching the API.
-  parseDistanceToken(fromToken);
-  parseDistanceToken(toToken);
+  // Both tokens parse synchronously before any network call, so a malformed
+  // token rejects immediately without touching the API.
+  const [parsedFrom, parsedTo] = [fromToken, toToken].map(parseDistanceToken);
   const [from, to, ownerAsiakasId] = await Promise.all([
-    resolveDistancePoint(client, fromToken),
-    resolveDistancePoint(client, toToken),
+    resolveDistancePoint(client, parsedFrom),
+    resolveDistancePoint(client, parsedTo),
     resolveOwnerAsiakasId(client),
   ]);
   const raw = await client.get<{ matkaM?: number; matkaAika?: number }>(
