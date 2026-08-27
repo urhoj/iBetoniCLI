@@ -3,7 +3,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { resolveDualString } from "../../targets.js";
+import { resolveDualString, intFlag } from "../../targets.js";
 // Shared request shaping for the three destructive verbs:
 // - preview (no --confirm): dry-run → X-Dry-Run header + { read: true } so it is
 //   allowed under --read-only and skips the endpoint guard.
@@ -94,14 +94,14 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         .option("--pattern <glob>", "", "*")
         .action(jsonAction(getClient, (client, opts) => runCacheKeys(client, opts)));
     addCacheWriteOptions(c.command("invalidate <entityType>")
-        .option("--id <n>", "", (v) => Number(v))
-        .option("--asiakas <n>", "", (v) => Number(v))
+        .option("--id <n>", "", intFlag("--id", 1))
+        .option("--asiakas <n>", "", intFlag("--asiakas", 1))
         // Back-compat alias for the pre-rename spelling (fb#388). `--asiakas-id` was
         // the lone outlier among 39 tenant-scoped commands — 38 spell it `--asiakas`
         // — so guessing the majority form failed here and guessing this one failed
         // everywhere else. Hidden: the spec documents only `--asiakas`, so `--help`
         // and `reference dump` show one spelling while old scripts keep working.
-        .addOption(new Option("--asiakas-id <n>").argParser((v) => Number(v)).hideHelp())
+        .addOption(new Option("--asiakas-id <n>").argParser(intFlag("--asiakas-id", 1)).hideHelp())
         .option("--cascade")).action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade }, opts)));
     addCacheWriteOptions(c.command("clear")).action(jsonAction(getClient, (client, opts) => runCacheClear(client, opts)));
     // The glob is dual-shaped: positional (canonical) OR `--pattern <glob>` — see

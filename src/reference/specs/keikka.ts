@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, intParseErr } from "./shared.js";
 
 export const KEIKKA_SPECS: CommandSpec[] = [
 
@@ -55,7 +55,13 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a `hint` explaining the count:0 (permitted-but-empty vs how to widen).",
-    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`, or narrow with `--from` / `--to`"), ...permErrors("auth.page.grid.tilaus.read")],
+    errors: [
+      limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`, or narrow with `--from` / `--to`"),
+      intParseErr("--customer", "pass a positive asiakasId"),
+      intParseErr("--vehicle", "pass a positive vehicleId"),
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      ...permErrors("auth.page.grid.tilaus.read"),
+    ],
     notes: [
       "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
       "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
@@ -94,7 +100,13 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{ item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }",
-    errors: permErrors("auth.page.grid.tilaus.read"),
+    errors: [
+      intParseErr("--customer", "pass a positive asiakasId"),
+      intParseErr("--vehicle", "pass a positive vehicleId"),
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      intParseErr("--lookback", "pass a non-negative integer number of days (max 3650)", 0),
+      ...permErrors("auth.page.grid.tilaus.read"),
+    ],
     notes: [
       "Client-side windowed search over `keikka list`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most). `item: null` + the `searched` range echo = genuinely nothing within --lookback.",
       "Windows truncated at the 500-row server cap are halved toward their newest end, so the true latest row cannot be hidden by truncation.",
@@ -152,7 +164,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         "deploy the backend (npm run deploy + swap), then retry"
       ),
       { origin: "client", exit: 4, match: "--by-person and --count are mutually exclusive", meaning: "Both collapse modes passed together", remedy: "pass exactly one of --by-person or --count" },
-      { origin: "client", exit: 4, match: "missing or invalid target", meaning: "No keikkaId given (or not a positive integer)", remedy: "pass <keikkaId> positionally or via --keikka <id>" }
+      { origin: "client", exit: 4, match: "missing or invalid target", meaning: "No keikkaId given (or not a positive integer)", remedy: "pass <keikkaId> positionally or via --keikka <id>" },
+      intParseErr("--source", "pass a valid keikkaPersonSourceId")
     ),
     notes: [
       "Gate = requireKeikkaManageAccess (same as the FE route): sysadmin/developer, any company role on the keikka's OWNER, or a delegated authEdit grant — delegated read-only is NOT enough.",
@@ -262,7 +275,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>",
-    errors: COMMON_AUTH_ERRORS,
+    errors: [limitErr("pass a positive integer; this command caps at 100"), ...COMMON_AUTH_ERRORS],
     notes: [
       "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses) — no deploy gate.",
       "Scope: the active company (ownerAsiakasId from the session token).",

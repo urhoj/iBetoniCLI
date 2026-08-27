@@ -8,7 +8,7 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom, threadAction } from "./resolveThread.js";
-import { parseId, resolveSearchQuery, queryAliasOption } from "../../../targets.js";
+import { parseId, resolveSearchQuery, queryAliasOption, intFlag, cappedInt } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 
@@ -279,7 +279,7 @@ export function registerMessageChatCommands(
 
   c.command("threads")
     .option("--unread")
-    .option("--tarjous <id>", "", Number)
+    .option("--tarjous <id>", "", intFlag("--tarjous", 1))
     .action(
       jsonAction(getClient, (client, opts: { unread?: boolean; tarjous?: number }) =>
         runChatThreads(client, opts)
@@ -291,7 +291,7 @@ export function registerMessageChatCommands(
 
   addThreadTargetOption(c.command("list [threadId]"))
     .option("--since <iso>")
-    .option("--limit <n>", "", Number)
+    .option("--limit <n>", "", cappedInt(500))
     .option("--deleted")
     .action(
       threadAction(
@@ -304,7 +304,7 @@ export function registerMessageChatCommands(
   c.command("search [query]")
     .option("--search <s>")
     .addOption(queryAliasOption())
-    .option("--limit <n>", "", Number)
+    .option("--limit <n>", "", cappedInt(200))
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number }) =>
         runChatSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts)
@@ -367,12 +367,12 @@ export function registerMessageChatCommands(
     .action(threadAction(getClient, (client, id) => runChatMarkRead(client, id)));
 
   const deleteCmd = addThreadTargetOption(
-    c.command("delete <messageId>").option("--thread <id>", "", Number)
+    c.command("delete <messageId>").option("--thread <id>", "", intFlag("--thread", 1))
   );
   addWriteFlagsToCommand(deleteCmd).action(messageAction(runChatDelete));
 
   const editCmd = addThreadTargetOption(
-    c.command("edit <messageId>").option("--thread <id>", "", Number)
+    c.command("edit <messageId>").option("--thread <id>", "", intFlag("--thread", 1))
   )
     .requiredOption("--body <text>");
   // Not messageAction: the body guard must stay ahead of getClient(), so a bad
@@ -393,7 +393,7 @@ export function registerMessageChatCommands(
   );
 
   const restoreCmd = addThreadTargetOption(
-    c.command("restore <messageId>").option("--thread <id>", "", Number)
+    c.command("restore <messageId>").option("--thread <id>", "", intFlag("--thread", 1))
   );
   addWriteFlagsToCommand(restoreCmd).action(messageAction(runChatRestore));
 }

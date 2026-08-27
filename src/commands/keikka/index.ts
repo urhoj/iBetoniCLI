@@ -11,7 +11,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
@@ -546,9 +546,9 @@ export function registerKeikkaCommands(
     .option(
       "--date <date>"
     )
-    .option("--customer <id>", "", (v: string) => Number(v))
-    .option("--vehicle <id>", "", (v: string) => Number(v))
-    .option("--worksite <id>", "", (v: string) => Number(v))
+    .option("--customer <id>", "", intFlag("--customer", 1))
+    .option("--vehicle <id>", "", intFlag("--vehicle", 1))
+    .option("--worksite <id>", "", intFlag("--worksite", 1))
     .option("--status <s>")
     .option("--limit <n>", "", cappedInt(500))
     .option("--cursor <c>")
@@ -587,13 +587,13 @@ export function registerKeikkaCommands(
 
   k.command("latest")
     .option("--status <s>")
-    .option("--customer <id>", "", (v: string) => Number(v))
-    .option("--vehicle <id>", "", (v: string) => Number(v))
-    .option("--worksite <id>", "", (v: string) => Number(v))
+    .option("--customer <id>", "", intFlag("--customer", 1))
+    .option("--vehicle <id>", "", intFlag("--vehicle", 1))
+    .option("--worksite <id>", "", intFlag("--worksite", 1))
     .option(
       "--lookback <days>",
       "",
-      (v: string) => Number(v)
+      intFlag("--lookback", 0)
     )
     .action(
       jsonAction(getClient, (client, opts: KeikkaLatestFilter) => runKeikkaLatest(client, opts))
@@ -611,7 +611,7 @@ export function registerKeikkaCommands(
   k.command("search [query]")
     .option("--search <s>")
     .addOption(queryAliasOption())
-    .option("--limit <n>", "", (v: string) => Number(v))
+    .option("--limit <n>", "", cappedInt(100))
     .action(
       guarded(async (query: string | undefined, opts: { search?: string; query?: string; limit?: number }) => {
         const client = await getClient();
@@ -686,7 +686,7 @@ export function registerKeikkaCommands(
   keikkaPerson
     .command("list [keikkaId]")
     .option("--keikka <id>", "", Number)
-    .option("--source <id>", "", Number)
+    .option("--source <id>", "", intFlag("--source", 1))
     .option("--by-person")
     .option("--count")
     .action(

@@ -10,6 +10,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
+import { intFlag } from "../../targets.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -96,7 +97,7 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("slow")
-    .option("--limit <n>", "", (v: string) => Number(v))
+    .option("--limit <n>", "", intFlag("--limit", 1))
     .option("--env <name>")
     .action(
       jsonAction(getClient, (client, opts: { limit?: number; env?: string }) =>

@@ -232,6 +232,11 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       // Client-side — see the twin on `sijainti create` (fb#668 follow-up).
       GEOCODE_CLIENT_ERR,
       GEOCODE_NO_ADDRESS_ERR,
+      intParseErr("--id", "pass a positive sijaintiId, or include it in --body"),
+      intParseErr("--type", "pass a sijaintiTypeId — `ib sijainti types` lists them"),
+      numParseErr("--lat", "pass the latitude as a number"),
+      numParseErr("--lng", "pass the longitude as a number"),
+      numParseErr("--max-distance", "pass the delivery radius in km as a number"),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       puomiErr(" — would otherwise clear the stored bound"),
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },

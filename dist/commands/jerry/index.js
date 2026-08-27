@@ -689,7 +689,7 @@ export function registerJerryCommands(parent, getClient) {
     addWriteFlagsToCommand(offer
         .command("create <requestId>")
         .requiredOption("--price-cents <n>", "", Number)
-        .option("--vat-percent <n>", "", Number)
+        .option("--vat-percent <n>", "", numFlag("--vat-percent", 0, 100))
         .option("--price-terms <s>")
         .option("--valid-until <iso>")
         .option("--available-from <iso>")
@@ -733,7 +733,7 @@ export function registerJerryCommands(parent, getClient) {
     addWriteFlagsToCommand(offer
         .command("confirm <requestId> <offerId>")
         .requiredOption("--scheduled-at <iso>")
-        .option("--pumppu <vehicleId>", "", Number)).action(guarded(async (idStr, offerIdStr, opts) => {
+        .option("--pumppu <vehicleId>", "", intFlag("--pumppu", 1))).action(guarded(async (idStr, offerIdStr, opts) => {
         const body = { scheduledAt: opts.scheduledAt };
         if (opts.pumppu !== undefined)
             body.pumppuId = opts.pumppu;
@@ -749,7 +749,7 @@ export function registerJerryCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, opts) => runJerryCounts(client, !!opts.provider)));
     // stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     j.command("stats")
-        .option("--weeks <n>", "", Number)
+        .option("--weeks <n>", "", intFlag("--weeks", 1))
         .action(jsonAction(getClient, (client, opts) => runJerryStats(client, opts.weeks)));
     // check-address â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     j.command("check-address")
@@ -794,7 +794,7 @@ export function registerJerryCommands(parent, getClient) {
         .action(jsonAction(getClient, runJerryCoverage));
     // email-activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     j.command("email-activity")
-        .option("--days <n>", "", (v) => Math.min(90, Math.max(1, Number(v))))
+        .option("--days <n>", "", (v) => Math.min(90, intFlag("--days", 1)(v)))
         .option("--domain <d>")
         .action(jsonAction(getClient, (client, opts) => runJerryEmailActivity(client, opts)));
     // provider-settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -856,7 +856,7 @@ export function registerJerryCommands(parent, getClient) {
     onboarding
         .command("list")
         .option("--status <key>")
-        .option("--tier <n>", "", Number)
+        .option("--tier <n>", "", intFlag("--tier", 1))
         .option("--due")
         .option("--search <text>")
         .action(jsonAction(getClient, (client, opts) => runJerryOnboardingList(client, opts)));
@@ -885,7 +885,7 @@ export function registerJerryCommands(parent, getClient) {
     };
     addWriteFlagsToCommand(onboarding
         .command("add <asiakasId>")
-        .option("--tier <n>", "", Number)
+        .option("--tier <n>", "", intFlag("--tier", 1))
         .option("--malli <v>")
         .option("--kanava <text>")
         .option("--alue <text>")
@@ -894,7 +894,7 @@ export function registerJerryCommands(parent, getClient) {
     addWriteFlagsToCommand(onboarding
         .command("set <asiakasId>")
         .option("--status <key>")
-        .option("--tier <n>", "", Number)
+        .option("--tier <n>", "", intFlag("--tier", 1))
         .option("--malli <v>")
         .option("--kanava <text>")
         .option("--alue <text>")

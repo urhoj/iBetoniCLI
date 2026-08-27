@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote } from "./shared.js";
+import { clearHint, clearNote, intParseErr } from "./shared.js";
 
 export const GLOSSARY_SPECS: CommandSpec[] = [
   // ─── glossary ────────────────────────────────────────────────────────────────
@@ -39,7 +39,10 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     notes: [
       "--terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).",
     ],
-    errors: [{ origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
+    errors: [
+      intParseErr("--stalest", "pass a positive integer"),
+      { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+    ],
     examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only", "ib glossary list --needs-review"],
   },
   {
@@ -50,7 +53,10 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     args: [],
     flags: [{ name: "top", type: "number", description: "Return up to N" }],
     outputShape: "{ items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }",
-    errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
+    errors: [
+      intParseErr("--top", "pass a positive integer"),
+      { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
+    ],
     examples: ["ib glossary misses --top 20"],
   },
   {

@@ -1,6 +1,7 @@
 import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { intFlag } from "../../targets.js";
 /**
  * GET /api/cli/driver/absences?from&to&personId — staff absences (personPvm 'pois'
  * rows: vacation / sick / etc.) in a date range. Staff-wide, person-keyed — this
@@ -20,7 +21,7 @@ export function registerPersonAbsencesCommand(parent, getClient) {
         .command("absences")
         .requiredOption("--from <date>")
         .requiredOption("--to <date>")
-        .option("--person <pid>", "", (s) => Number(s))
+        .option("--person <pid>", "", intFlag("--person", 1))
         .action(jsonAction(getClient, (client, opts) => runPersonAbsences(client, opts)));
 }
 //# sourceMappingURL=absences.js.map

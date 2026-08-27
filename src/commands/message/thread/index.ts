@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../../api/writeFlags.js";
 import { addThreadTargetOption, threadAction } from "../chat/resolveThread.js";
+import { intFlag } from "../../../targets.js";
 
 // --dry-run on every thread write resolves CLIENT-SIDE: the messages routes
 // honour no X-Dry-Run (messageRoutes.js has no guard), so a dry-run that POSTed
@@ -83,7 +84,7 @@ export function registerMessageThreadCommands(
     .description("Add/remove a thread participant (must be a member of the owning company)");
 
   const addCmd = addThreadTargetOption(p.command("add [threadId]"))
-    .requiredOption("--person <id>", "", Number)
+    .requiredOption("--person <id>", "", intFlag("--person", 1))
     .option("--role <role>");
   addWriteFlagsToCommand(addCmd).action(
     threadAction(
@@ -94,7 +95,7 @@ export function registerMessageThreadCommands(
   );
 
   const remCmd = addThreadTargetOption(p.command("remove [threadId]"))
-    .requiredOption("--person <id>", "", Number);
+    .requiredOption("--person <id>", "", intFlag("--person", 1));
   addWriteFlagsToCommand(remCmd).action(
     threadAction(getClient, (client, id, opts: WriteFlags & { tarjous?: number; person: number }) =>
       runThreadParticipantRemove(client, id, Number(opts.person), opts)

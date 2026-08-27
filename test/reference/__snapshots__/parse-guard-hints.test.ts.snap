@@ -257,6 +257,18 @@ ib attachment upload --worksite <id>
   ! --worksite must be an integer >= 1
   > pass the entity id as a positive integer
 
+ib auth impersonate <personId>
+  ! invalid personId: "" — expected a positive integer
+  > pass a positive integer personId, or use --email
+
+ib auth impersonate <personId>
+  ! invalid personId: "-5" — expected a positive integer
+  > pass a positive integer personId, or use --email
+
+ib auth impersonate <personId>
+  ! invalid personId: "abc" — expected a positive integer
+  > pass a positive integer personId, or use --email
+
 ib auth switch --to <asiakasId>
   ! --to must be an integer >= 1
   > (no hint)
@@ -277,6 +289,18 @@ ib betoni laatu list --asiakas <id>
   ! --asiakas must be an integer >= 1
   > (no hint)
 
+ib cache invalidate --asiakas <n>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId
+
+ib cache invalidate --asiakas-id <n>
+  ! --asiakas-id must be an integer >= 1
+  > (no hint)
+
+ib cache invalidate --id <n>
+  ! --id must be an integer >= 1
+  > pass a positive entity id
+
 ib changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
   > (no hint)
@@ -292,6 +316,14 @@ ib changelog add --feedback <ids>
 ib changelog list --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
+
+ib changelog list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 500 — page past it with --offset
+
+ib changelog list --offset <n>
+  ! --offset must be an integer >= 0
+  > pass a non-negative integer row offset
 
 ib changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
@@ -321,6 +353,14 @@ ib company switch --to <asiakasId>
   ! --to must be an integer >= 1
   > (no hint)
 
+ib customer create-or-update --contact-person <id>
+  ! --contact-person must be an integer >= 0
+  > pass a positive personId, or 0 to clear the primary contact
+
+ib customer create-or-update --type <id>
+  ! --type must be an integer >= 1
+  > pass a valid asiakasTypeId
+
 ib customer dead-list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 and has no narrowing filter — raise --limit if you need more than the 200 default
@@ -341,9 +381,57 @@ ib customer merge --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib customer person add --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId
+
+ib customer person add --contact-type <id>
+  ! --contact-type must be an integer >= 1
+  > pass a valid contactPersonTypeId (1, 2, 3, or 5)
+
+ib customer person add --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib customer person remove --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId
+
+ib customer person remove --contact-type <id>
+  ! --contact-type must be an integer >= 1
+  > pass a valid contactPersonTypeId (1, 2, 3, or 5)
+
+ib customer person remove --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib customer prh --page <n>
+  ! --page must be an integer >= 1
+  > pass a positive integer page number
+
 ib customer search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
+
+ib customer update --contact-person <id>
+  ! --contact-person must be an integer >= 0
+  > pass a positive personId, or 0 to clear the primary contact
+
+ib customer update --type <id>
+  ! --type must be an integer >= 1
+  > pass a valid asiakasTypeId
+
+ib dev cache invalidate --asiakas <n>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId
+
+ib dev cache invalidate --asiakas-id <n>
+  ! --asiakas-id must be an integer >= 1
+  > (no hint)
+
+ib dev cache invalidate --id <n>
+  ! --id must be an integer >= 1
+  > pass a positive entity id
 
 ib dev changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
@@ -360,6 +448,14 @@ ib dev changelog add --feedback <ids>
 ib dev changelog list --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
+
+ib dev changelog list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 500 — page past it with --offset
+
+ib dev changelog list --offset <n>
+  ! --offset must be an integer >= 0
+  > pass a non-negative integer row offset
 
 ib dev changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (empty element in "")
@@ -384,6 +480,50 @@ ib dev changelog update --unlink <ids>
 ib dev changelog update --unlink <ids>
   ! --unlink must be an integer >= 1 (got "abc")
   > (no hint)
+
+ib dev email-delivery --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 200
+
+ib dev email-health --days <n>
+  ! --days must be an integer >= 1
+  > pass a positive integer window in days (1..90)
+
+ib dev feedback claim --ttl-hours <n>
+  ! --ttl-hours must be an integer >= 1
+  > pass an integer 1-24
+
+ib dev feedback list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 200 — page past it with --offset
+
+ib dev feedback list --max-complexity <n>
+  ! --max-complexity must be an integer >= 1
+  > pass an integer 1-5
+
+ib dev feedback list --offset <n>
+  ! --offset must be an integer >= 0
+  > pass a non-negative integer row offset
+
+ib dev feedback update --complexity <n>
+  ! --complexity must be an integer >= 1
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+
+ib dev impersonation sessions --actor <id>
+  ! --actor must be an integer >= 1
+  > pass a positive personId
+
+ib dev impersonation sessions --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 1000
+
+ib dev impersonation sessions --target <id>
+  ! --target must be an integer >= 1
+  > pass a positive personId
+
+ib dev perf slow --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
 
 ib dev schema indexes --limit <n>
   ! --limit must be an integer >= 1
@@ -413,6 +553,26 @@ ib dev schema views --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
+ib feedback claim --ttl-hours <n>
+  ! --ttl-hours must be an integer >= 1
+  > pass an integer 1-24
+
+ib feedback list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 200 — page past it with --offset
+
+ib feedback list --max-complexity <n>
+  ! --max-complexity must be an integer >= 1
+  > pass an integer 1-5
+
+ib feedback list --offset <n>
+  ! --offset must be an integer >= 0
+  > pass a non-negative integer row offset
+
+ib feedback update --complexity <n>
+  ! --complexity must be an integer >= 1
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+
 ib fennoa purchases --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -421,10 +581,26 @@ ib fennoa purchases --months <n>
   ! --months must be an integer >= 1
   > pass a positive number of months (default 6, max 12)
 
+ib glossary list --stalest <n>
+  ! --stalest must be an integer >= 1
+  > pass a positive integer
+
+ib glossary misses --top <n>
+  ! --top must be an integer >= 1
+  > pass a positive integer
+
+ib jerry admin onboarding add --tier <n>
+  ! --tier must be an integer >= 1
+  > pass 1 (priority) or 2 (secondary)
+
 ib jerry admin onboarding events --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this only keeps the newest N client-side and sets \`truncated\` — OMIT \`--limit\` to keep every event
 
+ib jerry admin onboarding list --tier <n>
+  ! --tier must be an integer >= 1
+  > pass 1 (priority) or 2 (secondary)
+
 ib jerry admin onboarding log --time <iso>
   ! --time: not a valid ISO 8601 timestamp: "-5". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
   > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
@@ -440,6 +616,10 @@ ib jerry admin onboarding note --time <iso>
 ib jerry admin onboarding note --time <iso>
   ! --time: not a valid ISO 8601 timestamp: "abc". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
   > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
+
+ib jerry admin onboarding set --tier <n>
+  ! --tier must be an integer >= 1
+  > pass 1 (priority) or 2 (secondary)
 
 ib jerry admin request list --customer <id>
   ! --customer must be an integer >= 1
@@ -469,6 +649,18 @@ ib jerry check-address --lng <n>
   ! --lng must be a number
   > pass the longitude as a number
 
+ib jerry email-activity --days <n>
+  ! --days must be an integer >= 1
+  > pass a positive integer window in days (1..90; values above 90 are silently capped)
+
+ib jerry offer confirm --pumppu <vehicleId>
+  ! --pumppu must be an integer >= 1
+  > pass your vehicleId as a positive integer
+
+ib jerry offer create --vat-percent <n>
+  ! --vat-percent must be a number in 0..100
+  > pass a VAT percent between 0 and 100 (e.g. 25.5)
+
 ib jerry provider-settings get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -497,9 +689,41 @@ ib jerry request list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; the server caps \`--mine\` at 200, so narrow with \`--status\` rather than raising the cap
 
+ib jerry stats --weeks <n>
+  ! --weeks must be an integer >= 1
+  > pass a positive integer number of weeks
+
+ib keikka latest --customer <id>
+  ! --customer must be an integer >= 1
+  > pass a positive asiakasId
+
+ib keikka latest --lookback <days>
+  ! --lookback must be an integer >= 0
+  > pass a non-negative integer number of days (max 3650)
+
+ib keikka latest --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass a positive vehicleId
+
+ib keikka latest --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib keikka list --customer <id>
+  ! --customer must be an integer >= 1
+  > pass a positive asiakasId
+
 ib keikka list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
+
+ib keikka list --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass a positive vehicleId
+
+ib keikka list --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
 
 ib keikka log --limit <n>
   ! --limit must be an integer >= 1
@@ -509,9 +733,53 @@ ib keikka log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib keikka person list --source <id>
+  ! --source must be an integer >= 1
+  > pass a valid keikkaPersonSourceId
+
+ib keikka search --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 100
+
 ib legal acceptances --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap
+
+ib legal diff --owner <id>
+  ! --owner must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib legal save --owner <id>
+  ! --owner must be an integer >= 1
+  > pass a positive ownerAsiakasId (omit for a global document)
+
+ib legal status --owner <id>
+  ! --owner must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib legal status --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib legal type create --setting-type-id <n>
+  ! --setting-type-id must be an integer >= 1
+  > pass a valid personSettingTypeId
+
+ib legal type create --sort-order <n>
+  ! --sort-order must be an integer >= 0
+  > pass a non-negative integer list position
+
+ib legal type update --setting-type-id <n>
+  ! --setting-type-id must be an integer >= 1
+  > pass a valid personSettingTypeId
+
+ib legal type update --sort-order <n>
+  ! --sort-order must be an integer >= 0
+  > pass a non-negative integer list position
+
+ib legal versions --owner <id>
+  ! --owner must be an integer >= 1
+  > pass a positive ownerAsiakasId
 
 ib log by-entity-date --limit <n>
   ! --limit must be an integer >= 1
@@ -557,6 +825,58 @@ ib log user --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib message chat delete --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat delete --thread <id>
+  ! --thread must be an integer >= 1
+  > pass a positive threadId
+
+ib message chat edit --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat edit --thread <id>
+  ! --thread must be an integer >= 1
+  > pass a positive threadId
+
+ib message chat list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 500
+
+ib message chat list --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat mark-read --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat restore --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat restore --thread <id>
+  ! --thread must be an integer >= 1
+  > pass a positive threadId
+
+ib message chat search --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 200
+
+ib message chat send --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat thread --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message chat threads --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
 ib message daily get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -581,6 +901,42 @@ ib message daily share --to <asiakasId>
   ! --to must be an integer >= 1
   > pass the tenant's asiakasId to share with
 
+ib message support inbox --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
+ib message support mine --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
+ib message thread archive --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message thread participant add --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib message thread participant add --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message thread participant remove --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib message thread participant remove --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message thread rename --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
+ib message thread reopen --tarjous <id>
+  ! --tarjous must be an integer >= 1
+  > pass a positive pumppuRequestId
+
 ib notification fcm send --data <json>
   ! --data must be a JSON object
   > received: -5
@@ -592,6 +948,54 @@ ib notification fcm send --data <json>
 ib notification fcm send --data <json>
   ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
   > received: abc
+
+ib ohje list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
+ib opendata building --lat <n>
+  ! --lat must be a number
+  > pass the latitude as a number
+
+ib opendata building --lng <n>
+  ! --lng must be a number
+  > pass the longitude as a number
+
+ib opendata building --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass a positive sijaintiId
+
+ib opendata building --tyomaa <tyomaaId>
+  ! --tyomaa must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib opendata building --worksite <tyomaaId>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib opendata parcel --lat <n>
+  ! --lat must be a number
+  > pass the latitude as a number
+
+ib opendata parcel --lng <n>
+  ! --lng must be a number
+  > pass the longitude as a number
+
+ib opendata parcel --sijainti <id>
+  ! --sijainti must be an integer >= 1
+  > pass a positive sijaintiId
+
+ib opendata parcel --tyomaa <tyomaaId>
+  ! --tyomaa must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib opendata parcel --worksite <tyomaaId>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib opendata prh --page <n>
+  ! --page must be an integer >= 1
+  > pass a positive integer page number
 
 ib opendata weather day --lat <n>
   ! --lat must be a number
@@ -625,9 +1029,33 @@ ib opendata weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib perf slow --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
+ib person absences --person <pid>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib person activity --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; this command caps at 1000
+
 ib person create --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person day clear --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib person day get --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib person day set --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
 
 ib person duplicates --owner <id>
   ! --owner must be an integer >= 1
@@ -769,6 +1197,10 @@ ib schema views --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; max is 1000, and the 200 default returns a PARTIAL catalogue — pass \`--limit 1000\` whenever you intend to enumerate
 
+ib search --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
 ib sijainti closest --asiakas <id>
   ! --asiakas must be an integer >= 1
   > name the worksite once (--worksite OR --tyomaa) and pass integer ids
@@ -812,6 +1244,26 @@ ib sijainti list --limit <n>
 ib sijainti plants --limit <n>
   ! --limit must be an integer >= 1
   > pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via \`ib search <name>\`)
+
+ib sijainti update --id <sijaintiId>
+  ! --id must be an integer >= 1
+  > pass a positive sijaintiId, or include it in --body
+
+ib sijainti update --lat <n>
+  ! --lat must be a number
+  > pass the latitude as a number
+
+ib sijainti update --lng <n>
+  ! --lng must be a number
+  > pass the longitude as a number
+
+ib sijainti update --max-distance <n>
+  ! --max-distance must be a number
+  > pass the delivery radius in km as a number
+
+ib sijainti update --type <id>
+  ! --type must be an integer >= 1
+  > pass a sijaintiTypeId — \`ib sijainti types\` lists them
 
 ib task add --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -884,6 +1336,14 @@ ib vehicle create --type <n>
 ib vehicle dates expiring --days <n>
   ! --days must be an integer >= 1
   > pass a positive number of days (default 30)
+
+ib vehicle driver assign --person <pid>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib vehicle driver default set --person <pid>
+  ! --person must be an integer >= 1
+  > pass a positive personId
 
 ib vehicle get --asiakas <id>
   ! --asiakas must be an integer >= 1
@@ -977,9 +1437,17 @@ ib weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib worksite dates expiring --days <n>
+  ! --days must be an integer >= 0
+  > pass a non-negative integer look-ahead window
+
 ib worksite duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib worksite list --customer <n>
+  ! --customer must be an integer >= 1
+  > pass a positive asiakasId
 
 ib worksite list --limit <n>
   ! --limit must be an integer >= 1
@@ -997,7 +1465,35 @@ ib worksite merge --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib worksite person add --contact-type <id>
+  ! --contact-type must be an integer >= 1
+  > pass a valid contactPersonTypeId (1, 2, 3, or 5)
+
+ib worksite person add --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib worksite person add --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
+ib worksite person remove --contact-type <id>
+  ! --contact-type must be an integer >= 1
+  > pass a valid contactPersonTypeId (1, 2, 3, or 5)
+
+ib worksite person remove --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib worksite person remove --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
 ib worksite search --limit <n>
   ! --limit must be an integer >= 1
-  > pass a positive integer; the backend caps at 100, so narrow the search term rather than raising the cap"
+  > pass a positive integer; the backend caps at 100, so narrow the search term rather than raising the cap
+
+ib worksite update --contact-person <id>
+  ! --contact-person must be an integer >= 0
+  > pass a positive personId, or 0 to clear the contact"
 `;

@@ -1,5 +1,5 @@
 import { failWith, writeJson } from "../../../output/json.js";
-import { assertEnum, parseId } from "../../../targets.js";
+import { assertEnum, parseId, intFlag } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 const STATUSES = ["open", "resolved", "all"];
@@ -85,12 +85,12 @@ export function registerMessageSupportCommands(parent, getClient) {
     support
         .command("inbox")
         .option("--status <status>", "", "open")
-        .option("--limit <n>", "", Number)
+        .option("--limit <n>", "", intFlag("--limit", 1))
         .action(jsonAction(getClient, (client, opts) => runSupportInbox(client, opts)));
     support
         .command("mine")
         .option("--status <status>", "", "open")
-        .option("--limit <n>", "", Number)
+        .option("--limit <n>", "", intFlag("--limit", 1))
         .action(jsonAction(getClient, (client, opts) => runSupportMine(client, opts)));
     support
         .command("contact")

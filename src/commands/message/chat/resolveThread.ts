@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { CliError } from "../../../api/errors.js";
 import { writeJson } from "../../../output/json.js";
-import { parseOptionalId } from "../../../targets.js";
+import { parseOptionalId, intFlag } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
 
 /** How a command targets a thread: a raw id, or a pumppuRequest to resolve. */
@@ -23,7 +23,7 @@ export function addThreadTargetOption(cmd: Command): Command {
   return cmd.option(
     "--tarjous <id>",
     "",
-    Number
+    intFlag("--tarjous", 1)
   );
 }
 

@@ -630,6 +630,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → impersonation persists a rotated JWT; drop read-only
   exit 4 (client-side)  A session is already active — starting a second would overwrite the stashed admin profile, so --end could no longer restore you → end the current one first with \`ib auth impersonate --end\` (or \`--extend\` to keep it), then start the new target
   exit 4 (client-side)  No active session (--end/--extend), or neither personId nor --email given → start with \`ib auth impersonate <personId>\`
+  exit 4 (client-side)  The personId positional is not a positive integer, rejected locally before any request → pass a positive integer personId, or use --email
 
 NOTES
   - Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).
@@ -1252,6 +1253,8 @@ OUTPUT (JSON, stdout)
   { ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the primary contact
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a valid asiakasTypeId
   exit 4 (HTTP 400)  No ytunnus key, or >1 customers share the ytunnus (ambiguous) → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -1671,6 +1674,9 @@ OUTPUT (JSON, stdout)
   { added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 4 (HTTP 400)  Company limit (26) reached → remove an existing link first
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -1751,6 +1757,9 @@ OUTPUT (JSON, stdout)
   { removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 5 (HTTP 404)  Link not found         → verify asiakasId+personId combination
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -1880,6 +1889,8 @@ OUTPUT (JSON, stdout)
   flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the primary contact
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a valid asiakasTypeId
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -2091,6 +2102,8 @@ OUTPUT (JSON, stdout)
   preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --id is not an integer >= 1, rejected locally before any request → pass a positive entity id
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib dev cache entities\` to list valid types
   exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
   exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
@@ -2408,6 +2421,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<entry> (\`truncated: true\` when the row cap bit — the page is NOT the whole result) | (with --unreleased) { items, entries, maxBumpLevel, count }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with --offset
+  exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass a non-negative integer row offset
   exit 3 (HTTP 403)  Developer only         → dev token
 
 NOTES
@@ -2715,6 +2730,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
   exit 4 (client-side)  No target, or both an address and --message → pass exactly one: an address positional OR --message <sgMessageId>
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200
   exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 5 (HTTP 404)  Route not deployed yet → the backend half is deploy-gated — deploy puminet5api first
@@ -2756,6 +2772,7 @@ OUTPUT (JSON, stdout)
   { days, checkedAt, coverage:{ oldestEvent, newestEvent, daysWithData }, totals:{ processed, delivered, deferredEvents, deferredMessages, failed, spam }, daily:[{ date, processed, delivered, deferredEvents, deferredMessages, failed, spam }], recipients:[{ email, processed, deferredEvents, failed, sharePct }] (top 10 by volume), verdict:{ healthy, flags:[{ code, severity, detail }] } } — read \`verdict.healthy\` for the one-bit answer. Flag codes: deferral-rate | single-recipient-share | volume-spike | failure-rate | spam-rate.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 1, rejected locally before any request → pass a positive integer window in days (1..90)
   exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
   exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -2802,6 +2819,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation             → --ttl-hours must be 1-24
+  exit 4 (client-side)  --ttl-hours is not an integer >= 1, rejected locally before any request → pass an integer 1-24
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
   exit 4 (HTTP 409)  Already closed         → the row is done — read the linked entry with \`ib dev changelog get <id>\`; reopen it with \`ib dev feedback resolve <id> --status open\` first if it should not be
@@ -3038,6 +3056,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
+  exit 4 (client-side)  --max-complexity is not an integer >= 1, rejected locally before any request → pass an integer 1-5
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200 — page past it with --offset
+  exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass a non-negative integer row offset
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3281,6 +3302,9 @@ OUTPUT (JSON, stdout)
   { items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --actor is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --target is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 1000
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3420,6 +3444,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4167,6 +4192,7 @@ OUTPUT (JSON, stdout)
   { items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --stalest is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
 
 NOTES
@@ -4236,6 +4262,7 @@ OUTPUT (JSON, stdout)
   { items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --top is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 3 (HTTP 403)  Not a developer        → Developer access required
 
 EXAMPLES
@@ -4539,6 +4566,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Prospect already exists / company not found / unknown --source or --company-type → check asiakasId; --source is manual|import|scheduled, --company-type is pumppu|betoni|all|owner
+  exit 4 (client-side)  --tier is not an integer >= 1, rejected locally before any request → pass 1 (priority) or 2 (secondary)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4614,6 +4642,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, parkedUntil, parked, muistutusDue }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tier is not an integer >= 1, rejected locally before any request → pass 1 (priority) or 2 (secondary)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4720,6 +4749,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Unknown --status or --company-type, or malformed --parked-until → use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or empty (\`--parked-until=\` on PowerShell)
+  exit 4 (client-side)  --tier is not an integer >= 1, rejected locally before any request → pass 1 (priority) or 2 (secondary)
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5310,6 +5340,7 @@ OUTPUT (JSON, stdout)
   { domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 1, rejected locally before any request → pass a positive integer window in days (1..90; values above 90 are silently capped)
   exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
   exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -5392,6 +5423,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  scheduledAt missing/invalid/in the past, or pumppuId not yours → pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId
+  exit 4 (client-side)  --pumppu is not an integer >= 1, rejected locally before any request → pass your vehicleId as a positive integer
   exit 3 (HTTP 403)  Not a provider / offer not yours → switch to the owning provider company
   exit 5 (HTTP 404)  Request / offer not found → verify requestId + offerId
   exit 4 (HTTP 409)  Offer not in 'accepted' state → the customer must accept the offer before you confirm
@@ -5450,6 +5482,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400) → pass --price-cents as an integer 1..99999900 (cents, not euros)
+  exit 4 (client-side)  --vat-percent is not a number, rejected locally before any request → pass a VAT percent between 0 and 100 (e.g. 25.5)
   exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
   exit 5 (HTTP 404)  Request not found      → verify requestId
   exit 4 (HTTP 409)  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
@@ -5964,6 +5997,7 @@ OUTPUT (JSON, stdout)
   { weeks: [{ weekStart, visitors, wizardVisitors, authedVisitors, searches, coveredSearches, noSupplySearches, wizardSessions, reachedReview, requestsSent, noSupplyRequests, offersSent, offersAccepted }] }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --weeks is not an integer >= 1, rejected locally before any request → pass a positive integer number of weeks
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6119,6 +6153,10 @@ OUTPUT (JSON, stdout)
   { item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --lookback is not an integer >= 0, rejected locally before any request → pass a non-negative integer number of days (max 3650)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6167,6 +6205,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
+  exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6256,6 +6297,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  The route itself never 404s — a 404 here means GET /api/cli/keikka/persons is not deployed yet (deploy-gated) → deploy the backend (npm run deploy + swap), then retry
   exit 4 (client-side)  Both collapse modes passed together → pass exactly one of --by-person or --count
   exit 4 (client-side)  No keikkaId given (or not a positive integer) → pass <keikkaId> positionally or via --keikka <id>
+  exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a valid keikkaPersonSourceId
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
@@ -6299,6 +6341,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 100
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -6625,6 +6668,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither two documentIds nor --type supplied (or both), or --owner without --type → pass <a> <b> OR --type <name>
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 5 (HTTP 404)  documentId / type's draft or active not found → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6754,6 +6798,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --doc-version exceeds 20 characters (DB column legalDocuments.version is nvarchar(20)) → shorten the version string to 20 characters or fewer
   exit 4 (HTTP 400)  A field exceeds its DB column length (SQL Server truncation error, names the column) → shorten the field the message names — title is nvarchar(200), --doc-version nvarchar(20); --notes and content are unbounded
   exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId (omit for a global document)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6834,6 +6879,8 @@ OUTPUT (JSON, stdout)
   {personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 3 (HTTP 403)  --person on someone else without developer/sysadmin → drop --person or use a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6877,6 +6924,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped → check ib legal types; pass --reason unless --dry-run
+  exit 4 (client-side)  --sort-order is not an integer >= 0, rejected locally before any request → pass a non-negative integer list position
+  exit 4 (client-side)  --setting-type-id is not an integer >= 1, rejected locally before any request → pass a valid personSettingTypeId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6926,6 +6975,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
+  exit 4 (client-side)  --sort-order is not an integer >= 0, rejected locally before any request → pass a non-negative integer list position
+  exit 4 (client-side)  --setting-type-id is not an integer >= 1, rejected locally before any request → pass a valid personSettingTypeId
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -6999,6 +7050,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -7488,6 +7540,8 @@ OUTPUT (JSON, stdout)
   { messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --thread is not an integer >= 1, rejected locally before any request → pass a positive threadId
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not the author (and not a developer) → you can only delete your own messages
   exit 4 (HTTP 409)  Already answered       → a message someone replied to after cannot be retracted — delete the newest first
   exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
@@ -7539,6 +7593,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Empty or over-length --body → body is required, max 4000 chars
+  exit 4 (client-side)  --thread is not an integer >= 1, rejected locally before any request → pass a positive threadId
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not the author         → you can only edit your own messages
   exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
   exit 4 (HTTP 409)  Answered or deleted    → you cannot edit a message that was replied to, or a deleted one
@@ -7584,6 +7640,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, isDeleted, personFirstName, personLastName, senderAsiakasNimi }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500
   exit 3 (HTTP 403)  Not a participant of this thread → you can only read threads you are part of
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7625,6 +7683,7 @@ OUTPUT (JSON, stdout)
   { lastReadAt }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not a participant of this thread → you can only mark threads you are part of
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7669,6 +7728,8 @@ OUTPUT (JSON, stdout)
   { messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --thread is not an integer >= 1, rejected locally before any request → pass a positive threadId
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not the author (and not a developer) → you can only restore your own messages
   exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -7711,6 +7772,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, threadId, contextType, contextId, senderPersonId, body, createdAt, personFirstName, personLastName }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200
   exit 4 (HTTP 400)  Query too short        → q must be at least 2 characters
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7759,6 +7821,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Empty or over-length --body → body is required, max 4000 chars
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not a participant of this thread → you can only post to threads you are part of
   exit 4 (HTTP 409)  Thread archived        → archived threads are read-only
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -7801,6 +7864,7 @@ OUTPUT (JSON, stdout)
   { thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not a participant of this thread → you can only read threads you are part of
   exit 5 (HTTP 404)  Thread not found       → verify the threadId / --tarjous
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -7838,6 +7902,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, lastReadAt, unreadCount, lastMessageBody }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -8347,6 +8412,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → --status must be open|resolved|all
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8383,6 +8449,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → --status must be open|resolved|all
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 5 (HTTP 404)  Route not deployed     → the /support/mine backend may not be deployed yet
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8464,6 +8531,7 @@ OUTPUT (JSON, stdout)
   { threadId, archived:true } (+ alreadyArchived:true if already archived)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not a manager of this thread → requires owning-company admin role or sysadmin/developer
   exit 5 (HTTP 404)  Thread not found       → check the threadId via \`ib message chat threads\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -8514,6 +8582,8 @@ OUTPUT (JSON, stdout)
   { threadId, personId, role, added:true }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 3 (HTTP 403)  Not a manager of this thread → requires owning-company admin role or sysadmin/developer
   exit 3 (HTTP 403)  Person not in owning company → the person must be a member of thread.ownerAsiakasId (asiakasPerson membership — privacy gate; cross-company adds are blocked)
   exit 5 (HTTP 404)  Thread not found       → check the threadId via \`ib message chat threads\`
@@ -8565,6 +8635,8 @@ OUTPUT (JSON, stdout)
   { threadId, personId, removed:true|false } (removed:false when the participant was already gone)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 3 (HTTP 403)  Not a manager of this thread → requires owning-company admin role or sysadmin/developer
   exit 5 (HTTP 404)  Thread not found       → check the threadId via \`ib message chat threads\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -8613,6 +8685,7 @@ OUTPUT (JSON, stdout)
   { threadId, title } (title is null when cleared)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 4 (HTTP 400)  Title too long         → max 200 characters
   exit 3 (HTTP 403)  Not a manager of this thread → requires owning-company admin role or sysadmin/developer
   exit 5 (HTTP 404)  Thread not found       → check the threadId via \`ib message chat threads\`
@@ -8661,6 +8734,7 @@ OUTPUT (JSON, stdout)
   { threadId, archived:false } (+ alreadyOpen:true if already open)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --tarjous is not an integer >= 1, rejected locally before any request → pass a positive pumppuRequestId
   exit 3 (HTTP 403)  Not a manager of this thread → requires owning-company admin role or sysadmin/developer
   exit 5 (HTTP 404)  Thread not found       → check the threadId via \`ib message chat threads\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -8884,6 +8958,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, aiConfidence, needsHumanReview, … }> (rows projected to --fields when set)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -8974,6 +9049,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No source, multiple sources, or invalid city/coords → pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti
+  exit 4 (client-side)  --sijainti is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --tyomaa is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass the latitude as a number
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass the longitude as a number
   exit 5 (HTTP 404)  Sijainti/worksite not found (or no coordinates), or address not geocodable → verify the id/address; a worksite must be geocoded and in your tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9024,6 +9104,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords → pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address
+  exit 4 (client-side)  --sijainti is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --tyomaa is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass the latitude as a number
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass the longitude as a number
   exit 5 (HTTP 404)  Sijainti/worksite not found (or no coordinates), or address not geocodable → verify the id/address; a worksite must be geocoded and in your tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9070,6 +9155,7 @@ OUTPUT (JSON, stdout)
   by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --page is not an integer >= 1, rejected locally before any request → pass a positive integer page number
   exit 5 (HTTP 404)  Business ID not found  → verify the Y-tunnus
   exit 4 (HTTP 400)  Invalid Y-tunnus format → use XXXXXXXX-X
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -9404,6 +9490,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, date, status, statusName }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9443,6 +9530,7 @@ OUTPUT (JSON, stdout)
   { personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 1000
   exit 4 (HTTP 400)  personId is not a positive integer → pass a numeric personId
   exit 5 (HTTP 404)  no person with that id → check the id with \`ib person get <id>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -9587,6 +9675,7 @@ OUTPUT (JSON, stdout)
   delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing --reason       → supply --reason
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -9628,6 +9717,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9672,6 +9762,7 @@ OUTPUT (JSON, stdout)
   personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing --reason or unknown/ambiguous --status → supply --reason; check \`ib person day statuses\`
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11079,6 +11170,7 @@ OUTPUT (JSON, stdout)
   { items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -11698,6 +11790,11 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (client-side)  --geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status) → supply a fuller --address, or pass --lat/--lng directly and drop --geocode
   exit 4 (client-side)  --geocode passed with no address to resolve → pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng
+  exit 4 (client-side)  --id is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId, or include it in --body
+  exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a sijaintiTypeId — \`ib sijainti types\` lists them
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass the latitude as a number
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass the longitude as a number
+  exit 4 (client-side)  --max-distance is not a number, rejected locally before any request → pass the delivery radius in km as a number
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 4 (client-side)  Both --public and --private given → pass at most one — omit both to leave visibility untouched
@@ -12207,6 +12304,7 @@ OUTPUT (JSON, stdout)
   { success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari) → supply --reason, valid ids, and a driver eligible for this company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
@@ -12478,6 +12576,7 @@ OUTPUT (JSON, stdout)
   { success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing --reason / bad ids → supply --reason and a valid vehicleId/personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
@@ -13193,6 +13292,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 0, rejected locally before any request → pass a non-negative integer look-ahead window
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -13404,6 +13504,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`
+  exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -13557,6 +13658,9 @@ OUTPUT (JSON, stdout)
   { added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -13626,6 +13730,9 @@ OUTPUT (JSON, stdout)
   { removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 5 (HTTP 404)  Link not found         → verify tyomaaId+personId combination
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
@@ -13789,6 +13896,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
+  exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the contact
   exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

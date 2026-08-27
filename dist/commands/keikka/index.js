@@ -5,7 +5,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 /**
@@ -344,9 +344,9 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--from <date>", "", "today")
         .option("--to <date>", "", "today")
         .option("--date <date>")
-        .option("--customer <id>", "", (v) => Number(v))
-        .option("--vehicle <id>", "", (v) => Number(v))
-        .option("--worksite <id>", "", (v) => Number(v))
+        .option("--customer <id>", "", intFlag("--customer", 1))
+        .option("--vehicle <id>", "", intFlag("--vehicle", 1))
+        .option("--worksite <id>", "", intFlag("--worksite", 1))
         .option("--status <s>")
         .option("--limit <n>", "", cappedInt(500))
         .option("--cursor <c>")
@@ -377,10 +377,10 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     k.command("latest")
         .option("--status <s>")
-        .option("--customer <id>", "", (v) => Number(v))
-        .option("--vehicle <id>", "", (v) => Number(v))
-        .option("--worksite <id>", "", (v) => Number(v))
-        .option("--lookback <days>", "", (v) => Number(v))
+        .option("--customer <id>", "", intFlag("--customer", 1))
+        .option("--vehicle <id>", "", intFlag("--vehicle", 1))
+        .option("--worksite <id>", "", intFlag("--worksite", 1))
+        .option("--lookback <days>", "", intFlag("--lookback", 0))
         .action(jsonAction(getClient, (client, opts) => runKeikkaLatest(client, opts)));
     k.command("get <keikkaId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
@@ -389,7 +389,7 @@ export function registerKeikkaCommands(parent, getClient) {
     k.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())
-        .option("--limit <n>", "", (v) => Number(v))
+        .option("--limit <n>", "", cappedInt(100))
         .action(guarded(async (query, opts) => {
         const client = await getClient();
         const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
@@ -439,7 +439,7 @@ export function registerKeikkaCommands(parent, getClient) {
     keikkaPerson
         .command("list [keikkaId]")
         .option("--keikka <id>", "", Number)
-        .option("--source <id>", "", Number)
+        .option("--source <id>", "", intFlag("--source", 1))
         .option("--by-person")
         .option("--count")
         .action(jsonAction(getClient, (client, keikkaIdStr, opts) => runKeikkaPersonList(client, resolveTarget(keikkaIdStr, opts.keikka, "keikkaId", "keikka"), { source: opts.source, byPerson: opts.byPerson, count: opts.count })));

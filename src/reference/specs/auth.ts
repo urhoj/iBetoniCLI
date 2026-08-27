@@ -201,6 +201,7 @@ export const AUTH_SPECS: CommandSpec[] = [
       // the admin session would be unrecoverable.
       { origin: "client", exit: 4, match: "already impersonating", meaning: "A session is already active — starting a second would overwrite the stashed admin profile, so --end could no longer restore you", remedy: "end the current one first with `ib auth impersonate --end` (or `--extend` to keep it), then start the new target" },
       { origin: "client", exit: 4, match: ["no active impersonation session", "provide a target personid"], meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
+      { origin: "client", exit: 4, match: "invalid personId", meaning: "The personId positional is not a positive integer, rejected locally before any request", remedy: "pass a positive integer personId, or use --email" },
     ],
     notes: [
       "Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).",

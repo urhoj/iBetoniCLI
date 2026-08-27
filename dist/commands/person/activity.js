@@ -1,5 +1,5 @@
 import { writeJson } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { parseId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 /**
  * GET /api/cli/person/:personId/activity — developer-gated login / security-event /
@@ -13,7 +13,7 @@ export async function runPersonActivity(client, personId, opts) {
 export function registerPersonActivityCommand(parent, getClient) {
     parent
         .command("activity <personId>")
-        .option("--limit <n>", "", (s) => Number(s))
+        .option("--limit <n>", "", cappedInt(1000))
         .action(guarded(async (personIdStr, opts) => {
         const personId = parseId(personIdStr, "personId");
         writeJson(await runPersonActivity(await getClient(), personId, opts));

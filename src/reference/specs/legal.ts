@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr } from "./shared.js";
 
 export const LEGAL_SPECS: CommandSpec[] = [
 
@@ -82,6 +82,8 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape:
       "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}",
     errors: [
+      intParseErr("--person", "pass a positive personId"),
+      intParseErr("--owner", "pass a positive ownerAsiakasId"),
       apiErr(403, "--person on someone else without developer/sysadmin", "drop --person or use a developer token"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -113,7 +115,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
-    errors: COMMON_AUTH_ERRORS,
+    errors: [intParseErr("--owner", "pass a positive ownerAsiakasId"), ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
     examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
@@ -171,7 +173,8 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape:
       "{a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}",
     errors: [
-      { origin: "client", exit: 4, meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
+      { origin: "client", exit: 4, match: ["pass either", "only applies with --type", "provide two positive documentids"], meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
+      intParseErr("--owner", "pass a positive ownerAsiakasId"),
       apiErr(404, "documentId / type's draft or active not found", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -248,6 +251,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
         ["liian pitkä", "would be truncated", "string or binary data"]
       ),
       apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
+      intParseErr("--owner", "pass a positive ownerAsiakasId (omit for a global document)"),
       ...LEGAL_DEV_ERRORS,
     ],
     notes: [
@@ -372,7 +376,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
     errors: [
-      { origin: "client", exit: 4, meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
+      { origin: "client", exit: 4, match: "missing required flag: --reason", meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
+      intParseErr("--sort-order", "pass a non-negative integer list position", 0),
+      intParseErr("--setting-type-id", "pass a valid personSettingTypeId"),
       ...LEGAL_DEV_ERRORS,
     ],
     notes: [
@@ -403,7 +409,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
     errors: [
-      { origin: "client", exit: 4, meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
+      { origin: "client", exit: 4, match: "missing required flag: --reason", meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
+      intParseErr("--sort-order", "pass a non-negative integer list position", 0),
+      intParseErr("--setting-type-id", "pass a valid personSettingTypeId"),
       apiErr(404, "Unknown document type", "ib legal types"),
       ...LEGAL_DEV_ERRORS,
     ],

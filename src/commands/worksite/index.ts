@@ -11,7 +11,7 @@ import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { todayHelsinki } from "../../dates.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import {
   runAddressDashboard,
   registerDashboardCommand,
@@ -496,7 +496,7 @@ export function registerWorksiteCommands(
   w.command("list")
     .option("--limit <n>", "", cappedInt(500))
     .option("--cursor <c>")
-    .option("--customer <n>", "", (v: string) => Number(v))
+    .option("--customer <n>", "", intFlag("--customer", 1))
     .action(
       jsonAction(getClient, (client, opts: WorksiteListFilter) =>
         runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer })
@@ -534,7 +534,7 @@ export function registerWorksiteCommands(
     );
   dates
     .command("expiring")
-    .option("--days <n>", "", (v: string) => Number(v))
+    .option("--days <n>", "", intFlag("--days", 0))
     .action(
       jsonAction(getClient, (client, opts: { days?: number }) =>
         runWorksiteDatesExpiring(client, opts.days)
@@ -583,7 +583,7 @@ export function registerWorksiteCommands(
     .option("--driving-instructions <s>")
     .option("--comment <s>")
     .option("--invoice-ref <s>")
-    .option("--contact-person <id>", "", (v: string) => Number(v))
+    .option("--contact-person <id>", "", intFlag("--contact-person", 0))
     .option("--body <json>")
     .option(
       "--from-json <file>"

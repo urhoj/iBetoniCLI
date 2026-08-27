@@ -1,5 +1,6 @@
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { intFlag } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
@@ -252,13 +253,13 @@ export function registerGlossaryCommands(program, getClient) {
     addNeedsReviewFlags(glossary
         .command("list")
         .option("--search <s>")
-        .option("--stalest <n>", "", (v) => Number(v))
+        .option("--stalest <n>", "", intFlag("--stalest", 1))
         .option("--domain <d>")
         .option("--related <substr>")
         .option("--terms-only")).action(jsonAction(getClient, (client, opts) => runGlossaryList(client, opts)));
     glossary
         .command("misses")
-        .option("--top <n>", "", (v) => Number(v))
+        .option("--top <n>", "", intFlag("--top", 1))
         .action(jsonAction(getClient, (client, opts) => runGlossaryMisses(client, opts.top)));
     const dismiss = glossary
         .command("dismiss")

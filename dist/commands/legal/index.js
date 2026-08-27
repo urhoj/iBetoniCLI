@@ -4,7 +4,7 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
 import { personIdFromClaims } from "../../owner.js";
-import { parseId, cappedInt, assertEnum } from "../../targets.js";
+import { parseId, cappedInt, assertEnum, intFlag } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope } from "../../textEdit.js";
@@ -427,8 +427,8 @@ export function registerLegalCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, opts) => runLegalActive(client, normalizeLegalLanguage(opts.language))));
     legal
         .command("status")
-        .option("--person <id>", "", Number)
-        .option("--owner <id>", "", Number)
+        .option("--person <id>", "", intFlag("--person", 1))
+        .option("--owner <id>", "", intFlag("--owner", 1))
         .action(guarded(async (opts) => {
         const client = await getClient();
         const claims = decodeJwtPayload(client.getCurrentToken());
@@ -438,7 +438,7 @@ export function registerLegalCommands(parent, getClient) {
     }));
     legal
         .command("versions <typeName>")
-        .option("--owner <id>", "", Number)
+        .option("--owner <id>", "", intFlag("--owner", 1))
         .option("--status <status>")
         .option("--deleted")
         .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
@@ -461,7 +461,7 @@ export function registerLegalCommands(parent, getClient) {
     legal
         .command("diff [a] [b]")
         .option("--type <typeName>")
-        .option("--owner <id>", "", Number)
+        .option("--owner <id>", "", intFlag("--owner", 1))
         .action(guarded(async (aStr, bStr, opts) => {
         let input;
         if (opts.type) {
@@ -503,7 +503,7 @@ export function registerLegalCommands(parent, getClient) {
         .option("--title <title>")
         .option("--file <path>")
         .option("--content <markdown>")
-        .option("--owner <id>", "", Number)
+        .option("--owner <id>", "", intFlag("--owner", 1))
         .option("--notes <text>")
         .option("--effective-date <date>")
         .option("--activate")
@@ -605,8 +605,8 @@ export function registerLegalCommands(parent, getClient) {
         .requiredOption("--name <typeName>")
         .requiredOption("--display-name <s>")
         .option("--description <s>")
-        .option("--sort-order <n>", "", Number)
-        .option("--setting-type-id <n>", "", Number);
+        .option("--sort-order <n>", "", intFlag("--sort-order", 0))
+        .option("--setting-type-id <n>", "", intFlag("--setting-type-id", 1));
     addWriteFlagsToCommand(typeCreateCmd).action(guarded(async (opts) => {
         const client = await getClient();
         writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
@@ -615,8 +615,8 @@ export function registerLegalCommands(parent, getClient) {
         .command("update <typeName>")
         .option("--display-name <s>")
         .option("--description <s>")
-        .option("--sort-order <n>", "", Number)
-        .option("--setting-type-id <n>", "", Number);
+        .option("--sort-order <n>", "", intFlag("--sort-order", 0))
+        .option("--setting-type-id <n>", "", intFlag("--setting-type-id", 1));
     addWriteFlagsToCommand(typeUpdateCmd).action(guarded(async (typeName, opts) => {
         const client = await getClient();
         writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));

@@ -12,7 +12,7 @@ import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, parseId } from "../../targets.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
  *   - login    OAuth 2.1 + PKCE flow with local 127.0.0.1 callback
@@ -173,7 +173,7 @@ export function registerAuthCommands(parent, isReadOnly) {
     }));
     auth
         .command("impersonate")
-        .argument("[personId]", "Target personId (or use --email)", (v) => Number(v))
+        .argument("[personId]", "Target personId (or use --email)", (v) => parseId(v, "personId"))
         .option("--email <email>")
         .option("--end")
         .option("--extend")

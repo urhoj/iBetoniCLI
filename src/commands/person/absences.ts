@@ -4,6 +4,7 @@ import type { ListEnvelope } from "../../api/envelopes.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { intFlag } from "../../targets.js";
 type Row = Record<string, unknown>;
 
 export interface PersonAbsencesFilter {
@@ -40,7 +41,7 @@ export function registerPersonAbsencesCommand(
     .command("absences")
     .requiredOption("--from <date>")
     .requiredOption("--to <date>")
-    .option("--person <pid>", "", (s: string) => Number(s))
+    .option("--person <pid>", "", intFlag("--person", 1))
     .action(
       jsonAction(getClient, (client, opts: PersonAbsencesFilter) => runPersonAbsences(client, opts))
     );

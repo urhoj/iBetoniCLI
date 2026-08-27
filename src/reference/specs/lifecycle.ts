@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr } from "./shared.js";
 
 export const LIFECYCLE_SPECS: CommandSpec[] = [
 
@@ -41,6 +41,9 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
+      intParseErr("--asiakas", "pass a positive asiakasId"),
+      intParseErr("--person", "pass a positive personId"),
+      intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)"),
       apiErr(400, "Company limit (26) reached", "remove an existing link first"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
@@ -61,6 +64,9 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
+      intParseErr("--asiakas", "pass a positive asiakasId"),
+      intParseErr("--person", "pass a positive personId"),
+      intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)"),
       apiErr(404, "Link not found", "verify asiakasId+personId combination"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
@@ -167,7 +173,12 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
-    errors: permErrors("auth.page.tyomaa.edit"),
+    errors: [
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      intParseErr("--person", "pass a positive personId"),
+      intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)"),
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
     examples: ['ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"'],
   },
   {
@@ -185,6 +196,9 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      intParseErr("--person", "pass a positive personId"),
+      intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)"),
       apiErr(404, "Link not found", "verify tyomaaId+personId combination"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],

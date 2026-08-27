@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { failWith } from "../../output/json.js";
+import { intFlag, numFlag } from "../../targets.js";
 
 /**
  * The "resolve one geographic point" input shared by `ib opendata building`
@@ -19,11 +20,11 @@ export interface PointSourceOptions {
 /** Attach the six point-source options, in the order both commands declare them. */
 export function addPointSourceOptions(cmd: Command): Command {
   return cmd
-    .option("--sijainti <id>", "", Number)
-    .option("--worksite <tyomaaId>", "", Number)
-    .option("--tyomaa <tyomaaId>", "", Number)
-    .option("--lat <n>", "", Number)
-    .option("--lng <n>", "", Number)
+    .option("--sijainti <id>", "", intFlag("--sijainti", 1))
+    .option("--worksite <tyomaaId>", "", intFlag("--worksite", 1))
+    .option("--tyomaa <tyomaaId>", "", intFlag("--tyomaa", 1))
+    .option("--lat <n>", "", numFlag("--lat"))
+    .option("--lng <n>", "", numFlag("--lng"))
     .option("--address <s>");
 }
 

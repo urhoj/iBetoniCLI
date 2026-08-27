@@ -22,7 +22,7 @@ import {
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, parseId } from "../../targets.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -215,7 +215,7 @@ export function registerAuthCommands(
 
   auth
     .command("impersonate")
-    .argument("[personId]", "Target personId (or use --email)", (v: string) => Number(v))
+    .argument("[personId]", "Target personId (or use --email)", (v: string) => parseId(v, "personId"))
     .option("--email <email>")
     .option("--end")
     .option("--extend")

@@ -15,7 +15,7 @@ import type { ListEnvelope } from "../../../api/envelopes.js";
 import { qs } from "../../../api/query.js";
 import { writeJson } from "../../../output/json.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
-import { parseId } from "../../../targets.js";
+import { parseId, intFlag, cappedInt } from "../../../targets.js";
 
 export interface ImpersonationSession {
   sessionId: string;
@@ -85,11 +85,11 @@ export function registerImpersonationCommands(
 
   imp
     .command("sessions")
-    .option("--actor <id>", "", (s: string) => Number(s))
-    .option("--target <id>", "", (s: string) => Number(s))
+    .option("--actor <id>", "", intFlag("--actor", 1))
+    .option("--target <id>", "", intFlag("--target", 1))
     .option("--end-reason <r>")
     .option("--active")
-    .option("--limit <n>", "", (s: string) => Number(s))
+    .option("--limit <n>", "", cappedInt(1000))
     .action(jsonAction(getClient, runImpersonationSessions));
 
   imp

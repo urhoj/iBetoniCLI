@@ -1,6 +1,7 @@
 import { addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { guarded } from "./action.js";
+import { intFlag } from "../../targets.js";
 /**
  * Register the `add` + `remove` leaves of one entity↔person link group.
  *
@@ -14,9 +15,9 @@ export function registerPersonLinkCommands(parent, getClient, cfg) {
     const register = (name, run) => {
         addWriteFlagsToCommand(parent
             .command(name)
-            .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, Number)
-            .requiredOption("--person <id>", "", Number)
-            .option("--contact-type <id>", cfg.contactTypeDescription, Number, 1)).action(guarded(async (opts) => {
+            .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, intFlag(`--${cfg.targetFlag}`, 1))
+            .requiredOption("--person <id>", "", intFlag("--person", 1))
+            .option("--contact-type <id>", cfg.contactTypeDescription, intFlag("--contact-type", 1), 1)).action(guarded(async (opts) => {
             const client = await getClient();
             writeJson(await run(client, {
                 [cfg.targetField]: opts[cfg.targetFlag],

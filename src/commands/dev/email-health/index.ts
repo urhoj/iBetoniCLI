@@ -21,6 +21,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { qs } from "../../../api/query.js";
 import { jsonAction } from "../../_shared/action.js";
+import { intFlag } from "../../../targets.js";
 
 /**
  * Pass-through: the report shape is documented once, in the CommandSpec's
@@ -43,6 +44,6 @@ export function registerEmailHealthCommand(
   parent
     .command("email-health")
     .description("Account-wide SendGrid sender health — volume, deferral rate, recipient concentration")
-    .option("--days <n>", "Window in days (1..90, default 7)", Number)
+    .option("--days <n>", "Window in days (1..90, default 7)", intFlag("--days", 1))
     .action(jsonAction(getClient, runDevEmailHealth));
 }

@@ -8,7 +8,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { parseId, resolveDateInput } from "../../targets.js";
+import { parseId, resolveDateInput, intFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -288,7 +288,7 @@ export function registerVehicleDriverCommands(
     driver
       .command("assign <vehicleId> [date]")
       .option(DATE_FLAG)
-      .requiredOption("--person <pid>", "", (s: string) => Number(s))
+      .requiredOption("--person <pid>", "", intFlag("--person", 1))
   ).action(guarded(async (vehicleIdStr: string, date: string | undefined, opts: WriteFlags & VehicleDayOpts & { person: number }) => {
     const vehicleId = parseId(vehicleIdStr, "vehicleId");
     const day = resolveDateInput(date, opts.date);
@@ -323,7 +323,7 @@ export function registerVehicleDriverCommands(
   addWriteFlagsToCommand(
     def
       .command("set <vehicleId>")
-      .requiredOption("--person <pid>", "", (s: string) => Number(s))
+      .requiredOption("--person <pid>", "", intFlag("--person", 1))
   ).action(guarded(async (vehicleIdStr: string, opts: WriteFlags & { person: number }) => {
     writeJson(
       await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts)

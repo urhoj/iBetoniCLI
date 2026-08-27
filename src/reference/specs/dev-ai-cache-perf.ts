@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandError, CommandSpec } from "../../output/help.js";
-import { apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS, intParseErr } from "./shared.js";
 
 export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
   // ─── ai (2) — read AI assistant conversations ────────────────────────────
@@ -130,6 +130,8 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
         ],
         outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }",
         errors: [
+          intParseErr("--id", "pass a positive entity id"),
+          intParseErr("--asiakas", "pass a positive asiakasId"),
           apiErr(400, "Unknown entityType or cascade unsupported", "run `ib dev cache entities` to list valid types"),
           apiErr(403, "Not an admin, or cross-tenant entity needs developer", "cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role"),
           refusedRemote,
@@ -237,7 +239,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
           { name: "env", type: "string", description: "Environment buffer to read (default: backend's current env; discover via `ib dev perf config`)" },
         ],
         outputShape: "ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)",
-        errors: devErrors,
+        errors: [intParseErr("--limit", "pass a positive integer"), ...devErrors],
         notes: [COVERAGE_NOTE, "Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see `ib dev perf config`."],
         seeAlso: ["ib dev perf stats", "ib dev perf config"],
         examples: ["ib dev perf slow", "ib dev perf slow --limit 20 --env production"],

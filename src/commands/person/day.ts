@@ -12,6 +12,7 @@ import {
 } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
+import { intFlag } from "../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -229,7 +230,7 @@ export function registerPersonDayCommands(
     .command("get")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .requiredOption("--person <id>", "", (s: string) => Number(s))
+    .requiredOption("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--from <date>")
     .option("--to <date>")
     .action(
@@ -240,7 +241,7 @@ export function registerPersonDayCommands(
 
   const setCmd = day
     .command("set")
-    .requiredOption("--person <id>", "", (s: string) => Number(s))
+    .requiredOption("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--date <date>")
     .requiredOption("--status <id|name>")
     .option("--text <s>");
@@ -253,7 +254,7 @@ export function registerPersonDayCommands(
 
   const clearCmd = day
     .command("clear")
-    .requiredOption("--person <id>", "", (s: string) => Number(s))
+    .requiredOption("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--date <date>");
   addWriteFlagsToCommand(clearCmd).action(
     guarded(async (opts: WriteFlags & { person: number; date: string }) => {

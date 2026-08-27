@@ -5,7 +5,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { resolveDualString } from "../../targets.js";
+import { resolveDualString, intFlag } from "../../targets.js";
 export interface CacheWriteOpts {
   confirm?: boolean;
   forceProd?: boolean;
@@ -144,15 +144,15 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
 
   addCacheWriteOptions(
     c.command("invalidate <entityType>")
-      .option("--id <n>", "", (v: string) => Number(v))
-      .option("--asiakas <n>", "", (v: string) => Number(v))
+      .option("--id <n>", "", intFlag("--id", 1))
+      .option("--asiakas <n>", "", intFlag("--asiakas", 1))
       // Back-compat alias for the pre-rename spelling (fb#388). `--asiakas-id` was
       // the lone outlier among 39 tenant-scoped commands — 38 spell it `--asiakas`
       // — so guessing the majority form failed here and guessing this one failed
       // everywhere else. Hidden: the spec documents only `--asiakas`, so `--help`
       // and `reference dump` show one spelling while old scripts keep working.
       .addOption(
-        new Option("--asiakas-id <n>").argParser((v: string) => Number(v)).hideHelp()
+        new Option("--asiakas-id <n>").argParser(intFlag("--asiakas-id", 1)).hideHelp()
       )
       .option("--cascade")
   ).action(

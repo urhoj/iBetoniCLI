@@ -24,6 +24,7 @@ import type { ApiClient } from "../../../api/client.js";
 import { qs } from "../../../api/query.js";
 import { guarded } from "../../_shared/action.js";
 import { writeJson, failUsage } from "../../../output/json.js";
+import { cappedInt } from "../../../targets.js";
 
 export async function runEmailDeliveryAddress(
   client: ApiClient,
@@ -74,7 +75,7 @@ export function registerEmailDeliveryCommand(
     .description("What the SendGrid event log knows about one address or one message")
     .argument("[address]", "Recipient email address to look up")
     .option("--message <sgMessageId>", "Look up one message's event history instead")
-    .option("--limit <n>", "Max recent events for an address (1..200, default 50)", Number)
+    .option("--limit <n>", "Max recent events for an address (1..200, default 50)", cappedInt(200))
     .action(
       guarded(async (address: string | undefined, opts: { message?: string; limit?: number }) => {
         const target = resolveDeliveryTarget(address, opts.message);

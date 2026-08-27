@@ -1,7 +1,7 @@
 import { writeJson } from "../../output/json.js";
 import { resolveDate, toYyyymmddInt } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { parseId, resolveDateInput } from "../../targets.js";
+import { parseId, resolveDateInput, intFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -177,7 +177,7 @@ export function registerVehicleDriverCommands(parent, getClient) {
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> [date]")
         .option(DATE_FLAG)
-        .requiredOption("--person <pid>", "", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
+        .requiredOption("--person <pid>", "", intFlag("--person", 1))).action(guarded(async (vehicleIdStr, date, opts) => {
         const vehicleId = parseId(vehicleIdStr, "vehicleId");
         const day = resolveDateInput(date, opts.date);
         writeJson(await runVehicleDriverAssign(await getClient(), vehicleId, opts.person, day, opts));
@@ -200,7 +200,7 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, vehicleIdStr) => runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
-        .requiredOption("--person <pid>", "", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
+        .requiredOption("--person <pid>", "", intFlag("--person", 1))).action(guarded(async (vehicleIdStr, opts) => {
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
     }));
     addWriteFlagsToCommand(def

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec, CommandFlag } from "../../output/help.js";
-import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG, intParseErr, limitErr } from "./shared.js";
 
 /** The `--tarjous` thread-target alias every thread-addressed leaf repeats. */
 const TARJOUS_THREAD_FLAG: CommandFlag = {
@@ -15,6 +15,13 @@ const TARJOUS_THREAD_FLAG: CommandFlag = {
 /** The authorization note every `message thread` lifecycle leaf states. */
 const MANAGER_GATED_NOTE =
   "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.";
+
+/** The `--tarjous` parse-guard row every thread-targeting leaf shares (addThreadTargetOption). */
+const TARJOUS_PARSE_ERR = intParseErr("--tarjous", "pass a positive pumppuRequestId");
+/** The `--thread` parse-guard row for the leaves that register it directly (chat delete/edit/restore). */
+const THREAD_PARSE_ERR = intParseErr("--thread", "pass a positive threadId");
+/** The `--person` parse-guard row for the thread-participant leaves. */
+const PERSON_PARSE_ERR = intParseErr("--person", "pass a positive personId");
 
 export const MESSAGE_SPECS: CommandSpec[] = [
   // ─── message chat (9) ────────────────────────────────────────────────────
@@ -29,7 +36,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, lastReadAt, unreadCount, lastMessageBody }>",
-    errors: [...COMMON_AUTH_ERRORS],
+    errors: [TARJOUS_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     notes: [
       "Only threads you participate in are returned (server-scoped by your personId).",
       "A keikka thread (contextType 'keikka') appears here automatically once keikka messaging ships — no CLI change needed.",
@@ -55,6 +62,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     outputShape:
       "{ thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }",
     errors: [
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not a participant of this thread", "you can only read threads you are part of"),
       apiErr(404, "Thread not found", "verify the threadId / --tarjous"),
       ...COMMON_AUTH_ERRORS,
@@ -82,6 +90,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, isDeleted, personFirstName, personLastName, senderAsiakasNimi }>",
     errors: [
+      TARJOUS_PARSE_ERR,
+      limitErr("pass a positive integer; this command caps at 500"),
       apiErr(403, "Not a participant of this thread", "you can only read threads you are part of"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -119,6 +129,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       // `failWith(..., 4)` in the action, so the request is never sent and no
       // 400 can arrive — dead by the fb#280 rule, leaving the caller no hint.
       { origin: "client", exit: 4, match: ["message body cannot be empty", "message body too long"], meaning: "Empty or over-length --body", remedy: "body is required, max 4000 chars" },
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not a participant of this thread", "you can only post to threads you are part of"),
       apiErr(409, "Thread archived", "archived threads are read-only"),
       ...COMMON_AUTH_ERRORS,
@@ -149,6 +160,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     mutates: true,
     outputShape: "{ lastReadAt }",
     errors: [
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not a participant of this thread", "you can only mark threads you are part of"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -175,6 +187,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     outputShape:
       "{ messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run",
     errors: [
+      THREAD_PARSE_ERR,
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not the author (and not a developer)", "you can only delete your own messages"),
       apiErr(409, "Already answered", "a message someone replied to after cannot be retracted — delete the newest first"),
       apiErr(404, "Thread or message not found", "check the threadId/messageId"),
@@ -212,6 +226,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       // `failWith(..., 4)` in the action, so the request is never sent and no
       // 400 can arrive — dead by the fb#280 rule, leaving the caller no hint.
       { origin: "client", exit: 4, match: ["message body cannot be empty", "message body too long"], meaning: "Empty or over-length --body", remedy: "body is required, max 4000 chars" },
+      THREAD_PARSE_ERR,
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not the author", "you can only edit your own messages"),
       apiErr(404, "Thread or message not found", "check the threadId/messageId"),
       apiErr(409, "Answered or deleted", "you cannot edit a message that was replied to, or a deleted one"),
@@ -243,6 +259,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     outputShape:
       "{ messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run",
     errors: [
+      THREAD_PARSE_ERR,
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not the author (and not a developer)", "you can only restore your own messages"),
       apiErr(404, "Thread or message not found", "check the threadId/messageId"),
       ...COMMON_AUTH_ERRORS,
@@ -271,6 +289,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ messageId, threadId, contextType, contextId, senderPersonId, body, createdAt, personFirstName, personLastName }>",
     errors: [
+      limitErr("pass a positive integer; this command caps at 200"),
       apiErr(400, "Query too short", "q must be at least 2 characters"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -298,7 +317,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      intParseErr("--limit", "pass a positive integer"),
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -321,7 +341,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      intParseErr("--limit", "pass a positive integer"),
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(404, "Route not deployed", "the /support/mine backend may not be deployed yet"),
       apiErr(500, "Backend error", "retry with --verbose"),
@@ -405,6 +426,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ threadId, archived:true } (+ alreadyArchived:true if already archived)",
     errors: [
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
       apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
       ...COMMON_AUTH_ERRORS,
@@ -435,6 +457,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ threadId, archived:false } (+ alreadyOpen:true if already open)",
     errors: [
+      TARJOUS_PARSE_ERR,
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
       apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
       ...COMMON_AUTH_ERRORS,
@@ -465,6 +488,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ threadId, title } (title is null when cleared)",
     errors: [
+      TARJOUS_PARSE_ERR,
       apiErr(400, "Title too long", "max 200 characters"),
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
       apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
@@ -497,6 +521,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ threadId, personId, role, added:true }",
     errors: [
+      TARJOUS_PARSE_ERR,
+      PERSON_PARSE_ERR,
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
       // Matched on the backend's own Finnish text so it is reachable past the
       // manager row above, which stays the 403 catch-all (fb#668).
@@ -532,6 +558,8 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ threadId, personId, removed:true|false } (removed:false when the participant was already gone)",
     errors: [
+      TARJOUS_PARSE_ERR,
+      PERSON_PARSE_ERR,
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
       apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
       ...COMMON_AUTH_ERRORS,

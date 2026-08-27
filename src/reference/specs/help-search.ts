@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG, intParseErr } from "./shared.js";
 
 export const HELP_SEARCH_SPECS: CommandSpec[] = [
 
@@ -34,7 +34,7 @@ export const HELP_SEARCH_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{ items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }",
-    errors: COMMON_AUTH_ERRORS,
+    errors: [intParseErr("--limit", "pass a positive integer"), ...COMMON_AUTH_ERRORS],
     notes: [
       "A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.",
       "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.",

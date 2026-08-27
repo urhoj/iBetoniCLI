@@ -11,7 +11,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption } from "../../targets.js";
+import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption, intFlag } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -1203,7 +1203,7 @@ export function registerCustomerCommands(
       "Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>."
     )
     .option("--search <name>")
-    .option("--page <n>", "", (v: string) => Number(v), 1)
+    .option("--page <n>", "", intFlag("--page", 1), 1)
     .action(
       guarded(async (ytunnus: string | undefined, opts: { search?: string; page: number }) => {
         const client = await getClient();
@@ -1289,8 +1289,8 @@ export function registerCustomerCommands(
     .option("--email <s>")
     .option("--short-name <s>")
     .option("--comment <s>")
-    .option("--contact-person <id>", "", (v: string) => Number(v))
-    .option("--type <id>", "", (v: string) => Number(v))
+    .option("--contact-person <id>", "", intFlag("--contact-person", 0))
+    .option("--type <id>", "", intFlag("--type", 1))
     .option("--address <s>")
     .option("--postal-code <s>")
     .option("--city <s>")
@@ -1328,8 +1328,8 @@ export function registerCustomerCommands(
     .option("--email <s>")
     .option("--short-name <s>")
     .option("--comment <s>")
-    .option("--contact-person <id>", "", (v: string) => Number(v))
-    .option("--type <id>", "", (v: string) => Number(v))
+    .option("--contact-person <id>", "", intFlag("--contact-person", 0))
+    .option("--type <id>", "", intFlag("--type", 1))
     .option("--address <s>")
     .option("--postal-code <s>")
     .option("--city <s>")

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS, intParseErr, numParseErr } from "./shared.js";
 
 export const OPENDATA_SPECS: CommandSpec[] = [
 
@@ -25,7 +25,12 @@ export const OPENDATA_SPECS: CommandSpec[] = [
     outputShape:
       "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
     errors: [
-      { origin: "client", exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
+      { origin: "client", exit: 4, match: ["provide exactly one", "must be provided together", "disagree; pass only one"], meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
+      intParseErr("--sijainti", "pass a positive sijaintiId"),
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      intParseErr("--tyomaa", "pass a positive tyomaaId"),
+      numParseErr("--lat", "pass the latitude as a number"),
+      numParseErr("--lng", "pass the longitude as a number"),
       apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -63,7 +68,12 @@ export const OPENDATA_SPECS: CommandSpec[] = [
     outputShape:
       "{ source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }], buildingCount?, buildings?:[{ nationalBuildingId, usagePurpose, completionYear, status }] (only with --with-buildings) } }",
     errors: [
-      { origin: "client", exit: 4, meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
+      { origin: "client", exit: 4, match: ["provide exactly one", "must be provided together", "disagree; pass only one"], meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
+      intParseErr("--sijainti", "pass a positive sijaintiId"),
+      intParseErr("--worksite", "pass a positive tyomaaId"),
+      intParseErr("--tyomaa", "pass a positive tyomaaId"),
+      numParseErr("--lat", "pass the latitude as a number"),
+      numParseErr("--lng", "pass the longitude as a number"),
       apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -295,6 +305,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
     outputShape:
       "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>",
     errors: [
+      intParseErr("--page", "pass a positive integer page number"),
       apiErr(404, "Business ID not found", "verify the Y-tunnus"),
       apiErr(400, "Invalid Y-tunnus format", "use XXXXXXXX-X"),
       ...COMMON_AUTH_ERRORS,

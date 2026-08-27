@@ -1,6 +1,7 @@
 import { qs } from "../../../api/query.js";
 import { guarded } from "../../_shared/action.js";
 import { writeJson, failUsage } from "../../../output/json.js";
+import { cappedInt } from "../../../targets.js";
 export async function runEmailDeliveryAddress(client, address, opts = {}) {
     // encodeURIComponent, not a raw interpolation: an address is user data and
     // `#`/`?` in one would otherwise truncate the path or graft on a query string.
@@ -32,7 +33,7 @@ export function registerEmailDeliveryCommand(parent, getClient) {
         .description("What the SendGrid event log knows about one address or one message")
         .argument("[address]", "Recipient email address to look up")
         .option("--message <sgMessageId>", "Look up one message's event history instead")
-        .option("--limit <n>", "Max recent events for an address (1..200, default 50)", Number)
+        .option("--limit <n>", "Max recent events for an address (1..200, default 50)", cappedInt(200))
         .action(guarded(async (address, opts) => {
         const target = resolveDeliveryTarget(address, opts.message);
         const client = await getClient();

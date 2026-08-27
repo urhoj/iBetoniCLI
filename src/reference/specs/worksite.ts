@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
+import { clearHint, clearNote, apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, intParseErr } from "./shared.js";
 
 export const WORKSITE_SPECS: CommandSpec[] = [
 
@@ -24,7 +24,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>" + TRUNCATED_NOTE,
-    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), ...permErrors("auth.page.tyomaa.read")],
+    errors: [limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"), intParseErr("--customer", "pass a positive asiakasId"), ...permErrors("auth.page.tyomaa.read")],
     examples: ["ib worksite list", "ib worksite list --customer 1349"],
   },
   {
@@ -94,7 +94,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     flags: [{ name: "days", type: "number", default: "30", description: "Look-ahead window (days)" }],
     outputShape:
       "ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>",
-    errors: [...permErrors("auth.page.tyomaa.read")],
+    errors: [intParseErr("--days", "pass a non-negative integer look-ahead window", 0), ...permErrors("auth.page.tyomaa.read")],
     examples: ["ib worksite dates expiring --days 14"],
   },
   {
@@ -164,6 +164,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       // the fb#280 rule (a client failure can only be matched via `origin`), AND
       // it shadowed the real "Validation failed" 400 below it.
       { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag or a --body/--from-json patch" },
+      intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),

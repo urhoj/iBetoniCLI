@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, intParseErr } from "./shared.js";
 
 export const PERSON_SPECS: CommandSpec[] = [
 
@@ -415,7 +415,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "to", type: "date", description: "End date YYYY-MM-DD (default: --from)" },
     ],
     outputShape: "ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>",
-    errors: [...COMMON_AUTH_ERRORS],
+    errors: [intParseErr("--person", "pass a positive personId"), ...COMMON_AUTH_ERRORS],
     notes: [
       "Scoped to the active company (same-tenant).",
       "`status` is the personPvmStatus code; map statusId→friendly name via `ib person day statuses`.",
@@ -438,6 +438,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
+      intParseErr("--person", "pass a positive personId"),
       apiErr(400, "Missing --reason or unknown/ambiguous --status", "supply --reason; check `ib person day statuses`"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
       ...COMMON_AUTH_ERRORS,
@@ -467,6 +468,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [
+      intParseErr("--person", "pass a positive personId"),
       apiErr(400, "Missing --reason", "supply --reason"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
       ...COMMON_AUTH_ERRORS,
@@ -490,7 +492,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Filter to one personId" },
     ],
     outputShape: "ListEnvelope<{ personId, name, date, status, statusName }>",
-    errors: permErrors("auth.page.grid.read"),
+    errors: [intParseErr("--person", "pass a positive personId"), ...permErrors("auth.page.grid.read")],
     notes: [
       "Read-only — setting absence status is not exposed by the CLI in v1.",
       "Reuses /api/cli/driver/absences server-side; `ib vehicle driver available` already excludes these from the assignable pool. Deploy-gated.",
@@ -514,6 +516,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }",
     errors: [
+      limitErr("pass a positive integer; this command caps at 1000"),
       apiErr(400, "personId is not a positive integer", "pass a numeric personId"),
       apiErr(404, "no person with that id", "check the id with `ib person get <id>`"),
       ...permErrors("developer access (isSystemAdmin or isDeveloper)"),

@@ -1,7 +1,7 @@
 import { qs } from "../../../api/query.js";
 import { writeJson } from "../../../output/json.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
-import { parseId } from "../../../targets.js";
+import { parseId, intFlag, cappedInt } from "../../../targets.js";
 /**
  * GET /api/cli/impersonation-sessions — reconstructed sessions as a ListEnvelope.
  * The backend returns `{ items, count, truncated }`.
@@ -32,11 +32,11 @@ export function registerImpersonationCommands(parent, getClient) {
         .description("Impersonation audit trail — reconstructed sessions + grants (developer-only)");
     imp
         .command("sessions")
-        .option("--actor <id>", "", (s) => Number(s))
-        .option("--target <id>", "", (s) => Number(s))
+        .option("--actor <id>", "", intFlag("--actor", 1))
+        .option("--target <id>", "", intFlag("--target", 1))
         .option("--end-reason <r>")
         .option("--active")
-        .option("--limit <n>", "", (s) => Number(s))
+        .option("--limit <n>", "", cappedInt(1000))
         .action(jsonAction(getClient, runImpersonationSessions));
     imp
         .command("grants <personId>")

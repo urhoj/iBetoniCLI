@@ -1,5 +1,6 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { addThreadTargetOption, threadAction } from "../chat/resolveThread.js";
+import { intFlag } from "../../../targets.js";
 // --dry-run on every thread write resolves CLIENT-SIDE: the messages routes
 // honour no X-Dry-Run (messageRoutes.js has no guard), so a dry-run that POSTed
 // would actually persist (fb#244; same footgun class as fb#76). Each run* fn
@@ -60,11 +61,11 @@ export function registerMessageThreadCommands(parent, getClient) {
         .command("participant")
         .description("Add/remove a thread participant (must be a member of the owning company)");
     const addCmd = addThreadTargetOption(p.command("add [threadId]"))
-        .requiredOption("--person <id>", "", Number)
+        .requiredOption("--person <id>", "", intFlag("--person", 1))
         .option("--role <role>");
     addWriteFlagsToCommand(addCmd).action(threadAction(getClient, (client, id, opts) => runThreadParticipantAdd(client, id, Number(opts.person), opts)));
     const remCmd = addThreadTargetOption(p.command("remove [threadId]"))
-        .requiredOption("--person <id>", "", Number);
+        .requiredOption("--person <id>", "", intFlag("--person", 1));
     addWriteFlagsToCommand(remCmd).action(threadAction(getClient, (client, id, opts) => runThreadParticipantRemove(client, id, Number(opts.person), opts)));
 }
 //# sourceMappingURL=index.js.map

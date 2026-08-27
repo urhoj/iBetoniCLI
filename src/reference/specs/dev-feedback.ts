@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS } from "../../commands/feedback/index.js";
-import { apiErr, COMMON_AUTH_ERRORS } from "./shared.js";
+import { apiErr, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
 
 export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   // ─── feedback (5) ────────────────────────────────────────────────────────
@@ -98,7 +98,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
     prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
+      { origin: "client", exit: 4, match: ["use only one of", "must be one of"], meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
+      intParseErr("--max-complexity", "pass an integer 1-5"),
+      limitErr("pass a positive integer; this command caps at 200 — page past it with --offset"),
+      intParseErr("--offset", "pass a non-negative integer row offset", 0),
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -308,6 +311,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // statusCode===0; a real 400 never hits it), which silently drops the remedy
       // for the most likely misuse. Must key on `http:400` so matchHttpRow finds it.
       apiErr(400, "Validation", "--ttl-hours must be 1-24", "ttlhours"),
+      intParseErr("--ttl-hours", "pass an integer 1-24"),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
       apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback resolve <id> --status open` first if it should not be", "already closed"),

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE } from "./shared.js";
+import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, intParseErr } from "./shared.js";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -161,6 +161,8 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run",
     errors: [
+      intParseErr("--contact-person", "pass a positive personId, or 0 to clear the primary contact", 0),
+      intParseErr("--type", "pass a valid asiakasTypeId"),
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
@@ -193,6 +195,8 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run",
     errors: [
+      intParseErr("--contact-person", "pass a positive personId, or 0 to clear the primary contact", 0),
+      intParseErr("--type", "pass a valid asiakasTypeId"),
       apiErr(400, "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`"),
       ...permErrors("auth.page.asiakas.edit"),
     ],

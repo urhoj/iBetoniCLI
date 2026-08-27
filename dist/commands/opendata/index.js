@@ -4,6 +4,7 @@ import { registerParcelCommands } from "../parcel/index.js";
 import { registerWeatherCommands } from "../weather/index.js";
 import { runPrhById, runPrhSearch } from "../../prh.js";
 import { guarded } from "../_shared/action.js";
+import { intFlag } from "../../targets.js";
 /**
  * `ib opendata` — FREE / OPEN external-data APIs, distinct from tenant business
  * data. Each leaf queries a public source (city building registries via WFS,
@@ -23,7 +24,7 @@ export function registerOpendataCommands(parent, getClient) {
     registerWeatherCommands(od, getClient);
     od.command("prh [ytunnus]")
         .option("--search <name>")
-        .option("--page <n>", "", (v) => Number(v), 1)
+        .option("--page <n>", "", intFlag("--page", 1), 1)
         .action(guarded(async (ytunnus, opts) => {
         const client = await getClient();
         if (opts.search) {

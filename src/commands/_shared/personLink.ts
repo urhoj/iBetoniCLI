@@ -6,6 +6,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { guarded } from "./action.js";
+import { intFlag } from "../../targets.js";
 
 /**
  * The POST body both person-link routes take: the target entity's id first,
@@ -61,9 +62,9 @@ export function registerPersonLinkCommands(
     addWriteFlagsToCommand(
       parent
         .command(name)
-        .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, Number)
-        .requiredOption("--person <id>", "", Number)
-        .option("--contact-type <id>", cfg.contactTypeDescription, Number, 1)
+        .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, intFlag(`--${cfg.targetFlag}`, 1))
+        .requiredOption("--person <id>", "", intFlag("--person", 1))
+        .option("--contact-type <id>", cfg.contactTypeDescription, intFlag("--contact-type", 1), 1)
     ).action(
       guarded(async (opts: PersonLinkOptions) => {
         const client = await getClient();

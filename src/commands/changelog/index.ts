@@ -34,7 +34,7 @@ import { readJsonInput } from "../../api/parseBody.js";
 import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
-import { parseRefId, assertEnum, intFlag, intCsvFlag } from "../../targets.js";
+import { parseRefId, assertEnum, intFlag, intCsvFlag, cappedInt } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -1140,12 +1140,12 @@ export function registerChangelogCommands(
     .option("--has-sentry")
     .option("--unreleased")
     .option("--pending")
-    .option("--limit <n>", "", Number)
+    .option("--limit <n>", "", cappedInt(500))
     // The backend has ALWAYS supported offset (listEntries binds it); only the
     // flag was missing, which made everything below the 500-row cap unreachable
     // through this command (fb#605). Its sibling `ib dev feedback list` has had
     // --offset all along.
-    .option("--offset <n>", "", Number)
+    .option("--offset <n>", "", intFlag("--offset", 0))
     .action(
       guarded(async (o: Record<string, string | number | boolean>) => {
         // --unreleased/--pending is the pending-queue view, not a month filter;
@@ -1594,6 +1594,20 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ],
     outputShape: "ListEnvelope<entry> (`truncated: true` when the row cap bit — the page is NOT the whole result) | (with --unreleased) { items, entries, maxBumpLevel, count }",
     errors: [
+      {
+        origin: "client",
+        exit: 4,
+        match: "--limit must be an integer >= 1",
+        meaning: "--limit is not an integer >= 1, rejected locally before any request",
+        remedy: "pass a positive integer; this command caps at 500 — page past it with --offset",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        match: "--offset must be an integer >= 0",
+        meaning: "--offset is not an integer >= 0, rejected locally before any request",
+        remedy: "pass a non-negative integer row offset",
+      },
       {
         http: 403,
         exit: 3,

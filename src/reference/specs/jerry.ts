@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, numParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 export const JERRY_SPECS: CommandSpec[] = [
 
@@ -203,6 +203,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
     errors: [
       { origin: "client", exit: 4, match: "--price-cents", meaning: "--price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400)", remedy: "pass --price-cents as an integer 1..99999900 (cents, not euros)" },
+      numParseErr("--vat-percent", "pass a VAT percent between 0 and 100 (e.g. 25.5)"),
       apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
       apiErr(404, "Request not found", "verify requestId"),
       apiErr(409, "Request not open / expired, or offer no longer editable", "the request was closed, or your offer is already accepted/rejected"),
@@ -284,6 +285,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
     errors: [
       apiErr(400, "scheduledAt missing/invalid/in the past, or pumppuId not yours", "pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId"),
+      intParseErr("--pumppu", "pass your vehicleId as a positive integer"),
       apiErr(403, "Not a provider / offer not yours", "switch to the owning provider company"),
       apiErr(404, "Request / offer not found", "verify requestId + offerId"),
       apiErr(409, "Offer not in 'accepted' state", "the customer must accept the offer before you confirm"),
@@ -379,6 +381,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ weeks: [{ weekStart, visitors, wizardVisitors, authedVisitors, searches, coveredSearches, noSupplySearches, wizardSessions, reachedReview, requestsSent, noSupplyRequests, offersSent, offersAccepted }] }",
     errors: [
+      intParseErr("--weeks", "pass a positive integer number of weeks"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -466,6 +469,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }",
     errors: [
+      intParseErr("--days", "pass a positive integer window in days (1..90; values above 90 are silently capped)"),
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
       apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
       apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
@@ -656,7 +660,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, parkedUntil, parked, muistutusDue }>",
-    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
+    errors: [intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"), SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     notes: [
       "`lastNote` previews (200 chars) the most recent HUMAN-written event — note/call/response, with `lastNoteType` naming which — so the reason behind a status is visible without opening the trail. `status` alone cannot tell a ruled-out prospect from a deliberately held one; read `lastNote`/`muistiinpanot` before acting on a terminal status, and `ib jerry admin onboarding events <asiakasId>` for the full history. Deploy-gated: the three lastNote* fields are absent until puminet5api ships them.",
     ],
@@ -683,6 +687,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape: "{ jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run",
     errors: [
       apiErr(400, "Prospect already exists / company not found / unknown --source or --company-type", "check asiakasId; --source is manual|import|scheduled, --company-type is pumppu|betoni|all|owner"),
+      intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -716,6 +721,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     ],
     errors: [
       apiErr(400, "Unknown --status or --company-type, or malformed --parked-until", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or empty (`--parked-until=` on PowerShell)"),
+      intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,

@@ -6,6 +6,7 @@ import { jsonAction, guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
+import { intFlag } from "../../targets.js";
 /** 20260610 → "2026-06-10". */
 function intToDate(n) {
     const s = String(n);
@@ -162,13 +163,13 @@ export function registerPersonDayCommands(person, getClient) {
         .command("get")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--person <id>", "", intFlag("--person", 1))
         .requiredOption("--from <date>")
         .option("--to <date>")
         .action(jsonAction(getClient, (client, opts) => runPersonDayGet(client, opts.person, opts.from, opts.to)));
     const setCmd = day
         .command("set")
-        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--person <id>", "", intFlag("--person", 1))
         .requiredOption("--date <date>")
         .requiredOption("--status <id|name>")
         .option("--text <s>");
@@ -178,7 +179,7 @@ export function registerPersonDayCommands(person, getClient) {
     }));
     const clearCmd = day
         .command("clear")
-        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--person <id>", "", intFlag("--person", 1))
         .requiredOption("--date <date>");
     addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {
         const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);

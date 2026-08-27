@@ -1,6 +1,6 @@
 import { writeJson, errorMessage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
-import { resolveSearchQuery, queryAliasOption } from "../../targets.js";
+import { resolveSearchQuery, queryAliasOption, intFlag } from "../../targets.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { runCustomerSearch } from "../customer/index.js";
 import { runPersonSearch } from "../person/index.js";
@@ -198,7 +198,7 @@ export function registerSearchCommands(parent, getClient) {
         .option("--search <s>")
         .addOption(queryAliasOption())
         .option("--in <entities>")
-        .option("--limit <n>", "", (v) => Number(v), DEFAULT_LIMIT)
+        .option("--limit <n>", "", intFlag("--limit", 1), DEFAULT_LIMIT)
         .option("--my-companies")
         .action(guarded(async (query, opts) => {
         const q = resolveSearchQuery(query, opts.search, opts.query);

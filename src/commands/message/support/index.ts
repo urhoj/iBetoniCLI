@@ -21,7 +21,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
 import { failWith, writeJson } from "../../../output/json.js";
-import { assertEnum, parseId } from "../../../targets.js";
+import { assertEnum, parseId, intFlag } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 
@@ -155,7 +155,7 @@ export function registerMessageSupportCommands(
   support
     .command("inbox")
     .option("--status <status>", "", "open")
-    .option("--limit <n>", "", Number)
+    .option("--limit <n>", "", intFlag("--limit", 1))
     .action(
       jsonAction(getClient, (client, opts: { status?: string; limit?: number }) =>
         runSupportInbox(client, opts)
@@ -165,7 +165,7 @@ export function registerMessageSupportCommands(
   support
     .command("mine")
     .option("--status <status>", "", "open")
-    .option("--limit <n>", "", Number)
+    .option("--limit <n>", "", intFlag("--limit", 1))
     .action(
       jsonAction(getClient, (client, opts: { status?: string; limit?: number }) =>
         runSupportMine(client, opts)

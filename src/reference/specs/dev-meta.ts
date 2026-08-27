@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, authErrors, permErrors } from "./shared.js";
+import { apiErr, authErrors, permErrors, intParseErr, limitErr } from "./shared.js";
 
 export const DEV_META_SPECS: CommandSpec[] = [
 
@@ -86,7 +86,12 @@ export const DEV_META_SPECS: CommandSpec[] = [
     // the identical "Backend error / retry with --verbose" (fb#668). Two
     // byte-identical rows at one status is not a choice the matcher can make —
     // it takes the first and the second is simply dead weight in the dump.
-    errors: permErrors("developer access (isSystemAdmin or isDeveloper)"),
+    errors: [
+      intParseErr("--actor", "pass a positive personId"),
+      intParseErr("--target", "pass a positive personId"),
+      limitErr("pass a positive integer; this command caps at 1000"),
+      ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
+    ],
     notes: [
       "Developer-gated server-side and hidden from non-developer discovery.",
       "Sessions are reconstructed from personLog 30/31/32 (personLog.personId is always the actor). Deploy-gated: no-op until the puminet5api backend ships GET /api/cli/impersonation-sessions.",
@@ -196,6 +201,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     outputShape:
       "{ days, checkedAt, coverage:{ oldestEvent, newestEvent, daysWithData }, totals:{ processed, delivered, deferredEvents, deferredMessages, failed, spam }, daily:[{ date, processed, delivered, deferredEvents, deferredMessages, failed, spam }], recipients:[{ email, processed, deferredEvents, failed, sharePct }] (top 10 by volume), verdict:{ healthy, flags:[{ code, severity, detail }] } } — read `verdict.healthy` for the one-bit answer. Flag codes: deferral-rate | single-recipient-share | volume-spike | failure-rate | spam-rate.",
     errors: [
+      intParseErr("--days", "pass a positive integer window in days (1..90)"),
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
       apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
       apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
@@ -226,7 +232,8 @@ export const DEV_META_SPECS: CommandSpec[] = [
       "Address form: { email, verdict: \"delivering\"|\"pending\"|\"failing\"|\"no-data\", lastEventAt, lastDeliveredAt, lastFailureAt, lastFailure:{ event, reason, at }|null, events:[{ id, receivedTime, event, sg_message_id, category, reason, response, sg_template_id, sg_template_name }], eventCount, truncated, coverage:{ oldestEvent, newestEvent, totalEvents } }. Message form: { sgMessageId, found, recipients[], categories[], events[], eventCount, coverage }.",
     errors: [
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
-      { origin: "client", exit: 4, meaning: "No target, or both an address and --message", remedy: "pass exactly one: an address positional OR --message <sgMessageId>" },
+      { origin: "client", exit: 4, match: ["not both", "nothing to look up"], meaning: "No target, or both an address and --message", remedy: "pass exactly one: an address positional OR --message <sgMessageId>" },
+      limitErr("pass a positive integer; this command caps at 200"),
       apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
       apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
       apiErr(404, "Route not deployed yet", "the backend half is deploy-gated — deploy puminet5api first"),

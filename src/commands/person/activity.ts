@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { parseId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 export interface PersonActivityOpts {
   limit?: number;
@@ -27,7 +27,7 @@ export function registerPersonActivityCommand(
 ): void {
   parent
     .command("activity <personId>")
-    .option("--limit <n>", "", (s: string) => Number(s))
+    .option("--limit <n>", "", cappedInt(1000))
     .action(
       guarded(async (personIdStr: string, opts: PersonActivityOpts) => {
         const personId = parseId(personIdStr, "personId");

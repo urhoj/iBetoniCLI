@@ -22,7 +22,7 @@ import {
   warnIfLimitCapped,
 } from "../../api/listCaps.js";
 import { failWith, warnNote, writeJson } from "../../output/json.js";
-import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
+import { assertEnum, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
@@ -1329,12 +1329,12 @@ export function registerFeedbackCommands(
     // the backend's parseInt guard would drop as "no filter" — returning the whole
     // table as if nothing had been asked for (fb#535).
     .option("--complexity <n>", "", (v: string) => (v.toLowerCase() === "none" ? "none" : Number(v)))
-    .option("--max-complexity <n>", "", Number)
+    .option("--max-complexity <n>", "", intFlag("--max-complexity", 1))
     // See foldSeverityCase: one case policy across list/create/update.
     .option("--severity <s>", "", foldSeverityCase)
     .option("--oldest")
-    .option("--limit <n>", "", Number)
-    .option("--offset <n>", "", Number)
+    .option("--limit <n>", "", cappedInt(200))
+    .option("--offset <n>", "", intFlag("--offset", 0))
     .option("--unclaimed")
     .option("--mine")
     .option("--claimed-by <label>", "", String)
@@ -1427,7 +1427,7 @@ export function registerFeedbackCommands(
     .option("--scope <scope>")
     .option("--kind <kind>")
     .option("--severity <sev>", "", foldSeverityCase)
-    .option("--complexity <n>", "", Number)
+    .option("--complexity <n>", "", intFlag("--complexity", 1))
     .option("--description <text>")
     .option("--body <text>")
     .option("--append-description <text>")
@@ -1494,7 +1494,7 @@ export function registerFeedbackCommands(
 
   f.command("claim <id>")
     .option("--by <label>", "The claiming agent/session label (defaults to $IB_CLAIM_ID, then user@host)")
-    .option("--ttl-hours <n>", "Lease length in hours, 1-24 (default 24, measured from FIRST acquire)", Number)
+    .option("--ttl-hours <n>", "Lease length in hours, 1-24 (default 24, measured from FIRST acquire)", intFlag("--ttl-hours", 1))
     .option("--steal", "Take a row under another agent's LIVE claim")
     .option("--reason <text>", "Human-readable why-string stored in audit logs (X-Action-Reason)")
     .action(

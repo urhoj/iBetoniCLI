@@ -5,6 +5,7 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope } from "../../textEdit.js";
+import { intFlag } from "../../targets.js";
 /**
  * helpId validity: any non-empty string up to the `dbo.helps.helpId` column
  * width (nvarchar 250). The backend binds it as a parameter (no string-built
@@ -230,7 +231,7 @@ export function registerOhjeCommands(parent, getClient) {
         writeJson(result);
     }));
     addNeedsReviewFlags(o.command("list")
-        .option("--limit <n>", "", (v) => Number(v))
+        .option("--limit <n>", "", intFlag("--limit", 1))
         .option("--search <text>")
         .option("--empty-shorttext")
         .option("--fields <cols>", "", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))

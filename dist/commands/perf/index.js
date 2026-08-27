@@ -1,5 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
+import { intFlag } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { jsonAction } from "../_shared/action.js";
 import { bothInOrder } from "../../parallel.js";
@@ -48,7 +49,7 @@ export function registerPerfCommands(parent, getClient, opts = {}) {
     const perf = parent.command("perf", { hidden: !!opts.hidden }).description("SQL slow-query monitoring (developer)");
     perf
         .command("slow")
-        .option("--limit <n>", "", (v) => Number(v))
+        .option("--limit <n>", "", intFlag("--limit", 1))
         .option("--env <name>")
         .action(jsonAction(getClient, (client, opts) => runPerfSlow(client, opts)));
     perf

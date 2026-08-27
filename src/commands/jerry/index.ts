@@ -1123,7 +1123,7 @@ export function registerJerryCommands(
     offer
       .command("create <requestId>")
       .requiredOption("--price-cents <n>", "", Number)
-      .option("--vat-percent <n>", "", Number)
+      .option("--vat-percent <n>", "", numFlag("--vat-percent", 0, 100))
       .option("--price-terms <s>")
       .option("--valid-until <iso>")
       .option("--available-from <iso>")
@@ -1191,7 +1191,7 @@ export function registerJerryCommands(
     offer
       .command("confirm <requestId> <offerId>")
       .requiredOption("--scheduled-at <iso>")
-      .option("--pumppu <vehicleId>", "", Number)
+      .option("--pumppu <vehicleId>", "", intFlag("--pumppu", 1))
   ).action(
     guarded(async (
       idStr: string,
@@ -1220,7 +1220,7 @@ export function registerJerryCommands(
 
   // stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("stats")
-    .option("--weeks <n>", "", Number)
+    .option("--weeks <n>", "", intFlag("--weeks", 1))
     .action(
       jsonAction(getClient, (client, opts: { weeks?: number }) =>
         runJerryStats(client, opts.weeks)
@@ -1288,7 +1288,7 @@ export function registerJerryCommands(
 
   // email-activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("email-activity")
-    .option("--days <n>", "", (v: string) => Math.min(90, Math.max(1, Number(v))))
+    .option("--days <n>", "", (v: string) => Math.min(90, intFlag("--days", 1)(v)))
     .option("--domain <d>")
     .action(
       jsonAction(getClient, (client, opts: JerryEmailActivityOpts) =>
@@ -1399,7 +1399,7 @@ export function registerJerryCommands(
   onboarding
     .command("list")
     .option("--status <key>")
-    .option("--tier <n>", "", Number)
+    .option("--tier <n>", "", intFlag("--tier", 1))
     .option("--due")
     .option("--search <text>")
     .action(
@@ -1434,7 +1434,7 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("add <asiakasId>")
-      .option("--tier <n>", "", Number)
+      .option("--tier <n>", "", intFlag("--tier", 1))
       .option("--malli <v>")
       .option("--kanava <text>")
       .option("--alue <text>")
@@ -1455,7 +1455,7 @@ export function registerJerryCommands(
     onboarding
       .command("set <asiakasId>")
       .option("--status <key>")
-      .option("--tier <n>", "", Number)
+      .option("--tier <n>", "", intFlag("--tier", 1))
       .option("--malli <v>")
       .option("--kanava <text>")
       .option("--alue <text>")

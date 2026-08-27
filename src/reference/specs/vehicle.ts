@@ -514,6 +514,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
     errors: [
+      intParseErr("--person", "pass a positive personId"),
       apiErr(400, "Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari)", "supply --reason, valid ids, and a driver eligible for this company"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
@@ -591,6 +592,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
+      intParseErr("--person", "pass a positive personId"),
       apiErr(400, "Missing --reason / bad ids", "supply --reason and a valid vehicleId/personId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],

@@ -13,6 +13,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { intFlag } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
@@ -320,7 +321,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     glossary
       .command("list")
       .option("--search <s>")
-      .option("--stalest <n>", "", (v: string) => Number(v))
+      .option("--stalest <n>", "", intFlag("--stalest", 1))
       .option("--domain <d>")
       .option("--related <substr>")
       .option("--terms-only")
@@ -330,7 +331,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
 
   glossary
     .command("misses")
-    .option("--top <n>", "", (v: string) => Number(v))
+    .option("--top <n>", "", intFlag("--top", 1))
     .action(jsonAction(getClient, (client, opts: { top?: number }) => runGlossaryMisses(client, opts.top)));
 
   const dismiss = glossary

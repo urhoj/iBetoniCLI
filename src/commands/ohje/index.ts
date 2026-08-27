@@ -11,6 +11,7 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { type AssessFlags, assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type TextEditOp } from "../../textEdit.js";
+import { intFlag } from "../../targets.js";
 
 /**
  * `ib ohje` — read/write the **UI help-text content** stored in the `helps`
@@ -361,7 +362,7 @@ export function registerOhjeCommands(
 
   addNeedsReviewFlags(
     o.command("list")
-      .option("--limit <n>", "", (v: string) => Number(v))
+      .option("--limit <n>", "", intFlag("--limit", 1))
       .option("--search <text>")
       .option("--empty-shorttext")
       .option(

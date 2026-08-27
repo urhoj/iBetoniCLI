@@ -2,7 +2,7 @@ import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom, threadAction } from "./resolveThread.js";
-import { parseId, resolveSearchQuery, queryAliasOption } from "../../../targets.js";
+import { parseId, resolveSearchQuery, queryAliasOption, intFlag, cappedInt } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 /**
@@ -182,19 +182,19 @@ export function registerMessageChatCommands(parent, getClient) {
         .description("Conversational message threads (Jerry tarjous now, keikka later)");
     c.command("threads")
         .option("--unread")
-        .option("--tarjous <id>", "", Number)
+        .option("--tarjous <id>", "", intFlag("--tarjous", 1))
         .action(jsonAction(getClient, (client, opts) => runChatThreads(client, opts)));
     addThreadTargetOption(c.command("thread [threadId]"))
         .action(threadAction(getClient, (client, id) => runChatThread(client, id)));
     addThreadTargetOption(c.command("list [threadId]"))
         .option("--since <iso>")
-        .option("--limit <n>", "", Number)
+        .option("--limit <n>", "", cappedInt(500))
         .option("--deleted")
         .action(threadAction(getClient, (client, id, opts) => runChatList(client, id, opts)));
     c.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())
-        .option("--limit <n>", "", Number)
+        .option("--limit <n>", "", cappedInt(200))
         .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts)));
     // Trimmed, non-empty, ≤4000 chars — the message-body contract send and edit share.
     const assertMessageBody = (raw) => {
@@ -235,9 +235,9 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     addThreadTargetOption(c.command("mark-read [threadId]"))
         .action(threadAction(getClient, (client, id) => runChatMarkRead(client, id)));
-    const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "", Number));
+    const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "", intFlag("--thread", 1)));
     addWriteFlagsToCommand(deleteCmd).action(messageAction(runChatDelete));
-    const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "", Number))
+    const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "", intFlag("--thread", 1)))
         .requiredOption("--body <text>");
     // Not messageAction: the body guard must stay ahead of getClient(), so a bad
     // body is exit 4 even when logged out.
@@ -250,7 +250,7 @@ export function registerMessageChatCommands(parent, getClient) {
             body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
         }));
     }));
-    const restoreCmd = addThreadTargetOption(c.command("restore <messageId>").option("--thread <id>", "", Number));
+    const restoreCmd = addThreadTargetOption(c.command("restore <messageId>").option("--thread <id>", "", intFlag("--thread", 1)));
     addWriteFlagsToCommand(restoreCmd).action(messageAction(runChatRestore));
 }
 //# sourceMappingURL=index.js.map
