@@ -1177,7 +1177,11 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         const desc = foldAliases([opts.description, opts.body], "Provide the description via --description or --body, not both with different values");
         if (desc !== undefined)
             opts.description = desc;
-        warnIfShellMangled({ appendDescription: opts.appendDescription, reason: opts.reason });
+        warnIfShellMangled({
+            description: opts.description,
+            appendDescription: opts.appendDescription,
+            reason: opts.reason,
+        });
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, {
             scope: opts.scope,

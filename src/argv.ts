@@ -11,10 +11,12 @@
  * invocation into the one the caller meant.
  *
  * KNOWN RESIDUALS (documented, pinned by test/argv.test.ts, accepted):
- * 1. A `-word` sitting in a VALUE position (`--title -reason`) used to be
- *    consumed as a literal value; post-rewrite it parses as a flag. Deliberate
- *    dash-led literals must use the equals form (`--title=-reason`), which
- *    starts with `--` and is never rewritten.
+ * 1. A `-word` sitting in a VALUE position (`--title -reason`) is rewritten
+ *    too; commander then consumes it as that option's value (the literal
+ *    silently mutates), or the eaten-empty-string guard rejects it loudly
+ *    when the word equals a real flag name. Deliberate dash-led literals must
+ *    use the equals form (`--title=-reason`), which starts with `--` and is
+ *    never rewritten.
  * 2. Commander's combined-shorts expansion (`-hV`) also matches and becomes
  *    the unknown `--hV`. Both shapes were vanishingly rare in practice — the
  *    recurrence this fixes is orders of magnitude more common.

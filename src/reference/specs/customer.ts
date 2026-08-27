@@ -62,7 +62,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     description: "List customers flagged dead/caution by the PRH nightly business-registry sweep.",
     permissions: ["auth.page.asiakas.read"],
     flags: [
-      { name: "limit", type: "number", default: "200", description: "Max rows (capped at 500)." },
+      { name: "limit", type: "number", default: "200", description: "Max rows (capped at 500)" },
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.",

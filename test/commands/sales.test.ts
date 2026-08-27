@@ -250,4 +250,13 @@ describe("ib sales — segment/search parity with the Myynti UI (fb#817)", () =>
     // assertion on the same rows.
     expect((await runProspectList(mockClient, { search: "kainuu" })).count).toBe(1);
   });
+
+  test("--search matches a needle straddling the companyName→asiakasNimi join boundary, like the Myynti UI (fb#920)", async () => {
+    mockClient.get.mockResolvedValue([
+      row({ saasProspectId: 11, companyName: "Kamppi", asiakasNimi: "Rakennus Oy" }),
+    ]);
+    // Neither field alone contains "kamppi rakennus" — only the UI's joined
+    // `${companyName} ${asiakasNimi}` string does.
+    expect((await runProspectList(mockClient, { search: "kamppi rakennus" })).count).toBe(1);
+  });
 });

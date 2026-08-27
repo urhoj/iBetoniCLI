@@ -1272,7 +1272,7 @@ DESCRIPTION
   Permissions: requires auth.page.asiakas.read.
 
 FLAGS
-  --limit NUMBER    Max rows (capped at 500). (default: 200)
+  --limit NUMBER    Max rows (capped at 500) (default: 200)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
