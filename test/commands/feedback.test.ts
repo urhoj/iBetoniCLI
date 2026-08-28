@@ -1294,6 +1294,7 @@ describe("ib feedback count", () => {
     byStatus: { open: 91, reviewed: 5, applied: 105, dismissed: 5 },
     byKind: { improvement: 105, bug: 77 },
     byScope: { cli: 71, app: 39 },
+    byClaim: { held: 4, free: 541 },
     unestimated: 26,
   };
 
@@ -1304,6 +1305,12 @@ describe("ib feedback count", () => {
     expect(out).toMatchObject(statsPayload);
     // No cap involved, so no lower-bound caveat to carry.
     expect(out.truncated).toBeUndefined();
+  });
+
+  test("passes byClaim (fb#888) through untouched — a pure GET, no client-side reshaping", async () => {
+    get.mockResolvedValueOnce(statsPayload);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(out.byClaim).toEqual({ held: 4, free: 541 });
   });
 
   test("forwards --kind and --scope filters", async () => {
