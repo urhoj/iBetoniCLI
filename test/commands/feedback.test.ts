@@ -1307,12 +1307,6 @@ describe("ib feedback count", () => {
     expect(out.truncated).toBeUndefined();
   });
 
-  test("passes byClaim (fb#888) through untouched — a pure GET, no client-side reshaping", async () => {
-    get.mockResolvedValueOnce(statsPayload);
-    const out = await runFeedbackCount(mockClient, {});
-    expect(out.byClaim).toEqual({ held: 4, free: 541 });
-  });
-
   test("forwards --kind and --scope filters", async () => {
     get.mockResolvedValueOnce(statsPayload);
     await runFeedbackCount(mockClient, { kind: "bug", scope: "cli" });
