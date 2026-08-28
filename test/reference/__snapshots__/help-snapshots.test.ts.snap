@@ -3558,6 +3558,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 6 (HTTP 503)  The backend's SQL principal cannot read sys.dm_db_index_usage_stats. In PRODUCTION that is the normal state, not an outage: puminet_app is a contained database user on the Standard S1 tier, where the usage DMVs need ##MS_ServerStateReader## server-role membership that only a server-level login can hold — no GRANT fixes it (fb#923) → read production usage stats from the monthly docs generator (docs/tech/database indexes-performance.md), or run this against a LOCAL backend whose SQL login is server-level (--endpoint http://127.0.0.1:<port>)
 
 NOTES
   - Counters RESET on every SQL Server restart/failover — \`statsSince\` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.

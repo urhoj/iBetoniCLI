@@ -251,7 +251,20 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "{ statsSince, items: [{ table, index, columns, type:'CLUSTERED'|'NONCLUSTERED'|…, unique, primaryKey?, filter?, seeks, scans, lookups, updates, lastRead, lastWrite, unused? }], nextCursor: null, count, truncated?, hint? }. `primaryKey`/`filter`/`unused` are OMITTED when false — presence is the signal." +
           truncNote,
         prettyColumns: ["table", "index", "seeks", "scans", "lookups", "updates", "lastRead", "lastWrite"],
-        errors: [LIMIT_1000_ERR, invalidNameErr, ...devErrors],
+        errors: [
+          LIMIT_1000_ERR,
+          invalidNameErr,
+          ...devErrors,
+          {
+            http: 503,
+            exit: 6,
+            match: "dmv_permission",
+            meaning:
+              "The backend's SQL principal cannot read sys.dm_db_index_usage_stats. In PRODUCTION that is the normal state, not an outage: puminet_app is a contained database user on the Standard S1 tier, where the usage DMVs need ##MS_ServerStateReader## server-role membership that only a server-level login can hold — no GRANT fixes it (fb#923)",
+            remedy:
+              "read production usage stats from the monthly docs generator (docs/tech/database indexes-performance.md), or run this against a LOCAL backend whose SQL login is server-level (--endpoint http://127.0.0.1:<port>)",
+          },
+        ],
         notes: [
           "Counters RESET on every SQL Server restart/failover — `statsSince` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.",
           "An `unused` index with high `updates` is pure write cost — the strongest drop candidate. `lastRead`/`lastWrite` are the most recent seek/scan/lookup and update timestamps within the window.",
