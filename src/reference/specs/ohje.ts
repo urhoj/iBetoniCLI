@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr } from "./shared.js";
+import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags } from "./shared.js";
 
 export const OHJE_SPECS: CommandSpec[] = [
 
@@ -34,8 +34,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       { name: "empty-shorttext", type: "boolean", description: "Only rows whose shorttext is blank (grooming backfill targets)" },
       { name: "fields", type: "string", description: "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)" },
       { name: "sort", type: "string", description: "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)" },
-      { name: "needs-review", type: "boolean", description: "Only help rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first by lastModifiedTime." },
-      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
+      ...needsReviewFlags("help row", "oldest-first by lastModifiedTime"),
     ],
     outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, aiConfidence, needsHumanReview, … }> (rows projected to --fields when set)",
     errors: [intParseErr("--limit", "pass a positive integer"), apiErr(500, "Backend error", "retry with --verbose")],
@@ -62,9 +61,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       { name: "htmltext", type: "string", description: "Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally." },
       { name: "img", type: "string", description: "Image reference (" + clearHint("--img") + ", to null)" },
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
-      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
-      { name: "needs-human-review", type: "boolean", description: "Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
-      { name: "no-needs-human-review", type: "boolean", description: "Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
+      ...assessWriteFlags("help row"),
       { name: "field", type: "string", description: "Edit-mode target field: title | shorttext | htmltext (default htmltext)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
       { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },

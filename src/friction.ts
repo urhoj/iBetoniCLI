@@ -118,8 +118,8 @@ export function truncateMessage(message: string): string {
 /**
  * @param curatedHint the error was answered by a remedy the COMMAND owns — a
  *   matching spec ERRORS row, or one attached at the throw site (see
- *   `hintDetailForError`'s `source`). Only meaningful for exit 5; see the
- *   not-found skip below.
+ *   `hintDetailForError`'s `source`). Meaningful for exit 5 (the not-found
+ *   skip below) and for the 409 claim-conflict skip further down.
  */
 export function recordFriction(
   err: unknown,

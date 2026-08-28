@@ -4183,7 +4183,7 @@ FLAGS
   --domain STRING    Filter to a domain (exact match)
   --related STRING    Filter to terms whose relatedCommands contain this substring
   --terms-only    Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist.
-  --needs-review    Only terms still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
+  --needs-review    Only terms still needing grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
@@ -4294,7 +4294,7 @@ FLAGS
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
-  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
+  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the term.
   --needs-human-review    Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
   --no-needs-human-review    Un-park the term — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
 
@@ -8951,7 +8951,7 @@ FLAGS
   --empty-shorttext    Only rows whose shorttext is blank (grooming backfill targets)
   --fields STRING    Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)
   --sort STRING    Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)
-  --needs-review    Only help rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first by lastModifiedTime.
+  --needs-review    Only help rows still needing grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first by lastModifiedTime.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
@@ -8990,9 +8990,9 @@ FLAGS
   --htmltext STRING    Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally.
   --img STRING    Image reference (pass "" to clear — PowerShell DROPS a bare "", so use \`--img=\` there (same meaning in bash; \`ib help shell-quoting\`), to null)
   --must-exist    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
-  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
+  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the help row.
   --needs-human-review    Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
-  --no-needs-human-review    Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
+  --no-needs-human-review    Un-park the help row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
   --field STRING    Edit-mode target field: title | shorttext | htmltext (default htmltext)
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace (empty deletes the matched text; pass "" to clear — PowerShell DROPS a bare "", so use \`--with=\` there (same meaning in bash; \`ib help shell-quoting\`))
@@ -10719,7 +10719,7 @@ FLAGS
   --stalest NUMBER    Return up to N entries sorted by least-recently reviewed
   --domain STRING    Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest, so the budget isn't spent on unrelated commands
   --with-detail    Include each entry's full detail text (adds a \`detail\` field per item), folding the per-command \`reference detail get\` into this one call. Needs the backend deployed; on an old backend the field is simply absent.
-  --needs-review    Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
+  --needs-review    Only rows still needing grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
   --search STRING    Only rows whose command PATH contains this substring (case-insensitive). Client-side, so it works without a raw DB LIKE — the discover half of \`reference detail delete\`.
   --orphans    Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as \`reference detail lint\`, but streamed as normal list rows so you can pipe → \`delete\`. Compose with --search to narrow.
@@ -10770,7 +10770,7 @@ ARGUMENTS
 FLAGS
   --summary STRING    Short one-line summary stored in the catalog (≤160 chars, server-enforced)
   --detail STRING    Full markdown business-context detail (≤4000 chars, server-enforced). Don't recap flags/exit codes — those already render in \`--help\` from the spec; spend the budget on business context only found here.
-  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
+  --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
   --needs-human-review    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
   --no-needs-human-review    Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
   --field STRING    Edit-mode target field: summary | detail (default detail)

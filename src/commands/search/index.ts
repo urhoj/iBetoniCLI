@@ -143,7 +143,7 @@ function projectSijainnit(
       entity: "sijainti" as const,
       id: Number(s.sijaintiId),
       sijaintiId: Number(s.sijaintiId),
-      label: (s.name as string) ?? null,
+      label: (s.name as string) || null,
       detail: [s.typeName, s.address].filter(Boolean).join(" · ") || null,
     }));
 }

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr } from "./shared.js";
+import { clearHint, apiErr, assessWriteFlags, needsReviewFlags } from "./shared.js";
 
 export const REFERENCE_SPECS: CommandSpec[] = [
 
@@ -119,8 +119,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         type: "boolean",
         description: "Include each entry's full detail text (adds a `detail` field per item), folding the per-command `reference detail get` into this one call. Needs the backend deployed; on an old backend the field is simply absent.",
       },
-      { name: "needs-review", type: "boolean", description: "Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first." },
-      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
+      ...needsReviewFlags("row"),
       { name: "search", type: "string", description: "Only rows whose command PATH contains this substring (case-insensitive). Client-side, so it works without a raw DB LIKE — the discover half of `reference detail delete`." },
       { name: "orphans", type: "boolean", description: "Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as `reference detail lint`, but streamed as normal list rows so you can pipe → `delete`. Compose with --search to narrow." },
       { name: "limit", type: "number", description: "Return at most N rows. A client-side payload CAP applied LAST (after --search/--orphans), not a pager — there is no cursor, so the rows past N are simply not returned and `truncated: true` says so." },
@@ -176,9 +175,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         type: "string",
         description: "Full markdown business-context detail (≤4000 chars, server-enforced). Don't recap flags/exit codes — those already render in `--help` from the spec; spend the budget on business context only found here.",
       },
-      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
-      { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
-      { name: "no-needs-human-review", type: "boolean", description: "Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
+      ...assessWriteFlags("row"),
       { name: "field", type: "string", description: "Edit-mode target field: summary | detail (default detail)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
       { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },

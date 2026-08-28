@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, intParseErr } from "./shared.js";
+import { clearHint, clearNote, intParseErr, assessWriteFlags, needsReviewFlags } from "./shared.js";
 
 export const GLOSSARY_SPECS: CommandSpec[] = [
   // ─── glossary ────────────────────────────────────────────────────────────────
@@ -32,8 +32,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "domain", type: "string", description: "Filter to a domain (exact match)" },
       { name: "related", type: "string", description: "Filter to terms whose relatedCommands contain this substring" },
       { name: "terms-only", type: "boolean", description: "Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist." },
-      { name: "needs-review", type: "boolean", description: "Only terms still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first." },
-      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
+      ...needsReviewFlags("term"),
     ],
     outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }",
     notes: [
@@ -97,9 +96,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "add-synonyms", type: "string", description: "Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms." },
       { name: "remove-synonyms", type: "string", description: "Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms." },
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
-      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
-      { name: "needs-human-review", type: "boolean", description: "Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
-      { name: "no-needs-human-review", type: "boolean", description: "Un-park the term — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
+      ...assessWriteFlags("term"),
     ],
     outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
     notes: [

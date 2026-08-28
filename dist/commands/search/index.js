@@ -96,7 +96,7 @@ function projectSijainnit(items, query, limit) {
         entity: "sijainti",
         id: Number(s.sijaintiId),
         sijaintiId: Number(s.sijaintiId),
-        label: s.name ?? null,
+        label: s.name || null,
         detail: [s.typeName, s.address].filter(Boolean).join(" · ") || null,
     }));
 }

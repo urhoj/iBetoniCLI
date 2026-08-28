@@ -383,6 +383,24 @@ export const SEARCH_ALIAS_FLAG: CommandFlag = {
   type: "string",
   description: "Search query (alias for the <query> positional)",
 };
+/**
+ * Spec twin of `assess.ts` `addAssessWriteFlags` — the 3 flag rows every
+ * consumer of it must document. Hand-copied across ohje/glossary/reference
+ * had already drifted in wording before this existed (fb#952 review); one
+ * factory per entity noun keeps the Commander attacher and its spec in sync.
+ */
+export const assessWriteFlags = (entity: string): CommandFlag[] => [
+  { name: "ai-confidence", type: "number", description: `Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the ${entity}.` },
+  { name: "needs-human-review", type: "boolean", description: `Park the ${entity} for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.` },
+  { name: "no-needs-human-review", type: "boolean", description: `Un-park the ${entity} — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.` },
+];
+
+/** Spec twin of `assess.ts` `addNeedsReviewFlags`. `order` names the sort applied when `--needs-review` is set. */
+export const needsReviewFlags = (entity: string, order = "oldest-first"): CommandFlag[] => [
+  { name: "needs-review", type: "boolean", description: `Only ${entity}s still needing grooming: aiConfidence below the threshold (or never assessed) AND not parked, ${order}.` },
+  { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
+];
+
 /** The two safety notes every combinator `merge` spec states verbatim. */
 export const MERGE_DRY_RUN_FIRST_NOTE =
   "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.";
