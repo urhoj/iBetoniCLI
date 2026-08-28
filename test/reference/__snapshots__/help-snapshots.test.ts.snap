@@ -4195,6 +4195,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --stalest is not an integer >= 1, rejected locally before any request → pass a positive integer
+  exit 4 (client-side)  --max-confidence is not an integer >= 0, rejected locally before any request → pass an integer >= 0 (default 90)
   exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
 
 NOTES
@@ -8963,6 +8964,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
+  exit 4 (client-side)  --max-confidence is not an integer >= 0, rejected locally before any request → pass an integer >= 0 (default 90)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -10736,6 +10738,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
   exit 4 (client-side)  Unknown --domain       → \`ib commands\` for valid domains
   exit 4 (client-side)  --limit / --stalest is not an integer >= 1 → pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+  exit 4 (client-side)  --max-confidence is not an integer >= 0, rejected locally before any request → pass an integer >= 0 (default 90)
 
 NOTES
   - --search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.

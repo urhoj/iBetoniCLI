@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, assessWriteFlags, needsReviewFlags } from "./shared.js";
+import { clearHint, apiErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR } from "./shared.js";
 
 export const REFERENCE_SPECS: CommandSpec[] = [
 
@@ -129,6 +129,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
       { origin: "client", exit: 4, match: "unknown domain", meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
       { origin: "client", exit: 4, match: ["--limit", "--stalest"], meaning: "--limit / --stalest is not an integer >= 1", remedy: "pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog" },
+      MAX_CONFIDENCE_PARSE_ERR,
     ],
     notes: [
       "--search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.",

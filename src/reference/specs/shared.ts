@@ -339,6 +339,8 @@ export const DRIVER_DATE_NOTE =
 export const SYSADMIN_403: CommandError = apiErr(403, "Not a system admin", "use a system-admin token");
 /** The `--person` parse-guard row shared by every command taking a personId flag (message, person, lifecycle, legal, vehicle). */
 export const PERSON_PARSE_ERR: CommandError = intParseErr("--person", "pass a positive personId");
+/** The `--max-confidence` parse-guard row shared by every `addNeedsReviewFlags` consumer (ohje/glossary/reference detail list) — min 0, not 1, since a threshold of 0 is meaningful. */
+export const MAX_CONFIDENCE_PARSE_ERR: CommandError = intParseErr("--max-confidence", "pass an integer >= 0 (default 90)", 0);
 /**
  * `resolveRoleTypeId` rejects an unknown --role LOCALLY, before any request, so
  * every role-taking command needs this client row alongside its backend-400 twin

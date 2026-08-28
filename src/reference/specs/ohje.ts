@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags } from "./shared.js";
+import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR } from "./shared.js";
 
 export const OHJE_SPECS: CommandSpec[] = [
 
@@ -37,7 +37,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       ...needsReviewFlags("help row", "oldest-first by lastModifiedTime"),
     ],
     outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, aiConfidence, needsHumanReview, … }> (rows projected to --fields when set)",
-    errors: [intParseErr("--limit", "pass a positive integer"), apiErr(500, "Backend error", "retry with --verbose")],
+    errors: [intParseErr("--limit", "pass a positive integer"), MAX_CONFIDENCE_PARSE_ERR, apiErr(500, "Backend error", "retry with --verbose")],
     examples: [
       "ib ohje list --limit 10 --pretty",
       "ib ohje list --empty-shorttext --fields helpId,title,accessCount --sort accessCount:desc",

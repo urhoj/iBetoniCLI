@@ -1,4 +1,5 @@
 import { failWith } from "./output/json.js";
+import { intFlag } from "./targets.js";
 /**
  * Validate a self-assessed confidence: an integer 0–100, or undefined (the flag
  * was omitted — a human edit that resets the score). `failWith` throws a CliError
@@ -22,6 +23,6 @@ export function addAssessWriteFlags(cmd) {
 export function addNeedsReviewFlags(cmd) {
     return cmd
         .option("--needs-review", "Only rows that still need grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first.")
-        .option("--max-confidence <n>", "Confidence threshold for --needs-review (default 90).", (v) => Number(v));
+        .option("--max-confidence <n>", "Confidence threshold for --needs-review (default 90).", intFlag("--max-confidence", 0));
 }
 //# sourceMappingURL=assess.js.map

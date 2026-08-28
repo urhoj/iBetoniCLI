@@ -581,6 +581,10 @@ ib fennoa purchases --months <n>
   ! --months must be an integer >= 1
   > pass a positive number of months (default 6, max 12)
 
+ib glossary list --max-confidence <n>
+  ! --max-confidence must be an integer >= 0
+  > pass an integer >= 0 (default 90)
+
 ib glossary list --stalest <n>
   ! --stalest must be an integer >= 1
   > pass a positive integer
@@ -953,6 +957,10 @@ ib ohje list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer
 
+ib ohje list --max-confidence <n>
+  ! --max-confidence must be an integer >= 0
+  > pass an integer >= 0 (default 90)
+
 ib opendata building --lat <n>
   ! --lat must be a number
   > pass the latitude as a number
@@ -1124,6 +1132,10 @@ ib person search --limit <n>
 ib reference detail list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+
+ib reference detail list --max-confidence <n>
+  ! --max-confidence must be an integer >= 0
+  > pass an integer >= 0 (default 90)
 
 ib reference detail list --stalest <n>
   ! --stalest must be an integer >= 1

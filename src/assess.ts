@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { failWith } from "./output/json.js";
+import { intFlag } from "./targets.js";
 
 /** AI self-assessment fields carried on a content write. */
 export interface AssessFlags {
@@ -49,6 +50,6 @@ export function addNeedsReviewFlags(cmd: Command): Command {
     .option(
       "--max-confidence <n>",
       "Confidence threshold for --needs-review (default 90).",
-      (v: string) => Number(v)
+      intFlag("--max-confidence", 0)
     );
 }
