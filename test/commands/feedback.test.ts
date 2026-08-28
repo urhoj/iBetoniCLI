@@ -20,7 +20,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CliError, exitCodeFromStatus } from "../../src/api/errors.js";
-import { captureActionError } from "../helpers/stderr.js";
+import { captureActionError, captureStderr, type StderrCapture } from "../helpers/stderr.js";
 
 /**
  * A server error shaped exactly like the client throws one. These fixtures used
@@ -1845,18 +1845,17 @@ describe("ib feedback list — --held filter", () => {
  * actively misreports another session's claim as this caller's own.
  */
 describe("ib feedback list — claimState under a derived identity (fb#901)", () => {
-  let errSpy: ReturnType<typeof vi.spyOn>;
+  let cap: StderrCapture;
   const savedId = process.env.IB_CLAIM_ID;
   beforeEach(() => {
     delete process.env.IB_CLAIM_ID;
-    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    cap = captureStderr();
   });
   afterEach(() => {
-    errSpy.mockRestore();
+    cap.restore();
     if (savedId === undefined) delete process.env.IB_CLAIM_ID;
     else process.env.IB_CLAIM_ID = savedId;
   });
-  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
   const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
   test("a row claimed under the fallback label reports 'held', not 'mine', and warns", async () => {
@@ -1866,7 +1865,7 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
     ]);
     const out = await runFeedbackList(mockClient, { status: "open" });
     expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "held" });
-    expect(note()).toMatch(/DERIVED from user@host/);
+    expect(cap.text()).toMatch(/DERIVED from user@host/);
   });
 
   test("an explicit IB_CLAIM_ID still reports 'mine' with no warning", async () => {
@@ -1876,7 +1875,7 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
     ]);
     const out = await runFeedbackList(mockClient, { status: "open" });
     expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "mine" });
-    expect(note()).not.toMatch(/downgraded/);
+    expect(cap.text()).not.toMatch(/downgraded/);
   });
 
   test("a row held by SOMEONE ELSE under a derived identity is unaffected ('held' either way)", async () => {
@@ -1885,7 +1884,7 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
     ]);
     const out = await runFeedbackList(mockClient, { status: "open" });
     expect(out.items[0]).toMatchObject({ feedbackId: 1, claimState: "held" });
-    expect(note()).not.toMatch(/downgraded/);
+    expect(cap.text()).not.toMatch(/downgraded/);
   });
 });
 

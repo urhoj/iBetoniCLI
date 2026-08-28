@@ -15,7 +15,7 @@ export const SALES_SPECS: CommandSpec[] = [
       { name: "status", type: "string", description: "ei_aloitettu | analysoitu | kontaktoitu | tapaaminen | tarjous | voitettu | havitty | ei_sovellu" },
       { name: "tier", type: "number", description: "1 priority · 2 secondary · 3 long tail" },
       { name: "segment", type: "string", description: "pumppu | betoni | all | muu. SAME semantics as the Myynti UI buckets (fb#817): pumppu/betoni mean value-OR-all, muu means value-OR-unset (the not-yet-typed bucket). Any other value is an exact match." },
-      { name: "search", type: "string", description: "Case-insensitive substring over companyName + asiakasNimi + ytunnus + region (union of the Myynti UI's fields and this command's, fb#817)" },
+      { name: "search", type: "string", description: "Case-insensitive substring over companyName + asiakasNimi + ytunnus + region (union of the Myynti UI's fields and this command's, fb#817), plus the UI's joined \"companyName asiakasNimi\" string so a needle spanning that boundary matches too (fb#920)" },
       { name: "brief", type: "boolean", description: "Omit analysis + pitchAngle — the full list is ~60 KB of narrative" },
     ],
     outputShape:

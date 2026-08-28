@@ -521,7 +521,7 @@ export async function runFeedbackList(
   if (claimFilters.length > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
   }
-  const me = resolveClaimId(undefined);
+  const { by: me, source: idSource } = resolveClaim(undefined);
   const claimedBy = opts.mine ? me : opts.claimedBy;
   const statuses = resolveStatuses(opts);
   let items: Record<string, unknown>[];
@@ -588,7 +588,7 @@ export async function runFeedbackList(
   // caller made the claim, just that some unset-env session did. Reporting
   // "mine" there actively misreports ownership (fb#901) — downgrade to "held"
   // and warn once, rather than silently mislabeling another session's claim.
-  if (claimIdSource(undefined) === "derived" && items.some((r) => r.claimState === "mine")) {
+  if (idSource === "derived" && items.some((r) => r.claimState === "mine")) {
     items = items.map((r) => (r.claimState === "mine" ? { ...r, claimState: "held" as const } : r));
     warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
   }

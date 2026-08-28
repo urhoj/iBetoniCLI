@@ -42,16 +42,15 @@ export async function runProspectList(client, opts = {}) {
         // salesProspectFilters.js) — without it a padded search box and a padded
         // `--search` disagree, which is exactly the parity fb#817 exists to keep.
         const needle = opts.search.trim().toLowerCase();
-        // Union of the UI's fields (companyName + asiakasNimi, fb#817) and this
-        // command's original ones (ytunnus + region), so a name typed into Myynti
-        // and a name typed here can never disagree. The UI additionally matches
-        // against the JOINED string (salesProspectFilters.js), so a needle
-        // straddling the companyName→asiakasNimi space boundary must too (fb#920).
+        // Matches the UI's joined string (companyName + " " + asiakasNimi,
+        // salesProspectFilters.js) so a needle straddling that space boundary
+        // matches here too (fb#920) — this subsumes matching either field alone,
+        // so only this command's own extras (ytunnus + region, fb#817) need a
+        // separate check.
         all = all.filter((r) => {
             const joined = `${r.companyName || ""} ${r.asiakasNimi || ""}`.toLowerCase();
-            if (joined.includes(needle))
-                return true;
-            return [r.companyName, r.asiakasNimi, r.ytunnus, r.region].some((v) => String(v ?? "").toLowerCase().includes(needle));
+            return (joined.includes(needle) ||
+                [r.ytunnus, r.region].some((v) => String(v ?? "").toLowerCase().includes(needle)));
         });
     }
     if (opts.brief) {
