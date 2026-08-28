@@ -399,3 +399,28 @@ describe("hintForError — two causes behind one status (fb#485 mechanism)", () 
     expect(hintForError(err, shadowed)).not.toMatch(/auth\.page\.person\.read/);
   });
 });
+
+describe("hintForError — 5xx missing-object provisioning hint (fb#840)", () => {
+  test("a raw 'Could not find stored procedure' 500 is hinted as a provisioning gap, not a generic backend error", () => {
+    const err = new CliError("Could not find stored procedure 'person_search_global'.", 500, null, 6);
+    const hint = hintForError(err, null) ?? "";
+    expect(hint).toMatch(/missing this object/i);
+    expect(hint).toMatch(/provisioning|migration/i);
+    expect(hint).not.toMatch(/retry with --verbose/);
+  });
+
+  test("'Invalid object name' (missing table/view) gets the same provisioning hint", () => {
+    const err = new CliError("Invalid object name 'dbo.someView'.", 500, null, 6);
+    expect(hintForError(err, null)).toMatch(/missing this object/i);
+  });
+
+  test("matching is case-insensitive", () => {
+    const err = new CliError("COULD NOT FIND STORED PROCEDURE 'x'.", 500, null, 6);
+    expect(hintForError(err, null)).toMatch(/missing this object/i);
+  });
+
+  test("THE REGRESSION: an unrelated 500 still gets the generic backend-error fallback", () => {
+    const err = new CliError("Something else went wrong", 500, null, 6);
+    expect(hintForError(err, null)).toMatch(/retry with --verbose/);
+  });
+});

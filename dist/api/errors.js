@@ -213,6 +213,14 @@ function genericHint(err) {
             if (err.statusCode >= 500 && looksLikeHtml(err.body)) {
                 return "this came from the EDGE (a proxy interstitial), not the application — the request most likely never reached the backend. Retry: it is usually transient. Confirm with `ib version` before assuming an app fault, and use --verbose to see the raw page.";
             }
+            // A raw SQL "object not found" error reaching the caller verbatim (fb#840)
+            // means the endpoint's DATABASE is missing something the code expects —
+            // most often the isolated dev DB lagging a migration that already ran on
+            // prod — not a bad argument. Distinguishing this from the generic 500
+            // saves a debugging detour into the request itself.
+            if (err.statusCode >= 500 && /could not find stored procedure|invalid object name/i.test(err.message)) {
+                return "the endpoint's database is missing this object — likely a provisioning/migration gap (e.g. the isolated dev DB is stale, or a migration never ran there), not a bad argument. Against a local dev backend, check `scripts/dev-db/check-schema-drift.mjs`; against production, file `ib dev feedback create --kind bug`.";
+            }
             if (err.statusCode >= 500)
                 return "backend error — retry with --verbose; if it persists, file `ib dev feedback create --kind bug`";
             return null;

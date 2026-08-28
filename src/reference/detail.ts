@@ -158,9 +158,12 @@ export async function runReferenceDetailDelete(
  * `routes/cli/commandCatalogCliRoutes.js`). Mirrored here so an over-cap write
  * fails offline naming the submitted length instead of costing a round trip, and
  * so an `--append` that overflows surfaces in the `--dry-run` PREVIEW rather than
- * only on the real write (fb#284). Keep in sync if the server cap moves.
+ * only on the real write (fb#284). Keep in sync if the server cap moves. `detail`
+ * was raised 2000 -> 4000 (fb#941): the column is `nvarchar(max)`, so the cap was
+ * a pure app-layer constant, not a DB width limit, and 2000 was cutting off
+ * genuinely substantive documentation.
  */
-const FIELD_MAX = { summary: 160, detail: 2000 } as const;
+const FIELD_MAX = { summary: 160, detail: 4000 } as const;
 
 function assertWithinCap(field: DetailEditableField, text: string, verb = "is"): void {
   const max = FIELD_MAX[field];
