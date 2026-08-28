@@ -22,34 +22,34 @@ export function assertAiConfidence(v: number | undefined): void {
   }
 }
 
-/** Attach the AI self-assessment WRITE flags to a mutation command. */
+/**
+ * Attach the AI self-assessment WRITE flags to a mutation command. Descriptions
+ * are intentionally blank: `attachRichHelp` fully replaces `--help` rendering for
+ * every spec'd command with the spec's own flag descriptions (`assessWriteFlags`
+ * in reference/specs/shared.ts), so these strings render nowhere and only rot
+ * (fb#952 already found them drifted once; a code-simplifier pass over fb#958
+ * found them drifted again).
+ */
 export function addAssessWriteFlags(cmd: Command): Command {
   return cmd
     .option(
       "--ai-confidence <n>",
-      "Self-assessed completeness/correctness of the content you just wrote (0–100; see the groom rubric). Omit on a human edit to reset the score and re-open the row.",
+      "",
+      // Bare Number is safe here: assertAiConfidence re-validates the 0–100
+      // range on every write path.
       (v: string) => Number(v)
     )
-    .option(
-      "--needs-human-review",
-      "Park the row for a human (excludes it from --needs-review) — set with a low --ai-confidence when you cannot raise it without human input."
-    )
-    .option(
-      "--no-needs-human-review",
-      "Un-park the row — clear a previously-set --needs-human-review flag."
-    );
+    .option("--needs-human-review")
+    .option("--no-needs-human-review");
 }
 
-/** Attach the AI groom SELECT flags to a list command. */
+/**
+ * Attach the AI groom SELECT flags to a list command. Descriptions are
+ * intentionally blank — see {@link addAssessWriteFlags}'s comment; the spec
+ * twin is `needsReviewFlags` in reference/specs/shared.ts.
+ */
 export function addNeedsReviewFlags(cmd: Command): Command {
   return cmd
-    .option(
-      "--needs-review",
-      "Only rows that still need grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first."
-    )
-    .option(
-      "--max-confidence <n>",
-      "Confidence threshold for --needs-review (default 90).",
-      intFlag("--max-confidence", 0)
-    );
+    .option("--needs-review")
+    .option("--max-confidence <n>", "", intFlag("--max-confidence", 0));
 }
