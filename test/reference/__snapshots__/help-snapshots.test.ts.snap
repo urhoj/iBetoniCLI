@@ -4384,10 +4384,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in.
+  { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
+  exit 5 (HTTP 404)  Company not found      → the asiakasId has no asiakas row — distinct from a real company with no Jerry config, which returns 200 with empty arrays
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
