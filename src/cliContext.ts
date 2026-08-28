@@ -45,46 +45,14 @@ export async function resolveEphemeralSwitch(opts: {
   };
 }
 
-const normalizeEndpoint = (u: string) => u.replace(/\/+$/, "").toLowerCase();
-
-/**
- * The one "this 401 means WRONG ENDPOINT for this token, not expired session"
- * diagnostic (fb#465).
- *
- * A file-backed session is endpoint-specific — its JWT and refresh token were
- * minted by the stored endpoint. Under a `--endpoint` override a 401 elsewhere
- * means the token does not belong there: refreshing against the override fails
- * (different JWT_KEY), and if the keys happened to match it would persist a
- * foreign-minted JWT into the stored profile. The generic remedy ("session
- * unrecoverable, run `ib auth login`") names the wrong cause and throws away a
- * session that is still valid on its own endpoint.
- *
- * Raised from BOTH places a mismatched session can 401 (fb#484):
- *  - the refresh-on-401 callback, i.e. the command's own request; and
- *  - the global `--company` ephemeral switch, which calls performSwitch with the
- *    stored token BEFORE the API client and its refresh callback exist, so it
- *    could never reach the callback above.
- *
- * Client-origin (`statusCode` 0): the 401 itself came from the server, but THIS
- * error is locally fabricated — see test/api/client-origin-status.test.ts.
- */
-function endpointMismatchError(opts: {
-  /** The endpoint the request actually went to (the `--endpoint` override). */
-  requestEndpoint: string;
-  /** The endpoint the stored session was minted against. */
-  sessionEndpoint: string;
-  /** What 401'd, when it was not the command's own request. */
-  during?: string;
-}): CliError {
-  const what = opts.during ? `${opts.during}: 401` : "401";
-  return new CliError(
-    `${what} from ${opts.requestEndpoint}, but the stored session was minted against ${opts.sessionEndpoint} — a token is endpoint-specific (the stored session is likely still valid on its own endpoint)`,
-    0,
-    null,
-    2,
-    `authenticate against this endpoint with \`ib auth login --endpoint ${opts.requestEndpoint}\`, or set IB_TOKEN to a token minted for it (local backend: \`node puminet5api/utils/test/mint-local-token.js\`)`
-  );
-}
+// A file-backed session is endpoint-specific — its JWT and refresh token were
+// minted by one backend. Under `--endpoint` resolveAuth therefore loads ONLY the
+// session minted for that endpoint (fb#855), so a token can never be presented
+// to, refreshed against, or persisted from another backend. This is what the
+// fb#465/fb#484 "401 here means wrong endpoint, not expired session" diagnostic
+// used to guard at request time; with per-endpoint sessions that state is
+// unreachable and the missing session is reported as "Not logged in at <url>"
+// before any request is made.
 
 /**
  * Resolved per-invocation CLI context: an authenticated API client plus the
@@ -142,15 +110,6 @@ export async function createCliContext(opts: {
   const endpoint = opts.global.endpoint ?? auth.endpoint;
   const store = createStore(opts.credentialsPath);
 
-  // Computed BEFORE the ephemeral switch below, not after (fb#484): the switch is
-  // the FIRST network call of the invocation, so it is the first thing that can
-  // 401 on a mismatched endpoint — and it runs with the stored token, ahead of the
-  // API client that carries the refresh-path copy of this diagnostic.
-  const endpointMismatch =
-    auth.source === "file" &&
-    opts.global.endpoint != null &&
-    normalizeEndpoint(opts.global.endpoint) !== normalizeEndpoint(auth.endpoint);
-
   // Optional per-invocation global `--company <id>`: act in another company for this
   // one command without persisting the switch. Mints an ephemeral JWT bound to
   // the target tenant (the switch endpoint enforces access; no access → exit 3)
@@ -185,18 +144,6 @@ export async function createCliContext(opts: {
         // — feedback #311). The message above is already the full remedy.
         ""
       );
-    }
-    // A 401 here is the endpoint-mismatch case, NOT an expired session (fb#484).
-    // performSwitch ran against the OVERRIDE endpoint with a token the STORED
-    // endpoint minted, so the generic 401 remedy ("run `ib auth refresh`") sends
-    // the caller to refresh a session that is fine — the same wrong-cause framing
-    // fb#465 removed from the command's own request path.
-    if (e instanceof CliError && e.statusCode === 401 && endpointMismatch) {
-      throw endpointMismatchError({
-        requestEndpoint: endpoint,
-        sessionEndpoint: auth.endpoint,
-        during: "--company switch",
-      });
     }
     throw e;
   }
@@ -249,18 +196,9 @@ export async function createCliContext(opts: {
     // refreshAndPersistSession falls back to the OAuth refresh_token grant when
     // the JWT-bearer refresh fails (fb#258: heals a session whose JWT lapsed),
     // persisting the rotated refresh token + expiry alongside the fresh JWT.
-    // On an `--endpoint` override differing from the stored session's endpoint
-    // the callback instead raises the endpoint-mismatch diagnostic (fb#465).
     onRefresh:
       auth.refreshable && !eph.switched && !isImpersonating
-        ? endpointMismatch
-          ? async () => {
-              throw endpointMismatchError({
-                requestEndpoint: endpoint,
-                sessionEndpoint: auth.endpoint,
-              });
-            }
-          : (currentJwt: string) => refreshAndPersistSession({ endpoint, store, currentJwt })
+        ? (currentJwt: string) => refreshAndPersistSession({ endpoint, store, currentJwt })
         : undefined,
   });
 

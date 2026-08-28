@@ -65,7 +65,11 @@ export async function resolveAuth(opts) {
     // pointing at the wrong subsystem entirely (fb#420).
     if (process.env.IB_TOKEN !== undefined)
         return bareTokenAuth(process.env.IB_TOKEN, opts.defaultEndpoint, true);
-    const creds = await createStore(opts.credentialsPath).load();
+    // Sessions are per endpoint (fb#855): an explicit --endpoint selects the
+    // session minted FOR it, never the active one — a prod token presented to a
+    // local backend is a 401 with a misleading remedy, not a session.
+    const store = createStore(opts.credentialsPath);
+    const creds = opts.defaultEndpoint ? await store.loadFor(opts.defaultEndpoint) : await store.load();
     if (!creds)
         return null;
     return {

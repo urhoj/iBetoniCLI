@@ -1,9 +1,10 @@
 import { createStore } from "./store.js";
 /**
- * Tear down a CLI session: best-effort revoke the refresh token at
- * `POST /oauth/revoke`, then unconditionally delete the local credentials
- * file. Network failures are swallowed — the local file is always cleared
- * so the user is logged out from this machine even when offline.
+ * Tear down ONE CLI session: best-effort revoke the refresh token at
+ * `POST /oauth/revoke`, then unconditionally forget that endpoint's local
+ * session (other endpoints' sessions stay — fb#855; the file goes with the
+ * last one). Network failures are swallowed — the local session is always
+ * removed so the user is logged out from this machine even when offline.
  */
 export async function performLogout(opts) {
     // Best-effort revoke; never throws.
@@ -23,6 +24,6 @@ export async function performLogout(opts) {
     catch {
         // fail-open — still delete the local file
     }
-    await createStore(opts.credentialsPath).clear();
+    await createStore(opts.credentialsPath).removeEndpoint(opts.endpoint);
 }
 //# sourceMappingURL=logout.js.map

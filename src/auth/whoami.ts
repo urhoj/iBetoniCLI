@@ -37,6 +37,18 @@ export interface WhoamiOutput {
   refreshed?: true;
   /** Present only while an impersonation session is active. */
   impersonating?: { actorPersonId: number; sessionId: string };
+  /**
+   * File sessions only (fb#855): every stored session, active first — one per
+   * endpoint, so an agent can see which `--endpoint`s need no login.
+   */
+  sessions?: Array<{
+    endpoint: string;
+    personId: number;
+    ownerAsiakasId: number;
+    ownerAsiakasName: string;
+    expiresAt: string;
+    active: boolean;
+  }>;
 }
 
 /**

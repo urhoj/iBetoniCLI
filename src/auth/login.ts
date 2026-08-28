@@ -144,19 +144,24 @@ export async function performLogin(opts: LoginOptions): Promise<void> {
     );
   }
 
-  // 7. Persist credentials.
+  // 7. Persist credentials — as the ACTIVE session; a session for another
+  //    endpoint is parked, not replaced (fb#855).
   const store = createStore(opts.credentialsPath);
   const now = new Date();
-  await store.save({
-    jwt: tokenBody.access_token,
-    refreshToken: tokenBody.refresh_token ?? "",
-    issuedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + tokenBody.expires_in * 1000).toISOString(),
-    personId: payload.personId,
-    ownerAsiakasId: payload.ownerAsiakasId,
-    ownerAsiakasName: payload.ownerAsiakasName ?? "",
-    endpoint: opts.endpoint,
-  });
+  await store.save(
+    {
+      jwt: tokenBody.access_token,
+      refreshToken: tokenBody.refresh_token ?? "",
+      issuedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + tokenBody.expires_in * 1000).toISOString(),
+      personId: payload.personId,
+      ownerAsiakasId: payload.ownerAsiakasId,
+      ownerAsiakasName: payload.ownerAsiakasName ?? "",
+      endpoint: opts.endpoint,
+    },
+    undefined,
+    { activate: true }
+  );
 
   // 8. Confirmation to stderr — stdout is reserved for JSON/parseable output.
   const who = payload.email ?? "user";

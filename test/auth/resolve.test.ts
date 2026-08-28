@@ -166,3 +166,45 @@ describe("resolveAuth", () => {
     expect(auth).toMatchObject({ source: "env", personId: null, ownerAsiakasId: null });
   });
 });
+
+// fb#855: sessions are per endpoint — `defaultEndpoint` (the --endpoint
+// override) selects the session minted for it, never the active one.
+describe("resolveAuth — per-endpoint sessions (fb#855)", () => {
+  let dir: string;
+  let origEnv: string | undefined;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "ib-resolve-855-"));
+    origEnv = process.env.IB_TOKEN;
+    delete process.env.IB_TOKEN;
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    if (origEnv !== undefined) process.env.IB_TOKEN = origEnv;
+  });
+
+  const session = (endpoint: string, jwt: string) => ({
+    jwt, refreshToken: "rt", issuedAt: "", expiresAt: "",
+    personId: 1, ownerAsiakasId: 1, ownerAsiakasName: "X", endpoint,
+  });
+
+  test("--endpoint picks the parked session minted for it; no override picks the active one", async () => {
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    const store = createStore(file);
+    await store.save(session("https://api.example.com", "prod_jwt"), undefined, { activate: true });
+    await store.save(session("http://127.0.0.1:8080", "local_jwt"));
+
+    const local = await resolveAuth({ credentialsPath: file, defaultEndpoint: "http://127.0.0.1:8080" });
+    expect(local?.token).toBe("local_jwt");
+    expect(local?.endpoint).toBe("http://127.0.0.1:8080");
+    const active = await resolveAuth({ credentialsPath: file });
+    expect(active?.token).toBe("prod_jwt");
+  });
+
+  test("--endpoint with no session of its own resolves null — the active token is never presented elsewhere", async () => {
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    await createStore(file).save(session("https://api.example.com", "prod_jwt"), undefined, { activate: true });
+    expect(await resolveAuth({ credentialsPath: file, defaultEndpoint: "http://127.0.0.1:8080" })).toBeNull();
+  });
+});

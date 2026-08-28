@@ -30,15 +30,27 @@ function memoryStore(initial: CredentialsProfile | null) {
     async reload() {
       return current;
     },
+    async loadFor() {
+      return current;
+    },
+    async reloadFor() {
+      return current;
+    },
     async save(creds) {
       saves.push(creds);
       current = creds;
+    },
+    async sessions() {
+      return current ? [{ ...current, active: true }] : [];
     },
     async clear() {
       current = null;
     },
     async remove() {
       /* not used */
+    },
+    async removeEndpoint() {
+      current = null;
     },
     withLock<T>(fn: () => Promise<T>): Promise<T> {
       const run = chain.then(fn);

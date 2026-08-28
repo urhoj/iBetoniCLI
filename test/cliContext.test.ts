@@ -140,77 +140,76 @@ describe("createCliContext — --company switch 403 (feedback #311)", () => {
   });
 });
 
-// feedback #465: a file session's token is endpoint-specific. A 401 under an
-// `--endpoint` override that differs from the stored endpoint must name the
-// mismatch (and never attempt/persist a refresh against the override), instead
-// of reporting the still-valid session as "unrecoverable".
-describe("createCliContext — --endpoint differs from stored session endpoint (feedback #465)", () => {
+// fb#855: sessions are per endpoint. A file session's token is endpoint-specific,
+// so under `--endpoint <other>` the context must resolve ONLY a session minted
+// for that endpoint — never present the active session's token there (a 401
+// with a misleading remedy, fb#465/fb#484), never refresh against it, never
+// persist anything. No session for it = not logged in there, before any request.
+describe("createCliContext — --endpoint selects the session minted for it (fb#855)", () => {
   let dir: string;
   const mockFetch = vi.fn();
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ib-ctx-465-"));
+    dir = mkdtempSync(join(tmpdir(), "ib-ctx-855-"));
     mockFetch.mockReset();
     vi.stubGlobal("fetch", mockFetch);
+    vi.mocked(performSwitch).mockReset();
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
     vi.unstubAllGlobals();
   });
 
-  async function makeContext(endpointOverride: string) {
+  const session = (endpoint: string, jwt: string) => ({
+    jwt,
+    refreshToken: "r",
+    issuedAt: "",
+    expiresAt: "",
+    personId: 42,
+    ownerAsiakasId: 8,
+    ownerAsiakasName: "Kalle Urho Oy",
+    endpoint,
+  });
+
+  async function makeContext(global: Partial<GlobalOptions>) {
     const file = join(dir, "credentials.json");
-    await createStore(file).save({
-      jwt: "eyJstored",
-      refreshToken: "r",
-      issuedAt: "",
-      expiresAt: "",
-      personId: 42,
-      ownerAsiakasId: 8,
-      ownerAsiakasName: "Kalle Urho Oy",
-      endpoint: "https://api.example.com",
-    });
+    await createStore(file).save(session("https://api.example.com", "eyJstored"));
     const ctx = await createCliContext({
       credentialsPath: file,
       version: "1.0.0",
-      global: { ...EMPTY_GLOBAL, endpoint: endpointOverride },
+      global: { ...EMPTY_GLOBAL, ...global },
     });
     return { ctx, file };
   }
 
-  test("401 from the override endpoint names both endpoints, skips refresh, persists nothing", async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: "Invalid Token" }), {
-        status: 401,
-        headers: { "content-type": "application/json" },
-      })
-    );
-
-    const { ctx, file } = await makeContext("http://127.0.0.1:8080");
-    const err: CliError = await ctx.client!.get("/api/jerry/stats").then(
-      () => {
-        throw new Error("request did not fail");
-      },
-      (e) => e as CliError
-    );
-
-    // Client-origin statusCode 0 — a locally-fabricated diagnostic, not a
-    // wrapped server response (client-origin-status guard).
-    expect(err.statusCode).toBe(0);
-    expect(err.exitCode).toBe(2);
-    expect(err.message).toContain("http://127.0.0.1:8080");
-    expect(err.message).toContain("https://api.example.com");
-    expect(err.message).toMatch(/endpoint-specific/);
-    expect(err.hint).toContain("ib auth login --endpoint http://127.0.0.1:8080");
-    expect(err.hint).toContain("mint-local-token.js");
-    // No refresh round-trip was attempted — the only fetch is the original GET.
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    // The stored profile is untouched.
+  test("an override with no session of its own is 'not logged in' there — no request, nothing persisted", async () => {
+    const { ctx, file } = await makeContext({ endpoint: "http://127.0.0.1:8080" });
+    expect(ctx.client).toBeNull();
+    expect(ctx.endpoint).toBe("http://127.0.0.1:8080");
+    expect(mockFetch).not.toHaveBeenCalled();
     const creds = await createStore(file).load();
     expect(creds?.jwt).toBe("eyJstored");
-    expect(creds?.refreshToken).toBe("r");
   });
 
-  test("a normalization-equal override (trailing slash, case) keeps the refresh path", async () => {
+  test("an override WITH a parked session of its own acts with that session, not the active one", async () => {
+    const file = join(dir, "credentials.json");
+    const store = createStore(file);
+    await store.save(session("https://api.example.com", "eyJprod"), undefined, { activate: true });
+    await store.save(session("http://127.0.0.1:8080", "eyJlocal"));
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } })
+    );
+    const ctx = await createCliContext({
+      credentialsPath: file,
+      version: "1.0.0",
+      global: { ...EMPTY_GLOBAL, endpoint: "http://127.0.0.1:8080" },
+    });
+    await ctx.client!.get("/api/thing");
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(String(url)).toBe("http://127.0.0.1:8080/api/thing");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer eyJlocal");
+  });
+
+  test("a normalization-equal override (trailing slash, case) is the same session and keeps the refresh path", async () => {
     // Original GET → 401, bearer refresh → 200 with a fresh token, retry → 200.
     mockFetch
       .mockResolvedValueOnce(
@@ -232,7 +231,7 @@ describe("createCliContext — --endpoint differs from stored session endpoint (
         })
       );
 
-    const { ctx, file } = await makeContext("https://API.example.com/");
+    const { ctx, file } = await makeContext({ endpoint: "https://API.example.com/" });
     const result = await ctx.client!.get<{ ok: boolean }>("/api/thing");
 
     expect(result).toEqual({ ok: true });
@@ -240,97 +239,37 @@ describe("createCliContext — --endpoint differs from stored session endpoint (
     const creds = await createStore(file).load();
     expect(creds?.jwt).toBe("eyJfresh");
   });
-});
 
-// feedback #484: the fb#465 diagnostic above only covered the command's own
-// request. `--endpoint <other> --company <id>` 401s EARLIER — in performSwitch,
-// which runs with the stored token before the API client (and its refresh
-// callback) exists — so that combination still got the generic "run `ib auth
-// refresh`" framing for a session that was never expired.
-describe("createCliContext — --company switch under an endpoint mismatch (feedback #484)", () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ib-ctx-484-"));
-    vi.mocked(performSwitch).mockReset();
-  });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+  test("--endpoint <other> --company <id> never reaches the switch with a foreign token", async () => {
+    const { ctx } = await makeContext({ endpoint: "http://127.0.0.1:8080", asiakas: 1349 });
+    expect(ctx.client).toBeNull();
+    expect(performSwitch).not.toHaveBeenCalled();
   });
 
-  async function switchUnder(global: Partial<GlobalOptions>): Promise<CliError> {
-    const file = join(dir, "credentials.json");
-    await createStore(file).save({
-      jwt: "eyJstored",
-      refreshToken: "r",
-      issuedAt: "",
-      expiresAt: "",
-      personId: 42,
-      ownerAsiakasId: 8,
-      ownerAsiakasName: "Kalle Urho Oy",
-      endpoint: "https://api.example.com",
-    });
-    try {
-      await createCliContext({
-        credentialsPath: file,
-        version: "1.0.0",
-        global: { ...EMPTY_GLOBAL, ...global },
-      });
-    } catch (e) {
-      return e as CliError;
-    }
-    throw new Error("createCliContext did not throw");
-  }
-
-  test("a switch 401 under a mismatched --endpoint names the mismatch, not an expired session", async () => {
+  test("a switch 401 on the session's own endpoint propagates untouched", async () => {
     vi.mocked(performSwitch).mockRejectedValue(
       new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
     );
-
-    const err = await switchUnder({ endpoint: "http://127.0.0.1:8080", asiakas: 1349 });
-
-    // Client-origin (statusCode 0) — locally fabricated, same contract as fb#465.
-    expect(err.statusCode).toBe(0);
-    expect(err.exitCode).toBe(2);
-    expect(err.message).toContain("--company switch");
-    expect(err.message).toContain("http://127.0.0.1:8080");
-    expect(err.message).toContain("https://api.example.com");
-    expect(err.message).toMatch(/endpoint-specific/);
-    expect(err.hint).toContain("ib auth login --endpoint http://127.0.0.1:8080");
-    expect(err.hint).toContain("mint-local-token.js");
-    // Never routed through the generic 401 remedy.
-    expect(hintForError(err, null)).toBe(err.hint);
-  });
-
-  test("a switch 401 WITHOUT an endpoint override propagates untouched", async () => {
-    vi.mocked(performSwitch).mockRejectedValue(
-      new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
+    const err = await makeContext({ asiakas: 1349 }).then(
+      () => {
+        throw new Error("createCliContext did not throw");
+      },
+      (e) => e as CliError
     );
-
-    const err = await switchUnder({ asiakas: 1349 });
-
     expect(err.statusCode).toBe(401);
-    expect(err.message).not.toMatch(/endpoint-specific/);
     expect(err.hint).toBeUndefined();
   });
 
-  test("a normalization-equal override is NOT a mismatch — the 401 propagates untouched", async () => {
-    vi.mocked(performSwitch).mockRejectedValue(
-      new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
-    );
-
-    const err = await switchUnder({ endpoint: "https://API.example.com/", asiakas: 1349 });
-
-    expect(err.statusCode).toBe(401);
-    expect(err.message).not.toMatch(/endpoint-specific/);
-  });
-
-  test("the 403 branch still wins under a mismatch (fb#311 note is not shadowed)", async () => {
+  test("the 403 branch keeps the fb#311 --company note", async () => {
     vi.mocked(performSwitch).mockRejectedValue(
       new CliError("Company switch failed: HTTP 403 no access", 403, null, 3)
     );
-
-    const err = await switchUnder({ endpoint: "http://127.0.0.1:8080", asiakas: 1349 });
-
+    const err = await makeContext({ asiakas: 1349 }).then(
+      () => {
+        throw new Error("createCliContext did not throw");
+      },
+      (e) => e as CliError
+    );
     expect(err.statusCode).toBe(403);
     expect(err.message).toMatch(/MEMBER of/);
     expect(err.hint).toBe("");

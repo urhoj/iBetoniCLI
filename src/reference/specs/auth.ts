@@ -10,7 +10,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth login",
     description:
-      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600).",
+      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching.",
     auth: "none",
     flags: [
       {
@@ -52,14 +52,14 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth logout",
     description:
-      "Revoke the refresh token server-side (best-effort) and delete the local credentials file.",
+      "Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); the credentials file is removed with the last session.",
     auth: "any",
     flags: [],
     outputShape: "no stdout output; exit 0 on success",
     errors: [
       { origin: "client", exit: 1, meaning: "I/O error", remedy: "check file permissions" },
     ],
-    examples: ["ib auth logout"],
+    examples: ["ib auth logout", "ib auth logout --endpoint http://127.0.0.1:8080"],
   },
   {
     command: "ib auth whoami",
@@ -69,7 +69,7 @@ export const AUTH_SPECS: CommandSpec[] = [
     auth: "any",
     flags: [],
     outputShape:
-      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting.",
+      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating?, sessions?: { endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }[] } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting; `sessions` (file sessions only) lists every stored per-endpoint session, active first — the `--endpoint`s that need no login (fb#855).",
     errors: [
       { origin: "client", exit: 2, match: "not logged in", meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
       {

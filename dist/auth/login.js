@@ -112,7 +112,8 @@ export async function performLogin(opts) {
     if (payload.personId === undefined || payload.ownerAsiakasId === undefined) {
         throw new Error("Login token is missing personId/ownerAsiakasId claims — cannot persist credentials");
     }
-    // 7. Persist credentials.
+    // 7. Persist credentials — as the ACTIVE session; a session for another
+    //    endpoint is parked, not replaced (fb#855).
     const store = createStore(opts.credentialsPath);
     const now = new Date();
     await store.save({
@@ -124,7 +125,7 @@ export async function performLogin(opts) {
         ownerAsiakasId: payload.ownerAsiakasId,
         ownerAsiakasName: payload.ownerAsiakasName ?? "",
         endpoint: opts.endpoint,
-    });
+    }, undefined, { activate: true });
     // 8. Confirmation to stderr — stdout is reserved for JSON/parseable output.
     const who = payload.email ?? "user";
     const where = payload.ownerAsiakasName ?? `tenant ${payload.ownerAsiakasId}`;

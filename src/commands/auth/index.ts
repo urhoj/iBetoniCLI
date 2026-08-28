@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { getGlobalOptions, DEFAULT_ENDPOINT } from "../../globals.js";
-import { createStore, defaultCredentialsPath } from "../../auth/store.js";
+import { createStore, defaultCredentialsPath, endpointKey } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
 import { performLogout } from "../../auth/logout.js";
 import { renderWhoami } from "../../auth/whoami.js";
@@ -74,7 +74,10 @@ export function registerAuthCommands(
       guarded(async () => {
         try {
           const store = createStore(defaultCredentialsPath());
-          const creds = await store.load();
+          // Sessions are per endpoint (fb#855): `--endpoint` logs out THAT
+          // session; without it, the active one. Others stay.
+          const override = getGlobalOptions(parent).endpoint;
+          const creds = override ? await store.loadFor(override) : await store.load();
           if (!creds) {
             // Not logged in — no-op success.
             return;
@@ -116,7 +119,7 @@ export function registerAuthCommands(
         let claims = decodeJwtPayload(token);
         // Impersonation marker lives on the creds profile (file sessions);
         // renderWhoami falls back to the JWT imp claims for IB_TOKEN sessions.
-        const profile = resolved.source === "file" ? await store.load() : null;
+        const profile = resolved.source === "file" ? await store.loadFor(resolved.endpoint) : null;
         let refreshed = false;
 
         // A dead session must be caught HERE, at the orientation read — not on
@@ -165,6 +168,13 @@ export function registerAuthCommands(
           impersonation: profile?.impersonation,
         });
         if (refreshed) out.refreshed = true;
+        if (resolved.source === "file") {
+          out.sessions = (await store.sessions()).map(
+            ({ endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }) => ({
+              endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active,
+            })
+          );
+        }
         writeJson(out);
       })
     );
@@ -184,7 +194,8 @@ export function registerAuthCommands(
       guarded(async () => {
         try {
           const store = createStore(defaultCredentialsPath());
-          const creds = await store.load();
+          const override = getGlobalOptions(parent).endpoint;
+          const creds = override ? await store.loadFor(override) : await store.load();
           if (!creds) {
             failWith("Not logged in. Run `ib auth login` first.", 2);
           }
@@ -253,7 +264,13 @@ export function registerAuthCommands(
         } catch {
           // Audit end is best-effort — restoring the admin session must proceed.
         }
-        await store.save(admin, "default");
+        await store.save(admin, undefined, { activate: true });
+        // An impersonation minted against ANOTHER endpoint (--endpoint staging)
+        // was just parked under that host by the activate — drop it; a dead
+        // 10-minute token is not a session anyone should find there (fb#855).
+        if (current && endpointKey(current.endpoint) !== endpointKey(admin.endpoint)) {
+          await store.removeEndpoint(current.endpoint);
+        }
         await store.remove(IMPERSONATOR_PROFILE);
         writeJson({ ok: true, restored: { personId: admin.personId } });
         return;
@@ -309,7 +326,8 @@ export function registerAuthCommands(
       await store.save(admin, IMPERSONATOR_PROFILE); // stash the admin login
       await store.save(
         buildImpersonationProfile(token, impEndpoint, decoded, new Date().toISOString()),
-        "default",
+        undefined,
+        { activate: true },
       );
       writeJson({
         ok: true,

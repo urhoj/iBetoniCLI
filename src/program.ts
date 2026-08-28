@@ -12,7 +12,7 @@
 import { Command, Help, type Option } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { addGlobalOptions, getGlobalOptions, type GlobalOptions } from "./globals.js";
-import { defaultCredentialsPath } from "./auth/store.js";
+import { createStore, defaultCredentialsPath, endpointKey } from "./auth/store.js";
 import { createCliContext } from "./cliContext.js";
 import { recordFriction } from "./friction.js";
 import type { ApiClient } from "./api/client.js";
@@ -163,9 +163,29 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     if (!ctx.client) {
       // throw (not process.exit) — safe post-fetch on Windows; lands in the
       // action's exitWithError catch (or the bin catch) as envelope + exit 2.
-      failWith("Not logged in. Run `ib auth login` first.", 2);
+      const endpoint = inv.global.endpoint;
+      failWith(
+        `Not logged in${endpoint ? ` at ${endpoint}` : ""}. Run \`ib auth login${endpoint ? ` --endpoint ${endpoint}` : ""}\` first.`,
+        2,
+        await otherSessionsHint(endpoint)
+      );
     }
     return ctx.client;
+  }
+
+  // fb#855: sessions are per endpoint. Under --endpoint, name the sessions
+  // that DO exist so the fix reads as one login, not "re-login everywhere".
+  async function otherSessionsHint(endpoint: string | null | undefined): Promise<string | undefined> {
+    if (!endpoint) return undefined;
+    let hosts: string[] = [];
+    try {
+      hosts = (await createStore(defaultCredentialsPath()).sessions()).map((s) => endpointKey(s.endpoint));
+    } catch {
+      // a corrupt credentials file reads as "no sessions" — the message above already says what to do
+    }
+    return hosts.length
+      ? `sessions are kept per endpoint — you hold ${hosts.join(", ")}, which stay; \`ib auth login --endpoint ${endpoint}\` adds this one`
+      : undefined;
   }
 
   const getClient = (): Promise<ApiClient> => clientFrom(invocation());

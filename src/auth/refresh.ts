@@ -165,7 +165,7 @@ export async function refreshAndPersistSession(opts: RefreshAndPersistOptions): 
 /** The locked body of {@link refreshAndPersistSession} — never call directly. */
 async function refreshAndPersistLocked(opts: RefreshAndPersistOptions): Promise<string> {
   const doSwitch = opts.switchFn ?? performSwitch;
-  let creds = await opts.store.reload();
+  let creds = await opts.store.reloadFor(opts.endpoint);
   // Another process refreshed while we waited on the lock — its rotated
   // session is already persisted; running the grant ourselves would present a
   // CONSUMED token. If this JWT is somehow also bad, the client's single-retry
@@ -185,7 +185,7 @@ async function refreshAndPersistLocked(opts: RefreshAndPersistOptions): Promise<
     // have rotated the credentials underneath us. Re-read ONCE — prefer a
     // fresher persisted JWT outright, or retry the grant with the rotated
     // refresh token — before declaring the session dead.
-    const latest = await opts.store.reload();
+    const latest = await opts.store.reloadFor(opts.endpoint);
     if (latest?.jwt && latest.jwt !== opts.currentJwt) return latest.jwt;
     if (latest?.refreshToken && latest.refreshToken !== creds?.refreshToken) {
       session = await grant(latest.refreshToken);
