@@ -150,6 +150,17 @@ export function recordFriction(
     // and is still captured — those are the wrong-path / deploy-gate cases,
     // where a 404 is the symptom rather than the answer.
     if (exitCode === 5 && curatedHint) return;
+    // A claim-conflict 409 is a normal concurrency outcome, not a caller mistake
+    // (feedback #720) — CLAUDE.md prescribes exactly this multi-session flow
+    // ("a 409 means another agent got there first — pick a different item"),
+    // and the CLI already answers it with the holder + expiry + remedy. This is
+    // the fb#579 shape one exit code over, but scoped by MESSAGE rather than
+    // status alone: most other 409s in the CLI (jerry offers, message threads,
+    // "already closed" on this same command) are genuine wrong-state mistakes
+    // worth keeping as friction, so only the exact "is claimed by" race is
+    // skipped — see the backend message in modules/feedback/feedback.js.
+    const statusCode = err instanceof CliError ? err.statusCode : 0;
+    if (statusCode === 409 && curatedHint && /is claimed by/.test(errorMessage(err))) return;
     const argv = process.argv.slice(2).join(" ").slice(0, 400);
     // `displayed` is what the caller actually SAW (enriched envelope error +
     // hint) — prefer it over the raw internal err.message so the groom step
@@ -161,7 +172,6 @@ export function recordFriction(
       err instanceof CliError && err.body && typeof err.body === "object"
         ? ((err.body as Record<string, unknown>).code ?? null)
         : null;
-    const statusCode = err instanceof CliError ? err.statusCode : 0;
     const entry: Record<string, unknown> = {
       ts: new Date().toISOString(),
       sid: sessionId(),

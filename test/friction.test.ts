@@ -383,6 +383,44 @@ describe("anticipated not-found is not friction (#579)", () => {
   });
 });
 
+// fb#720: a 409 claim conflict on `ib dev feedback claim` is a normal
+// concurrency outcome the CLI already answers (holder, expiry, remedy) — not
+// a caller mistake. Scoped to that exact message, not every curated 409 (most
+// others — jerry offers, message threads, "already closed" on this same
+// command — ARE genuine wrong-state mistakes worth keeping as friction).
+describe("claim conflict (409) is not friction (#720)", () => {
+  test("a curated 409 'is claimed by' is not captured", () => {
+    const before = read();
+    recordFriction(
+      new CliError("Feedback 708 is claimed by 3eec3e until 2026-08-18T15:08:47.819Z", 409, null, 4),
+      undefined,
+      "Feedback 708 is claimed by 3eec3e until 2026-08-18T15:08:47.819Z — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway",
+      true
+    );
+    expect(read()).toBe(before);
+  });
+
+  test("an UNcurated 409 'is claimed by' is still captured (no command-owned remedy matched)", () => {
+    recordFriction(new CliError("Feedback 708 is claimed by 3eec3e", 409, null, 4), undefined, "generic 409", false);
+    expect(lastEntry().message).toBe("generic 409");
+  });
+
+  test("a different curated 409 on the same command ('already closed') still captures", () => {
+    recordFriction(
+      new CliError("Feedback 42 is already closed (applied)", 409, null, 4),
+      undefined,
+      "already closed",
+      true
+    );
+    expect(lastEntry().message).toBe("already closed");
+  });
+
+  test("a curated 409 on a DIFFERENT command (business-state conflict) still captures", () => {
+    recordFriction(new CliError("Offer not in draft / not owned", 409, null, 4), undefined, "not a draft", true);
+    expect(lastEntry().message).toBe("not a draft");
+  });
+});
+
 // The unit above proves recordFriction obeys the flag; this proves the CALLER
 // passes it. writeError is the funnel every command error goes through, so a
 // correct helper wired to nothing would leave the bug fully live.
