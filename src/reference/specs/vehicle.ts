@@ -424,7 +424,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       // out here because an empty gaps list beside a fully driverless board
       // reads as a contradiction otherwise (fb#380).
       "A driverless vehicle is NOT a gap unless it uses the no-driver bar — so an empty gaps list alongside a board full of driverless vehicles is expected, not a contradiction. keikkaCount/m3 are informational and do NOT affect needsDriver.",
-      "EMPTY LIST DISAMBIGUATED (fb#776): the envelope `hint` says WHICH case holds — every grid-eligible vehicle already has a driver, vs NO vehicle is grid-eligible that day (usually an expired lastDate window — check `ib vehicle list`).",
+      "EMPTY LIST DISAMBIGUATED (fb#776): the envelope `hint` says WHICH case holds — every grid-eligible vehicle already has a driver, vs NO vehicle is grid-eligible that day (e.g. an expired lastDate window — check `ib vehicle list`).",
       VEHICLE_PLACEHOLDER_NOTE,
       DRIVER_DATE_NOTE,
       "Pair with `ib vehicle driver available <date>` to find drivers to fill these. Deploy-gated.",
