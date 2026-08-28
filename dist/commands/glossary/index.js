@@ -185,8 +185,8 @@ export async function runGlossarySet(client, term, opts, flags = {}) {
         body.appendDefinition = opts.appendDefinition;
     if (opts.aiConfidence !== undefined)
         body.aiConfidence = opts.aiConfidence;
-    if (opts.needsHumanReview)
-        body.needsHumanReview = true;
+    if (opts.needsHumanReview !== undefined)
+        body.needsHumanReview = opts.needsHumanReview;
     return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 export async function runGlossaryMisses(client, top) {

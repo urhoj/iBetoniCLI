@@ -174,10 +174,11 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       {
         name: "detail",
         type: "string",
-        description: "Full markdown business-context detail (≤2000 chars, server-enforced). Don't recap flags/exit codes — those already render in `--help` from the spec; spend the budget on business context only found here.",
+        description: "Full markdown business-context detail (≤4000 chars, server-enforced). Don't recap flags/exit codes — those already render in `--help` from the spec; spend the budget on business context only found here.",
       },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
       { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
+      { name: "no-needs-human-review", type: "boolean", description: "Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
       { name: "field", type: "string", description: "Edit-mode target field: summary | detail (default detail)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
       { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },
@@ -203,7 +204,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
       {
         http: 400,
         exit: 4,
-        meaning: "summary >160 or detail >2000 chars (the message names the submitted length)",
+        meaning: "summary >160 or detail >4000 chars (the message names the submitted length)",
         remedy: "Trim to the cap — cut any flag/exit-code recap first (it already renders in `--help`), keep the business context",
       },
     ],

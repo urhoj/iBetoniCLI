@@ -33,8 +33,8 @@ function projectCustomer(rows) {
         entity: "customer",
         id: Number(r.asiakasId),
         asiakasId: Number(r.asiakasId),
-        label: r.asiakasNimi ?? null,
-        detail: r.ytunnus ?? null,
+        label: r.asiakasNimi || null,
+        detail: r.ytunnus || null,
     }));
 }
 function projectPersons(items) {
@@ -70,7 +70,7 @@ function projectVehicles(items, query) {
         id: Number(v.vehicleId),
         vehicleId: Number(v.vehicleId),
         label: [v.plate, v.name].filter(Boolean).join(" ") || null,
-        detail: v.typeName ?? null,
+        detail: v.typeName || null,
     }));
 }
 function projectKeikkas(items) {

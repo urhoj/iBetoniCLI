@@ -251,7 +251,7 @@ export async function runOhjeUpdate(
   // leaves the key out of the body and the backend resets the stored score to NULL.
   const payload: Record<string, unknown> = { ...proposed };
   if (assess.aiConfidence !== undefined) payload.aiConfidence = assess.aiConfidence;
-  if (assess.needsHumanReview) payload.needsHumanReview = true;
+  if (assess.needsHumanReview !== undefined) payload.needsHumanReview = assess.needsHumanReview;
   if (flags.dryRun) {
     return { dryRun: true, helpId, created, current, proposed: payload };
   }

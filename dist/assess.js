@@ -15,7 +15,8 @@ export function assertAiConfidence(v) {
 export function addAssessWriteFlags(cmd) {
     return cmd
         .option("--ai-confidence <n>", "Self-assessed completeness/correctness of the content you just wrote (0–100; see the groom rubric). Omit on a human edit to reset the score and re-open the row.", (v) => Number(v))
-        .option("--needs-human-review", "Park the row for a human (excludes it from --needs-review) — set with a low --ai-confidence when you cannot raise it without human input.");
+        .option("--needs-human-review", "Park the row for a human (excludes it from --needs-review) — set with a low --ai-confidence when you cannot raise it without human input.")
+        .option("--no-needs-human-review", "Un-park the row — clear a previously-set --needs-human-review flag.");
 }
 /** Attach the AI groom SELECT flags to a list command. */
 export function addNeedsReviewFlags(cmd) {

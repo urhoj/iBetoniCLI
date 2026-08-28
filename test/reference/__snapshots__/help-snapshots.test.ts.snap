@@ -2926,7 +2926,7 @@ NOTES
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
   - SHELL QUOTING (fb#299, fb#702): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — and NEWLINES split the same way, so a multi-line here-string with no quotes at all fails too. The tell differs by where the fragment lands: a bare word reads as \`too many arguments\`, a dash-led one (\`->\` out of "200 -> null") reads as \`unknown option\`, which looks like a flag mistake and is not. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see \`ib help shell-quoting\`.
   - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib dev ai conversation <id>\`. Manual CLI use does not set it.
-  - No --reason / --idempotency-key (unlike \`ib dev changelog add\`): a META request, not an audited entity mutation — only --dry-run applies here.
+  - No --reason / --idempotency-key (unlike \`ib dev changelog add\`): a META request, not an audited entity mutation.
 
 EXAMPLES
   ib dev feedback create "schema table output should include row counts"
@@ -4296,6 +4296,7 @@ FLAGS
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
   --needs-human-review    Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --no-needs-human-review    Un-park the term — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -8991,6 +8992,7 @@ FLAGS
   --must-exist    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
   --needs-human-review    Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --no-needs-human-review    Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
   --field STRING    Edit-mode target field: title | shorttext | htmltext (default htmltext)
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace (empty deletes the matched text; pass "" to clear — PowerShell DROPS a bare "", so use \`--with=\` there (same meaning in bash; \`ib help shell-quoting\`))
@@ -9017,6 +9019,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - aiConfidence/needsHumanReview are DIRECT-assigned, unlike the content fields (title/shorttext/htmltext), which the save proc COALESCEs — an omitted content field keeps its current value, but omitting --ai-confidence or --needs-human-review on ANY write resets the score to null and un-parks the row, re-opening it for the grooming routine. Pass --no-needs-human-review to make that reset explicit in the command line rather than implicit via omission.
 
 EXAMPLES
   ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"
@@ -10764,9 +10769,10 @@ ARGUMENTS
 
 FLAGS
   --summary STRING    Short one-line summary stored in the catalog (≤160 chars, server-enforced)
-  --detail STRING    Full markdown business-context detail (≤2000 chars, server-enforced). Don't recap flags/exit codes — those already render in \`--help\` from the spec; spend the budget on business context only found here.
+  --detail STRING    Full markdown business-context detail (≤4000 chars, server-enforced). Don't recap flags/exit codes — those already render in \`--help\` from the spec; spend the budget on business context only found here.
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
   --needs-human-review    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --no-needs-human-review    Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
   --field STRING    Edit-mode target field: summary | detail (default detail)
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace (empty deletes the matched text; pass "" to clear — PowerShell DROPS a bare "", so use \`--with=\` there (same meaning in bash; \`ib help shell-quoting\`))
@@ -10790,7 +10796,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 5 (client-side)  Unknown command        → \`ib commands\` for valid paths
-  exit 4 (HTTP 400)  summary >160 or detail >2000 chars (the message names the submitted length) → Trim to the cap — cut any flag/exit-code recap first (it already renders in \`--help\`), keep the business context
+  exit 4 (HTTP 400)  summary >160 or detail >4000 chars (the message names the submitted length) → Trim to the cap — cut any flag/exit-code recap first (it already renders in \`--help\`), keep the business context
 
 NOTES
   - --dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with \`reference detail get\` first, or use edit mode.

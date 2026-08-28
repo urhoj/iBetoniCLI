@@ -145,8 +145,8 @@ export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}, as
     const payload = { ...proposed };
     if (assess.aiConfidence !== undefined)
         payload.aiConfidence = assess.aiConfidence;
-    if (assess.needsHumanReview)
-        payload.needsHumanReview = true;
+    if (assess.needsHumanReview !== undefined)
+        payload.needsHumanReview = assess.needsHumanReview;
     if (flags.dryRun) {
         return { dryRun: true, helpId, created, current, proposed: payload };
     }

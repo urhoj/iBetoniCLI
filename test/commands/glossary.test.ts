@@ -361,6 +361,15 @@ describe("glossary append flags", () => {
     expect(body.needsHumanReview).toBe(true);
   });
 
+  test("set sends needsHumanReview: false when explicitly cleared (fb#952)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "valumassa" });
+    await runGlossarySet(mkClient({ put }), "valumassa",
+      { definition: "x", needsHumanReview: false },
+      { reason: "groom" });
+    const body = put.mock.calls[0][1];
+    expect(body.needsHumanReview).toBe(false);
+  });
+
   test("set omits aiConfidence when not provided", async () => {
     const put = vi.fn().mockResolvedValue({});
     await runGlossarySet(mkClient({ put }), "valumassa", { definition: "x" }, { reason: "groom" });

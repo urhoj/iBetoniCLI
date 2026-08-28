@@ -5,6 +5,9 @@
 import type { CommandSpec } from "../../output/help.js";
 import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, PERSON_PARSE_ERR } from "./shared.js";
 
+/** The `--type` parse-guard row every vehicle list/create/update leaf shares (fb#949). */
+const TYPE_PARSE_ERR = intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them");
+
 export const VEHICLE_SPECS: CommandSpec[] = [
 
   // ─── vehicle (16) ─────────────────────────────────────────────────────────
@@ -54,7 +57,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
       ASIAKAS_FLAG_ERR,
-      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
+      TYPE_PARSE_ERR,
       limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
@@ -182,7 +185,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     errors: [
       ASIAKAS_FLAG_ERR,
       intParseErr("--no", "pass the fleet number as an integer", 0),
-      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
+      TYPE_PARSE_ERR,
       intParseErr("--default-driver", "pass a personId — `ib person search` finds them"),
       numParseErr("--capacity", "pass the capacity in m3 as a number (e.g. 7.5)"),
       numParseErr("--puomi", "pass the boom length in metres as a number"),
@@ -233,7 +236,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     errors: [
       ASIAKAS_FLAG_ERR,
       intParseErr("--no", "pass the fleet number as an integer", 0),
-      intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them"),
+      TYPE_PARSE_ERR,
       numParseErr("--capacity", "pass the capacity in m3 as a number (e.g. 7.5)"),
       numParseErr("--puomi", "pass the boom length in metres as a number"),
       apiErr(404, "Vehicle not found", "verify vehicleId"),

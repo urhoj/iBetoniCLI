@@ -316,6 +316,16 @@ describe("ib ohje aiConfidence", () => {
     expect(body.title).toBe("T");                  // GET-merged content survives
   });
 
+  test("update sends needsHumanReview: false when explicitly cleared (fb#952)", async () => {
+    const c = client({
+      get: vi.fn().mockResolvedValue([{ helpId: "x", title: "T", shorttext: "s", htmltext: "<p>h</p>", needsHumanReview: true }]),
+      put: vi.fn().mockResolvedValue({ success: true }),
+    });
+    await runOhjeUpdate(c, "x", { shorttext: "new" }, { reason: "groom" }, {}, { needsHumanReview: false });
+    const body = c.put.mock.calls[0][1];
+    expect(body.needsHumanReview).toBe(false);
+  });
+
   test("update WITHOUT --ai-confidence omits the key (backend resets to NULL)", async () => {
     const c = client({
       get: vi.fn().mockResolvedValue([{ helpId: "x", title: "T", shorttext: "s", htmltext: "<p>h</p>", aiConfidence: 42 }]),

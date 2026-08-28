@@ -64,6 +64,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
       { name: "needs-human-review", type: "boolean", description: "Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
+      { name: "no-needs-human-review", type: "boolean", description: "Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
       { name: "field", type: "string", description: "Edit-mode target field: title | shorttext | htmltext (default htmltext)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
       { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },
@@ -76,6 +77,9 @@ export const OHJE_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape:
       "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}",
+    notes: [
+      "aiConfidence/needsHumanReview are DIRECT-assigned, unlike the content fields (title/shorttext/htmltext), which the save proc COALESCEs — an omitted content field keeps its current value, but omitting --ai-confidence or --needs-human-review on ANY write resets the score to null and un-parks the row, re-opening it for the grooming routine. Pass --no-needs-human-review to make that reset explicit in the command line rather than implicit via omission.",
+    ],
     errors: [
       { origin: "client", exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
       { origin: "client", exit: 5, meaning: "helpId has no existing row (edit mode only)", remedy: "create the entry first with a full --htmltext/--title/--shorttext" },

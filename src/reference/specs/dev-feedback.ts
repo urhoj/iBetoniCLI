@@ -50,7 +50,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
       "SHELL QUOTING (fb#299, fb#702): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — and NEWLINES split the same way, so a multi-line here-string with no quotes at all fails too. The tell differs by where the fragment lands: a bare word reads as `too many arguments`, a dash-led one (`->` out of \"200 -> null\") reads as `unknown option`, which looks like a flag mistake and is not. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see `ib help shell-quoting`.",
       "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
-      "No --reason / --idempotency-key (unlike `ib dev changelog add`): a META request, not an audited entity mutation — only --dry-run applies here.",
+      "No --reason / --idempotency-key (unlike `ib dev changelog add`): a META request, not an audited entity mutation.",
     ],
     examples: [
       'ib dev feedback create "schema table output should include row counts"',

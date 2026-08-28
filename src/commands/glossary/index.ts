@@ -248,7 +248,7 @@ export async function runGlossarySet(
   if (opts.removeSynonyms !== undefined) body.removeSynonyms = splitList(opts.removeSynonyms);
   if (opts.appendDefinition !== undefined) body.appendDefinition = opts.appendDefinition;
   if (opts.aiConfidence !== undefined) body.aiConfidence = opts.aiConfidence;
-  if (opts.needsHumanReview) body.needsHumanReview = true;
+  if (opts.needsHumanReview !== undefined) body.needsHumanReview = opts.needsHumanReview;
   return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 

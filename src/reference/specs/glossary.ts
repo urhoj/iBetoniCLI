@@ -99,6 +99,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
       { name: "needs-human-review", type: "boolean", description: "Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
+      { name: "no-needs-human-review", type: "boolean", description: "Un-park the term — same effect as omitting --needs-human-review (both reset it), but explicit in the command line." },
     ],
     outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
     notes: [

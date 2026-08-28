@@ -115,8 +115,8 @@ export async function runReferenceDetailSet(client, commandParts, body, flags = 
         payload.detail = body.detail;
     if (body.aiConfidence !== undefined)
         payload.aiConfidence = body.aiConfidence;
-    if (body.needsHumanReview)
-        payload.needsHumanReview = true;
+    if (body.needsHumanReview !== undefined)
+        payload.needsHumanReview = body.needsHumanReview;
     return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, payload, {
         headers: writeFlagsToHeaders(flags),
     });

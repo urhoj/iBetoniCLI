@@ -10,6 +10,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
   // ─── schema (13) — developer-only SQL introspection ───────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
+    /** The `--limit` guard row every capped-list leaf in this group shares (fb#949). */
+    const LIMIT_1000_ERR = limitErr("pass a positive integer; max is 1000");
     const devErrors: CommandError[] = [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Not a developer", "run `ib auth whoami`; if not a developer, `ib auth login` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed."),
@@ -155,7 +157,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         errors: [
           apiErr(400, "Table not on allowlist", "use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila"),
           apiErr(404, "Table not found", "verify the table name with `ib dev schema tables`"),
-          limitErr("pass a positive integer; max is 1000"),
+          LIMIT_1000_ERR,
           ...devErrors,
         ],
         notes: [
@@ -186,7 +188,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         flags: [{ name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" }],
         outputShape:
           "{ items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count, truncated?, hint? } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped." + truncNote,
-        errors: [limitErr("pass a positive integer; max is 1000"), ...devErrors],
+        errors: [LIMIT_1000_ERR, ...devErrors],
         notes: [
           "The retention contract is an `IB_Snapshot` extended property on the table itself, so it travels with the object and dies with it. `origin` names the migration that created the snapshot; `reason` says what it holds.",
           "`unstamped` = the table LOOKS like a snapshot by name but carries no contract — detection deliberately does not rely on the naming convention, since a forgotten stamp is the failure being caught. `malformed` = a stamp with no usable date, which is worse than none: it reads as owned but can never expire.",
@@ -249,7 +251,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "{ statsSince, items: [{ table, index, columns, type:'CLUSTERED'|'NONCLUSTERED'|…, unique, primaryKey?, filter?, seeks, scans, lookups, updates, lastRead, lastWrite, unused? }], nextCursor: null, count, truncated?, hint? }. `primaryKey`/`filter`/`unused` are OMITTED when false — presence is the signal." +
           truncNote,
         prettyColumns: ["table", "index", "seeks", "scans", "lookups", "updates", "lastRead", "lastWrite"],
-        errors: [limitErr("pass a positive integer; max is 1000"), invalidNameErr, ...devErrors],
+        errors: [LIMIT_1000_ERR, invalidNameErr, ...devErrors],
         notes: [
           "Counters RESET on every SQL Server restart/failover — `statsSince` is when the current window began. Zero reads two days after a failover proves nothing; check statsSince before calling an index dead, and prefer a window covering month-end/seasonal workloads.",
           "An `unused` index with high `updates` is pure write cost — the strongest drop candidate. `lastRead`/`lastWrite` are the most recent seek/scan/lookup and update timestamps within the window.",

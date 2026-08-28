@@ -35,6 +35,16 @@ describe("ib reference detail (DB-backed)", () => {
     );
   });
 
+  test("set sends needsHumanReview: false when explicitly cleared (fb#952)", async () => {
+    const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
+    await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s", needsHumanReview: false });
+    expect(c.put).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20keikka%20list",
+      { summary: "s", needsHumanReview: false },
+      expect.anything()
+    );
+  });
+
   test("set omits aiConfidence key when not provided (backend resets)", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({}) });
     await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s" });

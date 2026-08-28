@@ -32,6 +32,10 @@ export function addAssessWriteFlags(cmd: Command): Command {
     .option(
       "--needs-human-review",
       "Park the row for a human (excludes it from --needs-review) — set with a low --ai-confidence when you cannot raise it without human input."
+    )
+    .option(
+      "--no-needs-human-review",
+      "Un-park the row — clear a previously-set --needs-human-review flag."
     );
 }
 

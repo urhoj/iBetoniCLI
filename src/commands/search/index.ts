@@ -63,8 +63,8 @@ function projectCustomer(rows: unknown): UnifiedHit[] {
     entity: "customer" as const,
     id: Number(r.asiakasId),
     asiakasId: Number(r.asiakasId),
-    label: (r.asiakasNimi as string) ?? null,
-    detail: (r.ytunnus as string) ?? null,
+    label: (r.asiakasNimi as string) || null,
+    detail: (r.ytunnus as string) || null,
   }));
 }
 
@@ -111,7 +111,7 @@ function projectVehicles(items: Record<string, unknown>[], query: string): Unifi
       id: Number(v.vehicleId),
       vehicleId: Number(v.vehicleId),
       label: [v.plate, v.name].filter(Boolean).join(" ") || null,
-      detail: (v.typeName as string) ?? null,
+      detail: (v.typeName as string) || null,
     }));
 }
 
