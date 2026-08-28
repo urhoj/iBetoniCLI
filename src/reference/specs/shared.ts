@@ -339,6 +339,8 @@ export const DRIVER_DATE_NOTE =
 // ─── cross-domain shared fragments ───────────────────────────────────────────
 /** The system-admin 403 every `jerry admin` / admin-gated row repeats. */
 export const SYSADMIN_403: CommandError = apiErr(403, "Not a system admin", "use a system-admin token");
+/** The `--person` parse-guard row shared by every command taking a personId flag (message, person, lifecycle, legal, vehicle). */
+export const PERSON_PARSE_ERR: CommandError = intParseErr("--person", "pass a positive personId");
 /**
  * `resolveRoleTypeId` rejects an unknown --role LOCALLY, before any request, so
  * every role-taking command needs this client row alongside its backend-400 twin

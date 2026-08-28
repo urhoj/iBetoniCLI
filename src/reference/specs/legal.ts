@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr, PERSON_PARSE_ERR } from "./shared.js";
 
 /** The `--owner` parse-guard row shared by status/versions/diff. Note: `save`'s
  *  own --owner carries a DIFFERENT remedy ("omit for a global document") and
@@ -87,7 +87,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape:
       "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}",
     errors: [
-      intParseErr("--person", "pass a positive personId"),
+      PERSON_PARSE_ERR,
       OWNER_PARSE_ERR,
       apiErr(403, "--person on someone else without developer/sysadmin", "drop --person or use a developer token"),
       ...COMMON_AUTH_ERRORS,

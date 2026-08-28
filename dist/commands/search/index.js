@@ -43,7 +43,7 @@ function projectPersons(items) {
         id: p.personId,
         personId: p.personId,
         label: p.name || null,
-        detail: p.phone ?? p.email ?? null,
+        detail: p.phone || p.email || null,
     }));
 }
 function projectWorksites(items) {
@@ -78,7 +78,7 @@ function projectKeikkas(items) {
         entity: "keikka",
         id: k.keikkaId,
         keikkaId: k.keikkaId,
-        label: k.title ?? `keikka ${k.keikkaId}`,
+        label: k.title || `keikka ${k.keikkaId}`,
         detail: [k.pumppuAika, k.customerName].filter(Boolean).join(" · ") || null,
     }));
 }

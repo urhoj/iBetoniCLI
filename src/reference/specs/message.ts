@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec, CommandFlag } from "../../output/help.js";
-import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG, intParseErr, limitErr } from "./shared.js";
+import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG, intParseErr, limitErr, PERSON_PARSE_ERR } from "./shared.js";
 
 /** The `--tarjous` thread-target alias every thread-addressed leaf repeats. */
 const TARJOUS_THREAD_FLAG: CommandFlag = {
@@ -20,8 +20,6 @@ const MANAGER_GATED_NOTE =
 const TARJOUS_PARSE_ERR = intParseErr("--tarjous", "pass a positive pumppuRequestId");
 /** The `--thread` parse-guard row for the leaves that register it directly (chat delete/edit/restore). */
 const THREAD_PARSE_ERR = intParseErr("--thread", "pass a positive threadId");
-/** The `--person` parse-guard row for the thread-participant leaves. */
-const PERSON_PARSE_ERR = intParseErr("--person", "pass a positive personId");
 
 export const MESSAGE_SPECS: CommandSpec[] = [
   // ─── message chat (9) ────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, PERSON_PARSE_ERR } from "./shared.js";
 
 export const VEHICLE_SPECS: CommandSpec[] = [
 
@@ -514,7 +514,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
     errors: [
-      intParseErr("--person", "pass a positive personId"),
+      PERSON_PARSE_ERR,
       apiErr(400, "Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari)", "supply --reason, valid ids, and a driver eligible for this company"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
@@ -592,7 +592,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
-      intParseErr("--person", "pass a positive personId"),
+      PERSON_PARSE_ERR,
       apiErr(400, "Missing --reason / bad ids", "supply --reason and a valid vehicleId/personId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],

@@ -129,6 +129,24 @@ describe("runUnifiedSearch", () => {
     expect(env.items[0]).toMatchObject({ entity: "worksite", id: 14, label: "Fredrikinkatu 51" });
   });
 
+  test("person with phone: '' falls through to email for detail, same ??-vs-|| class as fb#894/942", async () => {
+    const env = await runUnifiedSearch("kamppi", sources({
+      person: async () => ({ items: [
+        { personId: 457, name: "Kai Kamppinen", email: "kai@example.com", phone: "", asiakasId: 9 },
+      ], nextCursor: null, count: 1 }),
+    }), ["person"]);
+    expect(env.items[0]).toMatchObject({ entity: "person", id: 457, detail: "kai@example.com" });
+  });
+
+  test("keikka with title: '' falls through to the `keikka <id>` fallback for label, same ??-vs-|| class as fb#894/942", async () => {
+    const env = await runUnifiedSearch("kamppi", sources({
+      keikka: async () => ({ items: [
+        { keikkaId: 8, title: "", pumppuAika: "2026-06-09T07:00:00.000Z", customerName: "Lujabetoni", worksiteName: "Kamppi", address: null, contactPerson: null, contactPhone: null },
+      ], nextCursor: null, count: 1 }),
+    }), ["keikka"]);
+    expect(env.items[0]).toMatchObject({ entity: "keikka", id: 8, label: "keikka 8" });
+  });
+
   test("a failing entity lands in errors[], others survive", async () => {
     const env = await runUnifiedSearch("kamppi", sources({
       keikka: async () => { throw new CliError("permission denied", 403, null, 3); },

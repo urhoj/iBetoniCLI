@@ -293,7 +293,7 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
     );
     expect(c.put).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20keikka%20list",
-      { summary: "Lists orders (cached)", aiConfidence: 95, needsHumanReview: undefined },
+      { summary: "Lists orders (cached)", aiConfidence: 95 },
       { headers: { "X-Action-Reason": "tweak summary" } }
     );
   });

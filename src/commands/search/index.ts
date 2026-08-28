@@ -74,7 +74,7 @@ function projectPersons(items: PersonSearchHit[]): UnifiedHit[] {
     id: p.personId,
     personId: p.personId,
     label: p.name || null,
-    detail: p.phone ?? p.email ?? null,
+    detail: p.phone || p.email || null,
   }));
 }
 
@@ -120,7 +120,7 @@ function projectKeikkas(items: KeikkaSearchHit[]): UnifiedHit[] {
     entity: "keikka" as const,
     id: k.keikkaId,
     keikkaId: k.keikkaId,
-    label: k.title ?? `keikka ${k.keikkaId}`,
+    label: k.title || `keikka ${k.keikkaId}`,
     detail: [k.pumppuAika, k.customerName].filter(Boolean).join(" · ") || null,
   }));
 }

@@ -3,10 +3,9 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr, PERSON_PARSE_ERR } from "./shared.js";
 
-/** The `--person` / `--contact-type` parse-guard pair every customer/worksite person add/remove leaf shares. */
-const PERSON_PARSE_ERR = intParseErr("--person", "pass a positive personId");
+/** The `--contact-type` parse-guard row every customer/worksite person add/remove leaf shares (its `--person` sibling is PERSON_PARSE_ERR, shared cross-domain via shared.ts). */
 const CONTACT_TYPE_PARSE_ERR = intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)");
 
 export const LIFECYCLE_SPECS: CommandSpec[] = [
