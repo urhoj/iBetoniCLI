@@ -5,6 +5,9 @@
 import type { CommandSpec } from "../../output/help.js";
 import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, intParseErr } from "./shared.js";
 
+/** The `--person` parse-guard row shared by day get/set/clear and absences. */
+const PERSON_PARSE_ERR = intParseErr("--person", "pass a positive personId");
+
 export const PERSON_SPECS: CommandSpec[] = [
 
   // ─── person (3) ──────────────────────────────────────────────────────────
@@ -17,7 +20,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       {
         name: "role",
         type: "string",
-        description: "Filter by role name (e.g. driver, admin, laskuAdmin)",
+        description: "Filter by role name (e.g. pumppari, asiakasAdmin, keikkaHandler)",
       },
       {
         name: "asiakas",
@@ -415,7 +418,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "to", type: "date", description: "End date YYYY-MM-DD (default: --from)" },
     ],
     outputShape: "ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>",
-    errors: [intParseErr("--person", "pass a positive personId"), ...COMMON_AUTH_ERRORS],
+    errors: [PERSON_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     notes: [
       "Scoped to the active company (same-tenant).",
       "`status` is the personPvmStatus code; map statusId→friendly name via `ib person day statuses`.",
@@ -438,7 +441,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
-      intParseErr("--person", "pass a positive personId"),
+      PERSON_PARSE_ERR,
       apiErr(400, "Missing --reason or unknown/ambiguous --status", "supply --reason; check `ib person day statuses`"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
       ...COMMON_AUTH_ERRORS,
@@ -468,7 +471,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [
-      intParseErr("--person", "pass a positive personId"),
+      PERSON_PARSE_ERR,
       apiErr(400, "Missing --reason", "supply --reason"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
       ...COMMON_AUTH_ERRORS,
@@ -492,7 +495,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Filter to one personId" },
     ],
     outputShape: "ListEnvelope<{ personId, name, date, status, statusName }>",
-    errors: [intParseErr("--person", "pass a positive personId"), ...permErrors("auth.page.grid.read")],
+    errors: [PERSON_PARSE_ERR, ...permErrors("auth.page.grid.read")],
     notes: [
       "Read-only — setting absence status is not exposed by the CLI in v1.",
       "Reuses /api/cli/driver/absences server-side; `ib vehicle driver available` already excludes these from the assignable pool. Deploy-gated.",

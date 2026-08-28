@@ -120,6 +120,15 @@ describe("runUnifiedSearch", () => {
     expect(env.items[0]).toMatchObject({ entity: "worksite", id: 13, detail: null });
   });
 
+  test("worksite with name: '' falls through to address for label, matching sibling projectors (fb#942)", async () => {
+    const env = await runUnifiedSearch("kamppi", sources({
+      worksite: async () => ({ items: [
+        { tyomaaId: 14, name: "", tyomaaNum: "T-14", address: "Fredrikinkatu 51", address2: null, postalCode: "00100", city: "Helsinki", formattedAddress: null, coords: null },
+      ], nextCursor: null, count: 1 }),
+    }), ["worksite"]);
+    expect(env.items[0]).toMatchObject({ entity: "worksite", id: 14, label: "Fredrikinkatu 51" });
+  });
+
   test("a failing entity lands in errors[], others survive", async () => {
     const env = await runUnifiedSearch("kamppi", sources({
       keikka: async () => { throw new CliError("permission denied", 403, null, 3); },

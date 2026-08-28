@@ -63,6 +63,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   },
   {
     command: "ib auth whoami",
+    aliases: ["ib auth status"],
     description:
       "One-shot orientation for the active session: who/where you are, what you can do (tier), and where else you can act (companies). Decoded from the JWT, so it works for IB_TOKEN sessions too (not just the on-disk creds store). An EXPIRED file session self-heals (refresh, incl. the OAuth refresh-token grant) or exits 2 — a dead session is caught here, not on your next write. Run it first.",
     auth: "any",

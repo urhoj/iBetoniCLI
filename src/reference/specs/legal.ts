@@ -5,6 +5,11 @@
 import type { CommandSpec } from "../../output/help.js";
 import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr } from "./shared.js";
 
+/** The `--owner` parse-guard row shared by status/versions/diff. Note: `save`'s
+ *  own --owner carries a DIFFERENT remedy ("omit for a global document") and
+ *  stays a separate inline call — do not fold it into this constant. */
+const OWNER_PARSE_ERR = intParseErr("--owner", "pass a positive ownerAsiakasId");
+
 export const LEGAL_SPECS: CommandSpec[] = [
 
   // ─── legal (15) — versioned legal documents + acceptance tracking ─────────
@@ -83,7 +88,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}",
     errors: [
       intParseErr("--person", "pass a positive personId"),
-      intParseErr("--owner", "pass a positive ownerAsiakasId"),
+      OWNER_PARSE_ERR,
       apiErr(403, "--person on someone else without developer/sysadmin", "drop --person or use a developer token"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -115,7 +120,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
-    errors: [intParseErr("--owner", "pass a positive ownerAsiakasId"), ...COMMON_AUTH_ERRORS],
+    errors: [OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
     examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
@@ -174,7 +179,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "{a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}",
     errors: [
       { origin: "client", exit: 4, match: ["pass either", "only applies with --type", "provide two positive documentids"], meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
-      intParseErr("--owner", "pass a positive ownerAsiakasId"),
+      OWNER_PARSE_ERR,
       apiErr(404, "documentId / type's draft or active not found", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],

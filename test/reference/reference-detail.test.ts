@@ -298,7 +298,7 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
     );
   });
 
-  test("omitting --ai-confidence in edit mode still resets the score (undefined, not carried over)", async () => {
+  test("omitting --ai-confidence in edit mode still resets the score (key absent, not carried over)", async () => {
     const c = mockApiClient({
       get: vi.fn().mockResolvedValue(CURRENT),
       put: vi.fn().mockResolvedValue({ command: "ib keikka list" }),
@@ -309,11 +309,11 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
       { kind: "append", text: " (cached)" },
       { reason: "tweak summary" }, "developer"
     );
-    expect(c.put).toHaveBeenCalledWith(
-      "/api/cli/command-catalog/ib%20keikka%20list",
-      { summary: "Lists orders (cached)", aiConfidence: undefined, needsHumanReview: undefined },
-      { headers: { "X-Action-Reason": "tweak summary" } }
-    );
+    // `toHaveBeenCalledWith` uses vitest's `equals()`, which treats an explicit
+    // `key: undefined` as equal to the key being absent — so this must assert
+    // on the body's own keys to actually pin "omitted", not just "falsy" (fb#943).
+    const body = c.put.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(["summary"]);
   });
 });
 

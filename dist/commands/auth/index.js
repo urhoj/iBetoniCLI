@@ -76,6 +76,10 @@ export function registerAuthCommands(parent, isReadOnly) {
     }));
     auth
         .command("whoami")
+        // `status` — hidden alias: the conventional name an agent reaches for
+        // first (CLAUDE.md documents "there is no auth status" as a known
+        // gotcha); accept it instead of dead-ending on exit 4 (fb#935).
+        .alias("status")
         .action(guarded(async () => {
         // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
         // sessions too, not just the on-disk creds store.

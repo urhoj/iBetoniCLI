@@ -87,7 +87,7 @@ function projectWorksites(items: WorksiteHitLike[]): UnifiedHit[] {
     entity: "worksite" as const,
     id: w.tyomaaId,
     tyomaaId: w.tyomaaId,
-    label: w.name ?? w.address ?? null,
+    label: w.name || w.address || null,
     detail: w.formattedAddress || [w.address, w.city].filter(Boolean).join(", ") || null,
   }));
 }

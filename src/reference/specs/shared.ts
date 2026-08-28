@@ -119,19 +119,21 @@ export const numParseErr = (flag: string, remedy: string): CommandError => ({
   remedy,
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// CONVENTION for new specs (fb#900): pick based on where this command's
+// custom rows (403/404/…) belong relative to the universal 401/500 pair —
+// do NOT mechanically unify existing specs onto one idiom, since that
+// reorders the ERRORS block in --help (and the help snapshots) for every
+// spec it touches.
+//   - custom rows sit BETWEEN 401 and 500 → `authErrors(...customRows)` (the
+//     sandwich, below).
+//   - custom rows can trail after 500, or there are none → list them then
+//     spread `...COMMON_AUTH_ERRORS` at the end (the majority pattern).
+//   - a hand-inlined `apiErr(401, …)` / `apiErr(500, …)` pair is legacy;
+//     prefer one of the above in new/touched specs.
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
- * CONVENTION for new specs (fb#900): pick based on where this command's
- * custom rows (403/404/…) belong relative to the universal 401/500 pair —
- * do NOT mechanically unify existing specs onto one idiom, since that
- * reorders the ERRORS block in --help (and the help snapshots) for every
- * spec it touches.
- *   - custom rows sit BETWEEN 401 and 500 → `authErrors(...customRows)` (the
- *     sandwich, below).
- *   - custom rows can trail after 500, or there are none → list them then
- *     spread `...COMMON_AUTH_ERRORS` at the end (the majority pattern).
- *   - a hand-inlined `apiErr(401, …)` / `apiErr(500, …)` pair is legacy;
- *     prefer one of the above in new/touched specs.
- *
  * Sandwich the command-specific rows between the universal 401 and 500 rows,
  * preserving their order. Most specs' custom rows (403/404/…) belong BETWEEN
  * the two, which `...COMMON_AUTH_ERRORS` (a trailing spread) cannot express.

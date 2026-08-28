@@ -6,6 +6,9 @@ import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
 import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
+/** The `--tier` parse-guard row every onboarding list/add/set leaf shares. */
+const TIER_PARSE_ERR = intParseErr("--tier", "pass 1 (priority) or 2 (secondary)");
+
 export const JERRY_SPECS: CommandSpec[] = [
 
   // ─── jerry (39) — BetoniJerry marketplace ──────────────────────────────────
@@ -660,7 +663,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, parkedUntil, parked, muistutusDue }>",
-    errors: [intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"), SYSADMIN_403, ...COMMON_AUTH_ERRORS],
+    errors: [TIER_PARSE_ERR, SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     notes: [
       "`lastNote` previews (200 chars) the most recent HUMAN-written event — note/call/response, with `lastNoteType` naming which — so the reason behind a status is visible without opening the trail. `status` alone cannot tell a ruled-out prospect from a deliberately held one; read `lastNote`/`muistiinpanot` before acting on a terminal status, and `ib jerry admin onboarding events <asiakasId>` for the full history. Deploy-gated: the three lastNote* fields are absent until puminet5api ships them.",
     ],
@@ -687,7 +690,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape: "{ jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run",
     errors: [
       apiErr(400, "Prospect already exists / company not found / unknown --source or --company-type", "check asiakasId; --source is manual|import|scheduled, --company-type is pumppu|betoni|all|owner"),
-      intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"),
+      TIER_PARSE_ERR,
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -721,7 +724,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     ],
     errors: [
       apiErr(400, "Unknown --status or --company-type, or malformed --parked-until", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or empty (`--parked-until=` on PowerShell)"),
-      intParseErr("--tier", "pass 1 (priority) or 2 (secondary)"),
+      TIER_PARSE_ERR,
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
