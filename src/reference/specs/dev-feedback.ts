@@ -367,7 +367,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback count",
     description:
-      "Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",
+      "Aggregate counts of filed feedback by status, kind, scope and severity, plus the claim split and how many rows still lack a complexity or severity grade (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",
     // `stats` mirrors the backend route this wraps (GET /api/feedback/stats), so
     // a caller who read the route table or the module reaches for that spelling
     // (fb#611). It previously dead-ended on exit 4 and — worse — pointed at
@@ -380,7 +380,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
     ],
     outputShape:
-      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, byClaim: { held, free }, unestimated, ungraded, truncated?, hint? }. The two completeness scalars are twins: `unestimated` = complexity IS NULL (pair with `list --complexity none`), `ungraded` = severity IS NULL (pair with `list --severity none`). `bySeverity` buckets the graded rows and carries the NULLs under the key `ungraded`. `byClaim` (fb#888) is the WHOLE-TABLE count of what `list --held`/`--unclaimed` narrows to the active bucket — not a same-population twin: `held` = live lease (claimedBy set AND unexpired), `free` = everything else including an expired lease. Because `byClaim` counts every status while `list --held`/`--unclaimed` defaults to open+reviewed only, the two numbers can disagree whenever a claimed-and-unexpired row sits in a closed status — `byClaim` answers \"how many rows are being worked right now, across the whole table?\" without pulling a page. ⚠ ALL of these count the WHOLE table including closed rows — most of which are settled applied/dismissed, so grading them is archaeology; narrow to the active bucket before reading a backlog number off this. `ib dev feedback lint` answers the same question already scoped to the active rows. bySeverity/byClaim/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.",
+      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, byClaim: { held, free }, unestimated, ungraded, truncated?, hint? }. The two completeness scalars are twins: `unestimated` = complexity IS NULL (pair with `list --complexity none`), `ungraded` = severity IS NULL (pair with `list --severity none`); `bySeverity` buckets the graded rows and carries the NULLs under the key `ungraded`. `byClaim` (fb#888) is a live-lease split — `held` = claimedBy set AND unexpired, `free` = everything else including an expired lease — answering \"what is being worked right now?\" without pulling a page. ⚠ EVERY key here counts the WHOLE table including closed rows, so all of them disagree with `list --held`/`--unclaimed`/`--severity`, which default to the active bucket (open+reviewed); closed rows are mostly settled applied/dismissed, so narrow before reading a backlog number off this. bySeverity/byClaim/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.",
     notes: [
       "DEPLOY-GATED (fb#536): the server-side aggregate needs /api/feedback/stats. Against an older backend the command falls back to the previous client-side rollup over a 200-row page and sets `truncated: true` with a hint — those numbers are a LOWER BOUND, and because the page is newest-first the rows dropped are the OLDEST, so `open` is understated most. Cross-check a truncated result with `ib dev feedback list --status open --limit 200`.",
     ],
@@ -389,6 +389,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],
+    seeAlso: ["ib dev feedback lint", "ib dev feedback list"],
     examples: ["ib dev feedback count", "ib dev feedback count --scope cli", "ib dev feedback count --kind legal"],
   },
 ];
