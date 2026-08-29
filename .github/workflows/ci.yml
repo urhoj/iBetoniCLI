@@ -52,7 +52,7 @@ jobs:
   #
   # This used to repository_dispatch puminet5api's bump-vendored-cli.yml and let
   # a job over there do the bump. GitHub bills every job rounded UP to a full
-  # minute, so that 20-second job on a PRIVATE repo cost 236 billed minutes in
+  # minute, so that 20-second job on a PRIVATE repo cost 256 billed minutes (236 runs) in
   # August 2026 for ~83 minutes of work — the single biggest avoidable line on
   # the account's 2000-minute Free quota, which ran dry and locked every private
   # repo out of Actions (fb#983). This repo is PUBLIC, so the same work here is
@@ -98,14 +98,21 @@ jobs:
               exit 0
             fi
             git update-index --cacheinfo "160000,${SHA},betonicli"
-            # [skip ci]: this push goes through a user PAT, which — unlike
-            # GITHUB_TOKEN — DOES trigger push-driven workflows on puminet5api.
-            # The bump carries no puminet5api source change, so there is nothing
-            # for its CI to test.
+            # The skip-ci suffix is inert today — puminet5api has had no push-
+            # triggered workflow since fb#983 — but a user-PAT push, unlike
+            # GITHUB_TOKEN, WOULD trigger one if it were ever re-added, and a
+            # pointer-only commit has nothing for that CI to test. Cheap insurance.
             git commit --quiet -m "chore: bump vendored ib CLI -> ${SHA:0:9} [skip ci]"
-            if git push --quiet origin HEAD:master; then
+            if PUSH_ERR=$(git push --quiet origin HEAD:master 2>&1); then
               echo "Bumped puminet5api/betonicli ${CURRENT:0:9} -> ${SHA:0:9}"
               exit 0
+            fi
+            # Only a non-fast-forward rejection is worth a retry; anything else
+            # (403 on an expired/rotated GH_PAT, branch protection) is reported as
+            # what it is instead of as three "concurrent pushes" (fb#1007).
+            if ! echo "$PUSH_ERR" | grep -qiE 'fetch first|non-fast-forward|rejected'; then
+              echo "::error::git push to puminet5api master failed: $PUSH_ERR"
+              exit 1
             fi
             echo "Push rejected (a concurrent push landed on puminet5api master) - retry $attempt/3 on fresh master"
             git fetch --quiet --depth=1 origin master
