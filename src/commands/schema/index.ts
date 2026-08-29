@@ -7,6 +7,8 @@ import { CliError } from "../../api/errors.js";
 import { qs } from "../../api/query.js";
 import { warnIfTruncated } from "../../api/listCaps.js";
 import { cappedInt } from "../../targets.js";
+import { foldAliases } from "../_shared/flags.js";
+import { failWith } from "../../output/json.js";
 
 export interface SchemaListFilter {
   search?: string;
@@ -133,6 +135,21 @@ export interface SchemaQueryResult {
  * `truncated: true` when the cap bit — warn like every other capped list, so
  * a caller reading only `rows` cannot mistake a cut result for a complete one.
  */
+/**
+ * Fold the `<sql>` positional and `--sql` flag alias into one value (fb#968) —
+ * an agent pattern-matching on sibling commands (`changelog add [description]`,
+ * `feedback create <description>`) reaches for the positional first and wasted
+ * a round-trip against a live-DB tool when only `--sql` was accepted.
+ */
+export function resolveSqlInput(positional?: string, flag?: string): string {
+  const sql = foldAliases(
+    [positional, flag],
+    "Provide the SQL once — via the positional or --sql; if both are given they must match"
+  );
+  if (!sql) failWith("--sql (or a positional SQL statement) is required", 4);
+  return sql;
+}
+
 export async function runSchemaQuery(client: ApiClient, sql: string): Promise<SchemaQueryResult> {
   const result = await client.post<SchemaQueryResult>("/api/cli/schema/query", { sql }, { read: true });
   if (result.truncated) {
@@ -246,12 +263,16 @@ export function registerSchemaCommands(
   s.command("trigger <name>")
     .action(runOneOrBatch(runSchemaTrigger));
 
-  s.command("query")
+  s.command("query [sql]")
     .description(
       "Run one read-only SELECT (or WITH … SELECT) against the live DB — for data-SHAPE questions (COUNT, GROUP BY, histograms). Single statement, no semicolons, hard 1000-row cap; runs under a db_datareader-only login."
     )
-    .requiredOption("--sql <select>", "The SELECT statement to run")
-    .action(jsonAction(getClient, (client, opts: { sql: string }) => runSchemaQuery(client, opts.sql)));
+    .option("--sql <select>", "The SELECT statement to run (alias for the positional)")
+    .action(
+      jsonAction(getClient, (client, sql: string | undefined, opts: { sql?: string }) =>
+        runSchemaQuery(client, resolveSqlInput(sql, opts.sql))
+      )
+    );
 
   s.command("dump")
     .action(jsonAction(getClient, runSchemaDump));

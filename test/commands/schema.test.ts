@@ -14,6 +14,7 @@ import {
   runSchemaSnapshots,
   runSchemaQuery,
   runSchemaIndexes,
+  resolveSqlInput,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -269,6 +270,28 @@ describe("ib schema", () => {
       expect(msg).toContain("TRUNCATED");
       expect(msg).toContain("ib dev schema query");
       expect(msg).toContain("GROUP BY");
+    });
+  });
+
+  describe("resolveSqlInput (fb#968)", () => {
+    test("accepts the positional alone", () => {
+      expect(resolveSqlInput("SELECT 1", undefined)).toBe("SELECT 1");
+    });
+
+    test("accepts --sql alone", () => {
+      expect(resolveSqlInput(undefined, "SELECT 1")).toBe("SELECT 1");
+    });
+
+    test("agreeing positional and --sql are fine", () => {
+      expect(resolveSqlInput("SELECT 1", "SELECT 1")).toBe("SELECT 1");
+    });
+
+    test("conflicting positional and --sql exit 4", () => {
+      expect(() => resolveSqlInput("SELECT 1", "SELECT 2")).toThrow(/must match/);
+    });
+
+    test("neither given exits 4", () => {
+      expect(() => resolveSqlInput(undefined, undefined)).toThrow(/--sql.*required/);
     });
   });
 });

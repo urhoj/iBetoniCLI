@@ -175,7 +175,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
           "Accepted for cross-command consistency; get always returns the full row (no-op).",
       },
     ],
-    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
+    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as `list`), ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — if the id exists in devChangelog the error hint names the changelog command (feedback #230)"),

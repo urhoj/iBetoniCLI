@@ -203,7 +203,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that `schema tables/table` cannot answer. Read-over-POST: works under --read-only. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
-        flags: [{ name: "sql", type: "string", required: true, description: "The SELECT statement (single statement; one trailing ';' tolerated)" }],
+        args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],
+        flags: [{ name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" }],
         outputShape:
           "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000 }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows.",
         errors: [
@@ -220,7 +221,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           "dbo scope like the rest of `ib dev schema`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).",
         ],
         examples: [
-          "ib dev schema query --sql \"SELECT COUNT(*) AS n FROM person\"",
+          "ib dev schema query \"SELECT COUNT(*) AS n FROM person\"",
           "ib dev schema query --sql \"SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId\"",
         ],
       },

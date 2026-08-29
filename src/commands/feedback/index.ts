@@ -621,12 +621,24 @@ export async function runFeedbackList(
   return env;
 }
 
-/** GET /api/feedback/:id — developer-only single row. */
+/**
+ * GET /api/feedback/:id — developer-only single row. Includes the same derived
+ * `claimState` (free|held|mine, fb#901 "mine"->"held" downgrade included) that
+ * `list` already computes — `get` used to omit it, forcing callers to re-derive
+ * claim liveness themselves (fb#973).
+ */
 export async function runFeedbackGet(
   client: ApiClient,
   id: number
 ): Promise<Record<string, unknown>> {
-  return client.get<Record<string, unknown>>(`/api/feedback/${id}`);
+  const row = await client.get<Record<string, unknown>>(`/api/feedback/${id}`);
+  const { by: me, source: idSource } = resolveClaim(undefined);
+  let claimState = deriveClaimState(row, me);
+  if (idSource === "derived" && claimState === "mine") {
+    claimState = "held";
+    warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
+  }
+  return { ...row, claimState };
 }
 
 /**

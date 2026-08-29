@@ -677,6 +677,81 @@ describe("ib feedback get", () => {
   });
 });
 
+/**
+ * `get` used to omit the derived `claimState` that `list` already computes
+ * server-side, forcing callers to re-derive claim liveness themselves (fb#973).
+ * Mirrors the `list` claimState tests above, including the fb#901 derived-
+ * identity downgrade.
+ */
+describe("ib feedback get — claimState (fb#973)", () => {
+  let cap: StderrCapture;
+  const savedId = process.env.IB_CLAIM_ID;
+  beforeEach(() => {
+    process.env.IB_CLAIM_ID = "hermes/groom";
+    cap = captureStderr();
+  });
+  afterEach(() => {
+    cap.restore();
+    if (savedId === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = savedId;
+  });
+  const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  test("a free row (no claimedBy) reports claimState 'free'", async () => {
+    get.mockResolvedValueOnce({ feedbackId: 42, status: "open" });
+    const out = await runFeedbackGet(mockClient, 42);
+    expect(out).toMatchObject({ feedbackId: 42, claimState: "free" });
+  });
+
+  test("a row claimed by me reports 'mine'", async () => {
+    get.mockResolvedValueOnce({
+      feedbackId: 42,
+      status: "open",
+      claimedBy: "hermes/groom",
+      claimExpiresAt: FUTURE,
+    });
+    const out = await runFeedbackGet(mockClient, 42);
+    expect(out).toMatchObject({ claimState: "mine" });
+  });
+
+  test("a row claimed by someone else reports 'held'", async () => {
+    get.mockResolvedValueOnce({
+      feedbackId: 42,
+      status: "open",
+      claimedBy: "someone-else",
+      claimExpiresAt: FUTURE,
+    });
+    const out = await runFeedbackGet(mockClient, 42);
+    expect(out).toMatchObject({ claimState: "held" });
+  });
+
+  test("an expired claim reads as 'free', not 'held'", async () => {
+    const PAST = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    get.mockResolvedValueOnce({
+      feedbackId: 42,
+      status: "open",
+      claimedBy: "someone-else",
+      claimExpiresAt: PAST,
+    });
+    const out = await runFeedbackGet(mockClient, 42);
+    expect(out).toMatchObject({ claimState: "free" });
+  });
+
+  test("a row claimed under a DERIVED (user@host fallback) identity downgrades 'mine' to 'held' and warns (fb#901)", async () => {
+    delete process.env.IB_CLAIM_ID;
+    const derivedMe = resolveClaimId(undefined);
+    get.mockResolvedValueOnce({
+      feedbackId: 42,
+      status: "open",
+      claimedBy: derivedMe,
+      claimExpiresAt: FUTURE,
+    });
+    const out = await runFeedbackGet(mockClient, 42);
+    expect(out).toMatchObject({ claimState: "held" });
+    expect(cap.text()).toMatch(/downgraded/);
+  });
+});
+
 // ─── resolve ─────────────────────────────────────────────────────────────────
 
 describe("ib feedback resolve", () => {

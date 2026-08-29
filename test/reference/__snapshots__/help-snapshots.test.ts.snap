@@ -2968,7 +2968,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
+  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as \`list\`), ... }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
@@ -3642,14 +3642,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib dev schema query matches snapshot 1`] = `
 "USAGE
-  ib dev schema query --sql <sql> [flags]
+  ib dev schema query [<sql>] [flags]
 
 DESCRIPTION
   Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that \`schema tables/table\` cannot answer. Read-over-POST: works under --read-only. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
+ARGUMENTS
+  <sql> STRING    The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree). (optional)
+
 FLAGS
-  --sql STRING    The SELECT statement (single statement; one trailing ';' tolerated) (required)
+  --sql STRING    The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -3670,7 +3673,7 @@ NOTES
   - dbo scope like the rest of \`ib dev schema\`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).
 
 EXAMPLES
-  ib dev schema query --sql "SELECT COUNT(*) AS n FROM person"
+  ib dev schema query "SELECT COUNT(*) AS n FROM person"
   ib dev schema query --sql "SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId"
 "
 `;
