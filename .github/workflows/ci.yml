@@ -47,26 +47,69 @@ jobs:
       - run: npm run lint
       - run: npm test
 
-  # On a green master push, tell puminet5api to move its vendored-CLI
-  # submodule pointer (bump-vendored-cli.yml there). Gated on build-and-test
-  # so a red master never propagates to the server-side CLI surface
-  # (MCP ib_exec / /api/cli/exec). Requires GH_PAT with write access to
-  # urhoj/puminet5api.
-  notify-vendored-bump:
+  # On a green master push, move puminet5api's vendored-CLI submodule pointer
+  # (puminet5api/betonicli) to this commit — from THIS job, directly.
+  #
+  # This used to repository_dispatch puminet5api's bump-vendored-cli.yml and let
+  # a job over there do the bump. GitHub bills every job rounded UP to a full
+  # minute, so that 20-second job on a PRIVATE repo cost 236 billed minutes in
+  # August 2026 for ~83 minutes of work — the single biggest avoidable line on
+  # the account's 2000-minute Free quota, which ran dry and locked every private
+  # repo out of Actions (fb#983). This repo is PUBLIC, so the same work here is
+  # free. bump-vendored-cli.yml over there stays as the manual fallback.
+  #
+  # Gated on build-and-test so a red master never propagates to the server-side
+  # CLI surface (MCP ib_exec / /api/cli/exec). Requires GH_PAT with write access
+  # to urhoj/puminet5api.
+  bump-vendored-copy:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Dispatch vendored-cli-bump to urhoj/puminet5api
+      - name: Move puminet5api/betonicli to ${{ github.sha }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          SHA: ${{ github.sha }}
         run: |
-          STATUS=$(curl -s -o resp.txt -w "%{http_code}" -X POST \
-            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/urhoj/puminet5api/dispatches \
-            -d "{\"event_type\":\"vendored-cli-bump\",\"client_payload\":{\"sha\":\"${{ github.sha }}\"}}")
-          if [ "$STATUS" != "204" ]; then
-            echo "Dispatch failed: HTTP $STATUS"
-            cat resp.txt
-            exit 1
-          fi
-          echo "Dispatched vendored-cli-bump for ${{ github.sha }} (HTTP 204)"
+          # Shallow, single-branch clone: a submodule pointer is a gitlink (mode
+          # 160000) written straight into the index, so neither the submodule nor
+          # its objects need to be present — no `submodule update`, no fetch.
+          git clone --quiet --depth=1 --single-branch --branch master \
+            "https://x-access-token:${GH_PAT}@github.com/urhoj/puminet5api.git" p5
+          cd p5
+          git config user.name "vendored-cli-bump[bot]"
+          git config user.email "vendored-cli-bump[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3; do
+            CURRENT=$(git rev-parse HEAD:betonicli)
+            if [ "$CURRENT" = "$SHA" ]; then
+              echo "puminet5api already pins ${SHA:0:9} - nothing to do."
+              exit 0
+            fi
+            # Never move the pointer BACKWARDS: two CLI pushes in quick
+            # succession can finish CI out of order, and the older run must not
+            # undo the newer pin. base=CURRENT, head=SHA -> "ahead" means SHA is
+            # a strict descendant of what puminet5api pins now.
+            REL=$(gh api "repos/${{ github.repository }}/compare/${CURRENT}...${SHA}" --jq '.status' || echo "compare-failed")
+            if [ "$REL" != "ahead" ]; then
+              echo "::warning::puminet5api pins ${CURRENT:0:9}, and ${SHA:0:9} is '$REL' relative to it - not bumping. Only a fast-forward is applied automatically; pin by hand with puminet5api's bump-vendored-cli.yml (workflow_dispatch)."
+              exit 0
+            fi
+            git update-index --cacheinfo "160000,${SHA},betonicli"
+            # [skip ci]: this push goes through a user PAT, which — unlike
+            # GITHUB_TOKEN — DOES trigger push-driven workflows on puminet5api.
+            # The bump carries no puminet5api source change, so there is nothing
+            # for its CI to test.
+            git commit --quiet -m "chore: bump vendored ib CLI -> ${SHA:0:9} [skip ci]"
+            if git push --quiet origin HEAD:master; then
+              echo "Bumped puminet5api/betonicli ${CURRENT:0:9} -> ${SHA:0:9}"
+              exit 0
+            fi
+            echo "Push rejected (a concurrent push landed on puminet5api master) - retry $attempt/3 on fresh master"
+            git fetch --quiet --depth=1 origin master
+            git reset --quiet --hard origin/master
+          done
+          echo "::error::Could not push the vendored-CLI bump after 3 attempts"
+          exit 1
