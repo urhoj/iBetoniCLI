@@ -241,11 +241,13 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
  * Curated cross-command redirects for flags an AI naturally guesses on the
  * WRONG command — where the right form lives on a sibling command, not just a
  * differently-named flag here (so a same-command "did you mean" can't express
- * it). Keyed by `"<full command path> <flag>"`. Consulted only at runtime by
- * {@link buildUnknownOptionEnvelope}, and only when the caller actually invoked
- * that exact command — so it never leaks into the spec-driven reference dump
- * (keeping the tier-scrub contract intact) and appears solely to a caller who
- * already reached that subtree. The flag analogue of `VERB_SYNONYMS`.
+ * it). Keyed by `"<canonical command path> <flag>"` — consulted only at
+ * runtime by {@link buildUnknownOptionEnvelope}, which resolves the invoking
+ * command through {@link canonicalPath} before the lookup (fb#1026), so a
+ * curated row also fires when the same command is reached through a hidden
+ * back-compat alias (e.g. `ib feedback list` for `ib dev feedback list`), not
+ * only its canonical path. It never leaks into the spec-driven reference dump
+ * (keeping the tier-scrub contract intact). The flag analogue of `VERB_SYNONYMS`.
  */
 export const OPTION_REDIRECTS = {
     "ib dev cache invalidate --pattern": "`cache invalidate` targets an entity FAMILY by its <entityType> positional (e.g. `ib dev cache invalidate keikka --id 123`). For a raw Redis key glob use `ib dev cache pattern <glob>` instead.",
@@ -684,14 +686,15 @@ export function shellSplitHint(token, availableOptions) {
  */
 export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer") {
     const { command, spec, availableOptions, positionals } = commandSurface(cmd);
+    const canonical = canonicalPath(command);
     const bare = unknownOption.replace(/^-+/, "");
     const bareNames = availableOptions.map((o) => o.replace(/^-+/, ""));
-    const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${canonicalPath(command)} ${unknownOption}`];
+    const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${canonical} ${unknownOption}`];
     const guess = overrideTarget && bareNames.includes(overrideTarget)
         ? overrideTarget
         : closestName(bare, bareNames, FLAG_SYNONYMS);
     const didYouMean = guess ? `--${guess}` : null;
-    const redirect = OPTION_REDIRECTS[`${canonicalPath(command)} ${unknownOption}`];
+    const redirect = OPTION_REDIRECTS[`${canonical} ${unknownOption}`];
     // A rejected write-safety flag is answered by THIS command's own idiom, never
     // by a sibling list — ~125 commands declare each of the trio, so any three
     // named would be arbitrary, and claiming the capability lives elsewhere is
@@ -719,13 +722,13 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     // guard below.
     const acceptedLiteral = redirect || didYouMean || idiomHint
         ? []
-        : siblingsAcceptingOption(canonicalPath(command), unknownOption, tier);
+        : siblingsAcceptingOption(canonical, unknownOption, tier);
     // Nothing accepts it verbatim — a synonym spelling still might (fb#388).
     // Suppressed when `didYouMean` fired: the flag exists on THIS command under
     // another name, which beats redirecting the caller to a sibling.
     const viaSynonym = redirect || didYouMean || idiomHint || acceptedLiteral.length
         ? null
-        : siblingsAcceptingSynonym(canonicalPath(command), unknownOption, tier);
+        : siblingsAcceptingSynonym(canonical, unknownOption, tier);
     const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
     const discover = discoverHint(command);
     const parts = [];
