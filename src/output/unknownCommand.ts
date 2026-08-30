@@ -858,13 +858,13 @@ export function buildUnknownOptionEnvelope(
 
   const bare = unknownOption.replace(/^-+/, "");
   const bareNames = availableOptions.map((o) => o.replace(/^-+/, ""));
-  const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${command} ${unknownOption}`];
+  const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${canonicalPath(command)} ${unknownOption}`];
   const guess =
     overrideTarget && bareNames.includes(overrideTarget)
       ? overrideTarget
       : closestName(bare, bareNames, FLAG_SYNONYMS);
   const didYouMean = guess ? `--${guess}` : null;
-  const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
+  const redirect = OPTION_REDIRECTS[`${canonicalPath(command)} ${unknownOption}`];
   // A rejected write-safety flag is answered by THIS command's own idiom, never
   // by a sibling list — ~125 commands declare each of the trio, so any three
   // named would be arbitrary, and claiming the capability lives elsewhere is

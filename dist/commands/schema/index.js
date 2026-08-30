@@ -81,15 +81,6 @@ export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
 }
 /**
- * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
- * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
- * and the acting-as write banner. The server enforces read-only twice: a text
- * guard (single SELECT/WITH statement, no semicolons, no INTO) and a
- * db_datareader-only login. Results are hard-capped at 1000 rows with
- * `truncated: true` when the cap bit — warn like every other capped list, so
- * a caller reading only `rows` cannot mistake a cut result for a complete one.
- */
-/**
  * Fold the `<sql>` positional and `--sql` flag alias into one value (fb#968) —
  * an agent pattern-matching on sibling commands (`changelog add [description]`,
  * `feedback create <description>`) reaches for the positional first and wasted
@@ -101,6 +92,15 @@ export function resolveSqlInput(positional, flag) {
         failWith("--sql (or a positional SQL statement) is required", 4);
     return sql;
 }
+/**
+ * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
+ * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
+ * and the acting-as write banner. The server enforces read-only twice: a text
+ * guard (single SELECT/WITH statement, no semicolons, no INTO) and a
+ * db_datareader-only login. Results are hard-capped at 1000 rows with
+ * `truncated: true` when the cap bit — warn like every other capped list, so
+ * a caller reading only `rows` cannot mistake a cut result for a complete one.
+ */
 export async function runSchemaQuery(client, sql) {
     const result = await client.post("/api/cli/schema/query", { sql }, { read: true });
     if (result.truncated) {

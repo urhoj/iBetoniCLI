@@ -189,6 +189,16 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     expect(env.didYouMean).toBe("--held");
   });
 
+  // fb#1026: OPTION_DID_YOU_MEAN_OVERRIDES/OPTION_REDIRECTS were keyed on the
+  // raw invoked path, so the SAME command reached through a hidden back-compat
+  // alias (`ib feedback list`, DEV_ALIAS_DOMAINS' top-level alias for `ib dev
+  // feedback list`) missed the curated override and fell back to the plain
+  // prefix match — the exact fb#1015 bug, just reachable via a different path.
+  test("curated override still fires through a hidden alias path (fb#1026)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("feedback", "list"), "--claimed");
+    expect(env.didYouMean).toBe("--held");
+  });
+
   test("OPTION_DID_YOU_MEAN_OVERRIDES targets are real flags on the named command", () => {
     for (const [key, target] of Object.entries(OPTION_DID_YOU_MEAN_OVERRIDES)) {
       const command = key.slice(0, key.lastIndexOf(" "));
