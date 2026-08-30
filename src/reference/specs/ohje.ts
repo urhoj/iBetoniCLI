@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR } from "./shared.js";
+import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR, AI_CONFIDENCE_PARSE_ERR } from "./shared.js";
 
 export const OHJE_SPECS: CommandSpec[] = [
 
@@ -78,10 +78,11 @@ export const OHJE_SPECS: CommandSpec[] = [
       "aiConfidence/needsHumanReview are DIRECT-assigned, unlike the content fields (title/shorttext/htmltext), which the save proc COALESCEs — an omitted content field keeps its current value, but omitting --ai-confidence or --needs-human-review on ANY write resets the score to null and un-parks the row, re-opening it for the grooming routine. Pass --no-needs-human-review to make that reset explicit in the command line rather than implicit via omission.",
     ],
     errors: [
-      { origin: "client", exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
+      { origin: "client", exit: 4, match: ["Missing required flag: --reason", "Invalid helpId", "has no existing row and --must-exist was set"], meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
       { origin: "client", exit: 5, meaning: "helpId has no existing row (edit mode only)", remedy: "create the entry first with a full --htmltext/--title/--shorttext" },
       apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),
       apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
+      AI_CONFIDENCE_PARSE_ERR,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [

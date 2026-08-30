@@ -345,6 +345,28 @@ export const OPTION_REDIRECTS: Record<string, string> = {
     "`person activity` is developer-only and reads globally by personId; drop `--asiakas` and run `ib person activity <personId>`. It is not tenant-scoped like `person list`, `get`, and `search`.",
 };
 
+/**
+ * Curated same-command "did you mean" overrides for cases where closestName's
+ * own ordering (prefix match wins outright, before FLAG_SYNONYMS is ever
+ * consulted) picks a technically-nearest flag that is the wrong semantic
+ * answer (feedback #1015). On `ib dev feedback list`, `--claimed` is a literal
+ * PREFIX of `--claimed-by` — a STRING flag needing a session-id label the
+ * caller did not type — so the prefix pass wins before the bidirectional
+ * `stats`/`count`-style synonym table would even get a look. But the bare,
+ * no-argument SHAPE of the typo more plausibly means `--held` (the no-arg
+ * boolean that lists every currently-claimed row, independent of who holds
+ * it) — the opposite of what the caller reached for.
+ *
+ * Keyed by `"<full command path> <bad flag>"`; consulted BEFORE closestName in
+ * {@link buildUnknownOptionEnvelope} so it wins outright, mirroring
+ * {@link OPTION_REDIRECTS}. Re-validated against the command's own
+ * `availableOptions` at call time, so a target renamed or removed later falls
+ * back to the derived guess instead of pointing at a dead flag.
+ */
+export const OPTION_DID_YOU_MEAN_OVERRIDES: Record<string, string> = {
+  "ib dev feedback list --claimed": "held",
+};
+
 /** Long flags a command accepts, derived from its curated spec (tier-blind — the
  *  caller already invoked this command; only sibling ENUMERATION is tier-gated).
  *  Deduped: a `reasonPolicy: "always"` command declares `--reason` in its own
@@ -835,11 +857,12 @@ export function buildUnknownOptionEnvelope(
   const { command, spec, availableOptions, positionals } = commandSurface(cmd);
 
   const bare = unknownOption.replace(/^-+/, "");
-  const guess = closestName(
-    bare,
-    availableOptions.map((o) => o.replace(/^-+/, "")),
-    FLAG_SYNONYMS
-  );
+  const bareNames = availableOptions.map((o) => o.replace(/^-+/, ""));
+  const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${command} ${unknownOption}`];
+  const guess =
+    overrideTarget && bareNames.includes(overrideTarget)
+      ? overrideTarget
+      : closestName(bare, bareNames, FLAG_SYNONYMS);
   const didYouMean = guess ? `--${guess}` : null;
   const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
   // A rejected write-safety flag is answered by THIS command's own idiom, never

@@ -4328,6 +4328,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
   exit 4 (HTTP 400)  definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length) → Shorten the definition
   exit 4 (client-side)  --from-json file is not valid JSON or not readable → Check the file path and contents
+  exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
 
 NOTES
   - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`--synonyms=\` there, which means the same thing in bash (\`ib help shell-quoting\`). To OVERWRITE, pass the new value.
@@ -9029,6 +9030,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (client-side)  helpId has no existing row (edit mode only) → create the entry first with a full --htmltext/--title/--shorttext
   exit 4 (HTTP 400)  Validation failed      → title ≤500, htmltext ≤10000, helpId 1–250 chars
   exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
+  exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10810,6 +10812,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 5 (client-side)  Unknown command        → \`ib commands\` for valid paths
   exit 4 (HTTP 400)  summary >160 or detail >4000 chars (the message names the submitted length) → Trim to the cap — cut any flag/exit-code recap first (it already renders in \`--help\`), keep the business context
+  exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
 
 NOTES
   - --dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with \`reference detail get\` first, or use edit mode.

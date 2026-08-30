@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR } from "./shared.js";
+import { clearHint, clearNote, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR, AI_CONFIDENCE_PARSE_ERR } from "./shared.js";
 
 export const GLOSSARY_SPECS: CommandSpec[] = [
   // ─── glossary ────────────────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { http: 404, exit: 5, match: "append/add/remove requires an existing term", meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
       { http: 400, exit: 4, meaning: "definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length)", remedy: "Shorten the definition" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
+      AI_CONFIDENCE_PARSE_ERR,
     ],
     examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"'],
   },

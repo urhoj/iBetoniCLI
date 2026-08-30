@@ -342,6 +342,23 @@ export const PERSON_PARSE_ERR: CommandError = intParseErr("--person", "pass a po
 /** The `--max-confidence` parse-guard row shared by every `addNeedsReviewFlags` consumer (ohje/glossary/reference detail list) — min 0, not 1, since a threshold of 0 is meaningful. */
 export const MAX_CONFIDENCE_PARSE_ERR: CommandError = intParseErr("--max-confidence", "pass an integer >= 0 (default 90)", 0);
 /**
+ * The `--ai-confidence` range-guard row shared by every `assessWriteFlags`
+ * consumer (glossary set / ohje update / reference detail set) — fb#974.
+ * `assertAiConfidence` (src/assess.ts) rejects a non-integer or out-of-range
+ * value LOCALLY, before any request, but none of the three consumer specs ever
+ * carried a row naming it, so the raw message reached the caller with no hint
+ * attached. Not built on {@link intParseErr}: that helper's message shape is
+ * "must be an integer >= N", while this guard's is a closed 0–100 RANGE, so
+ * the wording differs.
+ */
+export const AI_CONFIDENCE_PARSE_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "--ai-confidence must be an integer 0–100",
+  meaning: "--ai-confidence is not an integer 0–100, rejected locally before any request",
+  remedy: "pass an integer 0-100",
+};
+/**
  * `resolveRoleTypeId` rejects an unknown --role LOCALLY, before any request, so
  * every role-taking command needs this client row alongside its backend-400 twin
  * (the 400 is still reachable — the backend enforces role limits too).

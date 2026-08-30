@@ -1,7 +1,8 @@
 import { describe, test, expect } from "vitest";
 import { assertAiConfidence } from "../src/assess.js";
-import { CliError } from "../src/api/errors.js";
+import { CliError, hintForError } from "../src/api/errors.js";
 import { intFlag } from "../src/targets.js";
+import { COMMAND_SPECS } from "../src/reference/specs.js";
 
 describe("assertAiConfidence", () => {
   test("undefined is allowed (omitted = reset)", () => {
@@ -28,5 +29,31 @@ describe("assertAiConfidence", () => {
 describe("--max-confidence accepts its 0 boundary (fb#975)", () => {
   test("0 parses to the number 0, not a rejection", () => {
     expect(intFlag("--max-confidence", 0)("0")).toBe(0);
+  });
+});
+
+// fb#974: before this fix, none of the three assertAiConfidence consumers
+// carried an ERRORS row naming the guard, so a caller hitting it got the raw
+// message with no remedy attached — verified here by resolving the SAME
+// error the guard actually throws through the SAME hint pipeline the CLI uses.
+describe("--ai-confidence guard is documented on every consumer (fb#974)", () => {
+  const guardError = (): CliError => {
+    try {
+      assertAiConfidence(101);
+      throw new Error("did not throw");
+    } catch (e) {
+      return e as CliError;
+    }
+  };
+
+  test.each([
+    "ib glossary set",
+    "ib ohje update",
+    "ib reference detail set",
+  ])("%s carries a hint for the --ai-confidence range guard", (command) => {
+    const spec = COMMAND_SPECS.find((s) => s.command === command);
+    expect(spec).toBeDefined();
+    const hint = hintForError(guardError(), spec?.errors ?? null);
+    expect(hint).toContain("integer 0-100");
   });
 });

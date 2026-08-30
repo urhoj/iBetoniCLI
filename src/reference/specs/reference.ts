@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR } from "./shared.js";
+import { clearHint, apiErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR, AI_CONFIDENCE_PARSE_ERR } from "./shared.js";
 
 export const REFERENCE_SPECS: CommandSpec[] = [
 
@@ -205,6 +205,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         meaning: "summary >160 or detail >4000 chars (the message names the submitted length)",
         remedy: "Trim to the cap — cut any flag/exit-code recap first (it already renders in `--help`), keep the business context",
       },
+      AI_CONFIDENCE_PARSE_ERR,
     ],
     examples: [
       "ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'",

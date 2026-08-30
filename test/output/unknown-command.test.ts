@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
 import type { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import {
   levenshtein,
   closestName,
@@ -18,6 +19,7 @@ import {
   descendantsOwningVerb,
   topLevelDomainRedirect,
   OPTION_REDIRECTS,
+  OPTION_DID_YOU_MEAN_OVERRIDES,
 } from "../../src/output/unknownCommand.js";
 
 // Sibling enumeration and did-you-mean read the WHOLE tree, so build it once
@@ -176,6 +178,23 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     const env = buildUnknownOptionEnvelope(leafByPath("glossary", "lookup"), "--append");
     expect(env.acceptedAs).toBe("--append-definition");
     expect(env.acceptedBy).toEqual(["ib glossary set"]);
+  });
+
+  // fb#1015: `--claimed` is a literal prefix of `--claimed-by` (a string flag
+  // needing a session-id label), so closestName's prefix pass would otherwise
+  // answer before FLAG_SYNONYMS is consulted — even though the bare,
+  // no-argument typo more plausibly means `--held`.
+  test("curated same-command override: dev feedback list --claimed → --held, not --claimed-by (fb#1015)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "feedback", "list"), "--claimed");
+    expect(env.didYouMean).toBe("--held");
+  });
+
+  test("OPTION_DID_YOU_MEAN_OVERRIDES targets are real flags on the named command", () => {
+    for (const [key, target] of Object.entries(OPTION_DID_YOU_MEAN_OVERRIDES)) {
+      const command = key.slice(0, key.lastIndexOf(" "));
+      const spec = COMMAND_SPECS.find((s) => s.command === command);
+      expect(spec?.flags.some((f) => f.name === target)).toBe(true);
+    }
   });
 });
 
