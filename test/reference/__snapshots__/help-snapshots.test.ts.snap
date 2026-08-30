@@ -2906,7 +2906,10 @@ FLAGS
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT high|medium|low (the issue-tracker vocabulary most tooling uses): map high→major, medium→minor, low→cosmetic. Unknown exits 4
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
-  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity. The READ shape's \`errorText\` is also accepted for \`error\`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped).
+  --gate-kind STRING    What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses) | legal (a document version is superseded) | owner (a human decision) | backlog. Most rows have no gate at all — omit it.
+  --gate-ref STRING    Gate pointer, meaning depends on --gate-kind: deploy → repo@sha being waited on; legal → TYPE@version (the version being superseded); owner → free text. Only meaningful together with --gate-kind.
+  --gate-until STRING    Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog. Validated CLIENT-SIDE (fb#446) — the backend does not validate it, so a malformed date used to reach SQL as a 500 instead of a clean 400.
+  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity, gateKind, gateRef, gateUntil. The READ shape's \`errorText\` is also accepted for \`error\`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped).
   --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
@@ -2917,7 +2920,8 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
+  exit 4 (client-side)  Validation             → description is required; all enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic), --gate-kind (when given) must be deploy|soak|legal|owner|backlog; --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
+  exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all) → pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow
   exit 4 (client-side)  too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
   exit 4 (client-side)  unknown option — when the rejected token is not a flag name anybody would type (\`->\`, \`--\`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702) → Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
@@ -2945,6 +2949,48 @@ EXAMPLES
   ib dev feedback create --from-json ./report.json
   ib dev feedback create --from-json ./report.json --kind bug
   ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2
+  ib dev feedback create "wait for puminet5api@1.31.0 to ship before re-checking" --gate-kind deploy --gate-ref "puminet5api@1.31.0"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev feedback gate-clear matches snapshot 1`] = `
+"USAGE
+  ib dev feedback gate-clear [flags]
+
+DESCRIPTION
+  Close every ACTIVE row whose gate matches --kind and --ref-prefix, and whose gateRef is not itself --cleared-ref (developer-only). POST /api/feedback/gates/clear. A REAL write — blocked under --read-only. --dry-run previews the body client-side; the route has no server-side X-Dry-Run guard. NOT a command you type by hand day to day — \`npm run swap\` calls this automatically after a deploy gate clears; the legal gate is closed by \`ib legal activate\` server-side and never reaches this route.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --kind STRING    deploy | legal — narrower than the full gate-kind vocabulary on purpose: only these two auto-close (soak/owner/backlog close by a human calling \`resolve\`/\`update\`).
+  --ref-prefix STRING    Scope the clear to gateRefs starting with this, e.g. \`puminet5api@\` (a repo) or \`BETONIJERRY_TOS@\` (a legal document type). LIKE-escaped server-side, so a literal \`%\`/\`_\`/\`[\` in the prefix is treated literally, not as a wildcard.
+  --cleared-ref STRING    The evidence that just landed, e.g. \`puminet5api@1.31.0\`. Rows whose OWN gateRef already equals this are excluded — that row recorded the state being waited for, not one still waiting for it.
+  --dry-run    Print the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { cleared: number[] } — the feedbackIds actually closed (empty array when nothing matched, not an error). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Validation             → --kind is required and must be deploy|legal; --ref-prefix and --cleared-ref are both required
+  exit 4 (HTTP 400)  Validation             → the backend re-checks --kind against deploy|legal and rejects a non-string/empty --ref-prefix or --cleared-ref — this row is reachable only if a caller bypasses the CLI's own client-side guard (e.g. POST /api/cli/exec)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Driven by \`npm run swap\`, not typed by hand — after a slot swap it calls this once per repo with --ref-prefix \`<repo>@\` and --cleared-ref \`<repo>@<version deployed>\`. Find candidates first with \`ib dev feedback list --gated deploy\`.
+  - The legal gate is DIFFERENT: \`ib legal activate\` clears it server-side, in the same transaction that flips the document — never through this route (--kind legal here is a manual recovery lever).
+  - Idempotent: a terminal row is never touched twice, and the resolution is APPENDED, never replaced, so calling this again after a row already closed just clears zero more.
+
+SEE ALSO
+  ib dev feedback list, ib dev feedback update, ib legal activate
+
+EXAMPLES
+  ib dev feedback gate-clear --kind deploy --ref-prefix "puminet5api@" --cleared-ref "puminet5api@1.31.0"
+  ib dev feedback gate-clear --kind deploy --ref-prefix "puminet5api@" --cleared-ref "puminet5api@1.31.0" --dry-run
 "
 `;
 
@@ -3052,13 +3098,14 @@ FLAGS
   --mine    Only items YOU currently hold (shorthand for --claimed-by <your resolved label>)
   --claimed-by STRING    Only items held by this label, and only while the claim is still LIVE
   --held    Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes).
+  --gated STRING    Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated deploy). Filtered CLIENT-SIDE (not deploy-gated), forcing the 200-row-cap fetch even for one status so a gated row past --limit is never dropped.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries \`changelogLinks: [{changelogId, role}]\` — the same shape \`get\` returns — so a PARTLY-shipped row is visible before you claim it (fb#647).
+  { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries \`changelogLinks: [{changelogId, role}]\` — the same shape \`get\` returns — so a PARTLY-shipped row is visible before you claim it (fb#647). Every row ALSO carries gateKind/gateRef/gateUntil (null on an ungated row) — \`npm run swap\`'s gate-clear hook reads gateRef off this to decide which rows a release actually cleared.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
@@ -3088,6 +3135,8 @@ EXAMPLES
   ib dev feedback list --max-complexity 3 --unresolved
   ib dev feedback list --scope cli --oldest
   ib dev feedback list --severity none --unresolved --oldest
+  ib dev feedback list --gated
+  ib dev feedback list --gated deploy
   ib dev feedback list --severity critical --unresolved
   ib dev feedback list --held
 "
@@ -3196,7 +3245,7 @@ exports[`Help snapshots — contract stability > help for ib dev feedback update
   ib dev feedback update <id> [flags]
 
 DESCRIPTION
-  Edit a filed row's classification (--scope/--kind/--severity/--complexity) or its --description (developer-only). The correction twin of \`resolve\` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.
+  Edit a filed row's classification (--scope/--kind/--severity/--complexity/--gate-kind/--gate-ref/--gate-until) or its --description (developer-only). The correction twin of \`resolve\` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
@@ -3208,10 +3257,13 @@ FLAGS
   --severity STRING    critical | major | minor | cosmetic
   --complexity NUMBER    1-5 agent-triage estimate — promote/downgrade after investigation (see \`ib help complexity\`)
   --description STRING    REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)
+  --gate-kind STRING    What this row is waiting for: deploy|soak|legal|owner|backlog. pass "" to clear — PowerShell DROPS a bare "", so use \`--gate-kind=\` there (same meaning in bash; \`ib help shell-quoting\`)
+  --gate-ref STRING    Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text. pass "" to clear — PowerShell DROPS a bare "", so use \`--gate-ref=\` there (same meaning in bash; \`ib help shell-quoting\`)
+  --gate-until STRING    Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog, validated CLIENT-SIDE (fb#446). pass "" to clear — PowerShell DROPS a bare "", so use \`--gate-until=\` there (same meaning in bash; \`ib help shell-quoting\`)
   --body STRING    Alias for --description (free text, not JSON); if both are passed, they must match
   --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact
   --reason STRING    Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace
-  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell.
+  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell.
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
@@ -3220,10 +3272,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+  A compact ack { feedbackId, scope, kind, severity, complexity, gateKind, gateRef, gateUntil, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+  exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+  exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all) → pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it
   exit 4 (client-side)  The shell split the description on its inner double-quotes (typical on Windows PowerShell) → pass the text via --from-json <file|-> instead of argv
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → the error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
@@ -3236,7 +3289,7 @@ NOTES
   - --reason has no dedicated audit field here (unlike claim/release) — it merges into --append-description, same idiom \`resolve\` uses for --reason on its note. Combine it with --description (a full replace) instead and it exits 4.
 
 SEE ALSO
-  ib dev feedback resolve
+  ib dev feedback resolve, ib dev feedback gate-clear
 
 EXAMPLES
   ib dev feedback update 42 --scope security
@@ -3244,6 +3297,9 @@ EXAMPLES
   ib dev feedback update 42 --complexity 4
   ib dev feedback update 42 --from-json ./correction.json
   ib dev feedback update 42 --append-description "Confirmed on prod 2026-08-06; root cause is the cache key."
+  ib dev feedback update 42 --gate-kind deploy --gate-ref "puminet5api@1.31.0"
+  ib dev feedback update 42 --gate-kind soak --gate-until tomorrow
+  ib dev feedback update 42 --gate-kind=
 "
 `;
 

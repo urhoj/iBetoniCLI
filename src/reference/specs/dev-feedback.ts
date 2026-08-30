@@ -3,8 +3,8 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS } from "../../commands/feedback/index.js";
-import { apiErr, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
+import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS, GATE_KINDS as FEEDBACK_GATE_KINDS, AUTO_CLOSE_GATE_KINDS as FEEDBACK_AUTO_CLOSE_GATE_KINDS } from "../../commands/feedback/index.js";
+import { apiErr, clearHint, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
 
 export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   // ─── feedback (5) ────────────────────────────────────────────────────────
@@ -32,13 +32,17 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "error", type: "string", description: "Error message you hit, if any" },
       { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT high|medium|low (the issue-tracker vocabulary most tooling uses): map high→major, medium→minor, low→cosmetic. Unknown exits 4", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull `list --max-complexity 3`. See `ib help complexity`." },
-      { name: "from-json", type: "string", description: "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity. The READ shape's `errorText` is also accepted for `error`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped)." },
+      { name: "gate-kind", type: "string", description: "What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses) | legal (a document version is superseded) | owner (a human decision) | backlog. Most rows have no gate at all — omit it.", allowed: [...FEEDBACK_GATE_KINDS] },
+      { name: "gate-ref", type: "string", description: "Gate pointer, meaning depends on --gate-kind: deploy → repo@sha being waited on; legal → TYPE@version (the version being superseded); owner → free text. Only meaningful together with --gate-kind." },
+      { name: "gate-until", type: "string", description: "Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog. Validated CLIENT-SIDE (fb#446) — the backend does not validate it, so a malformed date used to reach SQL as a 500 instead of a clean 400." },
+      { name: "from-json", type: "string", description: "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity, gateKind, gateRef, gateUntil. The READ shape's `errorText` is also accepted for `error`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped)." },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
     ],
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one" },
+      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; all enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic), --gate-kind (when given) must be deploy|soak|legal|owner|backlog; --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one" },
+      { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "unknown option", meaning: "unknown option — when the rejected token is not a flag name anybody would type (`->`, `--`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702)", remedy: "Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
@@ -65,6 +69,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback create --from-json ./report.json",
       "ib dev feedback create --from-json ./report.json --kind bug",
       'ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2',
+      'ib dev feedback create "wait for puminet5api@1.31.0 to ship before re-checking" --gate-kind deploy --gate-ref "puminet5api@1.31.0"',
     ],
   },
   {
@@ -91,9 +96,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "mine", type: "boolean", description: "Only items YOU currently hold (shorthand for --claimed-by <your resolved label>)" },
       { name: "claimed-by", type: "string", description: "Only items held by this label, and only while the claim is still LIVE" },
       { name: "held", type: "boolean", description: "Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes)." },
+      { name: "gated", type: "string", description: "Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated deploy). Filtered CLIENT-SIDE (not deploy-gated), forcing the 200-row-cap fetch even for one status so a gated row past --limit is never dropped.", allowed: [...FEEDBACK_GATE_KINDS] },
     ],
     outputShape:
-      "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries `changelogLinks: [{changelogId, role}]` — the same shape `get` returns — so a PARTLY-shipped row is visible before you claim it (fb#647).",
+      "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries `changelogLinks: [{changelogId, role}]` — the same shape `get` returns — so a PARTLY-shipped row is visible before you claim it (fb#647). Every row ALSO carries gateKind/gateRef/gateUntil (null on an ungated row) — `npm run swap`'s gate-clear hook reads gateRef off this to decide which rows a release actually cleared.",
     // 18 columns is far past what a terminal table holds, and the triage-
     // relevant ones (scope/severity/complexity) sit at the END of the row, so
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
@@ -125,6 +131,8 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback list --max-complexity 3 --unresolved",
       "ib dev feedback list --scope cli --oldest",
       "ib dev feedback list --severity none --unresolved --oldest",
+      "ib dev feedback list --gated",
+      "ib dev feedback list --gated deploy",
       "ib dev feedback list --severity critical --unresolved",
       "ib dev feedback list --held",
     ],
@@ -243,7 +251,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback update",
     description:
-      "Edit a filed row's classification (--scope/--kind/--severity/--complexity) or its --description (developer-only). The correction twin of `resolve` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.",
+      "Edit a filed row's classification (--scope/--kind/--severity/--complexity/--gate-kind/--gate-ref/--gate-until) or its --description (developer-only). The correction twin of `resolve` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
@@ -255,20 +263,24 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "severity", type: "string", description: "critical | major | minor | cosmetic", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
       { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
+      { name: "gate-kind", type: "string", description: `What this row is waiting for: deploy|soak|legal|owner|backlog. ${clearHint("--gate-kind")}`, allowed: [...FEEDBACK_GATE_KINDS] },
+      { name: "gate-ref", type: "string", description: `Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text. ${clearHint("--gate-ref")}` },
+      { name: "gate-until", type: "string", description: `Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog, validated CLIENT-SIDE (fb#446). ${clearHint("--gate-until")}` },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
       { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace" },
-      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
+      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
-      "A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+      "A compact ack { feedbackId, scope, kind, severity, complexity, gateKind, gateRef, gateUntil, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       // Three client rows share exit 4, so EACH needs `match` — an unmatched row
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
-      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values", "cannot be combined"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason" },
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values", "cannot be combined"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason" },
+      { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "the error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
@@ -280,13 +292,16 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see `ib help shell-quoting`.",
       "--reason has no dedicated audit field here (unlike claim/release) — it merges into --append-description, same idiom `resolve` uses for --reason on its note. Combine it with --description (a full replace) instead and it exits 4.",
     ],
-    seeAlso: ["ib dev feedback resolve"],
+    seeAlso: ["ib dev feedback resolve", "ib dev feedback gate-clear"],
     examples: [
       "ib dev feedback update 42 --scope security",
       "ib dev feedback update 42 --kind bug --severity major",
       "ib dev feedback update 42 --complexity 4",
       "ib dev feedback update 42 --from-json ./correction.json",
       'ib dev feedback update 42 --append-description "Confirmed on prod 2026-08-06; root cause is the cache key."',
+      'ib dev feedback update 42 --gate-kind deploy --gate-ref "puminet5api@1.31.0"',
+      "ib dev feedback update 42 --gate-kind soak --gate-until tomorrow",
+      "ib dev feedback update 42 --gate-kind=",
     ],
   },
   {
@@ -391,5 +406,37 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib dev feedback lint", "ib dev feedback list"],
     examples: ["ib dev feedback count", "ib dev feedback count --scope cli", "ib dev feedback count --kind legal"],
+  },
+  {
+    command: "ib dev feedback gate-clear",
+    description:
+      "Close every ACTIVE row whose gate matches --kind and --ref-prefix, and whose gateRef is not itself --cleared-ref (developer-only). POST /api/feedback/gates/clear. A REAL write — blocked under --read-only. --dry-run previews the body client-side; the route has no server-side X-Dry-Run guard. NOT a command you type by hand day to day — `npm run swap` calls this automatically after a deploy gate clears; the legal gate is closed by `ib legal activate` server-side and never reaches this route.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    dryRunKind: "client",
+    flags: [
+      { name: "kind", type: "string", description: "deploy | legal — narrower than the full gate-kind vocabulary on purpose: only these two auto-close (soak/owner/backlog close by a human calling `resolve`/`update`).", allowed: [...FEEDBACK_AUTO_CLOSE_GATE_KINDS] },
+      { name: "ref-prefix", type: "string", description: "Scope the clear to gateRefs starting with this, e.g. `puminet5api@` (a repo) or `BETONIJERRY_TOS@` (a legal document type). LIKE-escaped server-side, so a literal `%`/`_`/`[` in the prefix is treated literally, not as a wildcard." },
+      { name: "cleared-ref", type: "string", description: "The evidence that just landed, e.g. `puminet5api@1.31.0`. Rows whose OWN gateRef already equals this are excluded — that row recorded the state being waited for, not one still waiting for it." },
+      { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+    ],
+    outputShape: "{ cleared: number[] } — the feedbackIds actually closed (empty array when nothing matched, not an error). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { origin: "client", exit: 4, match: ["is required", "must be one of"], meaning: "Validation", remedy: "--kind is required and must be deploy|legal; --ref-prefix and --cleared-ref are both required" },
+      apiErr(400, "Validation", "the backend re-checks --kind against deploy|legal and rejects a non-string/empty --ref-prefix or --cleared-ref — this row is reachable only if a caller bypasses the CLI's own client-side guard (e.g. POST /api/cli/exec)"),
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Driven by `npm run swap`, not typed by hand — after a slot swap it calls this once per repo with --ref-prefix `<repo>@` and --cleared-ref `<repo>@<version deployed>`. Find candidates first with `ib dev feedback list --gated deploy`.",
+      "The legal gate is DIFFERENT: `ib legal activate` clears it server-side, in the same transaction that flips the document — never through this route (--kind legal here is a manual recovery lever).",
+      "Idempotent: a terminal row is never touched twice, and the resolution is APPENDED, never replaced, so calling this again after a row already closed just clears zero more.",
+    ],
+    seeAlso: ["ib dev feedback list", "ib dev feedback update", "ib legal activate"],
+    examples: [
+      'ib dev feedback gate-clear --kind deploy --ref-prefix "puminet5api@" --cleared-ref "puminet5api@1.31.0"',
+      'ib dev feedback gate-clear --kind deploy --ref-prefix "puminet5api@" --cleared-ref "puminet5api@1.31.0" --dry-run',
+    ],
   },
 ];

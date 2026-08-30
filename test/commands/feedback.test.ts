@@ -10,6 +10,7 @@ import {
   runFeedbackUpdate,
   runFeedbackCount,
   runFeedbackLint,
+  runFeedbackGateClear,
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
   resolveClaimId,
@@ -455,6 +456,59 @@ describe("ib feedback create — /ai conversation provenance", () => {
     process.env.IB_CONVERSATION_ID = "9";
     const out = await runFeedbackCreate(mockClient, { description: "x", dryRun: true });
     expect(out).toMatchObject({ wouldSend: { body: { context: { conversationId: 9 } } } });
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib feedback create — gate fields (fb#446)", () => {
+  test("passes gateKind/gateRef through when both are given", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, {
+      description: "wait for the fix to ship",
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+    });
+    expect(post.mock.calls[0][1]).toMatchObject({
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+    });
+  });
+
+  test("an unknown --gate-kind exits 4, no POST", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", gateKind: "bogus" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("omits gate fields entirely when none are given", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 2 });
+    await runFeedbackCreate(mockClient, { description: "plain proposal, no gate" });
+    expect(post.mock.calls[0][1]).not.toHaveProperty("gateKind");
+    expect(post.mock.calls[0][1]).not.toHaveProperty("gateRef");
+    expect(post.mock.calls[0][1]).not.toHaveProperty("gateUntil");
+  });
+
+  test.each(["2026-09-01", "today", "tomorrow"])(
+    "--gate-until accepts %s",
+    async (value) => {
+      post.mockResolvedValueOnce({ feedbackId: 3 });
+      await runFeedbackCreate(mockClient, { description: "x", gateKind: "soak", gateUntil: value });
+      expect(post.mock.calls[0][1]).toHaveProperty("gateUntil");
+      expect(post.mock.calls[0][1].gateUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  );
+
+  test("a malformed --gate-until exits 4 CLIENT-SIDE, no POST (fb#446)", async () => {
+    // The backend does not validate this field at all — a bad date used to
+    // reach SQL and surface as a 500 + a Sentry event where a clean 400 was
+    // meant, and the CLI is the real caller.
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", gateKind: "soak", gateUntil: "not-a-date" })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--gate-until must be YYYY-MM-DD or an ISO datetime/),
+    });
     expect(post).not.toHaveBeenCalled();
   });
 });
@@ -1154,7 +1208,7 @@ describe("ib feedback update", () => {
         );
         expect(exitCode).toBe(4);
         expect(String(envelope.error)).toMatch(/unknown key status/);
-        expect(String(envelope.error)).toMatch(/accepted: appendDescription, body, complexity, description, kind, reason, scope, severity/);
+        expect(String(envelope.error)).toMatch(/accepted: appendDescription, body, complexity, description, gateKind, gateRef, gateUntil, kind, reason, scope, severity/);
       });
       expect(put).not.toHaveBeenCalled();
     });
@@ -1289,6 +1343,90 @@ describe("ib feedback update", () => {
     put.mockResolvedValueOnce({ feedbackId: 42, scope: "ops", resolution: "kept" });
     const out = await runFeedbackUpdate(mockClient, 42, { scope: "ops", full: true });
     expect(out).toMatchObject({ feedbackId: 42, scope: "ops", resolution: "kept" });
+  });
+});
+
+describe("ib feedback update — gate fields (fb#446)", () => {
+  test("PUTs gateKind + gateRef together", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+    const out = await runFeedbackUpdate(mockClient, 42, {
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      expect.anything()
+    );
+    expect(out).toMatchObject({ gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+  });
+
+  test("an unknown --gate-kind exits 4, no PUT", async () => {
+    await expect(
+      runFeedbackUpdate(mockClient, 1, { gateKind: "bogus" })
+    ).rejects.toThrowError(CliError);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("empty string CLEARS gateKind — the documented convention (--gate-kind=)", async () => {
+    // Bypasses assertEnum: "" is not a member of GATE_KINDS, but it is the
+    // clear signal, not a value being set — clearHint's convention, matched
+    // by --gate-kind here for the first time on this command.
+    put.mockResolvedValueOnce({ feedbackId: 42, gateKind: null });
+    await runFeedbackUpdate(mockClient, 42, { gateKind: "" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { gateKind: "" }, expect.anything());
+  });
+
+  test("empty string CLEARS gateRef / gateUntil the same way", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42 });
+    await runFeedbackUpdate(mockClient, 42, { gateRef: "", gateUntil: "" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { gateRef: "", gateUntil: "" },
+      expect.anything()
+    );
+  });
+
+  test("a malformed --gate-until exits 4 CLIENT-SIDE, no PUT (fb#446)", async () => {
+    await expect(
+      runFeedbackUpdate(mockClient, 1, { gateUntil: "2026-13-45" })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--gate-until must be YYYY-MM-DD or an ISO datetime/),
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("a valid --gate-until (today) resolves and is sent, unlike the unvalidated backend", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42 });
+    await runFeedbackUpdate(mockClient, 42, { gateKind: "soak", gateUntil: "today" });
+    const body = put.mock.calls[0][1];
+    expect(body.gateKind).toBe("soak");
+    expect(body.gateUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test("gate fields alone satisfy the 'at least one editable field' requirement", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42 });
+    await expect(runFeedbackUpdate(mockClient, 42, { gateRef: "puminet5api@1.31.0" })).resolves.toBeTruthy();
+    expect(put).toHaveBeenCalled();
+  });
+
+  test("compact ack surfaces gateKind/gateRef/gateUntil so a caller can verify the write", async () => {
+    put.mockResolvedValueOnce({
+      feedbackId: 42,
+      scope: "cli",
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+      gateUntil: null,
+      updatedAt: "2026-08-30T00:00:00Z",
+    });
+    const out = await runFeedbackUpdate(mockClient, 42, { gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+    expect(out).toMatchObject({
+      feedbackId: 42,
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+      gateUntil: null,
+    });
   });
 });
 
@@ -1964,6 +2102,90 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
   });
 });
 
+/**
+ * --gated (fb#446). Unlike --severity/--held, this filters CLIENT-SIDE — the
+ * backend has no server-side gate filter, but SELECT * already returns
+ * gateKind/gateRef/gateUntil on every row, so nothing is gained by waiting on
+ * a deploy the way the other filters do.
+ */
+describe("ib feedback list — --gated filter", () => {
+  test("an unknown --gated kind exits 4, no request sent", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open", gated: "bogus" })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/--gated must be one of/) });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("the bare flag (no kind) keeps every row carrying ANY gate", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0", gateUntil: null },
+      { feedbackId: 2, status: "open", gateKind: null, gateRef: null, gateUntil: null },
+      { feedbackId: 3, status: "open", gateKind: "soak", gateRef: null, gateUntil: "2026-09-01" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: true });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([3, 1]); // newest-first, ungated row 2 dropped
+  });
+
+  test("a kind value narrows to that gate kind only", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      { feedbackId: 2, status: "open", gateKind: "legal", gateRef: "BETONIJERRY_TOS@2" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([1]);
+  });
+
+  test("every returned row carries gateKind/gateRef/gateUntil verbatim — Task 9's swap hook reads gateRef off this", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0", gateUntil: null },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
+    expect(out.items[0]).toMatchObject({
+      gateKind: "deploy",
+      gateRef: "puminet5api@1.31.0",
+      gateUntil: null,
+    });
+  });
+
+  test("forces the multi-page (CAP-limit) fetch even for a single status, so a gated row past --limit is not dropped", async () => {
+    // The single-status branch would otherwise send the caller's small --limit
+    // straight to the backend and slice BEFORE the client-side gate filter ever
+    // runs — silently dropping a gated row sitting past position `limit` in the
+    // raw page.
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: null },
+      { feedbackId: 2, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: true, limit: 1 });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200"); // CAP, not the caller's 1
+    expect(out.items.map((r) => r.feedbackId)).toEqual([2]);
+  });
+
+  test("also forces the merge path under --all (no status filter)", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "applied", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+    ]);
+    const out = await runFeedbackList(mockClient, { all: true, gated: "deploy" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([1]);
+  });
+
+  test("composes with the default active-bucket fan-out (open+reviewed)", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" }]);
+    get.mockResolvedValueOnce([{ feedbackId: 2, status: "reviewed", gateKind: null }]);
+    const out = await runFeedbackList(mockClient, { gated: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([1]); // row 2 has no gate
+  });
+
+  test("without --gated the single-status path is unchanged (regression guard)", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", limit: 20 });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=20");
+  });
+});
+
 describe("ib feedback lint", () => {
   test("GETs the server-side audit and wraps it in the list envelope", async () => {
     // Thin by design: the value is that the audit runs server-side over the
@@ -2048,5 +2270,99 @@ describe("ib feedback lint --strict — the gate the warn/info split exists to s
         []
       )
     ).not.toBe(1);
+  });
+});
+
+/**
+ * `ib dev feedback gate-clear` — POST /api/feedback/gates/clear (fb#446).
+ * Called by `npm run swap`, not typed by hand. Deliberately narrow: --kind
+ * only accepts the AUTO-CLOSE subset (deploy|legal), never the full
+ * GATE_KINDS — the backend rejects the other three with a 400, and this exits
+ * 4 client-side before that round-trip.
+ */
+describe("ib feedback gate-clear", () => {
+  test("POSTs the scope + evidence and returns the cleared ids", async () => {
+    post.mockResolvedValueOnce({ cleared: [10, 11] });
+    const out = await runFeedbackGateClear(mockClient, {
+      kind: "deploy",
+      refPrefix: "puminet5api@",
+      clearedRef: "puminet5api@1.31.0",
+    });
+    expect(post).toHaveBeenCalledWith("/api/feedback/gates/clear", {
+      gateKind: "deploy",
+      refPrefix: "puminet5api@",
+      clearedRef: "puminet5api@1.31.0",
+    });
+    expect(out).toEqual({ cleared: [10, 11] });
+  });
+
+  test("--kind legal is accepted too", async () => {
+    post.mockResolvedValueOnce({ cleared: [] });
+    await runFeedbackGateClear(mockClient, {
+      kind: "legal",
+      refPrefix: "BETONIJERRY_TOS@",
+      clearedRef: "BETONIJERRY_TOS@2",
+    });
+    expect(post).toHaveBeenCalledWith("/api/feedback/gates/clear", {
+      gateKind: "legal",
+      refPrefix: "BETONIJERRY_TOS@",
+      clearedRef: "BETONIJERRY_TOS@2",
+    });
+  });
+
+  // AUTO_CLOSE_GATE_KINDS is the NARROW subset of GATE_KINDS — soak/owner/
+  // backlog are real gate kinds on create/update but must NEVER auto-close.
+  test.each(["soak", "owner", "backlog"])(
+    "--kind %s is rejected client-side (exit 4), no POST",
+    async (kind) => {
+      await expect(
+        runFeedbackGateClear(mockClient, { kind, refPrefix: "x@", clearedRef: "x@1" })
+      ).rejects.toMatchObject({ exitCode: 4 });
+      expect(post).not.toHaveBeenCalled();
+    }
+  );
+
+  test("a wholly unknown --kind is also rejected client-side", async () => {
+    await expect(
+      runFeedbackGateClear(mockClient, { kind: "bogus", refPrefix: "x@", clearedRef: "x@1" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("missing --kind exits 4 before the missing-refPrefix/clearedRef check", async () => {
+    await expect(
+      runFeedbackGateClear(mockClient, {})
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/--kind is required/) });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    [{ kind: "deploy", clearedRef: "x@1" }],
+    [{ kind: "deploy", refPrefix: "x@" }],
+  ])("missing --ref-prefix or --cleared-ref exits 4, no POST", async (input) => {
+    await expect(runFeedbackGateClear(mockClient, input)).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("--dry-run resolves client-side and never POSTs", async () => {
+    const out = await runFeedbackGateClear(mockClient, {
+      kind: "deploy",
+      refPrefix: "puminet5api@",
+      clearedRef: "puminet5api@1.31.0",
+      dryRun: true,
+    });
+    expect(out).toMatchObject({
+      dryRun: true,
+      wouldSend: {
+        method: "POST",
+        path: "/api/feedback/gates/clear",
+        body: {
+          gateKind: "deploy",
+          refPrefix: "puminet5api@",
+          clearedRef: "puminet5api@1.31.0",
+        },
+      },
+    });
+    expect(post).not.toHaveBeenCalled();
   });
 });

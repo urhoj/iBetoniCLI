@@ -25,6 +25,7 @@ import { qs } from "../../api/query.js";
 import { getEmbeddedCtx } from "../../embedded.js";
 import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
+import { resolveDate } from "../../dates.js";
 // Exported for specs.ts: the spec flags declare these as machine-readable
 // `allowed:` sets (validation envelopes), single-sourced from here.
 export const KINDS = ["improvement", "bug", "idea", "legal"];
@@ -58,6 +59,21 @@ export const SEVERITY_NONE = "none";
  * contradicting the machine-readable `allowed` set in the spec.
  */
 export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE];
+/**
+ * The five gate kinds a feedback row can be waiting on — must stay identical
+ * to `GATE_KINDS` in puminet5api's `modules/feedback/feedbackSql.js` (fb#446).
+ * Nothing enforces that across the repo boundary; keep the two lists in sync
+ * by hand when either changes.
+ */
+export const GATE_KINDS = ["deploy", "soak", "legal", "owner", "backlog"];
+/**
+ * The subset the backend auto-closes via `POST /api/feedback/gates/clear` —
+ * the only values `gate-clear --kind` accepts. The other three kinds
+ * (`soak`/`owner`/`backlog`) close only by a human calling `resolve`; the
+ * backend's `clearGates` primitive enforces the same restriction server-side,
+ * so this is a client-side pre-check, not the only guard.
+ */
+export const AUTO_CLOSE_GATE_KINDS = ["deploy", "legal"];
 /**
  * Case-folding coercion shared by EVERY `--severity` flag in this group.
  *
@@ -101,6 +117,26 @@ function validateComplexity(value, flag = "--complexity") {
         failWith(`${flag} must be an integer ${COMPLEXITY_MIN}-${COMPLEXITY_MAX}`, 4);
     }
     return n;
+}
+/** `YYYY-MM-DD` or a full ISO datetime — mirrors `ib log`'s local assertIsoDate. */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+/**
+ * Validate `--gate-until` CLIENT-SIDE (fb#446): the backend does not validate
+ * it at all — a malformed date reaches SQL and surfaces as a 500 + a Sentry
+ * event where a 400 was meant, and the CLI is the real caller. `today` /
+ * `yesterday` / `tomorrow` expand via the shared `resolveDate`; an
+ * explicitly-passed EMPTY string is the documented "clear this field"
+ * convention (see `clearHint`) and passes through unchecked — there is
+ * nothing to validate about clearing a field.
+ */
+function assertGateUntil(value) {
+    if (!value)
+        return value;
+    const resolved = resolveDate(value) ?? value;
+    if (!ISO_DATE_RE.test(resolved) || Number.isNaN(Date.parse(resolved))) {
+        failWith(`--gate-until must be YYYY-MM-DD or an ISO datetime (got '${value}').`, 4);
+    }
+    return resolved;
 }
 const MAX_FREETEXT = 200;
 /** Head/tail split for a truncated field (fb#714): appended updates land at the
@@ -283,6 +319,8 @@ function buildCreateBody(input) {
     assertEnum(input.kind, KINDS, "--kind");
     assertEnum(input.scope, SCOPES, "--scope");
     assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
+    if (input.gateKind)
+        assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
     const body = {
         kind: input.kind ?? "improvement",
         scope: input.scope ?? "cli",
@@ -296,6 +334,12 @@ function buildCreateBody(input) {
         body.severity = input.severity;
     if (input.complexity !== undefined)
         body.complexity = validateComplexity(input.complexity);
+    if (input.gateKind)
+        body.gateKind = input.gateKind;
+    if (input.gateRef)
+        body.gateRef = input.gateRef;
+    if (input.gateUntil !== undefined)
+        body.gateUntil = assertGateUntil(input.gateUntil);
     const convId = Number(process.env.IB_CONVERSATION_ID);
     if (Number.isInteger(convId) && convId > 0) {
         body.context = { conversationId: convId };
@@ -402,6 +446,16 @@ export async function runFeedbackList(client, opts) {
     // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
     // rather than a bare enum dump.
     assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
+    // --gated [kind]: Commander sets `true` for the bare flag, a kind string for
+    // `--gated deploy`. Validated the same way as the other enum filters, but
+    // applied CLIENT-SIDE below (see the branch further down) — unlike
+    // --severity/--held, the backend has no server-side gate filter to wait on
+    // (the gate columns are new, fb#446), and `SELECT *` already returns
+    // gateKind/gateRef/gateUntil on every row, so there is nothing to gain from
+    // a query-string param the backend would only ignore.
+    const gatedKind = typeof opts.gated === "string" ? opts.gated : undefined;
+    if (gatedKind)
+        assertEnum(gatedKind, GATE_KINDS, "--gated");
     const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
     if (claimFilters.length > 1) {
         failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
@@ -430,7 +484,12 @@ export async function runFeedbackList(client, opts) {
         claimedBy,
         held: opts.held,
     };
-    if (!statuses || statuses.length <= 1) {
+    // --gated forces the multi-page merge path below even for a single status:
+    // the filter runs CLIENT-SIDE (see above), and slicing by the caller's
+    // limit/offset BEFORE that filter — the single-request branch's whole
+    // approach — would silently drop gated rows sitting past position `limit`
+    // in the raw, unfiltered page.
+    if (!opts.gated && (!statuses || statuses.length <= 1)) {
         items = await fetchRows(client, {
             ...filters,
             status: statuses?.[0],
@@ -446,15 +505,21 @@ export async function runFeedbackList(client, opts) {
             truncated = true;
     }
     else {
-        const pages = await Promise.all(statuses.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP })));
+        // null (the --all case) has no per-status query to fan out over — one
+        // request with no status filter, same as the single-request branch above.
+        const statusList = statuses ?? [undefined];
+        const pages = await Promise.all(statusList.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP })));
         if (pages.some((p) => p.length >= CAP))
             truncated = true;
         // feedbackId is monotonic with createdAt, so it doubles as the merge key.
         // dir = +1 oldest-first (ASC), -1 newest-first (DESC, the default).
         const dir = opts.oldest ? 1 : -1;
-        const merged = pages
+        let merged = pages
             .flat()
             .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
+        if (opts.gated) {
+            merged = merged.filter((r) => r.gateKind != null && (!gatedKind || r.gateKind === gatedKind));
+        }
         const offset = opts.offset ?? 0;
         const limit = opts.limit ?? 50;
         if (merged.length > offset + limit)
@@ -772,7 +837,7 @@ export async function runFeedbackResolve(client, id, input) {
 }
 /** Project an updated row to the compact edit-ack fields (description capped). */
 function compactUpdateAck(row) {
-    return buildAck(row, ["feedbackId", "scope", "kind", "severity", "complexity", "updatedAt"], "description");
+    return buildAck(row, ["feedbackId", "scope", "kind", "severity", "complexity", "gateKind", "gateRef", "gateUntil", "updatedAt"], "description");
 }
 /**
  * `update`'s `--from-json` config (feedback #332) — the shared pipeline with no
@@ -797,6 +862,10 @@ export async function runFeedbackUpdate(client, id, input) {
     assertEnum(input.scope, SCOPES, "--scope");
     assertEnum(input.kind, KINDS, "--kind");
     assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
+    // Empty string is the documented CLEAR convention (clearHint) — only a
+    // non-empty value is validated against the enum, mirroring assertGateUntil.
+    if (input.gateKind)
+        assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
     if (input.description !== undefined && !input.description.trim()) {
         failWith("--description must be non-empty", 4);
     }
@@ -827,6 +896,12 @@ export async function runFeedbackUpdate(client, id, input) {
         body.complexity = validateComplexity(input.complexity);
     if (input.description !== undefined)
         body.description = input.description.trim();
+    if (input.gateKind !== undefined)
+        body.gateKind = input.gateKind;
+    if (input.gateRef !== undefined)
+        body.gateRef = input.gateRef;
+    if (input.gateUntil !== undefined)
+        body.gateUntil = assertGateUntil(input.gateUntil);
     // Read-merge-write: --description REPLACES the filed report, which is the
     // destructive half of feedback #332. Appending keeps the original text and
     // adds to it, so later commentary can never overwrite the evidence.
@@ -836,7 +911,7 @@ export async function runFeedbackUpdate(client, id, input) {
         body.description = existing ? `${existing.trimEnd()}\n\n${appendDescription}` : appendDescription;
     }
     if (Object.keys(body).length === 0) {
-        failWith("Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --reason", 4);
+        failWith("Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --reason / --gate-kind / --gate-ref / --gate-until", 4);
     }
     if (input.dryRun) {
         return wouldSend("PUT", `/api/feedback/${id}`, body);
@@ -1025,6 +1100,31 @@ export async function runFeedbackRelease(client, id, input) {
     }
 }
 /**
+ * POST /api/feedback/gates/clear — close every row whose gate this event
+ * cleared (developer-only). Called by `npm run swap` (deploy gates); the
+ * LEGAL gate is cleared server-side inside `activateDocument`'s own
+ * transaction and never comes through here. A REAL write — blocked under
+ * --read-only. `--dry-run` resolves client-side (prints the payload, never
+ * sends) — the route has no server-side `X-Dry-Run` guard.
+ *
+ * Deliberately narrow, mirroring the backend primitive: a scope (`refPrefix`)
+ * and an evidence string (`clearedRef`), never a row id — this cannot be used
+ * to close an arbitrary row.
+ */
+export async function runFeedbackGateClear(client, input) {
+    if (!input.kind)
+        failWith("--kind is required (deploy | legal)", 4);
+    assertEnum(input.kind, AUTO_CLOSE_GATE_KINDS, "--kind");
+    if (!input.refPrefix || !input.clearedRef) {
+        failWith("--ref-prefix and --cleared-ref are both required", 4);
+    }
+    const body = { gateKind: input.kind, refPrefix: input.refPrefix, clearedRef: input.clearedRef };
+    if (input.dryRun) {
+        return wouldSend("POST", "/api/feedback/gates/clear", body);
+    }
+    return client.post("/api/feedback/gates/clear", body);
+}
+/**
  * Register all `ib feedback` subcommands:
  *   create   POST /api/feedback   (any user; meta → read-only exempt)
  *   list     GET  /api/feedback   (developer-only)
@@ -1034,6 +1134,7 @@ export async function runFeedbackRelease(client, id, input) {
  *   claim    POST /api/feedback/:id/claim (developer-only; take/renew the work lease)
  *   release  DELETE /api/feedback/:id/claim, or POST /api/feedback/claims/release --all
  *            (developer-only; release the work lease)
+ *   gate-clear POST /api/feedback/gates/clear (developer-only; auto-close deploy/legal gates)
  */
 export function registerFeedbackCommands(parent, getClient, opts = {}) {
     const f = parent
@@ -1053,6 +1154,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--error <msg>")
         .option("--severity <sev>", "", foldSeverityCase)
         .option("--complexity <n>", "", Number)
+        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+        .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
+        .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
         .option("--from-json <file>")
         .option("--dry-run")
         .action(guarded(async (description, opts, cmd) => {
@@ -1077,6 +1181,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             error: opts.error,
             severity: opts.severity,
             complexity: opts.complexity,
+            gateKind: opts.gateKind,
+            gateRef: opts.gateRef,
+            gateUntil: opts.gateUntil,
             dryRun: opts.dryRun,
         }));
     }));
@@ -1103,6 +1210,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--mine")
         .option("--claimed-by <label>", "", String)
         .option("--held")
+        .option("--gated [kind]", "Only rows carrying a gate; optionally restrict to one kind")
         .action(jsonAction(getClient, (client, opts) => runFeedbackList(client, opts)));
     // Mirrors `ib glossary lint`: read-only audit, `--strict` exits 1 on any
     // warn-level finding so CI / a scheduled runner can gate on it. Only the
@@ -1171,6 +1279,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--severity <sev>", "", foldSeverityCase)
         .option("--complexity <n>", "", intFlag("--complexity", 1))
         .option("--description <text>")
+        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+        .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
+        .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
         .option("--body <text>")
         .option("--append-description <text>")
         .option("--reason <text>", "Audit why-string (fb#801) — merges into --append-description; rejected alongside a full --description replace")
@@ -1203,6 +1314,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             description: opts.description,
             appendDescription: opts.appendDescription,
             reason: opts.reason,
+            gateKind: opts.gateKind,
+            gateRef: opts.gateRef,
+            gateUntil: opts.gateUntil,
             dryRun: opts.dryRun,
             full: opts.full,
         })));
@@ -1237,5 +1351,14 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--kind <kind>")
         .option("--scope <scope>")
         .action(jsonAction(getClient, (client, opts) => runFeedbackCount(client, opts)));
+    // POST /api/feedback/gates/clear — called by `npm run swap`, not typed by
+    // hand (see runFeedbackGateClear's doc). --kind is narrower than the full
+    // GATE_KINDS on purpose: only deploy/legal auto-close.
+    f.command("gate-clear")
+        .option("--kind <kind>", "deploy | legal")
+        .option("--ref-prefix <prefix>", "Scope, e.g. puminet5api@ or BETONIJERRY_TOS@")
+        .option("--cleared-ref <ref>", "The evidence, e.g. puminet5api@1.30.5")
+        .option("--dry-run")
+        .action(jsonAction(getClient, (client, opts) => runFeedbackGateClear(client, opts)));
 }
 //# sourceMappingURL=index.js.map

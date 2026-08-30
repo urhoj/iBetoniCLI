@@ -507,7 +507,7 @@ ib dev feedback list --offset <n>
 
 ib dev feedback update --complexity <n>
   ! --complexity must be an integer >= 1
-  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
 
 ib dev impersonation sessions --actor <id>
   ! --actor must be an integer >= 1
@@ -571,7 +571,7 @@ ib feedback list --offset <n>
 
 ib feedback update --complexity <n>
   ! --complexity must be an integer >= 1
-  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
 
 ib fennoa purchases --asiakas <id>
   ! --asiakas must be an integer >= 1
