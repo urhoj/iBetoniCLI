@@ -211,6 +211,18 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           ...devErrors,
           apiErr(
             400,
+            "SQL error: permission denied",
+            "the `ib_readonly` principal lacks a permission the query needs — DMVs like sys.dm_db_index_usage_stats need VIEW DATABASE PERFORMANCE STATE. Ask an operator to GRANT it (or rewrite to avoid the DMV); this is NOT a guard rejection, so rephrasing the query will not help",
+            "permission denied"
+          ),
+          apiErr(
+            400,
+            "SQL error: aggregate over an aggregate/subquery",
+            "SQL Server rejects aggregating an expression that itself contains an aggregate or subquery (e.g. SUM(CASE WHEN EXISTS(...) THEN 1 ELSE 0 END)) — compute the per-row flag in a derived table and aggregate outside it: SELECT SUM(flag) FROM (SELECT CASE WHEN EXISTS(...) THEN 1 ELSE 0 END AS flag FROM t) x. Object/column names are not the problem here",
+            "cannot perform an aggregate function"
+          ),
+          apiErr(
+            400,
             "Guard rejection or SQL error",
             "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
           ),
