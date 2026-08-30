@@ -123,26 +123,16 @@ test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
 });
 
 describe("normalizeSentryRef (fb#1021)", () => {
+  // The no-hyphen, trim-fallback, and 64-char-cap branches are already pinned
+  // by the pre-existing normalizeSentryRef tests further down this file
+  // (fb#1047) — these two are the ones that actually exercise the greedy fix.
   test("keeps a hyphenated project slug intact instead of truncating at the first group", () => {
     expect(normalizeSentryRef("NODE-EXPRESS-7G")).toBe("NODE-EXPRESS-7G");
-  });
-
-  test("still handles a slug with no hyphen", () => {
-    expect(normalizeSentryRef("PUMINET5API-1A2")).toBe("PUMINET5API-1A2");
   });
 
   test("extracts a hyphenated ref out of a pasted URL", () => {
     expect(normalizeSentryRef("https://sentry.io/organizations/x/issues/NODE-EXPRESS-7G/"))
       .toBe("NODE-EXPRESS-7G");
-  });
-
-  test("falls back to the trimmed input when nothing matches", () => {
-    expect(normalizeSentryRef("  not a ref  ")).toBe("not a ref");
-  });
-
-  test("caps at 64 chars", () => {
-    const longRef = "A".repeat(70);
-    expect(normalizeSentryRef(longRef)).toHaveLength(64);
   });
 });
 
