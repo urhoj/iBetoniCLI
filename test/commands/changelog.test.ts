@@ -122,6 +122,30 @@ test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
   expect(() => normalizeLanguage("de")).toThrow(/--language must be one of: fi, en/);
 });
 
+describe("normalizeSentryRef (fb#1021)", () => {
+  test("keeps a hyphenated project slug intact instead of truncating at the first group", () => {
+    expect(normalizeSentryRef("NODE-EXPRESS-7G")).toBe("NODE-EXPRESS-7G");
+  });
+
+  test("still handles a slug with no hyphen", () => {
+    expect(normalizeSentryRef("PUMINET5API-1A2")).toBe("PUMINET5API-1A2");
+  });
+
+  test("extracts a hyphenated ref out of a pasted URL", () => {
+    expect(normalizeSentryRef("https://sentry.io/organizations/x/issues/NODE-EXPRESS-7G/"))
+      .toBe("NODE-EXPRESS-7G");
+  });
+
+  test("falls back to the trimmed input when nothing matches", () => {
+    expect(normalizeSentryRef("  not a ref  ")).toBe("not a ref");
+  });
+
+  test("caps at 64 chars", () => {
+    const longRef = "A".repeat(70);
+    expect(normalizeSentryRef(longRef)).toHaveLength(64);
+  });
+});
+
 describe("normalizeEnumFlag: case-insensitive --area/--bump-level/--source (fb#842)", () => {
   test("lowercases, so --area Workspace stops failing on casing alone", () => {
     // The inconsistency this closes: --type Fix and --severity High have always
