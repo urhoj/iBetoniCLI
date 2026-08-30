@@ -14,6 +14,30 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   // them. mutates:true is set explicitly so `ib commands --mutations` picks them
   // up and `--reads` excludes them despite writeFlags:false.
   {
+    command: "ib dev feedback import",
+    description:
+      "File SEVERAL reports from one JSON array file. Same per-entry keys as `create` (description|body|title, kind?, scope?, command?, error?, severity?, complexity?), defaults included. Exists because filing N findings is the routines' normal shape — post-impl-verify files one row per confirmed finding, and analyze-cli-feedback / groom-memory / review-legal-docs fan out the same way — so the alternative is N invocations or a caller-side splitting step (fb#1056). A SINGLE entry still goes to `create --from-json`, which takes an object.",
+    auth: "any",
+    mutates: true,
+    dryRunKind: "client",
+    args: [{ name: "file", type: "string", required: true, description: "JSON array file of create objects (or - for stdin)" }],
+    flags: [{ name: "dry-run", type: "boolean", description: "Resolve client-side: print what each entry would send, never send" }],
+    outputShape: "{ results: [{index, feedbackId, ok, error?}], ok, failed }",
+    errors: [
+      { origin: "client", exit: 4, match: "not valid JSON", meaning: "The file could not be parsed at all", remedy: "Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem" },
+      { origin: "client", exit: 4, match: "root must be an array", meaning: "The JSON root is an object, not an array", remedy: "A single entry goes to `ib dev feedback create --from-json`, which takes an object; wrap it in [ ] only if you really mean a batch" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "A per-entry failure does NOT exit non-zero — the call succeeds and reports it. Check `failed` in the output, not just the exit code.",
+      "Partial failure is REPORTED, never rolled back: one malformed entry does not cost you the rows that were fine. Check `failed` and the per-entry `error`, and re-send only those entries.",
+      "Each result carries its array `index`, so a failure lines up with the entry in the file you sent.",
+      "Entries are filed with bounded concurrency (5 in flight), so ordering of the underlying writes is not guaranteed — read `feedbackId` per result rather than assuming they are sequential.",
+      "An entry that is not a JSON object is counted as failed rather than aborting the batch.",
+    ],
+    examples: ["ib dev feedback import ./findings.json", "ib dev feedback import - --dry-run"],
+  },
+  {
     command: "ib dev feedback create",
     aliases: ["ib dev feedback add"],
     description:

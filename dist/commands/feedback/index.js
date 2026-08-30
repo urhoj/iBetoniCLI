@@ -22,8 +22,9 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import { applyFromJson } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
+import { readJsonInput } from "../../api/parseBody.js";
 import { getEmbeddedCtx } from "../../embedded.js";
-import { CliError } from "../../api/errors.js";
+import { CliError, errorMessage } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 // Exported for specs.ts: the spec flags declare these as machine-readable
 // `allowed:` sets (validation envelopes), single-sourced from here.
@@ -317,6 +318,61 @@ export async function runFeedbackCreate(client, input) {
         return wouldSend("POST", "/api/feedback", body);
     }
     return client.post("/api/feedback", body, { meta: true });
+}
+/** Bounded parallelism, mirroring `ib glossary import`'s IMPORT_CONCURRENCY. */
+const FEEDBACK_IMPORT_CONCURRENCY = 5;
+/**
+ * File SEVERAL reports from one JSON array file (fb#1056).
+ *
+ * `create` takes exactly one object, on purpose — it is the shape a caller
+ * templates off a `feedback get` row, and rejecting an array there produces a
+ * clearer message than silently guessing. But the multi-row case is not exotic:
+ * it is what the routines do. `post-impl-verify` files one row per confirmed
+ * finding, and `analyze-cli-feedback`, `groom-memory` and `review-legal-docs`
+ * all have the same fan-out shape, so the alternative is N invocations or a
+ * caller-side splitting step.
+ *
+ * Partial failure is REPORTED, never rolled back, exactly as glossary import
+ * does it: one malformed entry must not cost the caller the rows that were
+ * fine, and there is no transaction to roll back into. Each result carries its
+ * array `index` so a caller can line failures up with the file it sent.
+ */
+export async function runFeedbackImport(client, entries, flags = {}) {
+    const results = new Array(entries.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(FEEDBACK_IMPORT_CONCURRENCY, entries.length) }, async () => {
+        while (next < entries.length) {
+            const i = next++;
+            const e = entries[i];
+            if (!e || typeof e !== "object" || Array.isArray(e)) {
+                results[i] = { index: i, feedbackId: null, ok: false, error: "entry is not a JSON object" };
+                continue;
+            }
+            try {
+                const description = resolveFeedbackCreateDescription({
+                    description: e.description,
+                    bodyFlag: e.body,
+                    title: e.title,
+                });
+                const created = await runFeedbackCreate(client, {
+                    description,
+                    kind: e.kind ?? "improvement",
+                    scope: e.scope ?? "cli",
+                    command: e.command,
+                    error: e.error,
+                    severity: e.severity,
+                    complexity: e.complexity === undefined ? undefined : Number(e.complexity),
+                    dryRun: flags.dryRun,
+                });
+                const id = created?.feedbackId;
+                results[i] = { index: i, feedbackId: typeof id === "number" ? id : null, ok: true };
+            }
+            catch (err) {
+                results[i] = { index: i, feedbackId: null, ok: false, error: errorMessage(err) };
+            }
+        }
+    }));
+    return { results, ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length };
 }
 /**
  * Resolve the requested status filter into a list of statuses, or null for no
@@ -1079,6 +1135,26 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             complexity: opts.complexity,
             dryRun: opts.dryRun,
         }));
+    }));
+    f.command("import")
+        .description("File SEVERAL reports from one JSON array file — the routines' fan-out shape (fb#1056)")
+        .argument("<file>", "JSON array of create objects {description|body|title, kind?, scope?, command?, error?, severity?, complexity?} (or - for stdin)")
+        .option("--dry-run")
+        .action(guarded(async (file, opts) => {
+        let arr;
+        try {
+            arr = readJsonInput(file);
+        }
+        catch {
+            failWith("import: file is not valid JSON", 4);
+        }
+        // Mirrors create's own root-shape message, in the other direction: there
+        // the array is wrong and an object is wanted, here the reverse. Both name
+        // the sibling that takes the shape the caller actually has.
+        if (!Array.isArray(arr)) {
+            failWith("import: JSON root must be an array — a single entry goes to `ib dev feedback create --from-json`", 4);
+        }
+        writeJson(await runFeedbackImport(await getClient(), arr, opts));
     }));
     f.command("list")
         .option("--status <status>")

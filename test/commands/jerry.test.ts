@@ -393,6 +393,29 @@ describe("ib jerry admin", () => {
     );
   });
 
+  // fb#816/fb#1043: the endpoint hides Jerry-active companies by default, which
+  // is right for the Jerry pickers and backwards for the SaaS sales pipeline.
+  // The flag is the only way to reach the other half of the endpoint.
+  test("search omits includeJerryActive by default, keeping the exclusion", async () => {
+    get.mockResolvedValueOnce([]);
+    await runJerryAdminSearch(mockClient, "Betoni");
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-companies/search?q=Betoni");
+  });
+
+  test("search --include-jerry-active lifts the exclusion", async () => {
+    get.mockResolvedValueOnce([]);
+    await runJerryAdminSearch(mockClient, "Betoni", true);
+    expect(get).toHaveBeenCalledWith(
+      "/api/admin/jerry-companies/search?q=Betoni&includeJerryActive=1"
+    );
+  });
+
+  test("search sends nothing extra when the flag is explicitly false", async () => {
+    get.mockResolvedValueOnce([]);
+    await runJerryAdminSearch(mockClient, "Betoni", false);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-companies/search?q=Betoni");
+  });
+
   test("detail hits the drill-down path", async () => {
     get.mockResolvedValueOnce({ admins: [] });
     await runJerryAdminDetail(mockClient, 1402);
