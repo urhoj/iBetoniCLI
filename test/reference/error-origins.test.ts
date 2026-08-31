@@ -403,6 +403,36 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
     ).toMatch(/start with/);
   });
 
+  test("fb#1040: not-logged-in and all-paths-failed share exit 2 on `auth refresh` without cross-hinting", () => {
+    // Both rows are client exit-2 now, so each carries a `match`; each real
+    // message must reach its OWN row — the endpoint-aware login remedy for the
+    // guard, the re-auth remedy for the exhausted refresh chain.
+    const refreshRows = rowsOf("ib auth refresh");
+    expect(
+      hintForError(
+        new CliError("Not logged in at http://127.0.0.1:8080. Run `ib auth login --endpoint http://127.0.0.1:8080` first.", 0, null, 2),
+        refreshRows
+      )
+    ).toMatch(/auth login --endpoint/i);
+    expect(
+      hintForError(
+        new CliError(
+          "Refresh failed: HTTP 401; OAuth refresh-token grant failed: invalid_grant — session unrecoverable, run `ib auth login`",
+          0,
+          null,
+          2
+        ),
+        refreshRows
+      )
+    ).toMatch(/re-authenticate/);
+    expect(
+      hintForError(
+        new CliError("Not logged in at http://127.0.0.1:8080. Run `ib auth login --endpoint http://127.0.0.1:8080` first (or set IB_TOKEN).", 0, null, 2),
+        rowsOf("ib auth whoami")
+      )
+    ).toMatch(/auth login --endpoint/i);
+  });
+
   test("both --puomi alternatives are exercised, not just the first", () => {
     // The match array is ["non-negative number of metres", "cannot exceed"] and
     // each alternative corresponds to a DIFFERENT guard line in the source; only

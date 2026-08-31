@@ -71,7 +71,7 @@ export const AUTH_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating?, sessions?: { endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }[] } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting; `sessions` (file sessions only) lists every stored per-endpoint session, active first — the `--endpoint`s that need no login (fb#855).",
     errors: [
-      { origin: "client", exit: 2, match: "not logged in", meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
+      { origin: "client", exit: 2, match: "not logged in", meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN); under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1040) and lists the sessions you already hold" },
       {
         origin: "client",
         exit: 2,
@@ -155,6 +155,16 @@ export const AUTH_SPECS: CommandSpec[] = [
       {
         origin: "client",
         exit: 2,
+        match: "not logged in",
+        meaning: "Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855)",
+        remedy: "ib auth login first; under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1040)",
+      },
+      {
+        origin: "client",
+        exit: 2,
+        // refresh.ts joins both failures as "… — session unrecoverable, run
+        // `ib auth login`"; the match disambiguates from the not-logged-in row.
+        match: "session unrecoverable",
         meaning: "Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant)",
         remedy: "ib auth login to re-authenticate",
       },

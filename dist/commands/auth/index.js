@@ -7,6 +7,7 @@ import { assertPersistedSwitchAllowed, runPersistedSwitch, } from "../../auth/sw
 import { refreshAndPersistSession } from "../../auth/refresh.js";
 import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveAuth } from "../../auth/resolve.js";
+import { notLoggedInMessage, otherSessionsHint } from "../../auth/notLoggedIn.js";
 import { resolveCallerTier } from "../../tier.js";
 import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
@@ -86,12 +87,16 @@ export function registerAuthCommands(parent, isReadOnly) {
         .action(guarded(async () => {
         // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
         // sessions too, not just the on-disk creds store.
+        const endpointOverride = getGlobalOptions(parent).endpoint;
         const resolved = await resolveAuth({
             credentialsPath: defaultCredentialsPath(),
-            defaultEndpoint: getGlobalOptions(parent).endpoint ?? undefined,
+            defaultEndpoint: endpointOverride ?? undefined,
         });
         if (!resolved) {
-            failWith("Not logged in. Run `ib auth login` first (or set IB_TOKEN).", 2);
+            // Endpoint-aware remedy (fb#1040): the generic form prescribed
+            // `ib auth login` WITHOUT the endpoint, which authenticates against
+            // the DEFAULT endpoint and leaves the requested one unauthenticated.
+            failWith(notLoggedInMessage(endpointOverride, { mentionIbToken: true }), 2, await otherSessionsHint(endpointOverride));
             return;
         }
         const store = createStore(defaultCredentialsPath());
@@ -157,7 +162,10 @@ export function registerAuthCommands(parent, isReadOnly) {
             const override = getGlobalOptions(parent).endpoint;
             const creds = override ? await store.loadFor(override) : await store.load();
             if (!creds) {
-                failWith("Not logged in. Run `ib auth login` first.", 2);
+                // Endpoint-aware remedy (fb#1040) — same trap as `auth whoami`:
+                // the override WAS honoured in the lookup above, so the remedy
+                // must name it too instead of pointing at the default endpoint.
+                failWith(notLoggedInMessage(override), 2, await otherSessionsHint(override));
             }
             // The bearer refresh re-derives DB claims and would DROP imp/imp_sid +
             // the 10-min cap — silently escalating an impersonation into a

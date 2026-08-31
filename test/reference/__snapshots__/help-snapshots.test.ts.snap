@@ -726,6 +726,7 @@ OUTPUT (JSON, stdout)
   { ok: true }
 
 ERRORS (stderr, exit non-zero)
+  exit 2 (client-side)  Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855) → ib auth login first; under --endpoint the message names the exact \`ib auth login --endpoint <url>\` (fb#1040)
   exit 2 (client-side)  Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant) → ib auth login to re-authenticate
   exit 4 (client-side)  Refresh refused while impersonating (it would escalate to a permanent login as the target) → ib auth impersonate --extend (10 more minutes) or --end (restore your own login)
 
@@ -789,7 +790,7 @@ OUTPUT (JSON, stdout)
   { personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating?, sessions?: { endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }[] } — \`tier\` is the discovery/capability gate; \`companies\` are the \`company switch\` targets (no name in the JWT — use \`ib company list\` for names); \`source:'env'\` = IB_TOKEN (non-refreshable); \`refreshed: true\` = the stored JWT had expired and whoami self-healed the session before reporting; \`sessions\` (file sessions only) lists every stored per-endpoint session, active first — the \`--endpoint\`s that need no login (fb#855).
 
 ERRORS (stderr, exit non-zero)
-  exit 2 (client-side)  Not logged in          → ib auth login first (or set IB_TOKEN)
+  exit 2 (client-side)  Not logged in          → ib auth login first (or set IB_TOKEN); under --endpoint the message names the exact \`ib auth login --endpoint <url>\` (fb#1040) and lists the sessions you already hold
   exit 2 (client-side)  Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed) → ib auth login to re-authenticate
   exit 2 (client-side)  IB_TOKEN expired (env sessions have no refresh path) → mint a fresh JWT and update IB_TOKEN
   exit 2 (client-side)  IB_TOKEN is not JWT-shaped (not 3 dot-separated segments) — a value problem, not a rejected credential → a command substitution (IB_TOKEN=$(…)) captures the whole stdout, banners included — re-set IB_TOKEN to the bare token
