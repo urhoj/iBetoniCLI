@@ -557,19 +557,25 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin search",
     description:
-      "Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.",
+      "Search companies for an Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "query", type: "string", required: false, description: "name search (min 2 chars) — or pass --search" }],
     flags: [
       SEARCH_ALIAS_FLAG,
+      {
+        name: "include-jerry-active",
+        type: "boolean",
+        description:
+          "also return companies that already have Jerry (isPumppuToimittaja + HAS_JERRY). Off by default; the two Jerry pickers rely on the exclusion, the sales pipeline wants it lifted (fb#816).",
+      },
     ],
     outputShape: "ListEnvelope<{ asiakasId, name }>",
     errors: [
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ["ib jerry admin search Betoni"],
+    examples: ["ib jerry admin search Betoni", "ib jerry admin search Betoni --include-jerry-active"],
   },
   {
     command: "ib jerry admin detail",

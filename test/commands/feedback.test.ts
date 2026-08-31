@@ -3,6 +3,7 @@ import { mockApiClient } from "../helpers/mockClient.js";
 import { Command } from "commander";
 import {
   runFeedbackCreate,
+  runFeedbackImport,
   runFeedbackList,
   runFeedbackGet,
   runFeedbackResolve,
@@ -2363,6 +2364,79 @@ describe("ib feedback gate-clear", () => {
         },
       },
     });
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("feedback import — batch filing (fb#1056)", () => {
+  test("files every entry and reports per-entry ids", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 11 }).mockResolvedValueOnce({ feedbackId: 12 });
+    const out = await runFeedbackImport(mockClient, [
+      { description: "first", kind: "bug", scope: "cli" },
+      { description: "second" },
+    ]);
+    expect(out.ok).toBe(2);
+    expect(out.failed).toBe(0);
+    expect(out.results.map((r) => r.feedbackId).sort()).toEqual([11, 12]);
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  test("applies the same create defaults per entry", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackImport(mockClient, [{ description: "d" }]);
+    const body = post.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.kind).toBe("improvement");
+    expect(body.scope).toBe("cli");
+  });
+
+  test("folds title into the description, as create does", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackImport(mockClient, [{ title: "Short", description: "Long" }]);
+    const body = post.mock.calls[0][1] as Record<string, unknown>;
+    expect(String(body.description)).toContain("Short");
+    expect(String(body.description)).toContain("Long");
+  });
+
+  // The whole point of a batch: one bad entry must not cost the caller the rows
+  // that were fine, and there is no transaction to roll back into.
+  test("REPORTS a per-entry failure without aborting the batch", async () => {
+    post
+      .mockResolvedValueOnce({ feedbackId: 21 })
+      .mockRejectedValueOnce(new Error("backend said no"))
+      .mockResolvedValueOnce({ feedbackId: 23 });
+    const out = await runFeedbackImport(mockClient, [
+      { description: "a" },
+      { description: "b" },
+      { description: "c" },
+    ]);
+    expect(out.ok).toBe(2);
+    expect(out.failed).toBe(1);
+    const bad = out.results.find((r) => !r.ok);
+    expect(bad?.index).toBe(1);
+    expect(bad?.error).toContain("backend said no");
+  });
+
+  test("counts a non-object entry as failed rather than throwing", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 31 });
+    const out = await runFeedbackImport(mockClient, [
+      "oops" as unknown as Record<string, unknown>,
+      { description: "fine" },
+    ]);
+    expect(out.failed).toBe(1);
+    expect(out.results[0].error).toContain("not a JSON object");
+    expect(out.ok).toBe(1);
+  });
+
+  test("a missing description fails that entry only", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 41 });
+    const out = await runFeedbackImport(mockClient, [{ kind: "bug" }, { description: "fine" }]);
+    expect(out.failed).toBe(1);
+    expect(out.ok).toBe(1);
+  });
+
+  test("an empty array is a no-op, not an error", async () => {
+    const out = await runFeedbackImport(mockClient, []);
+    expect(out).toEqual({ results: [], ok: 0, failed: 0 });
     expect(post).not.toHaveBeenCalled();
   });
 });

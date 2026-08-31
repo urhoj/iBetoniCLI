@@ -91,7 +91,10 @@ const AREA_REPO_REMEDIES = {
  */
 export function normalizeSentryRef(raw) {
     const trimmed = raw.trim();
-    const m = trimmed.match(/[A-Z0-9]{2,}-[A-Z0-9]+/);
+    // Greedy on trailing hyphen groups (fb#1021): a Sentry short id is
+    // <PROJECT-SLUG>-<counter> and the slug itself may contain hyphens (e.g.
+    // NODE-EXPRESS-7G), so a non-greedy single "-GROUP" match truncated it.
+    const m = trimmed.match(/[A-Z0-9]{2,}(?:-[A-Z0-9]+)+/);
     return (m ? m[0] : trimmed).slice(0, 64);
 }
 /**

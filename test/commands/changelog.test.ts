@@ -122,6 +122,20 @@ test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
   expect(() => normalizeLanguage("de")).toThrow(/--language must be one of: fi, en/);
 });
 
+describe("normalizeSentryRef (fb#1021)", () => {
+  // The no-hyphen, trim-fallback, and 64-char-cap branches are already pinned
+  // by the pre-existing normalizeSentryRef tests further down this file
+  // (fb#1047) — these two are the ones that actually exercise the greedy fix.
+  test("keeps a hyphenated project slug intact instead of truncating at the first group", () => {
+    expect(normalizeSentryRef("NODE-EXPRESS-7G")).toBe("NODE-EXPRESS-7G");
+  });
+
+  test("extracts a hyphenated ref out of a pasted URL", () => {
+    expect(normalizeSentryRef("https://sentry.io/organizations/x/issues/NODE-EXPRESS-7G/"))
+      .toBe("NODE-EXPRESS-7G");
+  });
+});
+
 describe("normalizeEnumFlag: case-insensitive --area/--bump-level/--source (fb#842)", () => {
   test("lowercases, so --area Workspace stops failing on casing alone", () => {
     // The inconsistency this closes: --type Fix and --severity High have always

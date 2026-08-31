@@ -364,7 +364,7 @@ describe("unknown leaf + --help → exit 4 (fb#615)", () => {
     // Tier-filtered like every other discovery surface: the token is empty, so
     // the caller resolves to "standard" and the developer-only leaves (count,
     // list, get, resolve…) are correctly absent.
-    expect(env.available).toEqual(["create"]);
+    expect(env.available).toEqual(["create", "import"]);
   });
 
   test("--help and no---help agree on the same argv", async () => {

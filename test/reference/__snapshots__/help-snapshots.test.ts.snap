@@ -3033,6 +3033,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback import matches snapshot 1`] = `
+"USAGE
+  ib dev feedback import <file> [flags]
+
+DESCRIPTION
+  File SEVERAL reports from one JSON array file. Same per-entry keys as \`create\` (description|body|title, kind?, scope?, command?, error?, severity?, complexity?), defaults included. Exists because filing N findings is the routines' normal shape — post-impl-verify files one row per confirmed finding, and analyze-cli-feedback / groom-memory / review-legal-docs fan out the same way — so the alternative is N invocations or a caller-side splitting step (fb#1056). A SINGLE entry still goes to \`create --from-json\`, which takes an object.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <file> STRING    JSON array file of create objects (or - for stdin) (required)
+
+FLAGS
+  --dry-run    Resolve client-side: print what each entry would send, never send
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { results: [{index, feedbackId, ok, error?}], ok, failed }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  The file could not be parsed at all → Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem
+  exit 4 (client-side)  The JSON root is an object, not an array → A single entry goes to \`ib dev feedback create --from-json\`, which takes an object; wrap it in [ ] only if you really mean a batch
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - A per-entry failure does NOT exit non-zero — the call succeeds and reports it. Check \`failed\` in the output, not just the exit code.
+  - Partial failure is REPORTED, never rolled back: one malformed entry does not cost you the rows that were fine. Check \`failed\` and the per-entry \`error\`, and re-send only those entries.
+  - Each result carries its array \`index\`, so a failure lines up with the entry in the file you sent.
+  - Entries are filed with bounded concurrency (5 in flight), so ordering of the underlying writes is not guaranteed — read \`feedbackId\` per result rather than assuming they are sequential.
+  - An entry that is not a JSON object is counted as failed rather than aborting the batch.
+
+EXAMPLES
+  ib dev feedback import ./findings.json
+  ib dev feedback import - --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback lint matches snapshot 1`] = `
 "USAGE
   ib dev feedback lint [flags]
@@ -5186,7 +5226,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin search 
   ib jerry admin search [<query>] [flags]
 
 DESCRIPTION
-  Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.
+  Search companies for an Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -5194,6 +5234,7 @@ ARGUMENTS
 
 FLAGS
   --search STRING    Search query (alias for the <query> positional)
+  --include-jerry-active    also return companies that already have Jerry (isPumppuToimittaja + HAS_JERRY). Off by default; the two Jerry pickers rely on the exclusion, the sales pipeline wants it lifted (fb#816).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -5209,6 +5250,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin search Betoni
+  ib jerry admin search Betoni --include-jerry-active
 "
 `;
 

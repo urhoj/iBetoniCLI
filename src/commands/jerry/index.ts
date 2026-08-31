@@ -531,13 +531,25 @@ export async function runJerryAdminList(
   );
 }
 
-/** Search non-Jerry companies for the Add picker (GET /api/admin/jerry-companies/search?q=). System-admin only. */
+/**
+ * Companies for an "Add company" picker (GET /api/admin/jerry-companies/search?q=).
+ * System-admin only.
+ *
+ * Jerry-active companies are EXCLUDED by default, which is what the Jerry-enable
+ * and onboarding pickers want — their job is to add Jerry to a company that lacks
+ * it. `includeJerryActive` drops that exclusion, for the SaaS sales pipeline,
+ * where a pumping company already running Jerry is the strongest prospect there
+ * is (fb#816). Sent only when true, so the default request is unchanged.
+ */
 export async function runJerryAdminSearch(
   client: ApiClient,
-  q: string
+  q: string,
+  includeJerryActive = false
 ): Promise<ListEnvelope<Row>> {
   return toListEnvelope<Row>(
-    await client.get<unknown>(`/api/admin/jerry-companies/search${qs({ q })}`)
+    await client.get<unknown>(
+      `/api/admin/jerry-companies/search${qs({ q, includeJerryActive: includeJerryActive ? 1 : undefined })}`
+    )
   );
 }
 
@@ -1362,10 +1374,21 @@ export function registerJerryCommands(
   admin
     .command("search [query]")
     .option("--search <s>")
+    .option("--include-jerry-active", "also return companies that already have Jerry (fb#816)")
     .addOption(queryAliasOption())
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string }) =>
-        runJerryAdminSearch(client, resolveSearchQuery(query, opts.search, opts.query))
+      jsonAction(
+        getClient,
+        (
+          client,
+          query: string | undefined,
+          opts: { search?: string; query?: string; includeJerryActive?: boolean }
+        ) =>
+          runJerryAdminSearch(
+            client,
+            resolveSearchQuery(query, opts.search, opts.query),
+            opts.includeJerryActive ?? false
+          )
       )
     );
 

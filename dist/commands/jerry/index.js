@@ -317,9 +317,18 @@ export async function runJerryProviderSettingsSet(client, body, asiakasId, flags
 export async function runJerryAdminList(client, withNotification = false) {
     return toListEnvelope(await client.get(`/api/admin/jerry-companies${qs({ withNotification: withNotification ? 1 : undefined })}`));
 }
-/** Search non-Jerry companies for the Add picker (GET /api/admin/jerry-companies/search?q=). System-admin only. */
-export async function runJerryAdminSearch(client, q) {
-    return toListEnvelope(await client.get(`/api/admin/jerry-companies/search${qs({ q })}`));
+/**
+ * Companies for an "Add company" picker (GET /api/admin/jerry-companies/search?q=).
+ * System-admin only.
+ *
+ * Jerry-active companies are EXCLUDED by default, which is what the Jerry-enable
+ * and onboarding pickers want — their job is to add Jerry to a company that lacks
+ * it. `includeJerryActive` drops that exclusion, for the SaaS sales pipeline,
+ * where a pumping company already running Jerry is the strongest prospect there
+ * is (fb#816). Sent only when true, so the default request is unchanged.
+ */
+export async function runJerryAdminSearch(client, q, includeJerryActive = false) {
+    return toListEnvelope(await client.get(`/api/admin/jerry-companies/search${qs({ q, includeJerryActive: includeJerryActive ? 1 : undefined })}`));
 }
 /** Company drill-down: people by role, vehicles, sijainnit Jerry status (GET /api/admin/jerry-companies/:id/detail). System-admin only. */
 export async function runJerryAdminDetail(client, asiakasId) {
@@ -837,8 +846,9 @@ export function registerJerryCommands(parent, getClient) {
     admin
         .command("search [query]")
         .option("--search <s>")
+        .option("--include-jerry-active", "also return companies that already have Jerry (fb#816)")
         .addOption(queryAliasOption())
-        .action(jsonAction(getClient, (client, query, opts) => runJerryAdminSearch(client, resolveSearchQuery(query, opts.search, opts.query))));
+        .action(jsonAction(getClient, (client, query, opts) => runJerryAdminSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.includeJerryActive ?? false)));
     addAsiakasTargetOption(admin.command("detail [asiakasId]")).action(jsonAction(getClient, (client, idStr, opts) => runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas))));
     for (const [name, enable] of [
         ["enable", true],
