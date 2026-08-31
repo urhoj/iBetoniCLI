@@ -2865,7 +2865,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine}> (+truncated when a walk bound cut the component)
+  ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine,claimedBy,claimExpiresAt,...}> (+truncated when a walk bound cut the component)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
@@ -3054,7 +3054,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as \`list\`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine}] (deploy-gated: absent on an older backend), ... }
+  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as \`list\`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine, createdBy, createdAt}] (deploy-gated: absent on an older backend), ... }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
@@ -3139,6 +3139,7 @@ OUTPUT (JSON, stdout)
   { relationId, feedbackId, relatedFeedbackId, relationType, note, createdBy, createdAt } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  id and relatedId are the same row → pass two DIFFERENT feedback ids — the server's own 400 for this is defense-in-depth, not the primary guard
   exit 4 (client-side)  Validation             → --type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\` — either row is missing
@@ -3384,11 +3385,10 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed — not an error.
+  { feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed for either id/direction — NOT an error (no 404 case: a missing link, or a missing row, both just answer deleted:false).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

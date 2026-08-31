@@ -207,7 +207,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
           "Accepted for cross-command consistency; get always returns the full row (no-op).",
       },
     ],
-    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as `list`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine}] (deploy-gated: absent on an older backend), ... }",
+    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as `list`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine, createdBy, createdAt}] (deploy-gated: absent on an older backend), ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — if the id exists in devChangelog the error hint names the changelog command (feedback #230)"),
@@ -229,7 +229,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
     flags: [],
     outputShape:
-      "ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine}> (+truncated when a walk bound cut the component)",
+      "ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine,claimedBy,claimExpiresAt,...}> (+truncated when a walk bound cut the component)",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
@@ -316,6 +316,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ relationId, feedbackId, relatedFeedbackId, relationType, note, createdBy, createdAt } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
+      { origin: "client", exit: 4, match: "cannot link a feedback row to itself", meaning: "id and relatedId are the same row", remedy: "pass two DIFFERENT feedback ids — the server's own 400 for this is defense-in-depth, not the primary guard" },
       { origin: "client", exit: 4, match: ["--type is required", "must be one of", "invalid feedbackid", "invalid relatedid"], meaning: "Validation", remedy: "--type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get` — either row is missing"),
@@ -343,10 +344,9 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     flags: [
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
     ],
-    outputShape: "{ feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed — not an error.",
+    outputShape: "{ feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed for either id/direction — NOT an error (no 404 case: a missing link, or a missing row, both just answer deleted:false).",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get`"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib dev feedback link", "ib dev feedback cluster"],

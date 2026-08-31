@@ -2478,6 +2478,15 @@ describe("ib dev feedback link", () => {
     expect(out).toMatchObject({ dryRun: true, wouldSend: { method: "POST", path: "/api/feedback/1/relations" } });
     expect(post).not.toHaveBeenCalled();
   });
+
+  // A self-link is rejected client-side, before any round trip — the server's
+  // own 400 for this stays as defense-in-depth, not the primary guard.
+  test("id === relatedId is rejected client-side, no POST", async () => {
+    await expect(
+      runFeedbackLink(mockClient, 5, 5, { type: "duplicate" })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining("cannot link a feedback row to itself") });
+    expect(post).not.toHaveBeenCalled();
+  });
 });
 
 describe("ib dev feedback unlink", () => {
@@ -2573,5 +2582,92 @@ describe("ib dev feedback resolve --also", () => {
     });
     expect(put).not.toHaveBeenCalled();
     expect(get).not.toHaveBeenCalled();
+  });
+
+  /**
+   * fb#901 applies to the --also hold guard too, not just display. A DERIVED
+   * `me` (user@host fallback — nothing set $IB_CLAIM_ID) is a machine-wide
+   * label shared by every unset-IB_CLAIM_ID session on the host, so it cannot
+   * prove THIS caller made the claim. Without this check, a row live-held by a
+   * DIFFERENT no-claim-id session on the same host reads claimState "mine" and
+   * gets WRITTEN OVER — the exact violation "a row held by another agent is
+   * skipped, never written" exists to prevent, just on the write path instead
+   * of a mislabeled read.
+   */
+  test("a row that reads 'mine' only via the DERIVED identity fallback is skipped, not written (fb#901)", async () => {
+    const savedId = process.env.IB_CLAIM_ID;
+    delete process.env.IB_CLAIM_ID;
+    try {
+      const derivedMe = resolveClaimId(undefined);
+      const future = new Date(Date.now() + 3600_000).toISOString();
+      put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
+      get.mockResolvedValueOnce({ feedbackId: 2, claimedBy: derivedMe, claimExpiresAt: future });
+      const out = await runFeedbackResolve(mockClient, 1, { status: "applied", note: "n", also: [2] });
+      const also = out.also as Record<string, unknown>[];
+      expect(out.failed).toBe(1);
+      expect(also[0]).toMatchObject({ feedbackId: 2, ok: false });
+      expect(String(also[0].error)).toMatch(/derived identity cannot prove/);
+      expect(put.mock.calls.some((c: unknown[]) => c[0] === "/api/feedback/2")).toBe(false);
+    } finally {
+      if (savedId === undefined) delete process.env.IB_CLAIM_ID;
+      else process.env.IB_CLAIM_ID = savedId;
+    }
+  });
+});
+
+// ─── resolve --also, argv-level parsing ─────────────────────────────────────
+
+describe("ib dev feedback resolve --also — argv parsing", () => {
+  test("--also 2,3 reaches runFeedbackResolve as [2, 3]", async () => {
+    put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
+    get.mockResolvedValue({ feedbackId: 0, claimedBy: null, claimExpiresAt: null });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "resolve", "1", "--status", "applied", "--also", "2,3"],
+      { from: "user" }
+    );
+    const putPaths = put.mock.calls.map((c: unknown[]) => c[0]);
+    expect(putPaths).toEqual(["/api/feedback/1", "/api/feedback/2", "/api/feedback/3"]);
+  });
+
+  test("a non-integer --also token exits 4 naming it, no PUT to the also rows", async () => {
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    const { exitCode, envelope } = await captureActionError(() =>
+      program.parseAsync(
+        ["feedback", "resolve", "1", "--status", "applied", "--also", "2,x"],
+        { from: "user" }
+      )
+    );
+    expect(exitCode).toBe(4);
+    expect(String(envelope.error)).toMatch(/--also must be comma-separated feedback ids \(got 'x'\)/);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("the primary id is excluded from --also — resolve 5 --also 5,6 only also-PUTs 6", async () => {
+    put.mockResolvedValue({ feedbackId: 5, status: "applied", updatedAt: "t" });
+    get.mockResolvedValue({ feedbackId: 6, claimedBy: null, claimExpiresAt: null });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "resolve", "5", "--status", "applied", "--also", "5,6"],
+      { from: "user" }
+    );
+    const putPaths = put.mock.calls.map((c: unknown[]) => c[0]);
+    expect(putPaths).toEqual(["/api/feedback/5", "/api/feedback/6"]);
+  });
+
+  test("--also 2,2,3 dedupes to [2, 3] — id 2 is only PUT once", async () => {
+    put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
+    get.mockResolvedValue({ feedbackId: 0, claimedBy: null, claimExpiresAt: null });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "resolve", "1", "--status", "applied", "--also", "2,2,3"],
+      { from: "user" }
+    );
+    const putPaths = put.mock.calls.map((c: unknown[]) => c[0]);
+    expect(putPaths).toEqual(["/api/feedback/1", "/api/feedback/2", "/api/feedback/3"]);
   });
 });

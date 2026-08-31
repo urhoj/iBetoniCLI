@@ -822,6 +822,10 @@ export async function runFeedbackLink(
   relatedId: number,
   input: FeedbackLinkInput
 ): Promise<Record<string, unknown>> {
+  // Client-side, ahead of the round trip: the server's own 400 for this stays
+  // as defense-in-depth, but there is nothing to gain from a network call to
+  // learn a row cannot be linked to itself.
+  if (id === relatedId) failWith("cannot link a feedback row to itself", 4);
   if (!input.type) failWith("--type is required (duplicate | same-root-cause | related | blocks)", 4);
   assertEnum(input.type, RELATION_TYPES, "--type");
   const body: Record<string, unknown> = { relatedFeedbackId: relatedId, relationType: input.type as RelationType };
@@ -1178,13 +1182,23 @@ export async function runFeedbackResolve(
   // lease. Per-row results, never rolled back (the `import` shape: check
   // `failed`, not just the exit code).
   if (input.also?.length) {
-    const { by: me } = resolveClaim(undefined);
+    const { by: me, source } = resolveClaim(undefined);
     const also: Record<string, unknown>[] = [];
     for (const alsoId of input.also) {
       try {
         const existing = await client.get<Record<string, unknown>>(`/api/feedback/${alsoId}`);
-        if (deriveClaimState(existing, me) === "held") {
-          also.push({ feedbackId: alsoId, ok: false, error: `held by ${existing.claimedBy} — skipped` });
+        const state = deriveClaimState(existing, me);
+        // fb#901 applies here too: a DERIVED `me` (user@host fallback) cannot
+        // prove holdership, so a row that reads "mine" only because of that
+        // fallback is exactly as unauthorized to write as one held by someone
+        // else — mirrors the display-side downgrade in `downgradeDerivedMine`,
+        // but here the wrong answer is a WRITE, not a mislabeled read.
+        const unprovenMine = state === "mine" && source === "derived";
+        if (state === "held" || unprovenMine) {
+          const error = unprovenMine
+            ? "held (derived identity cannot prove it is yours) — set IB_CLAIM_ID and retry"
+            : `held by ${existing.claimedBy} — skipped`;
+          also.push({ feedbackId: alsoId, ok: false, error });
           continue;
         }
         const r = await putWithClaimAdvisory(client, alsoId, body);
@@ -1799,15 +1813,19 @@ export function registerFeedbackCommands(
           reason: opts.reason,
         });
         const also = opts.also
-          ? String(opts.also)
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-              .map((s) => {
-                if (!/^\d+$/.test(s)) failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
-                return Number(s);
-              })
-              .filter((n) => n !== id)
+          ? [
+              ...new Set(
+                String(opts.also)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .map((s) => {
+                    if (!/^\d+$/.test(s)) failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
+                    return Number(s);
+                  })
+                  .filter((n) => n !== id)
+              ),
+            ]
           : undefined;
         const client = await getClient();
         writeJson(
