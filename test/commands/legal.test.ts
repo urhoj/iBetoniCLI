@@ -478,6 +478,101 @@ describe("ib legal writes", () => {
   });
 });
 
+describe("resolveTypeNameTarget label (fb#1036)", () => {
+  // `get` takes <documentIdOrType>, not <typeName> — a shared resolver that
+  // hard-codes one name misdescribes the other command's own signature.
+  test("default label names typeName in the missing-target error", () => {
+    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
+      expect.objectContaining({ message: expect.stringContaining("<typeName>") })
+    );
+  });
+  test("custom label is used in both error paths", () => {
+    expect(() => resolveTypeNameTarget(undefined, undefined, "documentIdOrType")).toThrowError(
+      expect.objectContaining({ message: expect.stringContaining("<documentIdOrType>") })
+    );
+    expect(() => resolveTypeNameTarget("12", "TOS", "documentIdOrType")).toThrowError(
+      expect.objectContaining({ message: expect.stringContaining("positional documentIdOrType") })
+    );
+  });
+});
+
+// fb#1036: `--type` is the spelling the group teaches first (save/diff REQUIRE
+// it), so callers reach for it on the read commands too — two actors did so six
+// times in one session. These prove the alias is wired to the HANDLER, not just
+// declared in the spec: a spec-only change would still exit 4 at parse time.
+describe("ib legal --type alias on positional-taking commands (fb#1036)", () => {
+  function program(client: MockApiClient): Command {
+    const p = new Command();
+    registerLegalCommands(p, async () => client);
+    return p;
+  }
+
+  test("show --type reaches the same endpoint as the positional", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "show", "--type", "BETONIJERRY_TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/BETONIJERRY_TOS?language=fi");
+  });
+
+  test("versions --type reaches the same endpoint as the positional (the filed repro)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ items: [], count: 0 });
+    await program(c).parseAsync(["legal", "versions", "--type", "BETONIJERRY_TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith(
+      expect.stringContaining("/api/legal-documents/BETONIJERRY_TOS/versions")
+    );
+  });
+
+  test("get --type resolves the typeName form", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 9, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "get", "--type", "PRIVACY"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith(expect.stringContaining("PRIVACY"));
+  });
+
+  test("acceptances --type reaches the same endpoint as the positional", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ items: [], typeName: "TOS", personSettingTypeId: 40 });
+    await program(c).parseAsync(["legal", "acceptances", "--type", "TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith(expect.stringContaining("/api/legal-documents/acceptances/TOS"));
+  });
+
+  test("positional still works unchanged, and wins when both agree", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "show", "TOS", "--type", "TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS?language=fi");
+  });
+
+  test("positional and --type disagreeing exits 4 without calling the API", async () => {
+    const c = mockClient();
+    const prev = process.exitCode;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await program(c).parseAsync(["legal", "show", "TOS", "--type", "PRIVACY"], { from: "user" });
+      expect(c.get).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(4);
+    } finally {
+      process.exitCode = prev;
+      stderrSpy.mockRestore();
+    }
+  });
+
+  test("neither positional nor --type exits 4 without calling the API", async () => {
+    const c = mockClient();
+    const prev = process.exitCode;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await program(c).parseAsync(["legal", "versions"], { from: "user" });
+      expect(c.get).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(4);
+    } finally {
+      process.exitCode = prev;
+      stderrSpy.mockRestore();
+    }
+  });
+});
+
 describe("resolveTypeNameTarget (accept dual-target, feedback #32)", () => {
   test("positional alone resolves", () => {
     expect(resolveTypeNameTarget("TOS", undefined)).toBe("TOS");

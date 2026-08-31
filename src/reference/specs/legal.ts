@@ -30,8 +30,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     description:
       "Fetch the current ACTIVE document of a type, including markdown content. typeName uniquely implies the tenant (BETONIJERRY_TOS vs TOS) — no owner flag needed. --meta omits the (potentially >10 KB) content.",
     auth: "any",
-    args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
     flags: [
+      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
       { name: "meta", type: "boolean", description: "Omit markdownContent (returns contentLength instead)" },
       {
         name: "language",
@@ -100,8 +101,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     description:
       "All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Soft-deleted versions are EXCLUDED by default — pass --deleted (or --status deleted) to see them. Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.",
     auth: "any",
-    args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
     flags: [
+      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
       { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
       { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted", allowed: ["draft", "active", "archived", "deleted"] },
       {
@@ -122,7 +124,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
     errors: [OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
-    examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
+    examples: ["ib legal versions TOS", "ib legal versions --type TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
   {
     command: "ib legal drafts",
@@ -145,22 +147,23 @@ export const LEGAL_SPECS: CommandSpec[] = [
       {
         name: "documentIdOrType",
         type: "string",
-        description: "legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version",
+        required: false,
+        description: "legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version; or pass --type for the typeName form",
       },
     ],
-    flags: [],
+    flags: [{ name: "type", type: "string", description: "Document type name (alias for the positional's typeName form)" }],
     outputShape:
       "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
     notes: [
       "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
     ],
     errors: [
-      { origin: "client", exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY" },
+      { origin: "client", exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName, or neither the positional nor --type was given", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY (positionally or via --type)" },
       apiErr(404, "Document not found / type has no active document", "list ids via ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib legal versions", "ib legal diff"],
-    examples: ["ib legal get 12", "ib legal get PRIVACY"],
+    examples: ["ib legal get 12", "ib legal get PRIVACY", "ib legal get --type PRIVACY"],
   },
   {
     command: "ib legal diff",
@@ -316,8 +319,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.",
     permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
     tier: "developer",
-    args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
     flags: [
+      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
       { name: "doc-version", type: "string", description: "Only acceptances of this version string (NOT --version — that is the global CLI version flag)" },
       { name: "limit", type: "number", default: "500", description: "Max rows (cap 500)" },
     ],
@@ -402,8 +406,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.",
     permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
     tier: "developer",
-    args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
     flags: [
+      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
       { name: "display-name", type: "string", description: "Human-readable name (max 100)" },
       { name: "description", type: "string", description: "Short description (max 200)" },
       { name: "sort-order", type: "number", description: "List position" },

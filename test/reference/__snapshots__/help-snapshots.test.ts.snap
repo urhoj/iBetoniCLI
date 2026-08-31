@@ -2905,7 +2905,7 @@ FLAGS
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
-  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT high|medium|low (the issue-tracker vocabulary most tooling uses): map high→major, medium→minor, low→cosmetic. Unknown exits 4
+  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT the issue-tracker vocabulary most tooling uses. Five synonyms are RECOGNISED but never accepted — an unknown value always exits 4 with a \`did you mean\` naming the right one, and is never silently rewritten (fb#369): high→major, medium→minor, low→cosmetic, blocker→critical, trivial→cosmetic. Pass the mapped value, not the synonym
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
   --gate-kind STRING    What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses) | legal (a document version is superseded) | owner (a human decision) | backlog. Most rows have no gate at all — omit it.
   --gate-ref STRING    Gate pointer, meaning depends on --gate-kind: deploy → repo@sha being waited on; legal → TYPE@version (the version being superseded); owner → free text. Only meaningful together with --gate-kind.
@@ -2921,7 +2921,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → description is required; all enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic), --gate-kind (when given) must be deploy|soak|legal|owner|backlog; --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
+  exit 4 (client-side)  Validation             → description is required; all enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the issue-tracker vocabulary — high≈major, medium≈minor, low≈cosmetic, blocker≈critical, trivial≈cosmetic; all five are hinted, none is accepted), --gate-kind (when given) must be deploy|soak|legal|owner|backlog; --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
   exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all) → pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow
   exit 4 (client-side)  too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
   exit 4 (client-side)  unknown option — when the rejected token is not a flag name anybody would type (\`->\`, \`--\`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702) → Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead
@@ -6603,16 +6603,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal acceptances matches snapshot 1`] = `
 "USAGE
-  ib legal acceptances <typeName> [flags]
+  ib legal acceptances [<typeName>] [flags]
 
 DESCRIPTION
   Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.
   Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
 
 ARGUMENTS
-  <typeName> STRING    Document type name (see ib legal types) (required)
+  <typeName> STRING    Document type name (see ib legal types; or pass --type) (optional)
 
 FLAGS
+  --type STRING    Document type name (alias for the positional)
   --doc-version STRING    Only acceptances of this version string (NOT --version — that is the global CLI version flag)
   --limit NUMBER    Max rows (cap 500) (default: 500)
 
@@ -6830,17 +6831,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal get matches snapshot 1`] = `
 "USAGE
-  ib legal get <documentIdOrType> [flags]
+  ib legal get [<documentIdOrType>] [flags]
 
 DESCRIPTION
   One document version by documentId — or by typeName (e.g. PRIVACY) to read that type's current ACTIVE version, so the typeName-keyed rows of ib legal list chain directly into get. The body is returned in the \`markdownContent\` field.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <documentIdOrType> STRING    legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version (required)
+  <documentIdOrType> STRING    legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version; or pass --type for the typeName form (optional)
 
 FLAGS
-  (none)
+  --type STRING    Document type name (alias for the positional's typeName form)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6850,7 +6851,7 @@ OUTPUT (JSON, stdout)
   {documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Argument is neither a numeric documentId nor a typeName → pass a documentId from ib legal list, or a typeName like PRIVACY
+  exit 4 (client-side)  Argument is neither a numeric documentId nor a typeName, or neither the positional nor --type was given → pass a documentId from ib legal list, or a typeName like PRIVACY (positionally or via --type)
   exit 5 (HTTP 404)  Document not found / type has no active document → list ids via ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6864,6 +6865,7 @@ SEE ALSO
 EXAMPLES
   ib legal get 12
   ib legal get PRIVACY
+  ib legal get --type PRIVACY
 "
 `;
 
@@ -6936,16 +6938,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal show matches snapshot 1`] = `
 "USAGE
-  ib legal show <typeName> [flags]
+  ib legal show [<typeName>] [flags]
 
 DESCRIPTION
   Fetch the current ACTIVE document of a type, including markdown content. typeName uniquely implies the tenant (BETONIJERRY_TOS vs TOS) — no owner flag needed. --meta omits the (potentially >10 KB) content.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <typeName> STRING    Document type name (see ib legal types) (required)
+  <typeName> STRING    Document type name (see ib legal types; or pass --type) (optional)
 
 FLAGS
+  --type STRING    Document type name (alias for the positional)
   --meta    Omit markdownContent (returns contentLength instead)
   --language STRING    Document language: fi (binding original) or en (unofficial translation). The backend falls back to the fi row when no active en row exists for the type. (default: fi)
 
@@ -7060,16 +7063,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal type update matches snapshot 1`] = `
 "USAGE
-  ib legal type update <typeName> [flags]
+  ib legal type update [<typeName>] [flags]
 
 DESCRIPTION
   Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.
   Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
 
 ARGUMENTS
-  <typeName> STRING    Document type name (see ib legal types) (required)
+  <typeName> STRING    Document type name (see ib legal types; or pass --type) (optional)
 
 FLAGS
+  --type STRING    Document type name (alias for the positional)
   --display-name STRING    Human-readable name (max 100)
   --description STRING    Short description (max 200)
   --sort-order NUMBER    List position
@@ -7142,16 +7146,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal versions matches snapshot 1`] = `
 "USAGE
-  ib legal versions <typeName> [flags]
+  ib legal versions [<typeName>] [flags]
 
 DESCRIPTION
   All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Soft-deleted versions are EXCLUDED by default — pass --deleted (or --status deleted) to see them. Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <typeName> STRING    Document type name (see ib legal types) (required)
+  <typeName> STRING    Document type name (see ib legal types; or pass --type) (optional)
 
 FLAGS
+  --type STRING    Document type name (alias for the positional)
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
   --deleted    Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as \`ib vehicle list --deleted\`. An explicit --status overrides this flag (--status names exactly what you want, so \`--status deleted\` selects them and \`--status active --deleted\` is just --status active).
@@ -7174,6 +7179,7 @@ SEE ALSO
 
 EXAMPLES
   ib legal versions TOS
+  ib legal versions --type TOS
   ib legal versions TOS --status draft
   ib legal versions BETONIJERRY_TOS
   ib legal versions TOS --language en

@@ -369,17 +369,26 @@ export async function runLegalTypeUpdate(client, typeName, fields, flags) {
     return client.put(`/api/legal-documents/types/${encodeURIComponent(typeName)}`, fields, { headers: writeFlagsToHeaders(flags) });
 }
 /**
- * `accept` takes its typeName positionally like its siblings (show / versions /
- * acceptances), with --type kept as an alias (feedback #32). Exactly one is
- * required; both are allowed only when they agree.
+ * Every command in this group that names a document type takes it POSITIONALLY,
+ * with `--type` accepted as an alias (feedback #32, widened in fb#1036). Exactly
+ * one is required; both are allowed only when they agree.
+ *
+ * The alias exists because `save`/`diff` REQUIRE the flag spelling, so the group
+ * teaches `--type` first and callers then reach for it on the read commands —
+ * two independent actors did so six times in one session (fb#1036). Positional
+ * stays canonical (it is what --help advertises); the flag is additive, so no
+ * scripted invocation changes meaning.
+ *
+ * `label` names the positional in the error text: `get` takes <documentIdOrType>,
+ * everything else <typeName>.
  */
-export function resolveTypeNameTarget(positional, flag) {
+export function resolveTypeNameTarget(positional, flag, label = "typeName") {
     const name = positional ?? flag;
     if (!name) {
-        failWith("missing document type: pass <typeName> positionally or via --type <typeName>", 4);
+        failWith(`missing document type: pass <${label}> positionally or via --type <typeName>`, 4);
     }
     if (positional !== undefined && flag !== undefined && positional !== flag) {
-        failWith(`positional typeName (${positional}) and --type (${flag}) differ — pass only one`, 4);
+        failWith(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`, 4);
     }
     return name;
 }
@@ -416,10 +425,11 @@ export function registerLegalCommands(parent, getClient) {
         .command("types")
         .action(jsonAction(getClient, runLegalTypes));
     legal
-        .command("show <typeName>")
+        .command("show [typeName]")
+        .option("--type <typeName>")
         .option("--meta")
         .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
-        .action(jsonAction(getClient, (client, typeName, opts) => runLegalShow(client, typeName, !!opts.meta, normalizeLegalLanguage(opts.language))));
+        .action(jsonAction(getClient, (client, typeNameArg, opts) => runLegalShow(client, resolveTypeNameTarget(typeNameArg, opts.type), !!opts.meta, normalizeLegalLanguage(opts.language))));
     legal
         .command("active")
         .alias("list")
@@ -437,12 +447,14 @@ export function registerLegalCommands(parent, getClient) {
         writeJson(await runLegalStatus(client, personId, owner));
     }));
     legal
-        .command("versions <typeName>")
+        .command("versions [typeName]")
+        .option("--type <typeName>")
         .option("--owner <id>", "", intFlag("--owner", 1))
         .option("--status <status>")
         .option("--deleted")
         .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
-        .action(guarded(async (typeName, opts) => {
+        .action(guarded(async (typeNameArg, opts) => {
+        const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
         if (opts.status && !LEGAL_STATUSES.includes(opts.status)) {
             failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
         }
@@ -487,9 +499,10 @@ export function registerLegalCommands(parent, getClient) {
     // ALREADY owns a real `show <typeName>` command — Commander refuses the alias,
     // and the show reflex already lands on a working (type-shaped) read.
     legal
-        .command("get <documentIdOrType>")
-        .action(guarded(async (refStr) => {
-        const ref = parseLegalGetRef(refStr);
+        .command("get [documentIdOrType]")
+        .option("--type <typeName>")
+        .action(guarded(async (refArg, opts) => {
+        const ref = parseLegalGetRef(resolveTypeNameTarget(refArg, opts.type, "documentIdOrType"));
         const client = await getClient();
         writeJson(await runLegalGet(client, ref));
     }));
@@ -577,12 +590,13 @@ export function registerLegalCommands(parent, getClient) {
         }));
     }
     legal
-        .command("acceptances <typeName>")
+        .command("acceptances [typeName]")
+        .option("--type <typeName>")
         // NOT --version: shadowed by the root global -V/--version (enforced by the
         // root-option reuse test in test/reference/help-wiring.test.ts).
         .option("--doc-version <v>")
         .option("--limit <n>", "", cappedInt(500))
-        .action(jsonAction(getClient, (client, typeName, opts) => runLegalAcceptances(client, typeName, {
+        .action(jsonAction(getClient, (client, typeNameArg, opts) => runLegalAcceptances(client, resolveTypeNameTarget(typeNameArg, opts.type), {
         version: opts.docVersion,
         limit: opts.limit,
     })));
@@ -612,12 +626,14 @@ export function registerLegalCommands(parent, getClient) {
         writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
     }));
     const typeUpdateCmd = typeGroup
-        .command("update <typeName>")
+        .command("update [typeName]")
+        .option("--type <typeName>")
         .option("--display-name <s>")
         .option("--description <s>")
         .option("--sort-order <n>", "", intFlag("--sort-order", 0))
         .option("--setting-type-id <n>", "", intFlag("--setting-type-id", 1));
-    addWriteFlagsToCommand(typeUpdateCmd).action(guarded(async (typeName, opts) => {
+    addWriteFlagsToCommand(typeUpdateCmd).action(guarded(async (typeNameArg, opts) => {
+        const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
         const client = await getClient();
         writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));
     }));

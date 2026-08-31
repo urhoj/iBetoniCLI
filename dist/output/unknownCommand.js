@@ -103,6 +103,66 @@ export function descendantsOwningVerb(group, token, tier) {
     return hits.slice(0, 3);
 }
 /**
+ * Same subtree scan as {@link descendantsOwningVerb}, but for a COMPOUND token
+ * whose last hyphen-segment is the verb (fb#1020): `ib jerry company-search`
+ * dead-ended although `ib jerry admin search` is exactly what the caller wanted
+ * — the leaf is a substring of the typed token, so exact equality misses it.
+ *
+ * STRICTER than the exact-match layer, which may name up to 3 owners: a compound
+ * token is a weaker signal than a real verb, so this answers only when the group
+ * subtree has EXACTLY ONE owner of that leaf, and stays silent otherwise. Measured
+ * over the catalogue that is the common case — 144 of 169 group+leaf pairs are
+ * unambiguous, and the ambiguous 25 are all generic CRUD (`ib jerry ~ list` (5),
+ * `ib jerry ~ get` (3), `ib betoni ~ list` (2)) where naming an arbitrary one
+ * would be exactly the noise this guard exists to prevent.
+ */
+export function descendantsOwningCompoundVerb(group, token, tier) {
+    if (!token.includes("-"))
+        return [];
+    const verb = token.slice(token.lastIndexOf("-") + 1).toLowerCase();
+    if (!verb)
+        return [];
+    const hits = descendantsOwningVerb(group, verb, tier);
+    return hits.length === 1 ? hits : [];
+}
+/**
+ * The token is not a command at all but the NAME OF A POSITIONAL ARGUMENT of
+ * one (fb#1020): `ib dev sql` dead-ended although `ib dev schema query <sql>` is
+ * the read-only SQL command being reached for. Because the hint said nothing
+ * existed, that session wrote a scratch node probe against PRODUCTION instead of
+ * using the CLI — the expensive failure this layer prevents.
+ *
+ * Ranked LAST, below every verb layer, and guarded so it can only fire on a
+ * distinctive name. Two conditions, both measured over the catalogue rather than
+ * guessed:
+ *
+ * - EXACTLY ONE spec owns the arg name. 24 of 54 distinct positional names
+ *   qualify, and they are uniformly specific (`sql`, `ytunnus`, `glob`, `topic`,
+ *   `recipient`). The id-shaped generics that would be pure noise are excluded by
+ *   owner count alone — `asiakasId` 18, `requestId` 18, `vehicleId` 14,
+ *   `personId` 13, `id` 10.
+ * - The name is not ALSO a real command leaf somewhere (`entity`, `table`,
+ *   `note`), so this layer can never compete with the verb layers above it.
+ */
+export function descendantsOwningPositional(group, token, tier) {
+    if (!token)
+        return null;
+    const t = token.toLowerCase();
+    if (COMMAND_SPECS.some((s) => s.command.split(" ").pop().toLowerCase() === t))
+        return null;
+    const owners = COMMAND_SPECS.filter((s) => (s.args ?? []).some((a) => a.name.toLowerCase() === t));
+    if (owners.length !== 1)
+        return null;
+    const [spec] = owners;
+    if (isHiddenAtTier(spec, tier))
+        return null;
+    const base = canonicalPath(group);
+    if (group !== "ib" && !spec.command.startsWith(base + " "))
+        return null;
+    const arg = (spec.args ?? []).find((a) => a.name.toLowerCase() === t).name;
+    return { path: spec.command, arg };
+}
+/**
  * The unknown token under a group is itself a top-level DOMAIN (fb#386):
  * `ib dev task list` dead-ended although `ib task list` exists — a plausible
  * over-generalization of the 2026-06-30 `ib dev` re-homing (feedback/changelog/
@@ -202,11 +262,20 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     // cmd.args holds the bad token followed by whatever came after it.
     const curated = siblingGroupsWithCommand(group, unknownToken, tier);
     // Only when no curated pair answered: the verb may live in a CHILD subgroup
-    // of this very group (fb#379) — same copy-paste rendering.
-    const descendants = curated.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
+    // of this very group (fb#379) — same copy-paste rendering. When exact equality
+    // finds nothing, retry treating the token as COMPOUND (fb#1020).
+    const exactDescendants = curated.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
+    const descendants = curated.length || exactDescendants.length
+        ? exactDescendants
+        : descendantsOwningCompoundVerb(group, unknownToken, tier);
+    // Last resort, below every verb layer: the token names an ARGUMENT rather than
+    // a command (fb#1020).
+    const positional = curated.length || descendants.length
+        ? null
+        : descendantsOwningPositional(group, unknownToken, tier);
     // Last: the token names a top-level DOMAIN (fb#386). Ranked below both — an
     // answer inside the group the caller chose beats sending them to another one.
-    const elsewhere = curated.length || descendants.length
+    const elsewhere = curated.length || descendants.length || positional
         ? curated
         : topLevelDomainRedirect(group, unknownToken, available, tier);
     const rest = (cmd.args ?? []).slice(1).map(String);
@@ -220,7 +289,9 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
             ? `\`${group} ${unknownToken}\` does not exist, but \`${[descendants[0], ...rest].join(" ")}\` does — ${livesIn}. `
             : descendants.length > 1
                 ? `\`${group} ${unknownToken}\` does not exist, but ${livesDeeper}: ${descendants.map((d) => `\`${d}\``).join(", ")}. `
-                : "";
+                : positional
+                    ? `\`${group} ${unknownToken}\` does not exist — \`${unknownToken}\` is an ARGUMENT of \`${positional.path}\`, not a command: run \`${[positional.path, `<${positional.arg}>`, ...rest].join(" ")}\`. `
+                    : "";
     return {
         success: false,
         error: group === "ib"
@@ -232,7 +303,7 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
         unknownCommand: unknownToken,
         didYouMean,
         available,
-        availableElsewhere: [...elsewhere.map((e) => e.path), ...descendants],
+        availableElsewhere: [...elsewhere.map((e) => e.path), ...descendants, ...(positional ? [positional.path] : [])],
         cliVersion: packageJson.version,
         hint: `${crossGroup}${suggestion}${availableStr}Run ${discover} to discover them.`,
     };

@@ -17,6 +17,8 @@ import {
   siblingsAcceptingOption,
   siblingGroupsWithCommand,
   descendantsOwningVerb,
+  descendantsOwningCompoundVerb,
+  descendantsOwningPositional,
   topLevelDomainRedirect,
   OPTION_REDIRECTS,
   OPTION_DID_YOU_MEAN_OVERRIDES,
@@ -924,5 +926,92 @@ describe("write-safety flags explain their own idiom (fb#646)", () => {
     const env = buildUnknownOptionEnvelope(leafByPath("dev", "cache", "clear"), "--dry-run");
     expect(env.hint).toContain("Accepted flags:");
     expect(env.hint).toContain("--help");
+  });
+});
+
+// fb#1020: two ways a caller reaches a real command with a token that is not a
+// sibling verb. Both dead-ended with didYouMean:null AND availableElsewhere:[],
+// which reads as "nothing like this exists" — in the `ib dev sql` case that
+// sent the session to write a scratch node probe against PRODUCTION.
+describe("descendantsOwningCompoundVerb (fb#1020)", () => {
+  test("last hyphen-segment resolves the filed case", () => {
+    expect(descendantsOwningCompoundVerb("ib jerry", "company-search", "developer")).toEqual([
+      "ib jerry admin search",
+    ]);
+  });
+
+  test("silent on a token with no hyphen (the exact layer owns that)", () => {
+    expect(descendantsOwningCompoundVerb("ib jerry", "search", "developer")).toEqual([]);
+  });
+
+  test("silent when the leaf is AMBIGUOUS inside the group, rather than guessing one", () => {
+    // `ib jerry ~ list` has 5 owners; naming an arbitrary one is the noise this
+    // layer's single-owner guard exists to prevent.
+    expect(descendantsOwningCompoundVerb("ib jerry", "provider-list", "developer")).toEqual([]);
+  });
+
+  test("silent on a trailing hyphen (no verb to match)", () => {
+    expect(descendantsOwningCompoundVerb("ib jerry", "company-", "developer")).toEqual([]);
+  });
+});
+
+describe("descendantsOwningPositional (fb#1020)", () => {
+  test("an argument name resolves to its owning command", () => {
+    expect(descendantsOwningPositional("ib dev", "sql", "developer")).toEqual({
+      path: "ib dev schema query",
+      arg: "sql",
+    });
+  });
+
+  test("case-insensitive, and reports the arg's declared spelling", () => {
+    expect(descendantsOwningPositional("ib dev", "SQL", "developer")?.arg).toBe("sql");
+  });
+
+  test("silent on id-shaped generics owned by many commands", () => {
+    for (const generic of ["asiakasId", "requestId", "personId", "id", "keikkaId"]) {
+      expect(descendantsOwningPositional("ib", generic, "developer")).toBeNull();
+    }
+  });
+
+  test("silent when the token is ALSO a real command leaf, so it never competes with the verb layers", () => {
+    // `table`, `note` and `entity` are single-owner arg names that are also
+    // command leaves; the verb layers above must own those tokens.
+    for (const both of ["table", "note", "entity"]) {
+      expect(descendantsOwningPositional("ib", both, "developer")).toBeNull();
+    }
+  });
+
+  test("scoped to the group's own subtree — no cross-group redirect", () => {
+    expect(descendantsOwningPositional("ib keikka", "sql", "developer")).toBeNull();
+  });
+
+  test("hidden from a caller whose tier cannot run the owning command", () => {
+    expect(descendantsOwningPositional("ib dev", "sql", "standard")).toBeNull();
+  });
+});
+
+describe("fb#1020 envelope wiring", () => {
+  test("`ib dev sql` names the owning command and says it is an ARGUMENT", () => {
+    const dev = program.commands.find((c) => c.name() === "dev")!;
+    dev.args = ["sql"];
+    const env = buildUnknownCommandEnvelope(dev, "sql", "developer");
+    expect(env.availableElsewhere).toContain("ib dev schema query");
+    expect(env.hint).toContain("is an ARGUMENT of `ib dev schema query`");
+    expect(env.hint).toContain("ib dev schema query <sql>");
+  });
+
+  test("`ib jerry company-search` names the grandchild command", () => {
+    const jerry = program.commands.find((c) => c.name() === "jerry")!;
+    jerry.args = ["company-search"];
+    const env = buildUnknownCommandEnvelope(jerry, "company-search", "developer");
+    expect(env.availableElsewhere).toContain("ib jerry admin search");
+  });
+
+  test("a genuinely unknown token still dead-ends cleanly (no invented redirect)", () => {
+    const jerry = program.commands.find((c) => c.name() === "jerry")!;
+    jerry.args = ["zzzznope"];
+    const env = buildUnknownCommandEnvelope(jerry, "zzzznope", "developer");
+    expect(env.availableElsewhere).toEqual([]);
+    expect(env.hint).not.toContain("ARGUMENT");
   });
 });
