@@ -93,7 +93,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback create --from-json ./report.json",
       "ib dev feedback create --from-json ./report.json --kind bug",
       'ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2',
-      'ib dev feedback create "wait for puminet5api@1.31.0 to ship before re-checking" --gate-kind deploy --gate-ref "puminet5api@1.31.0"',
+      'ib dev feedback create "wait for the fb#941 detail-cap raise to ship" --gate-kind deploy --gate-ref "puminet5api@a930ccaf"',
     ],
   },
   {
@@ -323,7 +323,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback update 42 --complexity 4",
       "ib dev feedback update 42 --from-json ./correction.json",
       'ib dev feedback update 42 --append-description "Confirmed on prod 2026-08-06; root cause is the cache key."',
-      'ib dev feedback update 42 --gate-kind deploy --gate-ref "puminet5api@1.31.0"',
+      'ib dev feedback update 42 --gate-kind deploy --gate-ref "puminet5api@a930ccaf"',
       "ib dev feedback update 42 --gate-kind soak --gate-until tomorrow",
       "ib dev feedback update 42 --gate-kind=",
     ],

@@ -467,11 +467,11 @@ describe("ib feedback create — gate fields (fb#446)", () => {
     await runFeedbackCreate(mockClient, {
       description: "wait for the fix to ship",
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
     });
     expect(post.mock.calls[0][1]).toMatchObject({
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
     });
   });
 
@@ -1349,17 +1349,17 @@ describe("ib feedback update", () => {
 
 describe("ib feedback update — gate fields (fb#446)", () => {
   test("PUTs gateKind + gateRef together", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+    put.mockResolvedValueOnce({ feedbackId: 42, gateKind: "deploy", gateRef: "puminet5api@a930ccaf" });
     const out = await runFeedbackUpdate(mockClient, 42, {
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
     });
     expect(put).toHaveBeenCalledWith(
       "/api/feedback/42",
-      { gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      { gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
       expect.anything()
     );
-    expect(out).toMatchObject({ gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+    expect(out).toMatchObject({ gateKind: "deploy", gateRef: "puminet5api@a930ccaf" });
   });
 
   test("an unknown --gate-kind exits 4, no PUT", async () => {
@@ -1408,7 +1408,7 @@ describe("ib feedback update — gate fields (fb#446)", () => {
 
   test("gate fields alone satisfy the 'at least one editable field' requirement", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42 });
-    await expect(runFeedbackUpdate(mockClient, 42, { gateRef: "puminet5api@1.31.0" })).resolves.toBeTruthy();
+    await expect(runFeedbackUpdate(mockClient, 42, { gateRef: "puminet5api@a930ccaf" })).resolves.toBeTruthy();
     expect(put).toHaveBeenCalled();
   });
 
@@ -1417,15 +1417,15 @@ describe("ib feedback update — gate fields (fb#446)", () => {
       feedbackId: 42,
       scope: "cli",
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
       gateUntil: null,
       updatedAt: "2026-08-30T00:00:00Z",
     });
-    const out = await runFeedbackUpdate(mockClient, 42, { gateKind: "deploy", gateRef: "puminet5api@1.31.0" });
+    const out = await runFeedbackUpdate(mockClient, 42, { gateKind: "deploy", gateRef: "puminet5api@a930ccaf" });
     expect(out).toMatchObject({
       feedbackId: 42,
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
       gateUntil: null,
     });
   });
@@ -2119,7 +2119,7 @@ describe("ib feedback list — --gated filter", () => {
 
   test("the bare flag (no kind) keeps every row carrying ANY gate", async () => {
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0", gateUntil: null },
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf", gateUntil: null },
       { feedbackId: 2, status: "open", gateKind: null, gateRef: null, gateUntil: null },
       { feedbackId: 3, status: "open", gateKind: "soak", gateRef: null, gateUntil: "2026-09-01" },
     ]);
@@ -2129,7 +2129,7 @@ describe("ib feedback list — --gated filter", () => {
 
   test("a kind value narrows to that gate kind only", async () => {
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
       { feedbackId: 2, status: "open", gateKind: "legal", gateRef: "BETONIJERRY_TOS@2" },
     ]);
     const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
@@ -2138,12 +2138,12 @@ describe("ib feedback list — --gated filter", () => {
 
   test("every returned row carries gateKind/gateRef/gateUntil verbatim — Task 9's swap hook reads gateRef off this", async () => {
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0", gateUntil: null },
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf", gateUntil: null },
     ]);
     const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
     expect(out.items[0]).toMatchObject({
       gateKind: "deploy",
-      gateRef: "puminet5api@1.31.0",
+      gateRef: "puminet5api@a930ccaf",
       gateUntil: null,
     });
   });
@@ -2155,7 +2155,7 @@ describe("ib feedback list — --gated filter", () => {
     // raw page.
     get.mockResolvedValueOnce([
       { feedbackId: 1, status: "open", gateKind: null },
-      { feedbackId: 2, status: "open", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      { feedbackId: 2, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
     ]);
     const out = await runFeedbackList(mockClient, { status: "open", gated: true, limit: 1 });
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200"); // CAP, not the caller's 1
@@ -2164,7 +2164,7 @@ describe("ib feedback list — --gated filter", () => {
 
   test("also forces the merge path under --all (no status filter)", async () => {
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "applied", gateKind: "deploy", gateRef: "puminet5api@1.31.0" },
+      { feedbackId: 1, status: "applied", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
     ]);
     const out = await runFeedbackList(mockClient, { all: true, gated: "deploy" });
     expect(get).toHaveBeenCalledWith("/api/feedback?limit=200");
