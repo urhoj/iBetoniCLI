@@ -202,7 +202,12 @@ export const AUTH_SPECS: CommandSpec[] = [
     outputShape:
       "start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.",
     errors: [
-      { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
+      {
+        origin: "client",
+        exit: 2,
+        meaning: "Not logged in (checks for ANY active session, endpoint-agnostic — only the remedy is endpoint-aware)",
+        remedy: "ib auth login first; under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1102) and lists the sessions you already hold",
+      },
       apiErr(403, "Impersonation not allowed for the target", "needs systemAdmin/roleManager, same-tenant admin, or a grant"),
       apiErr(404, "Target not found (or has no personEmail)", "no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with `ib person get <id>`; an email-less person cannot be impersonated."),
       { origin: "client", exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },

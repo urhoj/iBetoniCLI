@@ -616,11 +616,11 @@ export function deriveClaimState(
  * downgrade" semantics; `get` calls it on a 1-element array (fb#1017 — this
  * was previously duplicated byte-for-byte between the two callers).
  */
-function downgradeDerivedMine<T extends { claimState?: unknown }>(
-  items: T[],
+function downgradeDerivedMine(
+  items: Record<string, unknown>[],
   idSource: ClaimIdSource,
   me: string
-): T[] {
+): Record<string, unknown>[] {
   if (idSource !== "derived" || !items.some((r) => r.claimState === "mine")) return items;
   const downgraded = items.map((r) =>
     r.claimState === "mine" ? { ...r, claimState: "held" as const } : r
