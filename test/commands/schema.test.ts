@@ -293,5 +293,9 @@ describe("ib schema", () => {
     test("neither given exits 4", () => {
       expect(() => resolveSqlInput(undefined, undefined)).toThrow(/--sql.*required/);
     });
+
+    test("treats whitespace-only as absent", () => {
+      expect(() => resolveSqlInput("   ", undefined)).toThrow(/required/);
+    });
   });
 });
