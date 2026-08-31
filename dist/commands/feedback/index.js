@@ -68,6 +68,14 @@ export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE];
  */
 export const GATE_KINDS = ["deploy", "soak", "legal", "owner", "backlog"];
 /**
+ * Relation vocabulary — mirror of `feedbackSql.RELATION_TYPES` in puminet5api
+ * (relations design 2026-08-31). `duplicate`/`blocks` are DIRECTED (A→B reads
+ * "A duplicates/blocks B"); `same-root-cause`/`related` are symmetric. Nothing
+ * enforces the two lists match across the repo boundary; keep them in sync by
+ * hand when either changes (same caveat as GATE_KINDS above).
+ */
+export const RELATION_TYPES = ["duplicate", "same-root-cause", "related", "blocks"];
+/**
  * The subset the backend auto-closes via `POST /api/feedback/gates/clear` —
  * the only values `gate-clear --kind` accepts. The other three kinds
  * (`soak`/`owner`/`backlog`) close only by a human calling `resolve`; the
@@ -646,6 +654,46 @@ export async function runFeedbackGet(client, id) {
     return result;
 }
 /**
+ * POST /api/feedback/:id/relations — link two feedback rows. A REAL write
+ * (blocked under --read-only); --dry-run resolves client-side. One link per
+ * pair (either direction) — a 409 means unlink first to change the type.
+ */
+export async function runFeedbackLink(client, id, relatedId, input) {
+    if (!input.type)
+        failWith("--type is required (duplicate | same-root-cause | related | blocks)", 4);
+    assertEnum(input.type, RELATION_TYPES, "--type");
+    const body = { relatedFeedbackId: relatedId, relationType: input.type };
+    if (input.note !== undefined)
+        body.note = input.note;
+    if (input.dryRun)
+        return wouldSend("POST", `/api/feedback/${id}/relations`, body);
+    return client.post(`/api/feedback/${id}/relations`, body, {
+        headers: { "x-claim-id": resolveClaimId(undefined) },
+    });
+}
+/** DELETE /api/feedback/:id/relations/:relatedId — unlink (idempotent). */
+export async function runFeedbackUnlink(client, id, relatedId, input) {
+    if (input.dryRun) {
+        return { dryRun: true, wouldSend: { method: "DELETE", path: `/api/feedback/${id}/relations/${relatedId}` } };
+    }
+    return client.delete(`/api/feedback/${id}/relations/${relatedId}`);
+}
+/**
+ * GET /api/feedback/:id/cluster — the fix-together component (duplicate +
+ * same-root-cause edges), as a ListEnvelope with claimState derived exactly
+ * as `list` derives it. `truncated: true` = a walk bound cut the component:
+ * treat the cluster as suspect data, not a bigger fix.
+ */
+export async function runFeedbackCluster(client, id) {
+    const data = await client.get(`/api/feedback/${id}/cluster`);
+    const { by: me, source: idSource } = resolveClaim(undefined);
+    const items = downgradeDerivedMine((data.rows ?? []).map((r) => ({ ...r, claimState: deriveClaimState(r, me) })), idSource, me);
+    const env = listEnvelope(items);
+    if (data.truncated)
+        env.truncated = true;
+    return env;
+}
+/**
  * Aggregate counts, server-side over the WHOLE table (GET /api/feedback/stats).
  *
  * This used to bucket a client-side page in JS, which was correct only while the
@@ -853,7 +901,11 @@ function compactAck(row) {
  * Unknown/wrong-typed JSON keys exit 4 (shared contract, fb#298 class).
  */
 const RESOLVE_FROM_JSON = {
-    nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
+    // --also is a BATCH-invocation modifier (which sibling rows to apply this
+    // same call to), not a per-row payload field — templating a --from-json
+    // file off a single row has no sensible "also" value, so it stays out of
+    // the accepted-key list alongside the other invocation flags.
+    nonPayload: new Set(["fromJson", "dryRun", "full", "also", "help"]),
 };
 /**
  * --note / --reason / --resolution are aliases for the same stored note. When a
@@ -887,12 +939,45 @@ export async function runFeedbackResolve(client, id, input) {
     if (input.note !== undefined)
         body.resolution = input.note;
     if (input.dryRun) {
-        return wouldSend("PUT", `/api/feedback/${id}`, body);
+        const preview = wouldSend("PUT", `/api/feedback/${id}`, body);
+        if (input.also?.length) {
+            preview.alsoWouldSend = input.also.map((alsoId) => ({
+                method: "PUT",
+                path: `/api/feedback/${alsoId}`,
+                body,
+            }));
+        }
+        return preview;
     }
     const row = await putWithClaimAdvisory(client, id, body);
     const out = input.full ? { ...row } : compactAck(row);
     if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
         out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
+    }
+    // Explicit multi-resolve (relations design 2026-08-31): the same body, one
+    // named row at a time. CLIENT-SIDE hold guard — the backend PUT is advisory
+    // about claims, but a batch closer must not write over another agent's live
+    // lease. Per-row results, never rolled back (the `import` shape: check
+    // `failed`, not just the exit code).
+    if (input.also?.length) {
+        const { by: me } = resolveClaim(undefined);
+        const also = [];
+        for (const alsoId of input.also) {
+            try {
+                const existing = await client.get(`/api/feedback/${alsoId}`);
+                if (deriveClaimState(existing, me) === "held") {
+                    also.push({ feedbackId: alsoId, ok: false, error: `held by ${existing.claimedBy} — skipped` });
+                    continue;
+                }
+                const r = await putWithClaimAdvisory(client, alsoId, body);
+                also.push({ feedbackId: alsoId, ok: true, status: r.status });
+            }
+            catch (e) {
+                also.push({ feedbackId: alsoId, ok: false, error: errorMessage(e) });
+            }
+        }
+        out.also = also;
+        out.failed = also.filter((r) => !r.ok).length;
     }
     return out;
 }
@@ -1315,6 +1400,29 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackGet(client, id)));
     }));
+    f.command("link <id> <relatedId>")
+        .option("--type <type>")
+        .option("--note <text>")
+        .option("--dry-run")
+        .action(guarded(async (idStr, relatedStr, opts) => {
+        const id = parseRefId(idStr, "feedback", "link");
+        const relatedId = parseRefId(relatedStr, "feedback", "link");
+        const client = await getClient();
+        writeJson(await runFeedbackLink(client, id, relatedId, opts));
+    }));
+    f.command("unlink <id> <relatedId>")
+        .option("--dry-run")
+        .action(guarded(async (idStr, relatedStr, opts) => {
+        const id = parseRefId(idStr, "feedback", "unlink");
+        const relatedId = parseRefId(relatedStr, "feedback", "unlink");
+        const client = await getClient();
+        writeJson(await runFeedbackUnlink(client, id, relatedId, opts));
+    }));
+    f.command("cluster <id>").action(guarded(async (idStr) => {
+        const id = parseRefId(idStr, "feedback", "cluster");
+        const client = await getClient();
+        writeJson(await runFeedbackCluster(client, id));
+    }));
     // `[note]` is positional so this command AGREES with its sibling
     // `feedback create <description>` (fb#583). Both take one id-ish thing plus
     // one block of prose, and they used to disagree about where the prose goes —
@@ -1325,6 +1433,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--note <text>")
         .option("--reason <text>")
         .option("--resolution <text>")
+        .option("--also <ids>", "Comma-separated feedback ids to apply the same status/note to")
         .option("--from-json <file>")
         .option("--dry-run")
         .option("--full")
@@ -1342,6 +1451,18 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             resolution: opts.resolution,
             reason: opts.reason,
         });
+        const also = opts.also
+            ? String(opts.also)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s) => {
+                if (!/^\d+$/.test(s))
+                    failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
+                return Number(s);
+            })
+                .filter((n) => n !== id)
+            : undefined;
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackResolve(client, id, {
             status: opts.status,
@@ -1350,6 +1471,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             // argv are both kept. mergeNoteFlags de-dupes, so passing the same
             // text positionally AND as --note stores it once.
             note: mergeNoteFlags(notePositional, opts.note, opts.resolution, opts.reason),
+            also,
             dryRun: opts.dryRun,
             full: opts.full,
         })));

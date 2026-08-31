@@ -15,6 +15,10 @@ import {
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
   resolveClaimId,
+  runFeedbackLink,
+  runFeedbackUnlink,
+  runFeedbackCluster,
+  RELATION_TYPES,
   type FeedbackResolveInput,
   type FeedbackUpdateInput,
 } from "../../src/commands/feedback/index.js";
@@ -38,11 +42,13 @@ const mockClient = mockApiClient();
 const post = mockClient.post;
 const get = mockClient.get;
 const put = mockClient.put;
+const del = mockClient.delete;
 
 beforeEach(() => {
   post.mockReset();
   get.mockReset();
   put.mockReset();
+  del.mockReset();
 });
 
 // ─── create ──────────────────────────────────────────────────────────────────
@@ -2438,5 +2444,134 @@ describe("feedback import — batch filing (fb#1056)", () => {
     const out = await runFeedbackImport(mockClient, []);
     expect(out).toEqual({ results: [], ok: 0, failed: 0 });
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+// ─── relations (link / unlink / cluster) ─────────────────────────────────────
+
+describe("ib dev feedback link", () => {
+  test("POSTs the relation with type and note", async () => {
+    post.mockResolvedValue({ relationId: 1, feedbackId: 10, relatedFeedbackId: 20, relationType: "duplicate" });
+    const out = await runFeedbackLink(mockClient, 10, 20, { type: "duplicate", note: "same argv-split root" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/feedback/10/relations",
+      { relatedFeedbackId: 20, relationType: "duplicate", note: "same argv-split root" },
+      expect.objectContaining({ headers: expect.objectContaining({ "x-claim-id": expect.any(String) }) })
+    );
+    expect(out).toMatchObject({ relationType: "duplicate" });
+  });
+
+  test("--type is required and strict", async () => {
+    await expect(runFeedbackLink(mockClient, 1, 2, {})).rejects.toThrow(/--type/);
+    await expect(runFeedbackLink(mockClient, 1, 2, { type: "dupe" })).rejects.toThrow(/must be one of/);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test.each(RELATION_TYPES)("--type %s is accepted and forwarded", async (type) => {
+    post.mockResolvedValueOnce({ relationId: 1, relationType: type });
+    await runFeedbackLink(mockClient, 1, 2, { type });
+    expect(post.mock.calls[0][1]).toMatchObject({ relationType: type });
+  });
+
+  test("--dry-run resolves client-side, nothing sent", async () => {
+    const out = await runFeedbackLink(mockClient, 1, 2, { type: "related", dryRun: true });
+    expect(out).toMatchObject({ dryRun: true, wouldSend: { method: "POST", path: "/api/feedback/1/relations" } });
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib dev feedback unlink", () => {
+  test("DELETEs either-direction and is shape-stable", async () => {
+    del.mockResolvedValue({ feedbackId: 1, relatedFeedbackId: 2, deleted: true });
+    const out = await runFeedbackUnlink(mockClient, 1, 2, {});
+    expect(del).toHaveBeenCalledWith("/api/feedback/1/relations/2");
+    expect(out).toMatchObject({ deleted: true });
+  });
+
+  test("--dry-run resolves client-side, nothing sent", async () => {
+    const out = await runFeedbackUnlink(mockClient, 1, 2, { dryRun: true });
+    expect(out).toMatchObject({ dryRun: true, wouldSend: { method: "DELETE", path: "/api/feedback/1/relations/2" } });
+    expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib dev feedback cluster", () => {
+  test("wraps rows in a ListEnvelope with derived claimState and carries truncated", async () => {
+    get.mockResolvedValue({
+      rows: [
+        { feedbackId: 1, status: "open", severity: "minor", complexity: 2, claimedBy: null, claimExpiresAt: null, firstLine: "a" },
+        { feedbackId: 2, status: "open", severity: null, complexity: null, claimedBy: null, claimExpiresAt: null, firstLine: "b" },
+      ],
+      truncated: true,
+    });
+    const out = await runFeedbackCluster(mockClient, 1);
+    expect(get).toHaveBeenCalledWith("/api/feedback/1/cluster");
+    expect(out.count).toBe(2);
+    expect(out.truncated).toBe(true);
+    expect(out.items[0]).toMatchObject({ claimState: "free" });
+  });
+
+  test("tolerates a missing rows array", async () => {
+    get.mockResolvedValueOnce({});
+    const out = await runFeedbackCluster(mockClient, 1);
+    expect(out).toEqual({ items: [], nextCursor: null, count: 0 });
+  });
+});
+
+// ─── resolve --also ──────────────────────────────────────────────────────────
+
+describe("ib dev feedback resolve --also", () => {
+  test("applies the same body to each named row, per-row results, no rollback", async () => {
+    put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t", resolution: "fixed" });
+    get.mockResolvedValue({ feedbackId: 2, claimedBy: null, claimExpiresAt: null });
+    put.mockResolvedValueOnce({ feedbackId: 1, status: "applied", updatedAt: "t", resolution: "fixed" });
+    const out = await runFeedbackResolve(mockClient, 1, {
+      status: "applied",
+      note: "fixed together",
+      also: [2],
+    });
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(put).toHaveBeenLastCalledWith(
+      "/api/feedback/2",
+      { status: "applied", resolution: "fixed together" },
+      expect.anything()
+    );
+    expect(out.also).toEqual([{ feedbackId: 2, ok: true, status: "applied" }]);
+    expect(out.failed).toBe(0);
+  });
+
+  test("a row held LIVE by another agent fails that row, others proceed", async () => {
+    put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
+    const future = new Date(Date.now() + 3600_000).toISOString();
+    get.mockImplementation(async (path: string) =>
+      path === "/api/feedback/2"
+        ? { feedbackId: 2, claimedBy: "someone-else", claimExpiresAt: future }
+        : { feedbackId: 3, claimedBy: null, claimExpiresAt: null }
+    );
+    const out = await runFeedbackResolve(mockClient, 1, { status: "applied", note: "n", also: [2, 3] });
+    const also = out.also as Record<string, unknown>[];
+    expect(out.failed).toBe(1);
+    expect(also[0]).toMatchObject({ feedbackId: 2, ok: false });
+    expect(also[1]).toMatchObject({ feedbackId: 3, ok: true });
+    // the held row was never written
+    expect(put.mock.calls.some((c: unknown[]) => c[0] === "/api/feedback/2")).toBe(false);
+  });
+
+  test("--dry-run previews the also-writes too, no PUT at all", async () => {
+    const out = await runFeedbackResolve(mockClient, 1, {
+      status: "applied",
+      note: "n",
+      also: [2, 3],
+      dryRun: true,
+    });
+    expect(out).toMatchObject({
+      dryRun: true,
+      alsoWouldSend: [
+        { method: "PUT", path: "/api/feedback/2" },
+        { method: "PUT", path: "/api/feedback/3" },
+      ],
+    });
+    expect(put).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
   });
 });

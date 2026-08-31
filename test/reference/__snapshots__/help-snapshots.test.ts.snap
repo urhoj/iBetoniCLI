@@ -2846,6 +2846,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback cluster matches snapshot 1`] = `
+"USAGE
+  ib dev feedback cluster <id> [flags]
+
+DESCRIPTION
+  Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only).
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine}> (+truncated when a walk bound cut the component)
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set — see \`get\`'s \`related\`.
+  - \`truncated: true\` means a walk bound cut the component — treat the result as suspect data, not a complete (bigger) fix.
+
+SEE ALSO
+  ib dev feedback link, ib dev feedback get
+
+EXAMPLES
+  ib dev feedback cluster 42
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback count matches snapshot 1`] = `
 "USAGE
   ib dev feedback count [flags]
@@ -3015,7 +3054,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as \`list\`), ... }
+  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as \`list\`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine}] (deploy-gated: absent on an older backend), ... }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
@@ -3024,9 +3063,10 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - The id accepts an optional \`fb#\` type anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected up front (exit 4, code WRONG_REF_TYPE) with the corresponding \`ib dev changelog get\` command in the hint — feedback #230. A bare id that is actually a changelog id 404s here and the error hint points at the changelog command.
+  - \`related\` (relations design 2026-08-31) lists every row LINKED via \`ib dev feedback link\`, each with the edge's \`direction\` (out = this row names the other; in = the other names this one). Absent entirely on a backend that predates it.
 
 SEE ALSO
-  ib dev feedback list, ib dev changelog get
+  ib dev feedback list, ib dev feedback link, ib dev changelog get
 
 EXAMPLES
   ib dev feedback get 42
@@ -3071,6 +3111,47 @@ NOTES
 EXAMPLES
   ib dev feedback import ./findings.json
   ib dev feedback import - --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev feedback link matches snapshot 1`] = `
+"USAGE
+  ib dev feedback link <id> <relatedId> --type <type> [flags]
+
+DESCRIPTION
+  Link two feedback rows as duplicate | same-root-cause | related | blocks (developer-only). A REAL write — blocked under --read-only. --dry-run previews client-side. Deploy-gated on puminet5api.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (required)
+  <relatedId> NUMBER    The OTHER feedbackId to link to (required)
+
+FLAGS
+  --type STRING    duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric (required)
+  --note STRING    Optional free-text note stored on the relation
+  --dry-run    Print the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { relationId, feedbackId, relatedFeedbackId, relationType, note, createdBy, createdAt } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Validation             → --type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\` — either row is missing
+  exit 4 (HTTP 409)  Already linked         → unlink first (\`ib dev feedback unlink <id> <relatedId>\`) to change the relation type
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev feedback unlink, ib dev feedback cluster, ib dev feedback get
+
+EXAMPLES
+  ib dev feedback link 10 20 --type duplicate --note "same argv-split root"
+  ib dev feedback link 10 20 --type related --dry-run
 "
 `;
 
@@ -3244,6 +3325,7 @@ FLAGS
   --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
   --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
   --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell.
+  --also STRING    Comma-separated feedback ids to apply the SAME --status/--note to (relations design 2026-08-31). A row held LIVE by another agent is skipped and reported, not fatal — check \`failed\` in the output, not just the exit code.
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
@@ -3252,7 +3334,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+  A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --also: also: [{feedbackId, ok, status?, error?}], failed (count). With --dry-run: { dryRun:true, wouldSend:{ method, path, body }, alsoWouldSend? }.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → provide --status and/or --note; status must be a known value
@@ -3278,6 +3360,43 @@ EXAMPLES
   ib dev feedback resolve 42 --status dismissed --note "by design"
   ib dev feedback resolve 42 --from-json ./resolution.json
   ib dev feedback resolve 42 --from-json ./resolution.json --status dismissed
+  ib dev feedback resolve 42 --status applied --note "fixed together" --also 43,44
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev feedback unlink matches snapshot 1`] = `
+"USAGE
+  ib dev feedback unlink <id> <relatedId> [flags]
+
+DESCRIPTION
+  Remove a link between two feedback rows, either direction (developer-only, idempotent). A REAL write — blocked under --read-only. --dry-run previews client-side. Deploy-gated on puminet5api.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (required)
+  <relatedId> NUMBER    The OTHER feedbackId the link was made with (required)
+
+FLAGS
+  --dry-run    Print the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed — not an error.
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev feedback link, ib dev feedback cluster
+
+EXAMPLES
+  ib dev feedback unlink 10 20
 "
 `;
 

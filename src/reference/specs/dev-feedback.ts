@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS, GATE_KINDS as FEEDBACK_GATE_KINDS, AUTO_CLOSE_GATE_KINDS as FEEDBACK_AUTO_CLOSE_GATE_KINDS } from "../../commands/feedback/index.js";
+import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS, GATE_KINDS as FEEDBACK_GATE_KINDS, AUTO_CLOSE_GATE_KINDS as FEEDBACK_AUTO_CLOSE_GATE_KINDS, RELATION_TYPES as FEEDBACK_RELATION_TYPES } from "../../commands/feedback/index.js";
 import { apiErr, clearHint, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
 
 export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
@@ -207,7 +207,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
           "Accepted for cross-command consistency; get always returns the full row (no-op).",
       },
     ],
-    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as `list`), ... }",
+    outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, claimedBy, claimExpiresAt, claimState (derived: free|held|mine, same fb#901 downgrade as `list`), related: [{feedbackId, relationType, direction, note, status, severity, firstLine}] (deploy-gated: absent on an older backend), ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — if the id exists in devChangelog the error hint names the changelog command (feedback #230)"),
@@ -215,9 +215,32 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
     notes: [
       "The id accepts an optional `fb#` type anchor (e.g. `fb#42`); a `cl#` id is rejected up front (exit 4, code WRONG_REF_TYPE) with the corresponding `ib dev changelog get` command in the hint — feedback #230. A bare id that is actually a changelog id 404s here and the error hint points at the changelog command.",
+      "`related` (relations design 2026-08-31) lists every row LINKED via `ib dev feedback link`, each with the edge's `direction` (out = this row names the other; in = the other names this one). Absent entirely on a backend that predates it.",
     ],
-    seeAlso: ["ib dev feedback list", "ib dev changelog get"],
+    seeAlso: ["ib dev feedback list", "ib dev feedback link", "ib dev changelog get"],
     examples: ["ib dev feedback get 42", "ib dev feedback get fb#42"],
+  },
+  {
+    command: "ib dev feedback cluster",
+    description:
+      "Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only).",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
+    flags: [],
+    outputShape:
+      "ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine}> (+truncated when a walk bound cut the component)",
+    errors: [
+      apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set — see `get`'s `related`.",
+      "`truncated: true` means a walk bound cut the component — treat the result as suspect data, not a complete (bigger) fix.",
+    ],
+    seeAlso: ["ib dev feedback link", "ib dev feedback get"],
+    examples: ["ib dev feedback cluster 42"],
   },
   {
     command: "ib dev feedback resolve",
@@ -237,11 +260,12 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
       { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell." },
+      { name: "also", type: "string", description: "Comma-separated feedback ids to apply the SAME --status/--note to (relations design 2026-08-31). A row held LIVE by another agent is skipped and reported, not fatal — check `failed` in the output, not just the exit code." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
-      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --also: also: [{feedbackId, ok, status?, error?}], failed (count). With --dry-run: { dryRun:true, wouldSend:{ method, path, body }, alsoWouldSend? }.",
     errors: [
       // Both client rows sit at exit 4, so EACH must carry `match` — an
       // unmatched row would win by exit alone and serve the wrong remedy
@@ -270,7 +294,63 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       'ib dev feedback resolve 42 --status dismissed --note "by design"',
       "ib dev feedback resolve 42 --from-json ./resolution.json",
       "ib dev feedback resolve 42 --from-json ./resolution.json --status dismissed",
+      'ib dev feedback resolve 42 --status applied --note "fixed together" --also 43,44',
     ],
+  },
+  {
+    command: "ib dev feedback link",
+    description:
+      "Link two feedback rows as duplicate | same-root-cause | related | blocks (developer-only). A REAL write — blocked under --read-only. --dry-run previews client-side. Deploy-gated on puminet5api.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    dryRunKind: "client",
+    args: [
+      { name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" },
+      { name: "relatedId", type: "number", description: "The OTHER feedbackId to link to" },
+    ],
+    flags: [
+      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric", allowed: [...FEEDBACK_RELATION_TYPES] },
+      { name: "note", type: "string", description: "Optional free-text note stored on the relation" },
+      { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+    ],
+    outputShape: "{ relationId, feedbackId, relatedFeedbackId, relationType, note, createdBy, createdAt } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { origin: "client", exit: 4, match: ["--type is required", "must be one of", "invalid feedbackid", "invalid relatedid"], meaning: "Validation", remedy: "--type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get` — either row is missing"),
+      apiErr(409, "Already linked", "unlink first (`ib dev feedback unlink <id> <relatedId>`) to change the relation type"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib dev feedback unlink", "ib dev feedback cluster", "ib dev feedback get"],
+    examples: [
+      'ib dev feedback link 10 20 --type duplicate --note "same argv-split root"',
+      "ib dev feedback link 10 20 --type related --dry-run",
+    ],
+  },
+  {
+    command: "ib dev feedback unlink",
+    description:
+      "Remove a link between two feedback rows, either direction (developer-only, idempotent). A REAL write — blocked under --read-only. --dry-run previews client-side. Deploy-gated on puminet5api.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    dryRunKind: "client",
+    args: [
+      { name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" },
+      { name: "relatedId", type: "number", description: "The OTHER feedbackId the link was made with" },
+    ],
+    flags: [
+      { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+    ],
+    outputShape: "{ feedbackId, relatedFeedbackId, deleted }. deleted:false means no link existed — not an error.",
+    errors: [
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib dev feedback link", "ib dev feedback cluster"],
+    examples: ["ib dev feedback unlink 10 20"],
   },
   {
     command: "ib dev feedback update",
