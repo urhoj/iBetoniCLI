@@ -223,7 +223,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback cluster",
     description:
-      "Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only).",
+      "Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only). Deploy-gated on puminet5api.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
@@ -232,7 +232,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ListEnvelope<{feedbackId,status,kind,scope,severity,complexity,claimState,firstLine,claimedBy,claimExpiresAt,...}> (+truncated when a walk bound cut the component)",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
-      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list` — or the backend predates this route (relations design 2026-08-31; deploy-gated on puminet5api), in which case even a valid id 404s since GET /api/feedback/:id/cluster doesn't exist yet. Check `ib version`."),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [

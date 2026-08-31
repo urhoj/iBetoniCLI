@@ -2851,7 +2851,7 @@ exports[`Help snapshots — contract stability > help for ib dev feedback cluste
   ib dev feedback cluster <id> [flags]
 
 DESCRIPTION
-  Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only).
+  Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only). Deploy-gated on puminet5api.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
@@ -2869,7 +2869,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — or the backend predates this route (relations design 2026-08-31; deploy-gated on puminet5api), in which case even a valid id 404s since GET /api/feedback/:id/cluster doesn't exist yet. Check \`ib version\`.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
