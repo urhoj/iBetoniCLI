@@ -433,6 +433,20 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
     ).toMatch(/auth login --endpoint/i);
   });
 
+  test("fb#1101: the bearer-only refresh failure still reaches the re-auth remedy", () => {
+    // refresh.ts:118 rethrows the bare bearer error when the profile holds no
+    // refresh token ("Refresh failed: HTTP …" — no "session unrecoverable"
+    // suffix). With two single-matched exit-2 rows that narrow failure matched
+    // NEITHER and fell through hintless; the match array restores the remedy
+    // without cross-hinting the not-logged-in row.
+    const hint = hintForError(
+      new CliError("Refresh failed: HTTP 401", 0, null, 2),
+      rowsOf("ib auth refresh")
+    );
+    expect(hint).toMatch(/re-authenticate/);
+    expect(hint).not.toMatch(/auth login --endpoint/i);
+  });
+
   test("both --puomi alternatives are exercised, not just the first", () => {
     // The match array is ["non-negative number of metres", "cannot exceed"] and
     // each alternative corresponds to a DIFFERENT guard line in the source; only

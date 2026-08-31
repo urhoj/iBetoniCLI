@@ -163,8 +163,12 @@ export const AUTH_SPECS: CommandSpec[] = [
         origin: "client",
         exit: 2,
         // refresh.ts joins both failures as "… — session unrecoverable, run
-        // `ib auth login`"; the match disambiguates from the not-logged-in row.
-        match: "session unrecoverable",
+        // `ib auth login`"; the BEARER-only path (no stored refresh token,
+        // refresh.ts:118) rethrows the bare "Refresh failed: HTTP …" error
+        // without that suffix — both alternatives are needed, or that narrow
+        // failure falls through to a hintless envelope (fb#1101). The match
+        // also disambiguates from the not-logged-in row.
+        match: ["session unrecoverable", "refresh failed"],
         meaning: "Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant)",
         remedy: "ib auth login to re-authenticate",
       },
