@@ -55,6 +55,13 @@ export interface SijaintiTypedFields {
    * omitted, which is what makes an unrelated update safe.
    */
   public?: boolean;
+  /**
+   * showOnMap — "Näytä kartalla", the /kartta map layer flag. Same tri-state
+   * contract as isPublic: ABSENT binds NULL and the save proc's
+   * COALESCE(@showOnMap, showOnMap) keeps the stored value, so an unrelated
+   * update never flips map visibility (fb#1081).
+   */
+  showOnMap?: boolean;
 }
 
 /**
@@ -84,6 +91,9 @@ export function buildSijaintiBody(
   // the stored value — sending `false` by default would silently unpublish a
   // supplier's plant on any unrelated `--nimi` edit.
   if (typed.public !== undefined) body.isPublic = typed.public;
+  // Same tri-state guard as isPublic — COALESCE(@showOnMap, showOnMap) keeps the
+  // stored map flag when the field is absent (fb#1081).
+  if (typed.showOnMap !== undefined) body.showOnMap = typed.showOnMap;
   return body;
 }
 
@@ -1238,6 +1248,8 @@ export function registerSijaintiCommands(
     .option("--puomi-max <m>", "", Number)
     .option("--public")
     .option("--private")
+    .option("--show-on-map")
+    .option("--hide-on-map")
     .option(
       "--geocode"
     );
@@ -1256,11 +1268,16 @@ export function registerSijaintiCommands(
       puomiMax?: number;
       public?: boolean;
       private?: boolean;
+      showOnMap?: boolean;
+      hideOnMap?: boolean;
       geocode?: boolean;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       if (opts.public && opts.private) {
         failWith("Pass at most one of --public / --private", 4);
+      }
+      if (opts.showOnMap && opts.hideOnMap) {
+        failWith("Pass at most one of --show-on-map / --hide-on-map", 4);
       }
       const client = await getClient();
       const parsed = opts.body
@@ -1280,6 +1297,9 @@ export function registerSijaintiCommands(
         // Neither flag = field absent = the stored value survives the
         // read-merge-write. Changing it requires company-admin server-side.
         public: opts.public ? true : opts.private ? false : undefined,
+        // Same tri-state shape as isPublic: neither flag = absent = the stored
+        // map flag survives (fb#1081).
+        showOnMap: opts.showOnMap ? true : opts.hideOnMap ? false : undefined,
       });
       if (body.sijaintiId === undefined) {
         failWith("update requires sijaintiId — pass --id or include it in --body", 4);

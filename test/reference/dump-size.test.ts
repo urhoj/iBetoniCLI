@@ -14,7 +14,7 @@ import { buildReference } from "../../src/reference/dump.js";
  * extend the shared-row hoist). Never bump casually: every byte here is paid
  * by every AI that ingests the dump.
  */
-const DUMP_LIMIT_BYTES = 665_000; // measured 633,349 B on 2026-08-26 after the fb#905 follow-up parse-guard rows (+5% headroom). The growth is the fix: ~30 matched client exit-4 rows replacing wrong or absent hints (the broad entity-row match had shadowed limitErr on attachment list; message daily guards were hintless).
+const DUMP_LIMIT_BYTES = 700_000; // measured 665,945 B on 2026-08-31 after the fb#1040/fb#1081 spec rows (+5% headroom). Deliberate growth: `auth whoami`/`auth refresh` gained the endpoint-aware not-logged-in rows (fb#1040 — the remedy used to drop the endpoint), and `sijainti update` documented --show-on-map/--hide-on-map (fb#1081).
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

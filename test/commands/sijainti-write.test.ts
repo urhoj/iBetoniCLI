@@ -605,3 +605,26 @@ describe("buildSijaintiBody — isPublic is tri-state", () => {
     expect(buildSijaintiBody({ isPublic: true }, {}).isPublic).toBe(true);
   });
 });
+
+describe("buildSijaintiBody — showOnMap is tri-state (fb#1081)", () => {
+  test("the flag ABSENT leaves showOnMap out of the body entirely", () => {
+    // Load-bearing: an absent key reaches sijainti_save as NULL, whose
+    // COALESCE(@showOnMap, showOnMap) then keeps the stored map flag — an
+    // unrelated --name edit must not flip /kartta visibility.
+    const body = buildSijaintiBody({}, { name: "Depot A" });
+    expect("showOnMap" in body).toBe(false);
+  });
+
+  test("--show-on-map sets it true, --hide-on-map sets it false", () => {
+    expect(buildSijaintiBody({}, { showOnMap: true }).showOnMap).toBe(true);
+    expect(buildSijaintiBody({}, { showOnMap: false }).showOnMap).toBe(false);
+  });
+
+  test("a typed flag wins over --body, like every other field", () => {
+    expect(buildSijaintiBody({ showOnMap: true }, { showOnMap: false }).showOnMap).toBe(false);
+  });
+
+  test("--body alone still passes showOnMap through untouched", () => {
+    expect(buildSijaintiBody({ showOnMap: true }, {}).showOnMap).toBe(true);
+  });
+});

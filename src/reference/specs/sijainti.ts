@@ -222,6 +222,8 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
       { name: "public", type: "boolean", description: "Publish (isPublic=1, readable cross-tenant). Requires company-admin rights; omit BOTH flags to leave visibility untouched" },
       { name: "private", type: "boolean", description: "Unpublish (isPublic=0, owning tenant only). Mutually exclusive with --public; see `ib sijainti set-public`" },
+      { name: "show-on-map", type: "boolean", description: "Show on the public /kartta map layer (showOnMap=true, \"Näytä kartalla\"). Omit BOTH flags to leave the stored map flag untouched" },
+      { name: "hide-on-map", type: "boolean", description: "Hide from the /kartta map layer (showOnMap=false). Mutually exclusive with --show-on-map" },
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
     ],
     writeFlags: true,
@@ -240,6 +242,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       puomiErr(" — would otherwise clear the stored bound"),
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
+      { origin: "client", exit: 4, match: "at most one of --show-on-map", meaning: "Both --show-on-map and --hide-on-map given", remedy: "pass at most one — omit both to leave the stored map flag untouched" },
       // Previously undocumented, so it fell through to no hint at all.
       // `--body` only: this command does NOT register --from-json (person/worksite
       // update do). Naming it here would send the caller to an unknown-option
@@ -253,6 +256,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       'ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode',
       "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
       "ib sijainti update --id 42 --public --reason 'open this plant to customers'",
+      "ib sijainti update --id 42 --show-on-map --reason 'plant visible on the public map'",
     ],
   },
   {

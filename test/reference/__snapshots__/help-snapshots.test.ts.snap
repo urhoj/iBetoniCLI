@@ -11894,6 +11894,8 @@ FLAGS
   --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --public    Publish (isPublic=1, readable cross-tenant). Requires company-admin rights; omit BOTH flags to leave visibility untouched
   --private    Unpublish (isPublic=0, owning tenant only). Mutually exclusive with --public; see \`ib sijainti set-public\`
+  --show-on-map    Show on the public /kartta map layer (showOnMap=true, "Näytä kartalla"). Omit BOTH flags to leave the stored map flag untouched
+  --hide-on-map    Hide from the /kartta map layer (showOnMap=false). Mutually exclusive with --show-on-map
   --geocode    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
 
 WRITE-SAFETY FLAGS
@@ -11921,6 +11923,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 4 (client-side)  Both --public and --private given → pass at most one — omit both to leave visibility untouched
+  exit 4 (client-side)  Both --show-on-map and --hide-on-map given → pass at most one — omit both to leave the stored map flag untouched
   exit 4 (client-side)  No sijaintiId given (neither --id nor a sijaintiId in --body) → pass --id <sijaintiId>, or include sijaintiId in --body
   exit 3 (HTTP 403)  Not a company admin — only admins may CHANGE isPublic → drop --public/--private to edit the other fields, or ask a company admin; see \`ib sijainti set-public\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11932,6 +11935,7 @@ EXAMPLES
   ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode
   ib sijainti update --body '{"sijaintiId":42,"sijaintiNimi":"Renamed depot"}'
   ib sijainti update --id 42 --public --reason 'open this plant to customers'
+  ib sijainti update --id 42 --show-on-map --reason 'plant visible on the public map'
 "
 `;
 
