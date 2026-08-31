@@ -608,6 +608,28 @@ export function deriveClaimState(
 }
 
 /**
+ * fb#901: a DERIVED `me` (user@host fallback — see resolveClaim) is a
+ * machine-wide label shared by every unset-IB_CLAIM_ID session on the host,
+ * so it cannot prove THIS caller made the claim — reporting "mine" there
+ * actively misreports ownership. Downgrades "mine" to "held" for such rows
+ * and warns once. Array-shaped so `list` keeps its "warn once even if N rows
+ * downgrade" semantics; `get` calls it on a 1-element array (fb#1017 — this
+ * was previously duplicated byte-for-byte between the two callers).
+ */
+function downgradeDerivedMine<T extends { claimState?: unknown }>(
+  items: T[],
+  idSource: ClaimIdSource,
+  me: string
+): T[] {
+  if (idSource !== "derived" || !items.some((r) => r.claimState === "mine")) return items;
+  const downgraded = items.map((r) =>
+    r.claimState === "mine" ? { ...r, claimState: "held" as const } : r
+  );
+  warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
+  return downgraded;
+}
+
+/**
  * GET /api/feedback — developer-only. Defaults to the active bucket
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
@@ -726,16 +748,7 @@ export async function runFeedbackList(
   const heldIgnored = heldFilterIgnored(opts.held, items, me);
 
   items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
-
-  // A DERIVED `me` (user@host fallback — see resolveClaim) is a machine-wide
-  // label shared by every unset-env session on the host: it is not proof this
-  // caller made the claim, just that some unset-env session did. Reporting
-  // "mine" there actively misreports ownership (fb#901) — downgrade to "held"
-  // and warn once, rather than silently mislabeling another session's claim.
-  if (idSource === "derived" && items.some((r) => r.claimState === "mine")) {
-    items = items.map((r) => (r.claimState === "mine" ? { ...r, claimState: "held" as const } : r));
-    warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
-  }
+  items = downgradeDerivedMine(items, idSource, me);
 
   let cut = false;
   if (!opts.full) {
@@ -777,12 +790,9 @@ export async function runFeedbackGet(
 ): Promise<Record<string, unknown>> {
   const row = await client.get<Record<string, unknown>>(`/api/feedback/${id}`);
   const { by: me, source: idSource } = resolveClaim(undefined);
-  let claimState = deriveClaimState(row, me);
-  if (idSource === "derived" && claimState === "mine") {
-    claimState = "held";
-    warnNote(`[ib] ⚠ claimState "mine" downgraded to "held" — ${derivedIdentityNote(me)}`);
-  }
-  return { ...row, claimState };
+  const claimState = deriveClaimState(row, me);
+  const [result] = downgradeDerivedMine([{ ...row, claimState }], idSource, me);
+  return result;
 }
 
 /**

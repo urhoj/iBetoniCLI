@@ -1,8 +1,13 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   performSwitch,
   assertPersistedSwitchAllowed,
+  runPersistedSwitch,
 } from "../../src/auth/switch.js";
+import { notLoggedInMessage } from "../../src/auth/notLoggedIn.js";
 import { CliError } from "../../src/api/errors.js";
 import { runEmbedded, makeEmbeddedCtx, type EmbeddedCtx } from "../../src/embedded.js";
 
@@ -130,5 +135,34 @@ describe("assertPersistedSwitchAllowed (embedded invocation)", () => {
       }
     });
     expect((err as CliError).body).toEqual({ code: "EMBEDDED_BLOCKED" });
+  });
+});
+
+// fb#1102: the literal in runPersistedSwitch's not-logged-in check was swapped
+// for notLoggedInMessage() (one source of truth with whoami/refresh/impersonate)
+// — behavior-neutral, since this switch is always endpoint-agnostic (no
+// --endpoint override to name) and notLoggedInMessage() with no endpoint
+// produces the identical text.
+describe("runPersistedSwitch (not logged in)", () => {
+  let dir: string;
+  let prevHome: string | undefined;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "ib-switch-"));
+    prevHome = process.env.HOME;
+    process.env.HOME = dir;
+  });
+
+  afterEach(() => {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("no stored session -> CliError exit 2 with the shared not-logged-in message", async () => {
+    const err = await runPersistedSwitch(26, false).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(2);
+    expect((err as CliError).message).toBe(notLoggedInMessage());
   });
 });

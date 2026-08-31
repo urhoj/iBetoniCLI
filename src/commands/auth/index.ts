@@ -318,7 +318,12 @@ export function registerAuthCommands(
       }
       const admin = await store.load();
       if (!admin) {
-        failWith("Not logged in. Run `ib auth login` first.", 2);
+        // Endpoint-aware remedy (fb#1102, same trap class fb#1040 killed): with
+        // no session at all and --endpoint set, the bare `ib auth login` below
+        // would mint a token for the DEFAULT endpoint while impersonation is
+        // about to present it against the --endpoint override instead — a 401.
+        const endpointOverride = getGlobalOptions(parent).endpoint;
+        failWith(notLoggedInMessage(endpointOverride), 2, await otherSessionsHint(endpointOverride));
       }
       if (admin.impersonation) {
         failWith("Already impersonating. Run `ib auth impersonate --end` first.", 4);

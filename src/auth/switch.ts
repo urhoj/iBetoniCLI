@@ -3,6 +3,7 @@ import { createStore, defaultCredentialsPath } from "./store.js";
 import { postJson } from "./http.js";
 import { failWith } from "../output/json.js";
 import { getEmbeddedCtx } from "../embedded.js";
+import { notLoggedInMessage } from "./notLoggedIn.js";
 
 export interface SwitchOptions {
   endpoint: string;
@@ -105,7 +106,10 @@ export async function runPersistedSwitch(
   const store = createStore(defaultCredentialsPath());
   const creds = await store.load();
   if (!creds) {
-    failWith("Not logged in. Run `ib auth login` first.", 2);
+    // Endpoint-agnostic (this switch always targets the ACTIVE session, no
+    // --endpoint override to name) — routes through the shared message
+    // builder for one source of truth (fb#1102), text is unchanged.
+    failWith(notLoggedInMessage(), 2);
   }
   const next = await performSwitch({
     endpoint: creds.endpoint,
