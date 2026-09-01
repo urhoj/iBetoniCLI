@@ -363,7 +363,8 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
     errors: [
       { origin: "client", exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
-      { origin: "client", exit: 4, meaning: "Missing typeName / missing --reason / type has no personSettingTypeId mapping", remedy: "pass <typeName> and --reason; check ib legal types" },
+      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+      { origin: "client", exit: 4, match: ["--reason", "personSettingTypeId"], meaning: "Missing --reason, or the type has no personSettingTypeId mapping so acceptance cannot be tracked", remedy: "pass --reason; check the type mapping with ib legal types" },
       apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -374,6 +375,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     examples: [
       'ib legal accept BETONIJERRY_TOS --reason "acceptance flow e2e test"',
       "ib legal accept TOS --dry-run",
+      "ib legal accept --type TOS --dry-run",
     ],
   },
   {

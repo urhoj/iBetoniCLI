@@ -578,13 +578,15 @@ export async function runLegalTypeUpdate(
  * The six positional-taking commands in this group — show, versions, get,
  * acceptances, accept and type update — name their document type POSITIONALLY,
  * with `--type` accepted as an alias (feedback #32, widened in fb#1036). Exactly
- * one is required; both are allowed only when they agree. `save` and `diff` are
- * flag-only (`--type`, required) and `type create` uses `--name`; none of the
- * three reaches this helper.
+ * one is required; both are allowed only when they agree. `save` is flag-only
+ * (`--type`, required), `diff` offers no positional type at all (its `[a] [b]`
+ * are documentIds; `--type` is its optional mode selector) and `type create`
+ * uses `--name`; none of the three reaches this helper.
  *
- * The alias exists because `save`/`diff` REQUIRE the flag spelling, so the group
- * teaches `--type` first and callers then reach for it on the read commands —
- * two independent actors did so six times in one session (fb#1036). Positional
+ * The alias exists because `save` REQUIRES the flag spelling and `diff` has only
+ * that spelling for a type, so the group teaches `--type` first and callers then
+ * reach for it on the read commands — two independent actors did so six times
+ * in one session (fb#1036). Positional
  * stays canonical (it is what --help advertises); the flag is additive, so no
  * scripted invocation changes meaning.
  *

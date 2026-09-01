@@ -162,9 +162,11 @@ export function descendantsOwningVerb(
  *
  * STRICTER than the exact-match layer, which may name up to 3 owners: a compound
  * token is a weaker signal than a real verb, so this answers only when the group
- * subtree has EXACTLY ONE owner of that leaf, and stays silent otherwise. Measured
- * over the catalogue that is the common case — 144 of 169 group+leaf pairs are
- * unambiguous, and the ambiguous 25 are all generic CRUD (`ib jerry ~ list` (5),
+ * subtree has EXACTLY ONE owner of that leaf, and stays silent otherwise. That is
+ * the common case, though the exact figures DRIFT with the catalogue exactly as
+ * they do for the positional layer below — 144 of 169 group+leaf pairs were
+ * unambiguous when this landed and 147 of 172 a day later, with the ambiguous
+ * count steady at 25. Those 25 are all generic CRUD (`ib jerry ~ list` (5),
  * `ib jerry ~ get` (3), `ib betoni ~ list` (2)) where naming an arbitrary one
  * would be exactly the noise this guard exists to prevent.
  *
@@ -207,7 +209,7 @@ export function descendantsOwningCompoundVerb(
  *   pointer to an unrelated command.
  * - EXACTLY ONE spec owns the arg name. This is what excludes the id-shaped
  *   generics that would be pure noise — `asiakasId` 18, `requestId` 18,
- *   `vehicleId` 14, `personId` 13, `id` 10.
+ *   `vehicleId` 14, `personId` 13, `id` 13.
  * - The name is not ALSO a real command leaf somewhere (`entity`, `table`,
  *   `note`), so this layer can never compete with the verb layers above it.
  * - Tier-gated on the owning spec, and scoped to the group's own subtree —

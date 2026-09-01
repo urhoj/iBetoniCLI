@@ -6703,7 +6703,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (client-side)  Not a developer/sysadmin token (client-side gate) → use a developer account
-  exit 4 (client-side)  Missing typeName / missing --reason / type has no personSettingTypeId mapping → pass <typeName> and --reason; check ib legal types
+  exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  Missing --reason, or the type has no personSettingTypeId mapping so acceptance cannot be tracked → pass --reason; check the type mapping with ib legal types
   exit 5 (HTTP 404)  No active document of this type → ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6717,6 +6718,7 @@ SEE ALSO
 EXAMPLES
   ib legal accept BETONIJERRY_TOS --reason "acceptance flow e2e test"
   ib legal accept TOS --dry-run
+  ib legal accept --type TOS --dry-run
 "
 `;
 
