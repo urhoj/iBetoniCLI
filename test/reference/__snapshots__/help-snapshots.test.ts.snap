@@ -3140,7 +3140,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  id and relatedId are the same row → pass two DIFFERENT feedback ids — the server's own 400 for this is defense-in-depth, not the primary guard
-  exit 4 (client-side)  Validation             → --type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers
+  exit 4 (client-side)  Validation             → --type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers ('invalid feedbackId' fires for EITHER positional — parseRefId names the ref field, not the argument)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\` — either row is missing
   exit 4 (HTTP 409)  Already linked         → unlink first (\`ib dev feedback unlink <id> <relatedId>\`) to change the relation type

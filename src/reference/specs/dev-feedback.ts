@@ -317,7 +317,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     outputShape: "{ relationId, feedbackId, relatedFeedbackId, relationType, note, createdBy, createdAt } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       { origin: "client", exit: 4, match: "cannot link a feedback row to itself", meaning: "id and relatedId are the same row", remedy: "pass two DIFFERENT feedback ids — the server's own 400 for this is defense-in-depth, not the primary guard" },
-      { origin: "client", exit: 4, match: ["--type is required", "must be one of", "invalid feedbackid", "invalid relatedid"], meaning: "Validation", remedy: "--type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers" },
+      { origin: "client", exit: 4, match: ["--type is required", "must be one of", "invalid feedbackid"], meaning: "Validation", remedy: "--type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers ('invalid feedbackId' fires for EITHER positional — parseRefId names the ref field, not the argument)" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get` — either row is missing"),
       apiErr(409, "Already linked", "unlink first (`ib dev feedback unlink <id> <relatedId>`) to change the relation type"),

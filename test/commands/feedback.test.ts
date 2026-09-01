@@ -2549,6 +2549,22 @@ describe("ib dev feedback resolve --also", () => {
     expect(out.failed).toBe(0);
   });
 
+  test("function-level guard: primary id and duplicates inside `also` are dropped (fb#1152)", async () => {
+    // The argv wiring already filters these, but a LIBRARY caller bypasses it —
+    // the exported function must not double-write the primary row.
+    put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
+    get.mockResolvedValue({ feedbackId: 2, claimedBy: null, claimExpiresAt: null });
+    const out = await runFeedbackResolve(mockClient, 1, {
+      status: "applied",
+      note: "n",
+      also: [1, 2, 2],
+    });
+    // One PUT for the primary, one for the single surviving also-id.
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(put.mock.calls.filter((c) => c[0] === "/api/feedback/1")).toHaveLength(1);
+    expect((out.also as Record<string, unknown>[]).map((r) => r.feedbackId)).toEqual([2]);
+  });
+
   test("a row held LIVE by another agent fails that row, others proceed", async () => {
     put.mockResolvedValue({ feedbackId: 1, status: "applied", updatedAt: "t" });
     const future = new Date(Date.now() + 3600_000).toISOString();

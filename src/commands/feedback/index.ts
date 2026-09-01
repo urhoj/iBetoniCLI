@@ -1185,7 +1185,10 @@ export async function runFeedbackResolve(
   if (input.also?.length) {
     const { by: me, source } = resolveClaim(undefined);
     const also: Record<string, unknown>[] = [];
-    for (const alsoId of input.also) {
+    // Defensive at the FUNCTION level, not just the argv wiring (fb#1152): a
+    // library caller passing the primary id inside `also` would double-write it.
+    const alsoIds = [...new Set(input.also)].filter((n) => n !== id);
+    for (const alsoId of alsoIds) {
       try {
         const existing = await client.get<Record<string, unknown>>(`/api/feedback/${alsoId}`);
         const state = deriveClaimState(existing, me);
