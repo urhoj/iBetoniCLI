@@ -115,6 +115,15 @@ export function descendantsOwningVerb(group, token, tier) {
  * unambiguous, and the ambiguous 25 are all generic CRUD (`ib jerry ~ list` (5),
  * `ib jerry ~ get` (3), `ib betoni ~ list` (2)) where naming an arbitrary one
  * would be exactly the noise this guard exists to prevent.
+ *
+ * INHERITED from {@link descendantsOwningVerb}, and easy to misread — two
+ * independent reviewers read this comment and both concluded the wrong thing:
+ * the depth>=2 rule means a DIRECT child can never be the answer here. So
+ * `ib customer company-list` does NOT stay silent and does NOT resolve to
+ * `ib customer list`; it names the unique DEEP owner `ib customer person list`.
+ * That shadowing is a known defect, tracked in fb#1154 along with the sibling
+ * case where a meaningful prefix (`ib keikka drivers-list`) is discarded. At the
+ * ROOT, ROOT_MAX_OWNERS applies before the single-owner filter.
  */
 export function descendantsOwningCompoundVerb(group, token, tier) {
     if (!token.includes("-"))
@@ -133,33 +142,50 @@ export function descendantsOwningCompoundVerb(group, token, tier) {
  * using the CLI — the expensive failure this layer prevents.
  *
  * Ranked LAST, below every verb layer, and guarded so it can only fire on a
- * distinctive name. Two conditions, both measured over the catalogue rather than
- * guessed:
+ * distinctive name. FOUR conditions — deliberately stating the rule rather than
+ * a survivor count, because the count drifts with every `args:` addition (it was
+ * 24 of 54 when this layer landed and 21 of 55 one day later):
  *
- * - EXACTLY ONE spec owns the arg name. 24 of 54 distinct positional names
- *   qualify, and they are uniformly specific (`sql`, `ytunnus`, `glob`, `topic`,
- *   `recipient`). The id-shaped generics that would be pure noise are excluded by
- *   owner count alone — `asiakasId` 18, `requestId` 18, `vehicleId` 14,
- *   `personId` 13, `id` 10.
+ * - The name is at least three characters (fb#1155). Owner count alone does not
+ *   express "distinctive": `a` and `b` (`ib legal diff`) each have one owner and
+ *   are not command leaves, so without this `ib a` answered with a confident
+ *   pointer to an unrelated command.
+ * - EXACTLY ONE spec owns the arg name. This is what excludes the id-shaped
+ *   generics that would be pure noise — `asiakasId` 18, `requestId` 18,
+ *   `vehicleId` 14, `personId` 13, `id` 10.
  * - The name is not ALSO a real command leaf somewhere (`entity`, `table`,
  *   `note`), so this layer can never compete with the verb layers above it.
+ * - Tier-gated on the owning spec, and scoped to the group's own subtree —
+ *   `ib dev sql` answers, `ib keikka sql` stays silent, and the root sees the
+ *   whole catalogue. Both are pinned by their own tests.
  */
 export function descendantsOwningPositional(group, token, tier) {
     if (!token)
         return null;
     const t = token.toLowerCase();
+    // Owner count alone does NOT express "distinctive" (fb#1155): `ib legal diff`
+    // declares positionals `a` and `b`, each with exactly one owner and neither a
+    // command leaf, so both passed and `ib a` answered "`a` is an ARGUMENT of
+    // `ib legal diff`". Of the names surviving the two guards below, `a` and `b`
+    // are the only ones under three characters, so this removes precisely the two
+    // demonstrated false positives and nothing else.
+    if (t.length < 3)
+        return null;
     if (COMMAND_SPECS.some((s) => s.command.split(" ").pop().toLowerCase() === t))
         return null;
-    const owners = COMMAND_SPECS.filter((s) => (s.args ?? []).some((a) => a.name.toLowerCase() === t));
+    // One pass: carry the matched arg out with its spec, so the declared spelling
+    // is never re-found behind a non-null assertion.
+    const owners = COMMAND_SPECS.flatMap((s) => {
+        const arg = (s.args ?? []).find((a) => a.name.toLowerCase() === t);
+        return arg ? [{ spec: s, arg: arg.name }] : [];
+    });
     if (owners.length !== 1)
         return null;
-    const [spec] = owners;
+    const [{ spec, arg }] = owners;
     if (isHiddenAtTier(spec, tier))
         return null;
-    const base = canonicalPath(group);
-    if (group !== "ib" && !spec.command.startsWith(base + " "))
+    if (group !== "ib" && !spec.command.startsWith(canonicalPath(group) + " "))
         return null;
-    const arg = (spec.args ?? []).find((a) => a.name.toLowerCase() === t).name;
     return { path: spec.command, arg };
 }
 /**

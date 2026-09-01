@@ -2,13 +2,20 @@
 // (src/reference/specs.ts) spreads every segment in a fixed sequence; order
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
-import type { CommandSpec } from "../../output/help.js";
+import type { CommandSpec, CommandArg, CommandFlag } from "../../output/help.js";
 import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr, PERSON_PARSE_ERR } from "./shared.js";
 
 /** The `--owner` parse-guard row shared by status/versions/diff. Note: `save`'s
  *  own --owner carries a DIFFERENT remedy ("omit for a global document") and
  *  stays a separate inline call — do not fold it into this constant. */
 const OWNER_PARSE_ERR = intParseErr("--owner", "pass a positive ownerAsiakasId");
+
+/** The positional+alias pair shared by every `ib legal` command that names a
+ *  document type (fb#1036). Single-sourced so a wording fix cannot land on four
+ *  of the five — the same reason `shared.ts` exports DRIVER_DATE_ARG/FLAG.
+ *  `get` keeps its own literal: its positional also accepts a documentId. */
+const TYPE_NAME_ARG: CommandArg = { name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" };
+const TYPE_ALIAS_FLAG: CommandFlag = { name: "type", type: "string", description: "Document type name (alias for the positional)" };
 
 export const LEGAL_SPECS: CommandSpec[] = [
 
@@ -30,9 +37,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     description:
       "Fetch the current ACTIVE document of a type, including markdown content. typeName uniquely implies the tenant (BETONIJERRY_TOS vs TOS) — no owner flag needed. --meta omits the (potentially >10 KB) content.",
     auth: "any",
-    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
+    args: [TYPE_NAME_ARG],
     flags: [
-      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
+      TYPE_ALIAS_FLAG,
       { name: "meta", type: "boolean", description: "Omit markdownContent (returns contentLength instead)" },
       {
         name: "language",
@@ -48,11 +55,12 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "The document body is the `markdownContent` field — NOT `content` or `body` (with --meta it is omitted and only `contentLength` is returned). `ib legal get` uses the same field name.",
     ],
     errors: [
+      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
       apiErr(404, "No active document of this type", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib legal types", "ib legal versions"],
-    examples: ["ib legal show BETONIJERRY_TOS", "ib legal show TOS --meta", "ib legal show TOS --language en"],
+    examples: ["ib legal show BETONIJERRY_TOS", "ib legal show --type BETONIJERRY_TOS", "ib legal show TOS --meta", "ib legal show TOS --language en"],
   },
   {
     command: "ib legal active",
@@ -101,9 +109,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     description:
       "All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Soft-deleted versions are EXCLUDED by default — pass --deleted (or --status deleted) to see them. Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.",
     auth: "any",
-    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
+    args: [TYPE_NAME_ARG],
     flags: [
-      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
+      TYPE_ALIAS_FLAG,
       { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
       { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted", allowed: ["draft", "active", "archived", "deleted"] },
       {
@@ -122,7 +130,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
-    errors: [OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
+    errors: [{ origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" }, OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
     examples: ["ib legal versions TOS", "ib legal versions --type TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
@@ -319,22 +327,23 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.",
     permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
     tier: "developer",
-    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
+    args: [TYPE_NAME_ARG],
     flags: [
-      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
+      TYPE_ALIAS_FLAG,
       { name: "doc-version", type: "string", description: "Only acceptances of this version string (NOT --version — that is the global CLI version flag)" },
       { name: "limit", type: "number", default: "500", description: "Max rows (cap 500)" },
     ],
     outputShape:
       "ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}",
     errors: [
+      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
       limitErr("pass a positive integer; this command caps at 500 — narrow with `--doc-version` rather than raising the cap"),
       apiErr(400, "Type has no personSettingTypeId mapping", "fix the legalDocumentTypes row first"),
       apiErr(404, "Unknown document type", "ib legal types"),
       ...LEGAL_DEV_ERRORS,
     ],
     seeAlso: ["ib legal status", "ib legal types"],
-    examples: ["ib legal acceptances BETONIJERRY_TOS", "ib legal acceptances TOS --doc-version 2.0"],
+    examples: ["ib legal acceptances BETONIJERRY_TOS", "ib legal acceptances --type BETONIJERRY_TOS", "ib legal acceptances TOS --doc-version 2.0"],
   },
   {
     command: "ib legal accept",
@@ -343,10 +352,10 @@ export const LEGAL_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper (client-side gate)"],
     tier: "developer",
     args: [
-      { name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" },
+      TYPE_NAME_ARG,
     ],
     flags: [
-      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
+      TYPE_ALIAS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -406,9 +415,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.",
     permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
     tier: "developer",
-    args: [{ name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" }],
+    args: [TYPE_NAME_ARG],
     flags: [
-      { name: "type", type: "string", description: "Document type name (alias for the positional)" },
+      TYPE_ALIAS_FLAG,
       { name: "display-name", type: "string", description: "Human-readable name (max 100)" },
       { name: "description", type: "string", description: "Short description (max 200)" },
       { name: "sort-order", type: "number", description: "List position" },
@@ -419,6 +428,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
     errors: [
+      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
       { origin: "client", exit: 4, match: "missing required flag: --reason", meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
       intParseErr("--sort-order", "pass a non-negative integer list position", 0),
       intParseErr("--setting-type-id", "pass a valid personSettingTypeId"),
@@ -433,6 +443,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     examples: [
       'ib legal type update GLOBAL --setting-type-id 44 --reason "fix NULL mapping (feedback #31)"',
       'ib legal type update TOS_EN --display-name "Terms of Service v2" --dry-run',
+      'ib legal type update --type TOS_EN --display-name "Terms of Service v2" --dry-run',
     ],
   },
 ];

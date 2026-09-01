@@ -98,12 +98,13 @@ export const AUTO_CLOSE_GATE_KINDS = ["deploy", "legal"];
  */
 const foldSeverityCase = (v) => v.toLowerCase();
 /**
- * The OTHER severity vocabulary — high/medium/low is what issue trackers and
+ * The OTHER severity vocabularies — high/medium/low is what issue trackers and
  * most AI tooling use, so it is the natural first guess here and too far from
- * ours for edit distance to bridge (`high`→`major` is 5 edits). Mapped to a
- * `did you mean` hint on the exit-4 message, NOT accepted as an alias: this
+ * ours for edit distance to bridge (`high`→`major` is 5 edits); `blocker` and
+ * `trivial` are the same reflex at the two extremes. All FIVE are mapped to a
+ * `did you mean` hint on the exit-4 message, NONE is accepted as an alias: this
  * command's whole contract is that an unknown enum value is reported, never
- * quietly rewritten (feedback #369).
+ * quietly rewritten (feedback #369, re-confirmed and documented in fb#1115).
  */
 const SEVERITY_SYNONYMS = {
     high: "major",

@@ -967,6 +967,23 @@ describe("descendantsOwningPositional (fb#1020)", () => {
     expect(descendantsOwningPositional("ib dev", "SQL", "developer")?.arg).toBe("sql");
   });
 
+  // fb#1155: owner count alone does not express "distinctive". `ib legal diff`
+  // declares positionals `a` and `b` — one owner each, neither a command leaf —
+  // so before the length guard `ib a` answered "`a` is an ARGUMENT of `ib legal
+  // diff`". These two are the ONLY survivors under three characters, so the
+  // guard removes exactly the demonstrated false positives.
+  test("silent on single-letter argument names (fb#1155)", () => {
+    expect(descendantsOwningPositional("ib", "a", "developer")).toBeNull();
+    expect(descendantsOwningPositional("ib", "b", "developer")).toBeNull();
+  });
+
+  test("still answers for a distinctive name of the same single-owner shape", () => {
+    expect(descendantsOwningPositional("ib dev", "sql", "developer")).toEqual({
+      path: "ib dev schema query",
+      arg: "sql",
+    });
+  });
+
   test("silent on id-shaped generics owned by many commands", () => {
     for (const generic of ["asiakasId", "requestId", "personId", "id", "keikkaId"]) {
       expect(descendantsOwningPositional("ib", generic, "developer")).toBeNull();

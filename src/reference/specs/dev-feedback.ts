@@ -364,7 +364,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     flags: [
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
       { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic", allowed: [...FEEDBACK_SEVERITIES] },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — same STRICT enum as `feedback create`: five synonyms (high/medium/low/blocker/trivial) are named back to you in the exit-4 `did you mean`, none is accepted. See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
       { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
       { name: "gate-kind", type: "string", description: `What this row is waiting for: deploy|soak|legal|owner|backlog. ${clearHint("--gate-kind")}`, allowed: [...FEEDBACK_GATE_KINDS] },

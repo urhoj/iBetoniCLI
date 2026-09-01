@@ -3414,7 +3414,7 @@ ARGUMENTS
 FLAGS
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
   --kind STRING    improvement | bug | idea | legal
-  --severity STRING    critical | major | minor | cosmetic
+  --severity STRING    critical | major | minor | cosmetic — same STRICT enum as \`feedback create\`: five synonyms (high/medium/low/blocker/trivial) are named back to you in the exit-4 \`did you mean\`, none is accepted. See \`ib help severity\`
   --complexity NUMBER    1-5 agent-triage estimate — promote/downgrade after investigation (see \`ib help complexity\`)
   --description STRING    REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)
   --gate-kind STRING    What this row is waiting for: deploy|soak|legal|owner|backlog. pass "" to clear — PowerShell DROPS a bare "", so use \`--gate-kind=\` there (same meaning in bash; \`ib help shell-quoting\`)
@@ -6744,6 +6744,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap
   exit 4 (HTTP 400)  Type has no personSettingTypeId mapping → fix the legalDocumentTypes row first
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
@@ -6756,6 +6757,7 @@ SEE ALSO
 
 EXAMPLES
   ib legal acceptances BETONIJERRY_TOS
+  ib legal acceptances --type BETONIJERRY_TOS
   ib legal acceptances TOS --doc-version 2.0
 "
 `;
@@ -7079,6 +7081,7 @@ OUTPUT (JSON, stdout)
   {documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
   exit 5 (HTTP 404)  No active document of this type → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7091,6 +7094,7 @@ SEE ALSO
 
 EXAMPLES
   ib legal show BETONIJERRY_TOS
+  ib legal show --type BETONIJERRY_TOS
   ib legal show TOS --meta
   ib legal show TOS --language en
 "
@@ -7212,6 +7216,7 @@ OUTPUT (JSON, stdout)
   the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
   exit 4 (client-side)  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
   exit 4 (client-side)  --sort-order is not an integer >= 0, rejected locally before any request → pass a non-negative integer list position
   exit 4 (client-side)  --setting-type-id is not an integer >= 1, rejected locally before any request → pass a valid personSettingTypeId
@@ -7230,6 +7235,7 @@ SEE ALSO
 EXAMPLES
   ib legal type update GLOBAL --setting-type-id 44 --reason "fix NULL mapping (feedback #31)"
   ib legal type update TOS_EN --display-name "Terms of Service v2" --dry-run
+  ib legal type update --type TOS_EN --display-name "Terms of Service v2" --dry-run
 "
 `;
 
@@ -7289,6 +7295,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

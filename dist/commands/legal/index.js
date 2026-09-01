@@ -149,7 +149,13 @@ export async function runLegalDrafts(client) {
     return listEnvelope(items);
 }
 /**
- * Classify `legal get`'s positional (feedback #231): `ib legal list` keys its
+ * Classify `legal get`'s target — the value resolved from its positional OR
+ * `--type` (feedback #231, fb#1036). Because both spellings land here, a
+ * digits-only `--type` is still read as a documentId: `ib legal get --type 12`
+ * succeeds and returns document 12, even though the flag is described as the
+ * typeName form. Harmless (identical to the positional result) and documented
+ * rather than rejected, so the alias stays a pure spelling choice.
+ * `ib legal list` keys its
  * rows by typeName, so `ib legal get PRIVACY` must work as the natural
  * follow-up. Digits-only → documentId (parseId's canonical-integer guard);
  * the server-side typeName grammar (`^[A-Z][A-Z0-9_]*$` in
@@ -369,9 +375,12 @@ export async function runLegalTypeUpdate(client, typeName, fields, flags) {
     return client.put(`/api/legal-documents/types/${encodeURIComponent(typeName)}`, fields, { headers: writeFlagsToHeaders(flags) });
 }
 /**
- * Every command in this group that names a document type takes it POSITIONALLY,
+ * The six positional-taking commands in this group — show, versions, get,
+ * acceptances, accept and type update — name their document type POSITIONALLY,
  * with `--type` accepted as an alias (feedback #32, widened in fb#1036). Exactly
- * one is required; both are allowed only when they agree.
+ * one is required; both are allowed only when they agree. `save` and `diff` are
+ * flag-only (`--type`, required) and `type create` uses `--name`; none of the
+ * three reaches this helper.
  *
  * The alias exists because `save`/`diff` REQUIRE the flag spelling, so the group
  * teaches `--type` first and callers then reach for it on the read commands —
