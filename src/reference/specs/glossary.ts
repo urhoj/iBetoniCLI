@@ -51,13 +51,13 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     tier: "developer",
     auth: "any",
     args: [],
-    flags: [{ name: "top", type: "number", description: "Return up to N" }],
+    flags: [{ name: "limit", type: "number", description: "Return up to N — the queue is frequency-ranked, so this is the top N" }],
     outputShape: "{ items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }",
     errors: [
-      intParseErr("--top", "pass a positive integer"),
+      intParseErr("--limit", "pass a positive integer"),
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
     ],
-    examples: ["ib glossary misses --top 20"],
+    examples: ["ib glossary misses --limit 20"],
   },
   {
     command: "ib glossary dismiss",

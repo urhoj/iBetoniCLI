@@ -9,7 +9,7 @@
  * JSON array (avoids Finnish ä/ö shell mangling); lint audits dead
  * relatedCommands, near-duplicates, empty fields.
  */
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -331,8 +331,13 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
 
   glossary
     .command("misses")
-    .option("--top <n>", "", intFlag("--top", 1))
-    .action(jsonAction(getClient, (client, opts: { top?: number }) => runGlossaryMisses(client, opts.top)));
+    .option("--limit <n>", "", intFlag("--limit", 1))
+    // fb#1138: `--top` was the lone outlier against the 36 commands that spell
+    // their row cap `--limit`. Hidden: the spec documents only `--limit`.
+    .addOption(new Option("--top <n>").argParser(intFlag("--top", 1)).hideHelp())
+    .action(jsonAction(getClient, (client, opts: { limit?: number; top?: number }) =>
+      runGlossaryMisses(client, opts.limit ?? opts.top)
+    ));
 
   const dismiss = glossary
     .command("dismiss")

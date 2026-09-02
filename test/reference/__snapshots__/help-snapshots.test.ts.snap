@@ -4484,7 +4484,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --top NUMBER    Return up to N
+  --limit NUMBER    Return up to N — the queue is frequency-ranked, so this is the top N
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -4494,11 +4494,11 @@ OUTPUT (JSON, stdout)
   { items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  --top is not an integer >= 1, rejected locally before any request → pass a positive integer
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 3 (HTTP 403)  Not a developer        → Developer access required
 
 EXAMPLES
-  ib glossary misses --top 20
+  ib glossary misses --limit 20
 "
 `;
 

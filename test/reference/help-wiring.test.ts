@@ -155,6 +155,8 @@ describe("Rich --help wiring — real command tree", () => {
     // usage line, so callers type `--query` — the flag the usage line just
     // showed them. Accept it as a hidden alias of the documented `--search`.
     "ib search --query": "--search",
+    // fb#1138: the one row cap spelled `--top` against 36 commands' `--limit`.
+    "ib glossary misses --top": "--limit",
     "ib customer search --query": "--search",
     "ib jerry admin search --query": "--search",
     "ib keikka search --query": "--search",

@@ -775,7 +775,10 @@ export async function runFeedbackList(
   if (truncated) env.truncated = true;
   const hints: string[] = [];
   if (cut) hints.push(TRUNCATE_HINT);
-  if (opts.complexity !== undefined || opts.maxComplexity !== undefined)
+  // `--complexity none` SELECTS the unestimated rows, so the exclusion hint
+  // would describe the opposite of what was asked — and advise re-running
+  // with the very flag just passed (fb#1193).
+  if ((opts.complexity !== undefined && opts.complexity !== "none") || opts.maxComplexity !== undefined)
     hints.push(COMPLEXITY_NULL_HINT);
   if (severityIgnored) {
     warnNote(SEVERITY_IGNORED_HINT);

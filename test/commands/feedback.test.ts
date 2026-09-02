@@ -1616,6 +1616,15 @@ describe("complexity filters announce their NULL blind spot (fb#362)", () => {
     expect(env.hint).toBeUndefined();
   });
 
+  // fb#1193: `none` SELECTS the unestimated rows, so the numeric-case hint
+  // ("EXCLUDES rows with no estimate … re-run with --complexity none") would
+  // describe the opposite of what was asked and advise the flag just passed.
+  test("--complexity none carries no exclusion hint — it selects the unestimated rows", async () => {
+    get.mockResolvedValue([{ feedbackId: 1, complexity: null, status: "open" }]);
+    const env = await runFeedbackList(mockClient as never, { complexity: "none", all: true });
+    expect(env.hint).toBeUndefined();
+  });
+
   test("the truncation hint and the complexity hint coexist", async () => {
     get.mockResolvedValue([
       { feedbackId: 1, complexity: 2, status: "open", description: "x".repeat(300) },

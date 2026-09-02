@@ -589,9 +589,13 @@ ib glossary list --stalest <n>
   ! --stalest must be an integer >= 1
   > pass a positive integer
 
+ib glossary misses --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
 ib glossary misses --top <n>
   ! --top must be an integer >= 1
-  > pass a positive integer
+  > (no hint)
 
 ib jerry admin onboarding add --tier <n>
   ! --tier must be an integer >= 1

@@ -1,3 +1,15 @@
+/**
+ * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
+ * lookup/list are open; set/import/lint/delete/misses/dismiss are developer-only. Backend:
+ * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB.
+ * Key behaviors: lookup <term> → exit 5 + miss recorded on 404, did-you-mean
+ * hints via /glossary?search=, comma-separated terms → batch lookup; set is a
+ * PARTIAL update (omitted flags preserved via COALESCE; "" clears), --update-only
+ * 404s instead of inserting, --from-json reads one object; import bulk-sets a
+ * JSON array (avoids Finnish ä/ö shell mangling); lint audits dead
+ * relatedCommands, near-duplicates, empty fields.
+ */
+import { Option } from "commander";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { intFlag } from "../../targets.js";
@@ -259,8 +271,11 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--terms-only")).action(jsonAction(getClient, (client, opts) => runGlossaryList(client, opts)));
     glossary
         .command("misses")
-        .option("--top <n>", "", intFlag("--top", 1))
-        .action(jsonAction(getClient, (client, opts) => runGlossaryMisses(client, opts.top)));
+        .option("--limit <n>", "", intFlag("--limit", 1))
+        // fb#1138: `--top` was the lone outlier against the 36 commands that spell
+        // their row cap `--limit`. Hidden: the spec documents only `--limit`.
+        .addOption(new Option("--top <n>").argParser(intFlag("--top", 1)).hideHelp())
+        .action(jsonAction(getClient, (client, opts) => runGlossaryMisses(client, opts.limit ?? opts.top)));
     const dismiss = glossary
         .command("dismiss")
         .argument("<term>", "Missed term to dismiss (as listed by `ib glossary misses`)");
