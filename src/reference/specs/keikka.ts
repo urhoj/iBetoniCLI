@@ -155,8 +155,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     errors: authErrors(
       apiErr(
         403,
-        "No company role on the keikka's owner company and no delegated authEdit grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers",
-        "verify the keikkaId; `ib company switch` to the keikka's owner, or use a sysadmin/developer token"
+        "No personnel-tier role (asiakasAdmin/owner/editor/keikkaHandler/hrAdmin) on the keikka's owner company and no delegated authEdit/authListPersons grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers; a viewer/pumppari role or worksite/customer membership alone is NOT enough (fb#1146)",
+        "verify the keikkaId; `ib company switch` to the keikka's owner (with an admin/HR role there), or use a sysadmin/developer token"
       ),
       apiErr(
         404,
@@ -168,7 +168,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       intParseErr("--source", "pass a valid keikkaPersonSourceId")
     ),
     notes: [
-      "Gate = requireKeikkaManageAccess (same as the FE route): sysadmin/developer, any company role on the keikka's OWNER, or a delegated authEdit grant — delegated read-only is NOT enough.",
+      "Gate = requireKeikkaManageAccess(ownerTier personnel, delegatedTier listPersons — same as the FE list routes): sysadmin/developer, an admin/HR role (asiakasAdmin/owner/editor/keikkaHandler/hrAdmin) on the keikka's OWNER, or a delegated authEdit/authListPersons grant. Delegated read-only, a viewer/pumppari role, or worksite/customer membership alone is NOT enough (fb#1146).",
       "RAW is the default ON PURPOSE: one person holds one row per source, and a silent collapse would hide exactly the bloat this command diagnoses (fb#833). --by-person is the opt-in fold.",
       "Source ids resolve to text server-side (dbo.keikkaPersonSource); typical: 1 created-by, 10/11 asiakas mirror/contact, 20/21 tyomaa mirror/contact, 30/31 manual/keikka contact, 50 pumppari.",
       "Deleted links (isDeleted=1) and system persons (personId<=0) are excluded server-side.",
