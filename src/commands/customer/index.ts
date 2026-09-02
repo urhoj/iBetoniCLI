@@ -256,16 +256,20 @@ export async function runCustomerUpsert(
 ): Promise<Record<string, unknown>> {
   const prhYt = opts.fromPrh;
   let key = (prhYt || opts.ytunnus || "").trim();
-  if (!key && opts.body) {
+  if (!key) {
     try {
-      const b = JSON.parse(opts.body) as Record<string, unknown>;
-      key = String(b.yTunnus ?? b.ytunnus ?? "").trim();
+      // Through the shared resolver, not a hand-rolled JSON.parse of --body: the
+      // command advertises --from-json, and reading only --body here made the flag
+      // inert on this command's PRIMARY path — it was accepted and the call then
+      // failed as if no key had been given (fb#1180).
+      const b = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
+      if (b) key = String(b.yTunnus ?? b.ytunnus ?? "").trim();
     } catch {
-      /* malformed --body is surfaced by the builders below */
+      /* a malformed --body/--from-json is surfaced by the builders below */
     }
   }
   if (!key) {
-    throw new Error("create-or-update requires --ytunnus (or --from-prh / --body with yTunnus)");
+    throw new Error("create-or-update requires --ytunnus (or --from-prh / --body / --from-json with yTunnus)");
   }
 
   const matches = await runCustomerByYtunnus(client, key);
@@ -1255,7 +1259,7 @@ export function registerCustomerCommands(
         : undefined;
       const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
       if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
-        failWith("create requires --ytunnus (or --from-prh / --body with yTunnus)", 4);
+        failWith("create requires --ytunnus (or --from-prh / --body / --from-json with yTunnus)", 4);
       }
       // --get-or-create: an existing yTunnus isn't a duplicate to recreate —
       // return it (so onboarding is idempotent). >1 match is ambiguous.

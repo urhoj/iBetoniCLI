@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, apiErr, COMMON_AUTH_ERRORS, intParseErr, assessWriteFlags, needsReviewFlags, MAX_CONFIDENCE_PARSE_ERR, AI_CONFIDENCE_PARSE_ERR } from "./shared.js";
+import { AI_CONFIDENCE_PARSE_ERR, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, MAX_CONFIDENCE_PARSE_ERR, apiErr, assessWriteFlags, clearHint, intParseErr, needsReviewFlags } from "./shared.js";
 
 export const OHJE_SPECS: CommandSpec[] = [
 
@@ -68,7 +68,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",

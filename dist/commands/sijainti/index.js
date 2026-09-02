@@ -294,7 +294,7 @@ export async function applyGeocodeToBody(client, body) {
     }
     const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
     if (!address) {
-        failWith("--geocode requires --address (or sijaintiOsoite1 in --body)", 4);
+        failWith("--geocode requires --address (or sijaintiOsoite1 in --body/--from-json)", 4);
     }
     // runSijaintiGeocode already flattens, so the coordinates are read straight
     // off the result — no second extraction pass.
@@ -917,7 +917,7 @@ export function registerSijaintiCommands(parent, getClient) {
             showOnMap: opts.showOnMap ? true : opts.hideOnMap ? false : undefined,
         });
         if (body.sijaintiId === undefined) {
-            failWith("update requires sijaintiId — pass --id or include it in --body", 4);
+            failWith("update requires sijaintiId — pass --id or include it in --body/--from-json", 4);
         }
         const { result, merged, geocodeFailed } = await runSijaintiUpdate(client, body, opts, !!opts.geocode);
         // The save proc drops lat/lng; persist them via the dedicated updateLatLng

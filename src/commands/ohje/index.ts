@@ -418,11 +418,17 @@ export function registerOhjeCommands(
       }
       if (editOp) {
         if (
-          opts.body !== undefined || opts.title !== undefined ||
+          // --from-json is the file twin of --body and sets exactly the same
+          // fields, so omitting it here let a caller who moved to the documented
+          // shell-safe flag sail past this guard and get a silent no-op where
+          // --body exits 4 (fb#1189) — the silent-drop class this helper exists
+          // to prevent.
+          opts.body !== undefined || opts.fromJson !== undefined ||
+          opts.title !== undefined ||
           opts.shorttext !== undefined || opts.htmltext !== undefined ||
           opts.img !== undefined
         ) {
-          failUsage("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img");
+          failUsage("edit mode (--replace/--append/--prepend) cannot be combined with --body/--from-json/--title/--shorttext/--htmltext/--img");
         }
         const rawField = opts.field ?? "htmltext";
         if (!(OHJE_EDITABLE_FIELDS as readonly string[]).includes(rawField)) {

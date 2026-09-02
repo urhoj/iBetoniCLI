@@ -1,4 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCustomerCreate,
@@ -124,6 +127,25 @@ describe("runCustomerUpsert", () => {
     await expect(
       runCustomerUpsert(mockClient, { ytunnus: "1234567-8" }, { reason: "x" })
     ).rejects.toThrow(/ambiguous/);
+  });
+
+  test("the upsert key can come from --from-json, not just --body (fb#1180)", async () => {
+    // The command advertises --from-json, but the key was resolved from --body
+    // only, so the flag was accepted and the call then failed as if no key had
+    // been given. --body and --from-json must be interchangeable here.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ib-upsert-fromjson-"));
+    const file = path.join(dir, "up.json");
+    fs.writeFileSync(file, JSON.stringify({ yTunnus: "1234567-8", asiakasNimi: "Example Oy" }));
+
+    mGet()
+      .mockResolvedValueOnce({ items: [], count: 0 })
+      .mockResolvedValueOnce({ currentCompanyId: 8 })
+      .mockResolvedValueOnce({ asiakasId: 5000, name: "Example Oy" });
+    mPost().mockResolvedValueOnce({ returnValue: 5000 });
+
+    const res = await runCustomerUpsert(mockClient, { fromJson: file }, { reason: "onboard" });
+    expect(res).toMatchObject({ asiakasId: 5000, action: "created" });
+    expect(mGet().mock.calls[0][0]).toContain("1234567-8");
   });
 
   test("no ytunnus key → throws before any lookup", async () => {

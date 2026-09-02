@@ -28,7 +28,10 @@ import { commandPath, specForPath } from "../../output/unknownCommand.js";
 
 /** The option pair, in the order help renders them. Chainable. */
 export function addJsonBodyOptions(cmd: Command): Command {
-  return cmd.option("--body <json>").option("--from-json <file>");
+  // `<file|->` not `<file>`: stdin is accepted, and every spec description and
+  // error remedy already says so — the placeholder was the only spelling that
+  // understated the contract.
+  return cmd.option("--body <json>").option("--from-json <file|->");
 }
 
 /** The two option attributes {@link addJsonBodyOptions} registers. */
@@ -96,16 +99,25 @@ export function requireFlags(
   o: Record<string, unknown>,
   attrs: string[]
 ): void {
-  const missing = attrs.filter((a) => o[a] === undefined || o[a] === "");
-  if (!missing.length) return;
+  const bad = attrs.filter((a) => o[a] === undefined || o[a] === "");
+  if (!bad.length) return;
   const path = commandPath(cmd);
   failValidation(
     path,
-    missing.map((a) => ({
-      flag: longFlagOf(a),
-      issue: "missing" as const,
-      remedy: `pass ${longFlagOf(a)}, or supply it as a key in --from-json <file|->`,
-    })),
+    bad.map((a) => {
+      // An EMPTY value is not an absent one. Reporting `issue: "missing"` with
+      // "supply it as a key in --from-json" told a caller who had done exactly
+      // that to do it again; the value arrived, it was just blank (fb#1187).
+      const empty = o[a] === "";
+      return {
+        flag: longFlagOf(a),
+        issue: empty ? ("invalid" as const) : ("missing" as const),
+        ...(empty ? { got: "" } : {}),
+        remedy: empty
+          ? `${longFlagOf(a)} arrived empty — give it a value (an empty string cannot stand in for it)`
+          : `pass ${longFlagOf(a)}, or supply it as a key in --from-json <file|->`,
+      };
+    }),
     { spec: specForPath(path) }
   );
 }

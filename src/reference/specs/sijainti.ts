@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, SIJAINTI_PUBLIC_403_MATCH, GEOCODE_CLIENT_ERR, puomiErr, GEOCODE_NO_ADDRESS_ERR, REASON_REQUIRED_FLAG, LIMIT_500_FLAG } from "./shared.js";
+import { ASIAKAS_FLAG_ERR, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, GEOCODE_CLIENT_ERR, GEOCODE_NO_ADDRESS_ERR, LIMIT_500_FLAG, REASON_REQUIRED_FLAG, SIJAINTI_PUBLIC_403_MATCH, apiErr, intParseErr, limitErr, numParseErr, permErrors, puomiErr } from "./shared.js";
 
 export const SIJAINTI_SPECS: CommandSpec[] = [
 
@@ -159,7 +159,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
       { name: "public", type: "boolean", description: "Create the row PUBLISHED (isPublic=1, readable cross-tenant). Omit for private — the default; requires company-admin rights" },
       { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -226,7 +226,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       { name: "show-on-map", type: "boolean", description: "Show on the public /kartta map layer (showOnMap=true, \"Näytä kartalla\"). Omit BOTH flags to leave the stored map flag untouched" },
       { name: "hide-on-map", type: "boolean", description: "Hide from the /kartta map layer (showOnMap=false). Mutually exclusive with --show-on-map" },
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

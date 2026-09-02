@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearNote, apiErr, limitErr, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, intParseErr } from "./shared.js";
+import { ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -123,7 +123,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "get-or-create", type: "boolean", description: "If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -157,7 +157,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "from-prh", type: "string", description: "Refresh name + yTunnus + billing address from PRH (explicit flags still win)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -192,7 +192,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

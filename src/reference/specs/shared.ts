@@ -425,3 +425,28 @@ export const MERGE_DRY_RUN_FIRST_NOTE =
   "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.";
 export const MERGE_VALIDATE_READONLY_NOTE =
   "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.";
+
+/**
+ * The `--from-json` row on a command whose `--body` IS the request payload
+ * (fb#808). Eight specs carried this string verbatim; the wording is exactly
+ * what drifted out of sync with reality before the parity test existed, so it
+ * belongs in one place.
+ */
+export const FROM_JSON_BODY_FLAG: CommandFlag = {
+  name: "from-json",
+  type: "string",
+  description:
+    "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.",
+};
+
+/**
+ * The `--from-json` row on a command whose flags are prose FIELDS rather than a
+ * request body (fb#808) — the keys are flag names, resolved through
+ * `applyFromJson` instead of `resolveJsonObjectBody`.
+ */
+export const FROM_JSON_FLAGS_FLAG: CommandFlag = {
+  name: "from-json",
+  type: "string",
+  description:
+    "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.",
+};

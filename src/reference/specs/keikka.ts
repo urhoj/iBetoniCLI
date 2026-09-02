@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, intParseErr } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, authErrors, intParseErr, limitErr, permErrors } from "./shared.js";
 
 export const KEIKKA_SPECS: CommandSpec[] = [
 
@@ -194,7 +194,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         required: true,
         description: "JSON object with the new keikka fields",
       },
-      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
+      FROM_JSON_BODY_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

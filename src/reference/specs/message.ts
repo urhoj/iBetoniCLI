@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec, CommandFlag } from "../../output/help.js";
-import { clearNote, apiErr, COMMON_AUTH_ERRORS, SEARCH_ALIAS_FLAG, intParseErr, limitErr, PERSON_PARSE_ERR } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_FLAGS_FLAG, PERSON_PARSE_ERR, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr } from "./shared.js";
 
 /** The `--tarjous` thread-target alias every thread-addressed leaf repeats. */
 const TARJOUS_THREAD_FLAG: CommandFlag = {
@@ -117,7 +117,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "Message text (max 4000 chars)" },
       { name: "source", type: "string", description: "Provenance: web|cli|ai (default: IB_SOURCE env or cli)" },
-      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
+      FROM_JSON_FLAGS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -215,7 +215,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "thread", type: "number", description: "Thread id the message belongs to" },
       TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "New message text (max 4000 chars)" },
-      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
+      FROM_JSON_FLAGS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -368,7 +368,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "keikka", type: "number", description: "keikkaId this escalation is about" },
       { name: "body", type: "string", required: true, description: "The message to support" },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
-      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
+      FROM_JSON_FLAGS_FLAG,
     ],
     outputShape:
       "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",

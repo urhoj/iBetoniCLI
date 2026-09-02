@@ -65,6 +65,15 @@ The `getClient: () => Promise<ApiClient>` factory is passed into every domain re
 
 Keep the network/transform logic in an exported pure `run*` function (e.g. `runCompanyList(client)`) that returns plain data, and keep the Commander `.action()` thin: call `getClient()`, call the `run*` fn, `writeJson(result)`, and `catch { writeError(e); process.exit(...) }`. Tests exercise the `run*` functions against a mock `ApiClient` — they do not spawn the CLI. Follow this split for every new command.
 
+**Payload flags (`src/commands/_shared/jsonBody.ts`, fb#808).** `--from-json` is NOT supplied by `addWriteFlagsToCommand`, so a command that takes a payload must declare it — and there are two shapes:
+
+- the payload IS the request body (`--body <json>`) → register the pair with `addJsonBodyOptions(cmd)` and read it with `resolveJsonBody(cmd, opts, { required: true })`. Registering the pair together is what stops them drifting apart; `test/reference/from-json-parity.test.ts` fails the build if a `--body` appears without its file twin.
+- the payload is this command's own FLAGS, one of which happens to be prose (`--body <text>`, `--title`, …) → declare `.option("--from-json <file>")` and merge with `applyFromJson(cmd, opts, CFG)`, then enforce with `requireFlags(cmd, opts, [...])`.
+
+⚠ **Never `.requiredOption()` on a flag that `--from-json` can supply.** Commander's required-option gate fires during parse, before the file has been read, so it rejects the very invocation the file route exists to enable — answering `ib X --from-json f.json` with "missing required flag: --body" while holding the body in its hand (fb#1179). Use `requireFlags` / `resolveJsonBody(..., { required: true })` instead; both emit the same `failValidation` envelope the parser branch would have, so nothing regresses for a caller who simply forgot the flag.
+
+Anything read out of the payload must go through `resolveJsonObjectBody({ body, fromJson })` — a hand-rolled `JSON.parse(opts.body)` reads only half the contract and leaves `--from-json` inert (fb#1180).
+
 ### Dual-target ids (`src/targets.ts`)
 
 Some commands accept their target id either as a positional OR a flag alias (`<asiakasId>` / `--asiakas`, `<tyomaaId>` / `--worksite`) — the dual-target pattern (feedback #28). Implement it by declaring the positional optional (`[asiakasId]`), adding `.option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)`, and resolving in the action via `resolveTarget(idStr, opts.asiakas, "asiakasId", "asiakas")` — or the `resolveAsiakasTarget` wrapper from `commands/customer` for the asiakas case. Exactly one is required; both are allowed only when they agree; any provided value that is not a positive integer exits 4. Used by customer modules/operator/settings/person-list, jerry admin detail/enable/disable, worksite person list, and message daily list/add. (`sijainti closest` is the one flag-vs-flag pair — `--worksite`/`--tyomaa` — validated inline.) Primary-key commands (`get <id>`, `update <id>`, `delete <id>`, …) stay positional-only by design — do not add target flags to them. **One carved-out exception (fb#1036):** where a SIBLING command already REQUIRES the flag spelling, the group teaches that spelling first and callers reach for it on the read commands too — so the alias belongs there. `ib legal save` requires `--type` and `diff` has no positional type form at all, which is why `ib legal show`/`versions`/`get`/`acceptances`/`accept`/`type update` all accept `--type` as an alias for their positional, `get` and `type update` included. The test is "does a sibling force this flag?", not "is this a PK command"; absent such a sibling, the positional-only rule stands.
@@ -89,7 +98,7 @@ The explicit selection is `CommandSpec.prettyColumns` — worth setting on any l
 
 ### Write-safety flags (`src/api/writeFlags.ts`)
 
-Every mutation command attaches the three universal flags via `addWriteFlagsToCommand`, mapped to headers by `writeFlagsToHeaders`: `--dry-run` → `X-Dry-Run: 1`, `--idempotency-key` → `Idempotency-Key`, `--reason` → `X-Action-Reason` (audit log). Pass the resulting headers into `client.post(..., { headers })`. Several v1.0.1 lifecycle commands (delete/person add-remove) make `--reason` effectively required — check the spec.
+Every mutation command attaches the three universal flags via `addWriteFlagsToCommand` (payload flags are separate — see "Command implementation pattern" above), mapped to headers by `writeFlagsToHeaders`: `--dry-run` → `X-Dry-Run: 1`, `--idempotency-key` → `Idempotency-Key`, `--reason` → `X-Action-Reason` (audit log). Pass the resulting headers into `client.post(..., { headers })`. Several v1.0.1 lifecycle commands (delete/person add-remove) make `--reason` effectively required — check the spec.
 
 `--dry-run` is **server-side per handler** (the backend skips persistence when it honours `X-Dry-Run`) — so a `--dry-run` against an endpoint whose guard is not deployed will still persist. Read-merge-write commands instead resolve `--dry-run` **client-side** (e.g. `vehicle update` returns a `wouldChange` field-level diff via `src/diff.ts` and never POSTs) — safe-by-construction, but skips backend validation.
 
@@ -180,7 +189,7 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
 - `threads` — inbox (GET `/threads/mine`); `--unread`/`--tarjous` filter client-side.
 - `thread [id]` — metadata + participants.
 - `list [id]` — messages oldest-first; does NOT mark read.
-- `send [id] --body` — POST a message. `--dry-run` is **client-side only** (GETs participants, echoes `wouldSend`; the route has no `X-Dry-Run` guard, so a real POST would persist). `--reason` → `sourceNote`.
+- `send [id] --body` — POST a message (`--body` is enforced at runtime, not by Commander, so `--from-json` can supply it). `--dry-run` is **client-side only** (GETs participants, echoes `wouldSend`; the route has no `X-Dry-Run` guard, so a real POST would persist). `--reason` → `sourceNote`.
 - `mark-read [id]` — stamps `lastReadAt`.
 - `delete <messageId> --thread|--tarjous` — **soft-delete** (sets `isDeleted=1`; row kept for audit, invisible on every read). Authorization: a sysadmin/developer may moderate (delete any) in an accessible thread; everyone else may delete only their OWN message and only while **unanswered** (no later reply from a different participant → 409). Idempotent → `{ deleted:true }` or `{ deleted:true, alreadyDeleted:true }`. Emits a `message:deleted` socket event. `--dry-run` is **client-side only** (lists thread, echoes `wouldDelete`, no DELETE issued).
 

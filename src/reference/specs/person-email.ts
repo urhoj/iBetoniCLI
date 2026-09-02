@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, COMMON_AUTH_ERRORS, permErrors, REASON_REQUIRED_FLAG } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_FLAGS_FLAG, REASON_REQUIRED_FLAG, apiErr, permErrors } from "./shared.js";
 
 export const PERSON_EMAIL_SPECS: CommandSpec[] = [
   {
@@ -21,7 +21,7 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
       { name: "title", type: "string", description: "Notification title", required: true },
       { name: "body", type: "string", description: "Notification body", required: true },
       { name: "data", type: "string", description: "Extra FCM data payload as a JSON object" },
-      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
+      FROM_JSON_FLAGS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",

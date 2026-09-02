@@ -3,7 +3,10 @@ import { failValidation } from "../../output/json.js";
 import { commandPath, specForPath } from "../../output/unknownCommand.js";
 /** The option pair, in the order help renders them. Chainable. */
 export function addJsonBodyOptions(cmd) {
-    return cmd.option("--body <json>").option("--from-json <file>");
+    // `<file|->` not `<file>`: stdin is accepted, and every spec description and
+    // error remedy already says so — the placeholder was the only spelling that
+    // understated the contract.
+    return cmd.option("--body <json>").option("--from-json <file|->");
 }
 /**
  * Resolve the JSON-object payload from whichever of the two flags was passed.
@@ -50,14 +53,23 @@ const longFlagOf = (attr) => `--${attr.replace(/[A-Z]/g, (c) => `-${c.toLowerCas
  * nothing regresses for the caller who simply forgot the flag.
  */
 export function requireFlags(cmd, o, attrs) {
-    const missing = attrs.filter((a) => o[a] === undefined || o[a] === "");
-    if (!missing.length)
+    const bad = attrs.filter((a) => o[a] === undefined || o[a] === "");
+    if (!bad.length)
         return;
     const path = commandPath(cmd);
-    failValidation(path, missing.map((a) => ({
-        flag: longFlagOf(a),
-        issue: "missing",
-        remedy: `pass ${longFlagOf(a)}, or supply it as a key in --from-json <file|->`,
-    })), { spec: specForPath(path) });
+    failValidation(path, bad.map((a) => {
+        // An EMPTY value is not an absent one. Reporting `issue: "missing"` with
+        // "supply it as a key in --from-json" told a caller who had done exactly
+        // that to do it again; the value arrived, it was just blank (fb#1187).
+        const empty = o[a] === "";
+        return {
+            flag: longFlagOf(a),
+            issue: empty ? "invalid" : "missing",
+            ...(empty ? { got: "" } : {}),
+            remedy: empty
+                ? `${longFlagOf(a)} arrived empty — give it a value (an empty string cannot stand in for it)`
+                : `pass ${longFlagOf(a)}, or supply it as a key in --from-json <file|->`,
+        };
+    }), { spec: specForPath(path) });
 }
 //# sourceMappingURL=jsonBody.js.map
