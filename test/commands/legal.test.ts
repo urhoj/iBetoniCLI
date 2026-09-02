@@ -28,6 +28,8 @@ import {
   assertDocVersionLength,
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { matchClientRowForMessage } from "../../src/api/errors.js";
 import { CliError } from "../../src/api/errors.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
 
@@ -478,40 +480,44 @@ describe("ib legal writes", () => {
   });
 });
 
-describe("resolveTypeNameTarget label (fb#1036)", () => {
+describe("resolveTypeNameTarget label (fb#1036) + USAGE code (fb#1156)", () => {
   // `get` takes <documentIdOrType>, not <typeName> — a shared resolver that
-  // hard-codes one name misdescribes the other command's own signature.
+  // hard-codes one name misdescribes the other command's own signature. Both
+  // throws also carry the parser's `code: "USAGE"` (fb#1156): fb#1036 moved
+  // Commander's own missing-argument check into this handler, and `code` is the
+  // envelope field `ib help exit-codes` tells AI callers to discriminate on.
+  const usage = { exitCode: 4, body: { code: "USAGE" } };
   test("default label names typeName in the missing-target error", () => {
     expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
-      expect.objectContaining({ message: expect.stringContaining("<typeName>") })
+      expect.objectContaining({ ...usage, message: expect.stringContaining("<typeName>") })
     );
   });
   test("custom label is used in both error paths", () => {
     expect(() => resolveTypeNameTarget(undefined, undefined, "documentIdOrType")).toThrowError(
-      expect.objectContaining({ message: expect.stringContaining("<documentIdOrType>") })
+      expect.objectContaining({ ...usage, message: expect.stringContaining("<documentIdOrType>") })
     );
     expect(() => resolveTypeNameTarget("12", "TOS", "documentIdOrType")).toThrowError(
-      expect.objectContaining({ message: expect.stringContaining("positional documentIdOrType") })
+      expect.objectContaining({ ...usage, message: expect.stringContaining("positional documentIdOrType") })
     );
   });
 });
 
-// fb#1156: fb#1036 made the positional optional, which moved the "missing
-// required argument" check out of Commander and into this handler — and the
-// handler then emitted code:null where `ib help exit-codes` promises code USAGE
-// for exactly that class of error. `code` is the field AI callers were told to
-// discriminate on, so the handler-level stand-in carries the parser's code.
-describe("resolveTypeNameTarget carries the parser's USAGE code (fb#1156)", () => {
-  test("missing target", () => {
-    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
-      expect.objectContaining({ exitCode: 4, body: { code: "USAGE" } })
-    );
-  });
-
-  test("conflicting positional and --type", () => {
-    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(
-      expect.objectContaining({ exitCode: 4, body: { code: "USAGE" } })
-    );
+// fb#1221: the conflict message had no ERRORS `match` row on five of the six
+// commands, so it fell through to the generic hint while the missing-type
+// message got the command's own remedy. Both messages must resolve a row.
+describe("legal spec ERRORS rows match both resolver messages (fb#1221)", () => {
+  const conflict = "positional typeName (TOS) and --type (EULA) differ — pass only one";
+  const missing = "missing document type: pass <typeName> positionally or via --type <typeName>";
+  test.each([
+    "ib legal show",
+    "ib legal versions",
+    "ib legal acceptances",
+    "ib legal accept",
+    "ib legal type update",
+  ])("%s", (path) => {
+    const spec = COMMAND_SPECS.find((s) => s.command === path)!;
+    expect(matchClientRowForMessage(spec.errors, conflict, 4)?.remedy).toContain("pass only one");
+    expect(matchClientRowForMessage(spec.errors, missing, 4)?.remedy).toContain("positionally");
   });
 });
 

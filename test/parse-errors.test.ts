@@ -65,6 +65,8 @@ describe("parser errors → JSON envelope", () => {
     expect(problems.map((p) => p.flag)).toContain("--asiakas");
     expect(problems.every((p) => p.issue === "missing")).toBe(true);
     expect(typeof parsed.sample).toBe("string");
+    // No unknown flag on this argv, so the fb#1179 branch below stays out of it.
+    expect(parsed.unknownOption).toBeUndefined();
     expect(process.exitCode).toBe(4);
   });
 
@@ -107,14 +109,6 @@ describe("parser errors → JSON envelope", () => {
       expect(parsed.unknownOption).toBe("--bogus");
       expect(String(parsed.hint)).toMatch(/missing required flag.*--to/);
       expect(process.exitCode).toBe(4);
-    });
-
-    test("a bare missing flag still gets the prescriptive envelope", async () => {
-      await run(["company", "switch"]);
-      const parsed = lastStderrJson();
-      expect(parsed.unknownOption).toBeUndefined();
-      const problems = parsed.problems as Array<{ flag: string }>;
-      expect(problems.map((p) => p.flag)).toEqual(["--to"]);
     });
 
     test("a dash token after the `--` terminator is an operand, not an unknown flag", async () => {

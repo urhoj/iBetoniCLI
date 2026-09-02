@@ -604,21 +604,10 @@ export function resolveTypeNameTarget(
   // handler, and `ib help exit-codes` promises that code for exactly that class —
   // it is the field AI callers discriminate on. No `hint`, so the command's spec
   // ERRORS remedy still renders (unlike `failUsage`, which suppresses it).
-  if (!name) {
-    throw new CliError(
-      `missing document type: pass <${label}> positionally or via --type <typeName>`,
-      0,
-      { code: "USAGE" },
-      4
-    );
-  }
+  const usage = (message: string) => new CliError(message, 0, { code: "USAGE" }, 4);
+  if (!name) throw usage(`missing document type: pass <${label}> positionally or via --type <typeName>`);
   if (positional !== undefined && flag !== undefined && positional !== flag) {
-    throw new CliError(
-      `positional ${label} (${positional}) and --type (${flag}) differ — pass only one`,
-      0,
-      { code: "USAGE" },
-      4
-    );
+    throw usage(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`);
   }
   return name;
 }

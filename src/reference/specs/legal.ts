@@ -2,7 +2,7 @@
 // (src/reference/specs.ts) spreads every segment in a fixed sequence; order
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
-import type { CommandSpec, CommandArg, CommandFlag } from "../../output/help.js";
+import type { CommandSpec, CommandArg, CommandFlag, CommandError } from "../../output/help.js";
 import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, LEGAL_DEV_ERRORS, intParseErr, PERSON_PARSE_ERR } from "./shared.js";
 
 /** The `--owner` parse-guard row shared by status/versions/diff. Note: `save`'s
@@ -16,6 +16,15 @@ const OWNER_PARSE_ERR = intParseErr("--owner", "pass a positive ownerAsiakasId")
  *  `get` keeps its own literal: its positional also accepts a documentId. */
 const TYPE_NAME_ARG: CommandArg = { name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" };
 const TYPE_ALIAS_FLAG: CommandFlag = { name: "type", type: "string", description: "Document type name (alias for the positional)" };
+
+/** The two client-side rejections of `resolveTypeNameTarget`, shared by every
+ *  command taking the pair above. TWO rows because the matcher is a substring:
+ *  a lone "missing document type" row never matched the conflict message, so
+ *  five commands fell through to the generic hint on it (fb#1221). */
+const TYPE_TARGET_ERRS: CommandError[] = [
+  { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+  { origin: "client", exit: 4, match: "pass only one", meaning: "The positional and --type name different types", remedy: "pass only one of them, or make them agree" },
+];
 
 export const LEGAL_SPECS: CommandSpec[] = [
 
@@ -55,7 +64,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "The document body is the `markdownContent` field — NOT `content` or `body` (with --meta it is omitted and only `contentLength` is returned). `ib legal get` uses the same field name.",
     ],
     errors: [
-      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+      ...TYPE_TARGET_ERRS,
       apiErr(404, "No active document of this type", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -130,7 +139,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
-    errors: [{ origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" }, OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
+    errors: [...TYPE_TARGET_ERRS, OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
     examples: ["ib legal versions TOS", "ib legal versions --type TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
@@ -336,7 +345,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}",
     errors: [
-      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+      ...TYPE_TARGET_ERRS,
       limitErr("pass a positive integer; this command caps at 500 — narrow with `--doc-version` rather than raising the cap"),
       apiErr(400, "Type has no personSettingTypeId mapping", "fix the legalDocumentTypes row first"),
       apiErr(404, "Unknown document type", "ib legal types"),
@@ -363,7 +372,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
     errors: [
       { origin: "client", exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
-      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+      ...TYPE_TARGET_ERRS,
       { origin: "client", exit: 4, match: ["--reason", "personSettingTypeId"], meaning: "Missing --reason, or the type has no personSettingTypeId mapping so acceptance cannot be tracked", remedy: "pass --reason; check the type mapping with ib legal types" },
       apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
@@ -430,7 +439,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
     errors: [
-      { origin: "client", exit: 4, match: "missing document type", meaning: "Neither the positional nor --type was given", remedy: "pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)" },
+      ...TYPE_TARGET_ERRS,
       { origin: "client", exit: 4, match: "missing required flag: --reason", meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
       intParseErr("--sort-order", "pass a non-negative integer list position", 0),
       intParseErr("--setting-type-id", "pass a valid personSettingTypeId"),

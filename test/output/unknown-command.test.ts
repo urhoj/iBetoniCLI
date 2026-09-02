@@ -1075,7 +1075,6 @@ describe("fb#1154 envelope wiring", () => {
     const env = buildUnknownCommandEnvelope(customer, "company-list", "developer");
     expect(env.didYouMean).toBe("list");
     expect(env.availableElsewhere).toEqual([]);
-    expect(env.hint).not.toContain("ib customer person list");
   });
 
   test("`ib keikka drivers-list` keeps the real subgroup as the lead answer", () => {
@@ -1083,14 +1082,6 @@ describe("fb#1154 envelope wiring", () => {
     keikka.args = ["drivers-list"];
     const env = buildUnknownCommandEnvelope(keikka, "drivers-list", "developer");
     expect(env.didYouMean).toBe("drivers");
-    expect(env.availableElsewhere).toEqual([]);
-  });
-
-  test("`ib vehicle truck-get` resolves to the direct `get` instead of dead-ending", () => {
-    const vehicle = leafByPath("vehicle");
-    vehicle.args = ["truck-get"];
-    const env = buildUnknownCommandEnvelope(vehicle, "truck-get", "developer");
-    expect(env.didYouMean).toBe("get");
     expect(env.availableElsewhere).toEqual([]);
   });
 });

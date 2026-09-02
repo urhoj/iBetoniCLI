@@ -6717,6 +6717,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (client-side)  Not a developer/sysadmin token (client-side gate) → use a developer account
   exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  The positional and --type name different types → pass only one of them, or make them agree
   exit 4 (client-side)  Missing --reason, or the type has no personSettingTypeId mapping so acceptance cannot be tracked → pass --reason; check the type mapping with ib legal types
   exit 5 (HTTP 404)  No active document of this type → ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6760,6 +6761,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  The positional and --type name different types → pass only one of them, or make them agree
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap
   exit 4 (HTTP 400)  Type has no personSettingTypeId mapping → fix the legalDocumentTypes row first
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
@@ -7097,6 +7099,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  The positional and --type name different types → pass only one of them, or make them agree
   exit 5 (HTTP 404)  No active document of this type → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7232,6 +7235,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  The positional and --type name different types → pass only one of them, or make them agree
   exit 4 (client-side)  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
   exit 4 (client-side)  --sort-order is not an integer >= 0, rejected locally before any request → pass a non-negative integer list position
   exit 4 (client-side)  --setting-type-id is not an integer >= 1, rejected locally before any request → pass a valid personSettingTypeId
@@ -7311,6 +7315,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither the positional nor --type was given → pass <typeName> positionally or via --type (the positional is canonical; both are allowed only when they agree)
+  exit 4 (client-side)  The positional and --type name different types → pass only one of them, or make them agree
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

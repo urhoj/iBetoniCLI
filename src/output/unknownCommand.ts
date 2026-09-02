@@ -161,14 +161,11 @@ export function descendantsOwningVerb(
  * — the leaf is a substring of the typed token, so exact equality misses it.
  *
  * STRICTER than the exact-match layer, which may name up to 3 owners: a compound
- * token is a weaker signal than a real verb, so this answers only when the group
- * subtree has EXACTLY ONE owner of that leaf, and stays silent otherwise. That is
- * the common case, though the exact figures DRIFT with the catalogue exactly as
- * they do for the positional layer below — 144 of 169 group+leaf pairs were
- * unambiguous when this landed and 147 of 172 a day later, with the ambiguous
- * count steady at 25. Those 25 are all generic CRUD (`ib jerry ~ list` (5),
- * `ib jerry ~ get` (3), `ib betoni ~ list` (2)) where naming an arbitrary one
- * would be exactly the noise this guard exists to prevent.
+ * token is a weaker signal than a real verb, so the deep scan (rule C below)
+ * answers only when the group subtree has EXACTLY ONE owner of that leaf. The
+ * ambiguous pairs are all generic CRUD (`ib jerry ~ list`, `ib jerry ~ get`,
+ * `ib betoni ~ list`), where naming an arbitrary one would be exactly the noise
+ * this guard exists to prevent.
  *
  * The deep scan INHERITS the depth>=2 rule from {@link descendantsOwningVerb},
  * so on its own it could never name a DIRECT child — `ib customer company-list`
@@ -236,7 +233,9 @@ export function compoundChildOf(token: string, available: string[]): string | nu
  * existed, that session wrote a scratch node probe against PRODUCTION instead of
  * using the CLI — the expensive failure this layer prevents.
  *
- * Ranked LAST, below every verb layer, and guarded so it can only fire on a
+ * Ranked LAST — below every verb layer AND below {@link topLevelDomainRedirect},
+ * since an exact domain-name match outranks this heuristic (fb#1154 found the
+ * two evaluated in the other order) — and guarded so it can only fire on a
  * distinctive name. FOUR conditions — deliberately stating the rule rather than
  * a survivor count, because the count drifts with every `args:` addition (it was
  * 24 of 54 when this layer landed and 21 of 55 one day later):
@@ -298,10 +297,12 @@ export function descendantsOwningPositional(
  *
  * Two guards, each measured against the whole catalogue rather than guessed:
  *
- * - Ranked BELOW {@link descendantsOwningVerb} by the caller, because an answer
- *   inside the group the caller already chose beats sending them elsewhere. 8
- *   pairs collide, and the in-group answer is right in all 8 (`ib jerry stats`
- *   → `ib jerry admin request stats`, not the `ib stats` domain).
+ * - Ranked BELOW {@link descendantsOwningVerb} and its compound twin by the
+ *   caller, because an answer inside the group the caller already chose beats
+ *   sending them elsewhere. 8 pairs collide, and the in-group answer is right in
+ *   all 8 (`ib jerry stats` → `ib jerry admin request stats`, not the `ib stats`
+ *   domain). But ABOVE {@link descendantsOwningPositional}: an exact domain-name
+ *   match outranks that argument-name heuristic (fb#1154).
  * - `available` (this group's visible children) suppresses the redirect when one
  *   of them literally EXTENDS the token, which is the caller reaching for a real
  *   child and stopping a character early. Exactly 3 in the catalogue —
@@ -406,8 +407,6 @@ export function buildUnknownCommandEnvelope(
 ): UnknownCommandEnvelope {
   const group = commandPath(cmd);
   const available = visibleSubcommands(cmd, tier);
-  // A compound token's own segments beat the fuzzy guess (fb#1154): `company-list`
-  // is `list`, not the edit-distance neighbour `dead-list`.
   const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, available);
   const discover = discoverHint(group);
   const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
@@ -723,28 +722,32 @@ export function excessPositionals(cmd: Command): string[] {
  * when both faults sit on one argv the caller hears only about the missing flag
  * (fb#1179). After parse `cmd.args` is the operands followed by the unknown
  * tail — every recognised option has been consumed — so its first option-like
- * token is exactly what Commander's own check would have named. Mirrors
- * `parseOptions`: a lone `-` and a negative number are operands.
+ * token is exactly what Commander's own check would have named. The lone-`-`
+ * and negative-number exclusions are `parseOptions`' own (Commander applies the
+ * latter only on a childless leaf; every `.requiredOption()` command here is one).
  *
- * One shape `cmd.args` alone cannot settle: dash tokens after a `--` terminator
- * are operands, and Commander keeps the `--` itself only when an unknown option
- * already preceded it. So a `--` on the root argv that is absent from
- * `cmd.args` means no unknown option was seen at all.
+ * Dash tokens after a `--` terminator are operands, and Commander drops the
+ * `--` itself from `cmd.args` unless an unknown option preceded it — so any
+ * terminator on the root argv answers null, and the caller falls back to the
+ * plain missing-flag envelope. Today only `ib jerry request create` pairs a
+ * real `.requiredOption()` (`--pump-at`/`--m3`) with a prose positional
+ * (`[address]`) — `ib dev changelog add`'s look-alike fields are plain
+ * `.option()`s enforced at runtime instead (so `--from-json` can supply
+ * them), so Commander's mandatory-option check never reaches it. So that
+ * fallback costs nothing real.
  */
-export function strayOption(cmd: Command): string | null {
-  const args = (cmd.args ?? []).map(String);
+export function firstUnknownOption(cmd: Command): string | null {
   let root: Command = cmd;
   while (root.parent) root = root.parent;
   // `rawArgs` is set on the ROOT by Commander's `_prepareUserArgs` (the full
   // user argv) but is not in its typings.
   const rawArgs = (root as unknown as { rawArgs?: string[] }).rawArgs ?? [];
-  const terminator = args.indexOf("--");
-  if (terminator < 0 && rawArgs.includes("--")) return null;
-  const scan = terminator < 0 ? args : args.slice(0, terminator);
+  if (rawArgs.includes("--")) return null;
   return (
-    scan.find(
-      (a) => a.length > 1 && a.startsWith("-") && !/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(a)
-    ) ?? null
+    (cmd.args ?? [])
+      .map(String)
+      .find((a) => a.length > 1 && a.startsWith("-") && !/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(a)) ??
+    null
   );
 }
 
