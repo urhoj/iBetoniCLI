@@ -20,7 +20,7 @@ import { assertEnum, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../..
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
-import { applyFromJson } from "../_shared/fromJson.js";
+import { applyFromJson, normalizeFromJson } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { getEmbeddedCtx } from "../../embedded.js";
@@ -322,6 +322,32 @@ async function fetchRows(client, params) {
     return Array.isArray(rows) ? rows : [];
 }
 /**
+ * Walk ONE status to the end of its rows, CAP rows per request. The merge
+ * branch filters and slices CLIENT-SIDE, so its view must not stop at the
+ * first page: `applied` alone holds more rows than CAP, and a filter over one
+ * capped page is the fb#536/fb#1198 failure class. Stops at the first short
+ * page; MAX_MERGE_PAGES bounds the walk against a backend that never returns
+ * one (the walk is then marked cut, which surfaces as `truncated`).
+ */
+const MAX_MERGE_PAGES = 50; // 50 * CAP = 10 000 rows per status
+async function fetchStatusWalk(client, filters, status) {
+    const rows = [];
+    for (let page = 0; page < MAX_MERGE_PAGES; page++) {
+        const batch = await fetchRows(client, {
+            ...filters,
+            status,
+            limit: CAP,
+            // No offset key on the first page — the single-status URL stays exactly
+            // `?status=…&limit=200`, as before the walk existed.
+            offset: page === 0 ? undefined : page * CAP,
+        });
+        rows.push(...batch);
+        if (batch.length < CAP)
+            return { rows, walkCut: false };
+    }
+    return { rows, walkCut: true };
+}
+/**
  * Resolve the create description from the positional or its --description /
  * --body aliases (--body is the gh/git convention an agent reaches for by
  * default, and already this CLI's free-text body flag on `message chat send` —
@@ -355,6 +381,36 @@ const CREATE_FROM_JSON = {
     readShapeAliases: { errorText: "error" },
     numericFields: new Set(["complexity"]),
 };
+/**
+ * The key set an `import` entry accepts — the SAME contract `create
+ * --from-json` promises for the same payload shape: an unknown or wrong-typed
+ * key is never silently dropped. `import` used to hand-map entries and forward
+ * only description/kind/scope/command/error/severity/complexity — silently
+ * dropping gateKind/gateRef/gateUntil and creating UNGATED rows the swap hook
+ * can never close, the exact fb#446 silence the gate feature exists to end
+ * (fb#1085). Per-entry, not per-process: one bad entry fails THAT entry and
+ * the batch reports it, matching import's partial-failure contract. The
+ * spellings mirror payloadKeyMap (camelCase attribute + literal flag), and the
+ * `errorText` alias is create's readShapeAliases (fb#357).
+ */
+const IMPORT_ENTRY_KEYS = new Map([
+    ["description", "description"],
+    ["body", "body"],
+    ["title", "title"],
+    ["kind", "kind"],
+    ["scope", "scope"],
+    ["command", "command"],
+    ["error", "error"],
+    ["errorText", "error"],
+    ["severity", "severity"],
+    ["complexity", "complexity"],
+    ["gateKind", "gateKind"],
+    ["gate-kind", "gateKind"],
+    ["gateRef", "gateRef"],
+    ["gate-ref", "gateRef"],
+    ["gateUntil", "gateUntil"],
+    ["gate-until", "gateUntil"],
+]);
 function buildCreateBody(input) {
     const description = input.description?.trim();
     if (!description) {
@@ -441,19 +497,29 @@ export async function runFeedbackImport(client, entries, flags = {}) {
                 continue;
             }
             try {
+                // The create --from-json contract, per entry: an unknown or
+                // wrong-typed key fails THIS entry (failUsage throws; the catch
+                // below records it) instead of vanishing silently (fb#1085).
+                const entry = normalizeFromJson(e, IMPORT_ENTRY_KEYS, {
+                    numericFields: new Set(["complexity"]),
+                    flagName: `import entry ${i}`,
+                });
                 const description = resolveFeedbackCreateDescription({
-                    description: e.description,
-                    bodyFlag: e.body,
-                    title: e.title,
+                    description: entry.description,
+                    bodyFlag: entry.body,
+                    title: entry.title,
                 });
                 const created = await runFeedbackCreate(client, {
                     description,
-                    kind: e.kind ?? "improvement",
-                    scope: e.scope ?? "cli",
-                    command: e.command,
-                    error: e.error,
-                    severity: e.severity,
-                    complexity: e.complexity === undefined ? undefined : Number(e.complexity),
+                    kind: entry.kind ?? "improvement",
+                    scope: entry.scope ?? "cli",
+                    command: entry.command,
+                    error: entry.error,
+                    severity: entry.severity,
+                    complexity: entry.complexity,
+                    gateKind: entry.gateKind,
+                    gateRef: entry.gateRef,
+                    gateUntil: entry.gateUntil,
                     dryRun: flags.dryRun,
                 });
                 const id = created?.feedbackId;
@@ -634,20 +700,23 @@ export async function runFeedbackList(client, opts) {
             truncated = true;
     }
     else {
-        // A comma-separated --status fans out one request per status and merges.
-        // (`--all` no longer reaches this branch: statuses is null there, so it
-        // takes the single-request path above — which is the correct shape for it,
-        // one unfiltered server-side query, and not the capped pseudo-fan-out that
-        // used to make --gated --all under-report. fb#1198.)
-        const statusList = statuses ?? [undefined];
-        const pages = await Promise.all(statusList.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP })));
-        if (pages.some((p) => p.length >= CAP))
+        // A multi-status scope (the default active bucket, --unresolved, a CSV
+        // --status) fans out one request per status and merges. (`--all` no longer
+        // reaches this branch: statuses is null there, so it takes the single-
+        // request path above — one unfiltered server-side query, and not the
+        // capped pseudo-fan-out that used to make --gated --all under-report.
+        // fb#1198.) Each status WALKS its pages to the end: one status alone
+        // (applied) already holds more rows than CAP, and this branch slices
+        // CLIENT-SIDE at the end, so a one-page fetch would silently drop rows
+        // past the cap out of the merge — the fb#536 class.
+        const walks = await Promise.all(statuses.map((s) => fetchStatusWalk(client, filters, s)));
+        if (walks.some((w) => w.walkCut))
             truncated = true;
         // feedbackId is monotonic with createdAt, so it doubles as the merge key.
         // dir = +1 oldest-first (ASC), -1 newest-first (DESC, the default).
         const dir = opts.oldest ? 1 : -1;
-        const merged = pages
-            .flat()
+        const merged = walks
+            .flatMap((w) => w.rows)
             .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
         const offset = opts.offset ?? 0;
         const limit = opts.limit ?? 50;
@@ -756,7 +825,7 @@ export async function runFeedbackCluster(client, id) {
     return env;
 }
 /**
- * Aggregate counts, server-side over the WHOLE table (GET /api/feedback/stats).
+ * Aggregate counts, server-side (GET /api/feedback/stats).
  *
  * This used to bucket a client-side page in JS, which was correct only while the
  * table stayed under the 200-row cap. It didn't: the page is newest-first, so
@@ -766,6 +835,14 @@ export async function runFeedbackCluster(client, id) {
  * measured: byStatus.open 87 vs a true 91). The docstring's old parenthetical
  * ("won't happen at current row counts") is exactly the kind of assumption
  * nothing re-checks; it had silently expired.
+ *
+ * STATUS SCOPE mirrors `list` (fb#1192): the DEFAULT is the active bucket
+ * (open + reviewed) — every settled NULL sits on closed rows, so whole-table
+ * ungraded/unestimated misread as backlog — and `--all` restores the whole
+ * table. The scope rides as `status=` on the stats route (deploy-gated);
+ * a backend that ignores it is DETECTED (byStatus carrying a status outside
+ * the requested set) and answered with the scoped client-side rollup instead
+ * of the misleading whole-table number.
  *
  * DEPLOY-GATED with a graceful fallback: against a backend without the route we
  * fall back to the old rollup and keep its `truncated`/`hint` caveat, so the
@@ -782,15 +859,37 @@ export async function runFeedbackCount(client, opts) {
     // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
     assertEnum(opts.kind, KINDS, "--kind");
     assertEnum(opts.scope, SCOPES, "--scope");
-    const suffix = qs({ kind: opts.kind || undefined, scope: opts.scope || undefined });
+    // Status scope mirrors `list` (fb#1192): bare count is the ACTIVE bucket, not
+    // the whole table — closed rows are where every settled NULL sits, so a
+    // whole-table ungraded/unestimated used to read as a backlog that does not
+    // exist (403/330 against an active queue of 0/0). --all restores the
+    // whole-table number.
+    const statuses = resolveStatuses(opts);
+    const suffix = qs({
+        kind: opts.kind || undefined,
+        scope: opts.scope || undefined,
+        status: statuses ? statuses.join(",") : undefined,
+    });
     try {
-        return await client.get(`/api/feedback/stats${suffix}`);
+        const out = await client.get(`/api/feedback/stats${suffix}`);
+        // Deploy-gated CHECK, the --severity/--held pattern: a backend that
+        // predates status scoping ignores the param and answers whole-table — the
+        // exact misleading number this flag was filed to end. A byStatus carrying
+        // a status OUTSIDE the requested set proves the filter was ignored; fall
+        // back to the capped, caveated client-side rollup scoped the same way
+        // rather than report it. An empty result needs no check — there is no
+        // whole-table/scoped ambiguity in zero.
+        const byStatus = out.byStatus;
+        if (statuses && byStatus && Object.keys(byStatus).some((s) => !statuses.includes(s))) {
+            return countClientSide(client, opts, statuses);
+        }
+        return out;
     }
     catch (e) {
         const status = e instanceof CliError ? e.statusCode : 0;
         if (status === 401 || status === 403)
             throw e;
-        return countClientSide(client, opts);
+        return countClientSide(client, opts, statuses);
     }
 }
 /**
@@ -808,9 +907,18 @@ export async function runFeedbackLint(client) {
     // yields an empty envelope rather than throwing).
     return toListEnvelope(await client.get("/api/feedback/lint"));
 }
-/** Pre-fb#536 rollup: bucket one capped page in JS. Only reached on an older backend. */
-async function countClientSide(client, opts) {
-    const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
+/**
+ * Pre-fb#536 rollup: bucket capped pages in JS. Only reached on an older
+ * backend (no /stats route, or one that ignores the status param — fb#1192).
+ * A scoped rollup fans out one page PER STATUS — the list route's status
+ * filter predates /stats, so even a backend old enough to land here honours
+ * it; the whole-table case (--all) stays the single page it always was.
+ */
+async function countClientSide(client, opts, statuses) {
+    const pages = statuses
+        ? await Promise.all(statuses.map((s) => fetchRows(client, { kind: opts.kind, scope: opts.scope, status: s, limit: CAP })))
+        : [await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP })];
+    const rows = pages.flat();
     const byStatus = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
     const byKind = {};
     const byScope = {};
@@ -827,7 +935,7 @@ async function countClientSide(client, opts) {
             unestimated += 1;
     }
     const out = { total: rows.length, byStatus, byKind, byScope, unestimated };
-    if (rows.length >= CAP) {
+    if (pages.some((p) => p.length >= CAP)) {
         out.truncated = true;
         out.hint =
             "count is a lower bound — this backend has no /api/feedback/stats, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
@@ -1410,7 +1518,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     }));
     f.command("import")
         .description("File SEVERAL reports from one JSON array file — the routines' fan-out shape (fb#1056)")
-        .argument("<file>", "JSON array of create objects {description|body|title, kind?, scope?, command?, error?, severity?, complexity?} (or - for stdin)")
+        .argument("<file>", "JSON array of create objects {description|body|title, kind?, scope?, command?, error?, severity?, complexity?, gateKind?, gateRef?, gateUntil?} (or - for stdin)")
         .option("--dry-run")
         .action(guarded(async (file, opts) => {
         let arr;
@@ -1630,6 +1738,11 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .alias("stats")
         .option("--kind <kind>")
         .option("--scope <scope>")
+        // Status scope mirrors `list` (fb#1192) — including the active-bucket
+        // DEFAULT; `--all` restores the whole-table number count used to report.
+        .option("--status <status>")
+        .option("--unresolved")
+        .option("--all")
         .action(jsonAction(getClient, (client, opts) => runFeedbackCount(client, opts)));
     // POST /api/feedback/gates/clear — called by `npm run swap`, not typed by
     // hand (see runFeedbackGateClear's doc). --kind is narrower than the full

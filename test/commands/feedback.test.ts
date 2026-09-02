@@ -1508,8 +1508,8 @@ describe("ib feedback resolve/update — claim-lease advisory warning", () => {
 // ─── count ───────────────────────────────────────────────────────────────────
 
 describe("ib feedback count", () => {
-  /** The whole-table aggregate the backend now returns. */
-  const statsPayload = {
+  /** The whole-table aggregate --all returns (the pre-fb#1192 number). */
+  const wholeStatsPayload = {
     total: 545,
     byStatus: { open: 91, reviewed: 5, applied: 105, dismissed: 5 },
     byKind: { improvement: 105, bug: 77 },
@@ -1517,20 +1517,64 @@ describe("ib feedback count", () => {
     byClaim: { held: 4, free: 541 },
     unestimated: 26,
   };
+  /** What a status-aware backend returns for the default active bucket. */
+  const activeStatsPayload = {
+    total: 96,
+    byStatus: { open: 91, reviewed: 5 },
+    byKind: { improvement: 60, bug: 36 },
+    byScope: { cli: 71, app: 25 },
+    byClaim: { held: 4, free: 92 },
+    unestimated: 2,
+    ungraded: 1,
+  };
 
-  test("reads the server-side aggregate, uncapped", async () => {
-    get.mockResolvedValueOnce(statsPayload);
+  test("defaults to the ACTIVE bucket, mirroring list (fb#1192)", async () => {
+    get.mockResolvedValueOnce(activeStatsPayload);
     const out = await runFeedbackCount(mockClient, {});
-    expect(get).toHaveBeenCalledWith("/api/feedback/stats");
-    expect(out).toMatchObject(statsPayload);
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats?status=open%2Creviewed");
+    expect(out).toMatchObject(activeStatsPayload);
     // No cap involved, so no lower-bound caveat to carry.
     expect(out.truncated).toBeUndefined();
   });
 
-  test("forwards --kind and --scope filters", async () => {
-    get.mockResolvedValueOnce(statsPayload);
+  test("--all restores the whole-table aggregate", async () => {
+    get.mockResolvedValueOnce(wholeStatsPayload);
+    const out = await runFeedbackCount(mockClient, { all: true });
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats");
+    expect(out).toMatchObject(wholeStatsPayload);
+  });
+
+  test("forwards --kind and --scope alongside the status scope", async () => {
+    get.mockResolvedValueOnce(activeStatsPayload);
     await runFeedbackCount(mockClient, { kind: "bug", scope: "cli" });
-    expect(get).toHaveBeenCalledWith("/api/feedback/stats?kind=bug&scope=cli");
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats?kind=bug&scope=cli&status=open%2Creviewed");
+  });
+
+  test("--status sends exactly the requested statuses", async () => {
+    get.mockResolvedValueOnce({ total: 105, byStatus: { applied: 105 } });
+    await runFeedbackCount(mockClient, { status: "applied" });
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats?status=applied");
+  });
+
+  test("a backend that IGNORES the status param is detected and answered client-side (fb#1192)", async () => {
+    // Whole-table byStatus while the active bucket was asked for: out-of-set
+    // statuses prove the filter was ignored. The scoped fallback fans out one
+    // capped page per status (the list route's status filter predates /stats,
+    // so even this backend honours it).
+    get.mockResolvedValueOnce(wholeStatsPayload);
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", kind: "bug", scope: "cli", complexity: 2 },
+      { feedbackId: 2, status: "open", kind: "bug", scope: "cli" },
+    ]);
+    get.mockResolvedValueOnce([]);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(3, "/api/feedback?status=reviewed&limit=200");
+    expect(out).toMatchObject({
+      total: 2,
+      byStatus: { open: 2, reviewed: 0, applied: 0, dismissed: 0 },
+      unestimated: 1,
+    });
   });
 
   test("falls back to the client-side rollup on a backend without the route", async () => {
@@ -1539,13 +1583,16 @@ describe("ib feedback count", () => {
     get.mockResolvedValueOnce([
       { feedbackId: 1, status: "open", kind: "improvement", scope: "cli", complexity: 2 },
       { feedbackId: 2, status: "open", kind: "bug", scope: "app", complexity: null },
-      { feedbackId: 3, status: "applied", kind: "improvement", scope: "cli" },
+    ]);
+    get.mockResolvedValueOnce([
+      { feedbackId: 3, status: "reviewed", kind: "improvement", scope: "cli" },
     ]);
     const out = await runFeedbackCount(mockClient, {});
-    expect(get).toHaveBeenLastCalledWith("/api/feedback?limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(3, "/api/feedback?status=reviewed&limit=200");
     expect(out).toMatchObject({
       total: 3,
-      byStatus: { open: 2, reviewed: 0, applied: 1, dismissed: 0 },
+      byStatus: { open: 2, reviewed: 1, applied: 0, dismissed: 0 },
       byKind: { improvement: 2, bug: 1 },
       byScope: { cli: 2, app: 1 },
       unestimated: 2,
@@ -1567,8 +1614,9 @@ describe("ib feedback count", () => {
     // predates the route.
     get.mockRejectedValueOnce(httpError("Conversion failed", 500));
     get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", kind: "bug", scope: "cli" }]);
+    get.mockResolvedValueOnce([]);
     const out = await runFeedbackCount(mockClient, {});
-    expect(get).toHaveBeenLastCalledWith("/api/feedback?limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=open&limit=200");
     expect(out).toMatchObject({ total: 1, byStatus: { open: 1 } });
   });
 
@@ -1581,6 +1629,7 @@ describe("ib feedback count", () => {
     }));
     get.mockRejectedValueOnce(httpError("Not found", 404));
     get.mockResolvedValueOnce(rows);
+    get.mockResolvedValueOnce([]);
     const out = await runFeedbackCount(mockClient, {});
     expect(out.truncated).toBe(true);
     expect(out.hint).toMatch(/lower bound/);
@@ -1591,6 +1640,23 @@ describe("ib feedback count", () => {
   // Unvalidated, an unknown filter reports total:0 — "nothing open" (fb#369).
   test("an unknown --kind exits 4 instead of reporting total 0", async () => {
     await expect(runFeedbackCount(mockClient, { kind: "bugs" })).rejects.toMatchObject({
+      exitCode: 4,
+    });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("the status selectors are mutually exclusive, as on list", async () => {
+    await expect(
+      runFeedbackCount(mockClient, { all: true, unresolved: true })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/Use only one of/),
+    });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("an unknown --status value exits 4, as on list", async () => {
+    await expect(runFeedbackCount(mockClient, { status: "bogus" })).rejects.toMatchObject({
       exitCode: 4,
     });
     expect(get).not.toHaveBeenCalled();
@@ -2119,10 +2185,11 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
 });
 
 /**
- * --gated (fb#446). Unlike --severity/--held, this filters CLIENT-SIDE — the
- * backend has no server-side gate filter, but SELECT * already returns
- * gateKind/gateRef/gateUntil on every row, so nothing is gained by waiting on
- * a deploy the way the other filters do.
+ * --gated (fb#446, fb#1198). The value rides to the server (gated=any|<kind>),
+ * where a new-enough backend filters in SQL before OFFSET/FETCH; an older
+ * backend ignores the param and the client-side filter below the merge branch
+ * is the fallback — correct because the per-status walk fetches every row in
+ * scope, never one capped page.
  */
 describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
   test("an unknown --gated kind exits 4, no request sent", async () => {
@@ -2195,6 +2262,33 @@ describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { status: "open", limit: 20 });
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=20");
+  });
+
+  test("a multi-status merge walks each status past CAP, so rows past page one survive (fb#1198)", async () => {
+    // One status alone (applied) holds more rows than CAP, and the merge
+    // branch slices CLIENT-SIDE at the end — a one-page fetch per status
+    // would silently drop rows past the cap out of the merge (the fb#536
+    // class the server-side gated filter fixed for --gated, still open for
+    // multi-status scopes). Walks start in status order, so applied's second
+    // page lands only after its first page AND reviewed's first resolve.
+    const pageOne = Array.from({ length: 200 }, (_, i) => ({
+      feedbackId: 1000 - i,
+      status: "applied",
+    }));
+    get.mockResolvedValueOnce(pageOne); // applied, page 1 — full, walk on
+    get.mockResolvedValueOnce([]); // reviewed, page 1
+    get.mockResolvedValueOnce([{ feedbackId: 7, status: "applied" }]); // applied, page 2
+    // --oldest puts the page-two row first in the window (the 200 filler ids
+    // all sort above it).
+    const out = await runFeedbackList(mockClient, {
+      status: "applied,reviewed",
+      oldest: true,
+      limit: 200,
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/feedback?status=applied&limit=200&offset=200&orderBy=createdAt&orderDirection=ASC"
+    );
+    expect(out.items[0]).toMatchObject({ feedbackId: 7, status: "applied" });
   });
 
   // Deploy-gated and CHECKED: an older backend ignores the param and answers
@@ -2480,6 +2574,60 @@ describe("feedback import — batch filing (fb#1056)", () => {
   test("an empty array is a no-op, not an error", async () => {
     const out = await runFeedbackImport(mockClient, []);
     expect(out).toEqual({ results: [], ok: 0, failed: 0 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  // fb#1085: import used to hand-map entries and silently drop the gate
+  // fields, creating UNGATED rows the swap hook can never close — the exact
+  // silence the gate feature exists to end.
+  test("carries gateKind/gateRef/gateUntil through to the create body", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 51 });
+    const out = await runFeedbackImport(mockClient, [
+      {
+        description: "wait for the detail-cap raise",
+        gateKind: "deploy",
+        gateRef: "puminet5api@a930ccaf",
+        gateUntil: "2026-09-15",
+      },
+    ]);
+    expect(out.ok).toBe(1);
+    const body = post.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.gateKind).toBe("deploy");
+    expect(body.gateRef).toBe("puminet5api@a930ccaf");
+    expect(body.gateUntil).toBe("2026-09-15");
+  });
+
+  test("an unknown key fails THAT entry with the accepted-key list — never a silent drop", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 52 });
+    const out = await runFeedbackImport(mockClient, [
+      // The fb#1085 trap: a row templated off `feedback get` carries read-only
+      // keys. Importing it must not quietly lose the gate while pretending to
+      // file the row.
+      { description: "templated", gateKind: "deploy", feedbackId: 446, status: "open" },
+      { description: "clean entry" },
+    ]);
+    expect(out.ok).toBe(1);
+    expect(out.failed).toBe(1);
+    const bad = out.results.find((r) => !r.ok);
+    expect(bad?.index).toBe(0);
+    expect(bad?.error).toMatch(/unknown keys? .*feedbackId/);
+    expect(bad?.error).toMatch(/accepted:/);
+    expect(post).toHaveBeenCalledTimes(1); // the clean entry still filed
+  });
+
+  test("the read-shape errorText alias lands on the error field, as create --from-json does", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 53 });
+    await runFeedbackImport(mockClient, [{ description: "d", errorText: "exit 7" }]);
+    const body = post.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.error).toBe("exit 7");
+  });
+
+  test("a wrong-typed complexity fails that entry by name", async () => {
+    const out = await runFeedbackImport(mockClient, [
+      { description: "d", complexity: { not: "a number" } },
+    ]);
+    expect(out.failed).toBe(1);
+    expect(out.results[0].error).toMatch(/"complexity" must be a number/);
     expect(post).not.toHaveBeenCalled();
   });
 });

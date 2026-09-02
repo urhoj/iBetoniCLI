@@ -26,7 +26,7 @@ import { assertEnum, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../..
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
-import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
+import { applyFromJson, normalizeFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { getEmbeddedCtx } from "../../embedded.js";
@@ -377,7 +377,7 @@ export interface FeedbackListOptions extends Omit<FeedbackFilterParams, "gated">
   all?: boolean;
   full?: boolean;
   mine?: boolean;
-  /** `--gated [kind]` — `true` for the bare flag, a kind string to narrow. */
+  /** Commander shape: `true` for the bare flag, a GATE_KINDS string to narrow. */
   gated?: boolean | string;
 }
 
@@ -412,6 +412,37 @@ async function fetchRows(
   });
   const rows = await client.get<Record<string, unknown>[]>(`/api/feedback${suffix}`);
   return Array.isArray(rows) ? rows : [];
+}
+
+/**
+ * Walk ONE status to the end of its rows, CAP rows per request. The merge
+ * branch filters and slices CLIENT-SIDE, so its view must not stop at the
+ * first page: `applied` alone holds more rows than CAP, and a filter over one
+ * capped page is the fb#536/fb#1198 failure class. Stops at the first short
+ * page; MAX_MERGE_PAGES bounds the walk against a backend that never returns
+ * one (the walk is then marked cut, which surfaces as `truncated`).
+ */
+const MAX_MERGE_PAGES = 50; // 50 * CAP = 10 000 rows per status
+
+async function fetchStatusWalk(
+  client: ApiClient,
+  filters: FeedbackFilterParams,
+  status: string
+): Promise<{ rows: Record<string, unknown>[]; walkCut: boolean }> {
+  const rows: Record<string, unknown>[] = [];
+  for (let page = 0; page < MAX_MERGE_PAGES; page++) {
+    const batch = await fetchRows(client, {
+      ...filters,
+      status,
+      limit: CAP,
+      // No offset key on the first page — the single-status URL stays exactly
+      // `?status=…&limit=200`, as before the walk existed.
+      offset: page === 0 ? undefined : page * CAP,
+    });
+    rows.push(...batch);
+    if (batch.length < CAP) return { rows, walkCut: false };
+  }
+  return { rows, walkCut: true };
 }
 
 export interface FeedbackCreateInput {
@@ -473,6 +504,37 @@ const CREATE_FROM_JSON: FromJsonConfig = {
   readShapeAliases: { errorText: "error" },
   numericFields: new Set(["complexity"]),
 };
+
+/**
+ * The key set an `import` entry accepts — the SAME contract `create
+ * --from-json` promises for the same payload shape: an unknown or wrong-typed
+ * key is never silently dropped. `import` used to hand-map entries and forward
+ * only description/kind/scope/command/error/severity/complexity — silently
+ * dropping gateKind/gateRef/gateUntil and creating UNGATED rows the swap hook
+ * can never close, the exact fb#446 silence the gate feature exists to end
+ * (fb#1085). Per-entry, not per-process: one bad entry fails THAT entry and
+ * the batch reports it, matching import's partial-failure contract. The
+ * spellings mirror payloadKeyMap (camelCase attribute + literal flag), and the
+ * `errorText` alias is create's readShapeAliases (fb#357).
+ */
+const IMPORT_ENTRY_KEYS = new Map<string, string>([
+  ["description", "description"],
+  ["body", "body"],
+  ["title", "title"],
+  ["kind", "kind"],
+  ["scope", "scope"],
+  ["command", "command"],
+  ["error", "error"],
+  ["errorText", "error"],
+  ["severity", "severity"],
+  ["complexity", "complexity"],
+  ["gateKind", "gateKind"],
+  ["gate-kind", "gateKind"],
+  ["gateRef", "gateRef"],
+  ["gate-ref", "gateRef"],
+  ["gateUntil", "gateUntil"],
+  ["gate-until", "gateUntil"],
+]);
 
 interface FeedbackCreateBody {
   kind: Kind;
@@ -588,19 +650,29 @@ export async function runFeedbackImport(
           continue;
         }
         try {
+          // The create --from-json contract, per entry: an unknown or
+          // wrong-typed key fails THIS entry (failUsage throws; the catch
+          // below records it) instead of vanishing silently (fb#1085).
+          const entry = normalizeFromJson(e, IMPORT_ENTRY_KEYS, {
+            numericFields: new Set(["complexity"]),
+            flagName: `import entry ${i}`,
+          });
           const description = resolveFeedbackCreateDescription({
-            description: e.description as string | undefined,
-            bodyFlag: e.body as string | undefined,
-            title: e.title as string | undefined,
+            description: entry.description as string | undefined,
+            bodyFlag: entry.body as string | undefined,
+            title: entry.title as string | undefined,
           });
           const created = await runFeedbackCreate(client, {
             description,
-            kind: (e.kind as string) ?? "improvement",
-            scope: (e.scope as string) ?? "cli",
-            command: e.command as string | undefined,
-            error: e.error as string | undefined,
-            severity: e.severity as string | undefined,
-            complexity: e.complexity === undefined ? undefined : Number(e.complexity),
+            kind: (entry.kind as string) ?? "improvement",
+            scope: (entry.scope as string) ?? "cli",
+            command: entry.command as string | undefined,
+            error: entry.error as string | undefined,
+            severity: entry.severity as string | undefined,
+            complexity: entry.complexity as number | undefined,
+            gateKind: entry.gateKind as string | undefined,
+            gateRef: entry.gateRef as string | undefined,
+            gateUntil: entry.gateUntil as string | undefined,
             dryRun: flags.dryRun,
           });
           const id = created?.feedbackId;
@@ -796,21 +868,22 @@ export async function runFeedbackList(
     const effective = Math.min(opts.limit ?? FEEDBACK_LIST_DEFAULT, CAP);
     if (client.getLastListMeta?.()?.truncated || items.length >= effective) truncated = true;
   } else {
-    // A comma-separated --status fans out one request per status and merges.
-    // (`--all` no longer reaches this branch: statuses is null there, so it
-    // takes the single-request path above — which is the correct shape for it,
-    // one unfiltered server-side query, and not the capped pseudo-fan-out that
-    // used to make --gated --all under-report. fb#1198.)
-    const statusList: (string | undefined)[] = statuses ?? [undefined];
-    const pages = await Promise.all(
-      statusList.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP }))
-    );
-    if (pages.some((p) => p.length >= CAP)) truncated = true;
+    // A multi-status scope (the default active bucket, --unresolved, a CSV
+    // --status) fans out one request per status and merges. (`--all` no longer
+    // reaches this branch: statuses is null there, so it takes the single-
+    // request path above — one unfiltered server-side query, and not the
+    // capped pseudo-fan-out that used to make --gated --all under-report.
+    // fb#1198.) Each status WALKS its pages to the end: one status alone
+    // (applied) already holds more rows than CAP, and this branch slices
+    // CLIENT-SIDE at the end, so a one-page fetch would silently drop rows
+    // past the cap out of the merge — the fb#536 class.
+    const walks = await Promise.all(statuses.map((s) => fetchStatusWalk(client, filters, s)));
+    if (walks.some((w) => w.walkCut)) truncated = true;
     // feedbackId is monotonic with createdAt, so it doubles as the merge key.
     // dir = +1 oldest-first (ASC), -1 newest-first (DESC, the default).
     const dir = opts.oldest ? 1 : -1;
-    const merged = pages
-      .flat()
+    const merged = walks
+      .flatMap((w) => w.rows)
       .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
     const offset = opts.offset ?? 0;
     const limit = opts.limit ?? 50;
@@ -946,7 +1019,7 @@ export async function runFeedbackCluster(
 }
 
 /**
- * Aggregate counts, server-side over the WHOLE table (GET /api/feedback/stats).
+ * Aggregate counts, server-side (GET /api/feedback/stats).
  *
  * This used to bucket a client-side page in JS, which was correct only while the
  * table stayed under the 200-row cap. It didn't: the page is newest-first, so
@@ -956,6 +1029,14 @@ export async function runFeedbackCluster(
  * measured: byStatus.open 87 vs a true 91). The docstring's old parenthetical
  * ("won't happen at current row counts") is exactly the kind of assumption
  * nothing re-checks; it had silently expired.
+ *
+ * STATUS SCOPE mirrors `list` (fb#1192): the DEFAULT is the active bucket
+ * (open + reviewed) — every settled NULL sits on closed rows, so whole-table
+ * ungraded/unestimated misread as backlog — and `--all` restores the whole
+ * table. The scope rides as `status=` on the stats route (deploy-gated);
+ * a backend that ignores it is DETECTED (byStatus carrying a status outside
+ * the requested set) and answered with the scoped client-side rollup instead
+ * of the misleading whole-table number.
  *
  * DEPLOY-GATED with a graceful fallback: against a backend without the route we
  * fall back to the old rollup and keep its `truncated`/`hint` caveat, so the
@@ -970,18 +1051,40 @@ export async function runFeedbackCluster(
  */
 export async function runFeedbackCount(
   client: ApiClient,
-  opts: { kind?: string; scope?: string }
+  opts: { kind?: string; scope?: string; status?: string; unresolved?: boolean; all?: boolean }
 ): Promise<Record<string, unknown>> {
   // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
   assertEnum(opts.kind, KINDS, "--kind");
   assertEnum(opts.scope, SCOPES, "--scope");
-  const suffix = qs({ kind: opts.kind || undefined, scope: opts.scope || undefined });
+  // Status scope mirrors `list` (fb#1192): bare count is the ACTIVE bucket, not
+  // the whole table — closed rows are where every settled NULL sits, so a
+  // whole-table ungraded/unestimated used to read as a backlog that does not
+  // exist (403/330 against an active queue of 0/0). --all restores the
+  // whole-table number.
+  const statuses = resolveStatuses(opts);
+  const suffix = qs({
+    kind: opts.kind || undefined,
+    scope: opts.scope || undefined,
+    status: statuses ? statuses.join(",") : undefined,
+  });
   try {
-    return await client.get<Record<string, unknown>>(`/api/feedback/stats${suffix}`);
+    const out = await client.get<Record<string, unknown>>(`/api/feedback/stats${suffix}`);
+    // Deploy-gated CHECK, the --severity/--held pattern: a backend that
+    // predates status scoping ignores the param and answers whole-table — the
+    // exact misleading number this flag was filed to end. A byStatus carrying
+    // a status OUTSIDE the requested set proves the filter was ignored; fall
+    // back to the capped, caveated client-side rollup scoped the same way
+    // rather than report it. An empty result needs no check — there is no
+    // whole-table/scoped ambiguity in zero.
+    const byStatus = out.byStatus as Record<string, number> | undefined;
+    if (statuses && byStatus && Object.keys(byStatus).some((s) => !statuses.includes(s))) {
+      return countClientSide(client, opts, statuses);
+    }
+    return out;
   } catch (e) {
     const status = e instanceof CliError ? e.statusCode : 0;
     if (status === 401 || status === 403) throw e;
-    return countClientSide(client, opts);
+    return countClientSide(client, opts, statuses);
   }
 }
 
@@ -1011,12 +1114,26 @@ export async function runFeedbackLint(
   return toListEnvelope<FeedbackLintFinding>(await client.get("/api/feedback/lint"));
 }
 
-/** Pre-fb#536 rollup: bucket one capped page in JS. Only reached on an older backend. */
+/**
+ * Pre-fb#536 rollup: bucket capped pages in JS. Only reached on an older
+ * backend (no /stats route, or one that ignores the status param — fb#1192).
+ * A scoped rollup fans out one page PER STATUS — the list route's status
+ * filter predates /stats, so even a backend old enough to land here honours
+ * it; the whole-table case (--all) stays the single page it always was.
+ */
 async function countClientSide(
   client: ApiClient,
-  opts: { kind?: string; scope?: string }
+  opts: { kind?: string; scope?: string },
+  statuses: string[] | null
 ): Promise<Record<string, unknown>> {
-  const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
+  const pages = statuses
+    ? await Promise.all(
+        statuses.map((s) =>
+          fetchRows(client, { kind: opts.kind, scope: opts.scope, status: s, limit: CAP })
+        )
+      )
+    : [await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP })];
+  const rows = pages.flat();
   const byStatus: Record<string, number> = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
   const byKind: Record<string, number> = {};
   const byScope: Record<string, number> = {};
@@ -1031,7 +1148,7 @@ async function countClientSide(
     if (r.complexity == null) unestimated += 1;
   }
   const out: Record<string, unknown> = { total: rows.length, byStatus, byKind, byScope, unestimated };
-  if (rows.length >= CAP) {
+  if (pages.some((p) => p.length >= CAP)) {
     out.truncated = true;
     out.hint =
       "count is a lower bound — this backend has no /api/feedback/stats, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
@@ -1742,7 +1859,7 @@ export function registerFeedbackCommands(
 
   f.command("import")
     .description("File SEVERAL reports from one JSON array file — the routines' fan-out shape (fb#1056)")
-    .argument("<file>", "JSON array of create objects {description|body|title, kind?, scope?, command?, error?, severity?, complexity?} (or - for stdin)")
+    .argument("<file>", "JSON array of create objects {description|body|title, kind?, scope?, command?, error?, severity?, complexity?, gateKind?, gateRef?, gateUntil?} (or - for stdin)")
     .option("--dry-run")
     .action(
       guarded(async (file: string, opts: { dryRun?: boolean }) => {
@@ -2034,9 +2151,16 @@ export function registerFeedbackCommands(
     .alias("stats")
     .option("--kind <kind>")
     .option("--scope <scope>")
+    // Status scope mirrors `list` (fb#1192) — including the active-bucket
+    // DEFAULT; `--all` restores the whole-table number count used to report.
+    .option("--status <status>")
+    .option("--unresolved")
+    .option("--all")
     .action(
-      jsonAction(getClient, (client, opts: { kind?: string; scope?: string }) =>
-        runFeedbackCount(client, opts)
+      jsonAction(
+        getClient,
+        (client, opts: { kind?: string; scope?: string; status?: string; unresolved?: boolean; all?: boolean }) =>
+          runFeedbackCount(client, opts)
       )
     );
 

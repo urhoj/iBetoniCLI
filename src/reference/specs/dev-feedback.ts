@@ -16,7 +16,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback import",
     description:
-      "File SEVERAL reports from one JSON array file. Same per-entry keys as `create` (description|body|title, kind?, scope?, command?, error?, severity?, complexity?), defaults included. Exists because filing N findings is the routines' normal shape — post-impl-verify files one row per confirmed finding, and analyze-cli-feedback / groom-memory / review-legal-docs fan out the same way — so the alternative is N invocations or a caller-side splitting step (fb#1056). A SINGLE entry still goes to `create --from-json`, which takes an object.",
+      "File SEVERAL reports from one JSON array file. Same per-entry keys as `create` (description|body|title, kind?, scope?, command?, error?, severity?, complexity?, gateKind?, gateRef?, gateUntil?), defaults included. Exists because filing N findings is the routines' normal shape — post-impl-verify files one row per confirmed finding, and analyze-cli-feedback / groom-memory / review-legal-docs fan out the same way — so the alternative is N invocations or a caller-side splitting step (fb#1056). A SINGLE entry still goes to `create --from-json`, which takes an object.",
     auth: "any",
     mutates: true,
     dryRunKind: "client",
@@ -29,11 +29,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "A per-entry failure does NOT exit non-zero — the call succeeds and reports it. Check `failed` in the output, not just the exit code.",
-      "Partial failure is REPORTED, never rolled back: one malformed entry does not cost you the rows that were fine. Check `failed` and the per-entry `error`, and re-send only those entries.",
-      "Each result carries its array `index`, so a failure lines up with the entry in the file you sent.",
-      "Entries are filed with bounded concurrency (5 in flight), so ordering of the underlying writes is not guaranteed — read `feedbackId` per result rather than assuming they are sequential.",
-      "An entry that is not a JSON object is counted as failed rather than aborting the batch.",
+      "A per-entry failure does NOT exit non-zero — the call succeeds and reports it. Check `failed`, not just the exit code; each result carries its array `index`, the failed ones their `error`.",
+      "Partial failure is REPORTED, never rolled back — re-send only the failed entries. A non-object entry counts as failed rather than aborting the batch.",
+      "Filed with bounded concurrency (5); write ordering is not guaranteed — read `feedbackId` per result.",
+      "Entries get the `create --from-json` key contract (fb#1085): an unknown or wrong-typed key fails THAT entry, never a silent drop — strip the read-only keys (feedbackId, status, …) off a templated `feedback get` row. Gate fields (gateKind/gateRef/gateUntil) are carried, so batch-filed rows can be gated like created ones.",
     ],
     examples: ["ib dev feedback import ./findings.json", "ib dev feedback import - --dry-run"],
   },
@@ -488,7 +487,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback count",
     description:
-      "Aggregate counts of filed feedback by status, kind, scope and severity, plus the claim split and how many rows still lack a complexity or severity grade (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",
+      "Aggregate counts of filed feedback by status, kind, scope and severity, plus the claim split and how many rows still lack a complexity or severity grade (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side, so the totals stay correct at any volume. STATUS SCOPE mirrors `list` (fb#1192): the DEFAULT is the active bucket (open+reviewed) — closed rows are where every settled NULL sits, and whole-table ungraded/unestimated used to read as a backlog that does not exist; pass --all for the whole-table number.",
     // `stats` mirrors the backend route this wraps (GET /api/feedback/stats), so
     // a caller who read the route table or the module reaches for that spelling
     // (fb#611). It previously dead-ended on exit 4 and — worse — pointed at
@@ -499,19 +498,31 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     flags: [
       { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind", allowed: [...FEEDBACK_KINDS] },
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all", allowed: [...FEEDBACK_STATUSES] },
+      { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed rows) — same as the default; mutually exclusive with --status/--all" },
+      { name: "all", type: "boolean", description: "Count EVERY status (the whole table) — restores the pre-fb#1192 behaviour; mutually exclusive with --status/--unresolved" },
     ],
     outputShape:
-      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, byClaim: { held, free }, unestimated, ungraded, truncated?, hint? }. The two completeness scalars are twins: `unestimated` = complexity IS NULL (pair with `list --complexity none`), `ungraded` = severity IS NULL (pair with `list --severity none`); `bySeverity` buckets the graded rows and carries the NULLs under the key `ungraded`. `byClaim` (fb#888) is a live-lease split — `held` = claimedBy set AND unexpired, `free` = everything else including an expired lease — answering \"what is being worked right now?\" without pulling a page. ⚠ EVERY key here counts the WHOLE table including closed rows, so all of them disagree with `list --held`/`--unclaimed`/`--severity`, which default to the active bucket (open+reviewed); closed rows are mostly settled applied/dismissed, so narrow before reading a backlog number off this. bySeverity/byClaim/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.",
+      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, byClaim: { held, free }, unestimated, ungraded, truncated?, hint? }. EVERY key counts the STATUS SCOPE — the active bucket (open+reviewed) by default, the whole table under --all — so the completeness scalars finally answer \"what still needs triage\": `unestimated` = complexity IS NULL in scope (pair with `list --complexity none`), `ungraded` = severity IS NULL in scope (pair with `list --severity none`); `bySeverity` buckets the graded rows and carries the NULLs under the key `ungraded`. `byClaim` (fb#888) is a live-lease split — `held` = claimedBy set AND unexpired, `free` = everything else including an expired lease — answering \"what is being worked right now?\" without pulling a page. bySeverity/byClaim/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.",
     notes: [
-      "DEPLOY-GATED (fb#536): the server-side aggregate needs /api/feedback/stats. Against an older backend the command falls back to the previous client-side rollup over a 200-row page and sets `truncated: true` with a hint — those numbers are a LOWER BOUND, and because the page is newest-first the rows dropped are the OLDEST, so `open` is understated most. Cross-check a truncated result with `ib dev feedback list --status open --limit 200`.",
+      "DEFAULT IS THE ACTIVE BUCKET (fb#1192), mirroring `list` — whole-table ungraded/unestimated used to count settled NULLs on closed rows as backlog. --all restores the whole-table number; byStatus shows the scope.",
+      "Status scoping is DEPLOY-GATED but CHECKED: a backend that ignores the `status` param is detected (out-of-set statuses in byStatus) and answered with the capped client-side rollup, scope honoured.",
+      "DEPLOY-GATED (fb#536): needs /api/feedback/stats; an older backend falls back to the client-side rollup over 200-row pages and sets `truncated` with a hint — a LOWER BOUND whose drops are the OLDEST rows (`open` understated most).",
     ],
     errors: [
-      { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)" },
+      { origin: "client", exit: 4, match: ["must be one of", "use only one of"], meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal, --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --status values open|reviewed|applied|dismissed (all STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error). Use only one of --all / --unresolved / --status" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib dev feedback lint", "ib dev feedback list"],
-    examples: ["ib dev feedback count", "ib dev feedback count --scope cli", "ib dev feedback count --kind legal"],
+    examples: [
+      "ib dev feedback count",
+      "ib dev feedback count --all",
+      "ib dev feedback count --scope cli",
+      "ib dev feedback count --kind legal",
+      "ib dev feedback count --status applied",
+      "ib dev feedback count --unresolved",
+    ],
   },
   {
     command: "ib dev feedback gate-clear",
