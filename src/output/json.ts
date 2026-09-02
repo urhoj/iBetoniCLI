@@ -368,6 +368,19 @@ export function failUsage(message: string, hint = ""): never {
 }
 
 /**
+ * `failWith` for a HANDLER check that stands in for a parser rule — a required
+ * positional declared optional only so a flag alias can supply it (the
+ * dual-target resolvers in `targets.ts`, the legal type-name twin). Carries the
+ * parser's `code: "USAGE"`, which `failWith`/`failUsage` do not (body null →
+ * code null), so `ib help exit-codes`' promise that a missing required arg
+ * answers with code USAGE holds whoever enforces it (fb#1156). No `hint`, so the
+ * command's spec ERRORS remedy still renders.
+ */
+export function failParseUsage(message: string): never {
+  throw new CliError(message, 0, { code: "USAGE" }, 4);
+}
+
+/**
  * Terminate a command with an AGGREGATED, prescriptive validation error
  * (feedback #204). Builds the standard validation envelope for `commandPath`
  * from the supplied flag `problems` — enriching each with its allowed values /

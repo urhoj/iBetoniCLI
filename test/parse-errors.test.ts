@@ -117,6 +117,16 @@ describe("parser errors → JSON envelope", () => {
       expect(parsed.unknownOption).toBeUndefined();
       expect(String(parsed.error)).toMatch(/missing required flag: --to/);
     });
+
+    test("an unknown flag BEFORE the `--` terminator is still detected", async () => {
+      // Commander keeps the `--` in cmd.args only when an unknown option preceded
+      // it, so the terminator bounds the scan rather than cancelling it. The one
+      // catalogue command pairing real required flags with a prose positional.
+      await run(["jerry", "request", "create", "--bogus", "--pump-at", "2026-09-03T08:00", "--", "-1"]);
+      const parsed = lastStderrJson();
+      expect(parsed.unknownOption).toBe("--bogus");
+      expect(String(parsed.hint)).toMatch(/missing required flag.*--m3/);
+    });
   });
 
   test("unknown subcommand under a group → JSON envelope by default", async () => {

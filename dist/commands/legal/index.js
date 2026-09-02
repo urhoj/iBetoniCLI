@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { CliError } from "../../api/errors.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
-import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failParseUsage, warnNote } from "../../output/json.js";
 import { personIdFromClaims } from "../../owner.js";
 import { parseId, cappedInt, assertEnum, intFlag } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
@@ -395,16 +395,13 @@ export async function runLegalTypeUpdate(client, typeName, fields, flags) {
  */
 export function resolveTypeNameTarget(positional, flag, label = "typeName") {
     const name = positional ?? flag;
-    // Both throws carry the parser's `code: "USAGE"` (fb#1156): making the positional
-    // optional (fb#1036) moved Commander's own missing-argument check into this
-    // handler, and `ib help exit-codes` promises that code for exactly that class —
-    // it is the field AI callers discriminate on. No `hint`, so the command's spec
-    // ERRORS remedy still renders (unlike `failUsage`, which suppresses it).
-    const usage = (message) => new CliError(message, 0, { code: "USAGE" }, 4);
+    // fb#1036 made the positional optional, moving Commander's own missing-argument
+    // check into this handler — so both throws carry the parser's code (fb#1156,
+    // see `failParseUsage`).
     if (!name)
-        throw usage(`missing document type: pass <${label}> positionally or via --type <typeName>`);
+        failParseUsage(`missing document type: pass <${label}> positionally or via --type <typeName>`);
     if (positional !== undefined && flag !== undefined && positional !== flag) {
-        throw usage(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`);
+        failParseUsage(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`);
     }
     return name;
 }

@@ -726,28 +726,24 @@ export function excessPositionals(cmd: Command): string[] {
  * and negative-number exclusions are `parseOptions`' own (Commander applies the
  * latter only on a childless leaf; every `.requiredOption()` command here is one).
  *
- * Dash tokens after a `--` terminator are operands, and Commander drops the
- * `--` itself from `cmd.args` unless an unknown option preceded it — so any
- * terminator on the root argv answers null, and the caller falls back to the
- * plain missing-flag envelope. Today only `ib jerry request create` pairs a
- * real `.requiredOption()` (`--pump-at`/`--m3`) with a prose positional
- * (`[address]`) — `ib dev changelog add`'s look-alike fields are plain
- * `.option()`s enforced at runtime instead (so `--from-json` can supply
- * them), so Commander's mandatory-option check never reaches it. So that
- * fallback costs nothing real.
+ * Dash tokens after a `--` terminator are operands, and Commander keeps the
+ * `--` itself in `cmd.args` only when an unknown option preceded it. So a `--`
+ * inside `cmd.args` bounds the scan (the unknown option is before it), while a
+ * `--` that is only on the root argv means every dash token was an operand.
  */
 export function firstUnknownOption(cmd: Command): string | null {
+  const args = (cmd.args ?? []).map(String);
+  const terminator = args.indexOf("--");
   let root: Command = cmd;
   while (root.parent) root = root.parent;
   // `rawArgs` is set on the ROOT by Commander's `_prepareUserArgs` (the full
   // user argv) but is not in its typings.
   const rawArgs = (root as unknown as { rawArgs?: string[] }).rawArgs ?? [];
-  if (rawArgs.includes("--")) return null;
+  if (terminator < 0 && rawArgs.includes("--")) return null;
   return (
-    (cmd.args ?? [])
-      .map(String)
-      .find((a) => a.length > 1 && a.startsWith("-") && !/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(a)) ??
-    null
+    args
+      .slice(0, terminator < 0 ? args.length : terminator)
+      .find((a) => a.length > 1 && a.startsWith("-") && !/^-\d*\.?\d+(e[+-]?\d+)?$/.test(a)) ?? null
   );
 }
 

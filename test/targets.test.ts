@@ -9,6 +9,7 @@ import {
   parseRefId,
   resolveDateInput,
   resolveSearchQuery,
+  resolveTarget,
   zeroOneFlag,
 } from "../src/targets.js";
 import { todayHelsinki } from "../src/dates.js";
@@ -219,6 +220,23 @@ describe("resolveDateInput (feedback #393 — positional OR --date)", () => {
     expect(errorOf(() => resolveDateInput(undefined, undefined, "pvm"))?.message).toMatch(
       /missing pvm/
     );
+  });
+});
+
+// The dual-target resolvers stand in for Commander's own missing-argument
+// check (the positional is optional only so the flag alias can supply it), so
+// their envelopes carry the parser's `code: "USAGE"` — the field `ib help
+// exit-codes` tells AI callers to discriminate on. fb#1156 fixed the legal
+// type-name twin; the id and date twins had stayed on code null.
+describe("dual-target resolvers carry the parser's USAGE code", () => {
+  const usage = { exitCode: 4, body: { code: "USAGE" } };
+  test("resolveTarget: missing and conflicting target", () => {
+    expect(errorOf(() => resolveTarget(undefined, undefined, "asiakasId", "asiakas"))).toMatchObject(usage);
+    expect(errorOf(() => resolveTarget("8", 9, "asiakasId", "asiakas"))).toMatchObject(usage);
+  });
+  test("resolveDateInput: missing and conflicting date", () => {
+    expect(errorOf(() => resolveDateInput(undefined, undefined))).toMatchObject(usage);
+    expect(errorOf(() => resolveDateInput("2026-06-10", "2026-06-11"))).toMatchObject(usage);
   });
 });
 

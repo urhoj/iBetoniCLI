@@ -1,5 +1,5 @@
 import { Option, type Command } from "commander";
-import { failWith } from "./output/json.js";
+import { failWith, failParseUsage } from "./output/json.js";
 import { CliError } from "./api/errors.js";
 import { closestName } from "./output/nearest.js";
 import { resolveDate } from "./dates.js";
@@ -371,15 +371,13 @@ export function resolveTarget(
     n !== undefined && (!Number.isInteger(n) || n <= 0);
   const id = pos ?? flag;
   if (id === undefined || bad(pos) || bad(flag)) {
-    failWith(
-      `missing or invalid target: pass <${positionalName}> positionally or via --${flagName} <id>`,
-      4
+    failParseUsage(
+      `missing or invalid target: pass <${positionalName}> positionally or via --${flagName} <id>`
     );
   }
   if (pos !== undefined && flag !== undefined && pos !== flag) {
-    failWith(
-      `positional ${positionalName} (${positional}) and --${flagName} (${flag}) differ — pass only one`,
-      4
+    failParseUsage(
+      `positional ${positionalName} (${positional}) and --${flagName} (${flag}) differ — pass only one`
     );
   }
   return id;
@@ -407,15 +405,13 @@ export function resolveDateInput(
   const opt = resolveDate(flag);
   const date = pos ?? opt;
   if (date === undefined) {
-    failWith(
-      `missing ${argName}: pass <${argName}> positionally or via --${argName} <date> (YYYY-MM-DD, or today/yesterday/tomorrow)`,
-      4
+    failParseUsage(
+      `missing ${argName}: pass <${argName}> positionally or via --${argName} <date> (YYYY-MM-DD, or today/yesterday/tomorrow)`
     );
   }
   if (pos !== undefined && opt !== undefined && pos !== opt) {
-    failWith(
-      `positional ${argName} (${positional}) and --${argName} (${flag}) differ — pass only one`,
-      4
+    failParseUsage(
+      `positional ${argName} (${positional}) and --${argName} (${flag}) differ — pass only one`
     );
   }
   return date;

@@ -879,7 +879,7 @@ export function handleParseRejection(
         // rather than making them fix one error to discover the next.
         const dateHint = dateFlagSuggestion(cmd, excessPositionals(cmd));
         if (dateHint) {
-          const base = (envelope.hint ?? "").trim().replace(/[.\s]*$/, "");
+          const base = envelope.hint.replace(/[.\s]*$/, "");
           envelope.hint = `${base}. Also: a surplus positional looks like a date — pass it as \`${dateHint.suggestion}\`, not as a positional.`;
         }
         return emitUsageEnvelope(err, envelope);

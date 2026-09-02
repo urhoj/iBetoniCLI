@@ -29,8 +29,7 @@ import {
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
-import { matchClientRowForMessage } from "../../src/api/errors.js";
-import { CliError } from "../../src/api/errors.js";
+import { CliError, matchClientRowForMessage } from "../../src/api/errors.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
 
 function mockClient(): MockApiClient {
@@ -490,6 +489,11 @@ describe("resolveTypeNameTarget label (fb#1036) + USAGE code (fb#1156)", () => {
   test("default label names typeName in the missing-target error", () => {
     expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
       expect.objectContaining({ ...usage, message: expect.stringContaining("<typeName>") })
+    );
+  });
+  test("conflicting positional and --type under the default label", () => {
+    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(
+      expect.objectContaining({ ...usage, message: expect.stringContaining("pass only one") })
     );
   });
   test("custom label is used in both error paths", () => {

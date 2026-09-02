@@ -20,7 +20,7 @@ import {
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failParseUsage, warnNote } from "../../output/json.js";
 import { personIdFromClaims } from "../../owner.js";
 import { parseId, cappedInt, assertEnum, intFlag } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
@@ -599,15 +599,12 @@ export function resolveTypeNameTarget(
   label = "typeName"
 ): string {
   const name = positional ?? flag;
-  // Both throws carry the parser's `code: "USAGE"` (fb#1156): making the positional
-  // optional (fb#1036) moved Commander's own missing-argument check into this
-  // handler, and `ib help exit-codes` promises that code for exactly that class —
-  // it is the field AI callers discriminate on. No `hint`, so the command's spec
-  // ERRORS remedy still renders (unlike `failUsage`, which suppresses it).
-  const usage = (message: string) => new CliError(message, 0, { code: "USAGE" }, 4);
-  if (!name) throw usage(`missing document type: pass <${label}> positionally or via --type <typeName>`);
+  // fb#1036 made the positional optional, moving Commander's own missing-argument
+  // check into this handler — so both throws carry the parser's code (fb#1156,
+  // see `failParseUsage`).
+  if (!name) failParseUsage(`missing document type: pass <${label}> positionally or via --type <typeName>`);
   if (positional !== undefined && flag !== undefined && positional !== flag) {
-    throw usage(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`);
+    failParseUsage(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`);
   }
   return name;
 }
