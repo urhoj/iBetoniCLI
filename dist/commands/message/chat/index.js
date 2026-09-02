@@ -4,6 +4,8 @@ import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom, threadAction } from "./resolveThread.js";
 import { parseId, resolveSearchQuery, queryAliasOption, intFlag, cappedInt } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { applyFromJson } from "../../_shared/fromJson.js";
+import { requireFlags } from "../../_shared/jsonBody.js";
 import { qs } from "../../../api/query.js";
 /**
  * GET /api/messages/threads/mine → your threads (inbox), newest first.
@@ -214,10 +216,19 @@ export function registerMessageChatCommands(parent, getClient) {
         const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
         writeJson(await run(client, id, messageId, opts));
     });
+    // A chat message is user prose in Finnish; --thread/--tarjous are the target
+    // selectors, which a --from-json file may equally carry.
+    const CHAT_FROM_JSON = {
+        nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+        numericFields: new Set(["thread", "tarjous"]),
+    };
     const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
-        .requiredOption("--body <text>")
+        .option("--body <text>")
+        .option("--from-json <file>")
         .option("--source <src>");
-    addWriteFlagsToCommand(sendCmd).action(guarded(async (threadIdStr, opts) => {
+    addWriteFlagsToCommand(sendCmd).action(guarded(async (threadIdStr, opts, cmd) => {
+        applyFromJson(cmd, opts, CHAT_FROM_JSON);
+        requireFlags(cmd, opts, ["body"]);
         const body = assertMessageBody(opts.body);
         const source = opts.source ?? process.env.IB_SOURCE ?? "cli";
         if (!["web", "cli", "ai"].includes(source)) {
@@ -238,10 +249,13 @@ export function registerMessageChatCommands(parent, getClient) {
     const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "", intFlag("--thread", 1)));
     addWriteFlagsToCommand(deleteCmd).action(messageAction(runChatDelete));
     const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "", intFlag("--thread", 1)))
-        .requiredOption("--body <text>");
+        .option("--body <text>")
+        .option("--from-json <file>");
     // Not messageAction: the body guard must stay ahead of getClient(), so a bad
     // body is exit 4 even when logged out.
-    addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts) => {
+    addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts, cmd) => {
+        applyFromJson(cmd, opts, CHAT_FROM_JSON);
+        requireFlags(cmd, opts, ["body"]);
         const messageId = parseId(messageIdStr, "messageId");
         const body = assertMessageBody(opts.body);
         const client = await getClient();

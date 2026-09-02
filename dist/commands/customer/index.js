@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import { listEnvelope, unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption, intFlag } from "../../targets.js";
@@ -504,8 +505,9 @@ export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
     if (flags.shortName !== undefined)
         body.asiakasShortNimi = flags.shortName;
     applyBillingFlags(body, flags);
-    if (flags.body)
-        Object.assign(body, parseJsonBodyFlag(flags.body));
+    const raw = resolveJsonObjectBody({ body: flags.body, fromJson: flags.fromJson });
+    if (raw)
+        Object.assign(body, raw);
     return body;
 }
 /**
@@ -605,8 +607,9 @@ export function buildAsiakasUpdateBody(current, flags, prh) {
     if (flags.type !== undefined)
         body.asiakasTypeId = flags.type;
     applyBillingFlags(body, flags);
-    if (flags.body)
-        Object.assign(body, parseJsonBodyFlag(flags.body));
+    const raw = resolveJsonObjectBody({ body: flags.body, fromJson: flags.fromJson });
+    if (raw)
+        Object.assign(body, raw);
     return body;
 }
 /**
@@ -824,8 +827,8 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--address <s>")
         .option("--postal-code <s>")
         .option("--city <s>")
-        .option("--get-or-create")
-        .option("--body <json>");
+        .option("--get-or-create");
+    addJsonBodyOptions(createCmd);
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
@@ -875,8 +878,8 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--address <s>")
         .option("--postal-code <s>")
         .option("--city <s>")
-        .option("--from-prh <ytunnus>")
-        .option("--body <json>");
+        .option("--from-prh <ytunnus>");
+    addJsonBodyOptions(updateCmd);
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const asiakasId = parseId(idStr, "asiakasId");
@@ -907,8 +910,8 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--type <id>", "", intFlag("--type", 1))
         .option("--address <s>")
         .option("--postal-code <s>")
-        .option("--city <s>")
-        .option("--body <json>");
+        .option("--city <s>");
+    addJsonBodyOptions(upsertCmd);
     addWriteFlagsToCommand(upsertCmd).action(async (opts) => {
         try {
             const client = await getClient();

@@ -108,6 +108,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
         type: "json",
         description: "JSON object with the new tyomaa fields",
       },
+      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
     ],
     writeFlags: true,
     dryRunKind: "server",

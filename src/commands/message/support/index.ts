@@ -23,6 +23,8 @@ import type { ListEnvelope } from "../../../api/envelopes.js";
 import { failWith, writeJson } from "../../../output/json.js";
 import { assertEnum, parseId, intFlag } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "../../_shared/fromJson.js";
+import { requireFlags } from "../../_shared/jsonBody.js";
 import { qs } from "../../../api/query.js";
 
 const STATUSES = ["open", "resolved", "all"] as const;
@@ -172,16 +174,28 @@ export function registerMessageSupportCommands(
       )
     );
 
+  // A support report is free Finnish prose typed by a human — exactly the
+  // payload PowerShell splits on its inner quotes.
+  const CONTACT_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set(["fromJson", "dryRun", "help"]),
+    numericFields: new Set(["tarjous", "keikka"]),
+  };
   support
     .command("contact")
     .option("--tarjous <id>", "", Number)
     .option("--keikka <id>", "", Number)
-    .requiredOption("--body <text>")
+    .option("--body <text>")
+    .option("--from-json <file>")
     // client-side --dry-run (the /support routes have no server X-Dry-Run guard); no
     // audit headers — contact persists no reason and ensureSupportThread is idempotent.
     .option("--dry-run")
     .action(
-      guarded(async (opts: { tarjous?: number; keikka?: number; body: string; dryRun?: boolean }) => {
+      guarded(async (
+        opts: { tarjous?: number; keikka?: number; body?: string; fromJson?: string; dryRun?: boolean },
+        cmd: Command
+      ) => {
+        applyFromJson(cmd, opts as Record<string, unknown>, CONTACT_FROM_JSON);
+        requireFlags(cmd, opts as Record<string, unknown>, ["body"]);
         // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
         // bare presence check would skip this guard and fire a misleading downstream
         // error. Gate on finiteness instead. (run* keeps its own guard as defence.)
@@ -194,7 +208,7 @@ export function registerMessageSupportCommands(
           await runSupportContact(await getClient(), {
             contextType,
             contextId: contextId as number,
-            body: opts.body,
+            body: opts.body as string,
             dryRun: opts.dryRun,
           })
         );

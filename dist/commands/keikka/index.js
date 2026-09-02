@@ -1,7 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
@@ -409,12 +409,10 @@ export function registerKeikkaCommands(parent, getClient) {
         });
         writeJson(result);
     }));
-    const createCmd = k
-        .command("create")
-        .requiredOption("--body <json>");
-    addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
+    const createCmd = addJsonBodyOptions(k.command("create"));
+    addWriteFlagsToCommand(createCmd).action(guarded(async (opts, cmd) => {
+        const parsed = resolveJsonBody(cmd, opts, { required: true });
         const client = await getClient();
-        const parsed = parseJsonBodyFlag(opts.body);
         const result = await runKeikkaCreate(client, parsed, opts);
         writeJson(result);
     }));

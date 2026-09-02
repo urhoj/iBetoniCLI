@@ -3,7 +3,8 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { todayHelsinki } from "../../dates.js";
-import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
@@ -337,12 +338,10 @@ export function registerWorksiteCommands(parent, getClient) {
         addressDescription: "Resolve the point from a street address instead of tyomaaId",
         run: (client, tyomaaId, address) => runWorksiteDashboard(client, { tyomaaId, address }),
     });
-    const createCmd = w
-        .command("create")
-        .requiredOption("--body <json>");
-    addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
+    const createCmd = addJsonBodyOptions(w.command("create"));
+    addWriteFlagsToCommand(createCmd).action(guarded(async (opts, cmd) => {
+        const parsed = resolveJsonBody(cmd, opts, { required: true });
         const client = await getClient();
-        const parsed = parseJsonBodyFlag(opts.body);
         const result = await runWorksiteCreate(client, parsed, opts);
         writeJson(result);
     }));
@@ -357,10 +356,8 @@ export function registerWorksiteCommands(parent, getClient) {
         .option("--driving-instructions <s>")
         .option("--comment <s>")
         .option("--invoice-ref <s>")
-        .option("--contact-person <id>", "", intFlag("--contact-person", 0))
-        .option("--body <json>")
-        .option("--from-json <file>")
-        .option("--yyyymmdd <date>");
+        .option("--contact-person <id>", "", intFlag("--contact-person", 0));
+    addJsonBodyOptions(updateCmd).option("--yyyymmdd <date>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         // `opts` IS a WorksiteUpdateFlags (plus the write/body flags); the builder

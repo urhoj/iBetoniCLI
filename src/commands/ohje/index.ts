@@ -8,7 +8,8 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { type AssessFlags, assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type TextEditOp } from "../../textEdit.js";
 import { intFlag } from "../../targets.js";
@@ -178,12 +179,13 @@ export async function runOhjeList(
  */
 export function buildOhjeFields(opts: {
   body?: string;
+  fromJson?: string;
   title?: string;
   shorttext?: string;
   htmltext?: string;
   img?: string;
 }): OhjeFields {
-  const parsed = opts.body ? (parseJsonBodyFlag(opts.body) as OhjeFields) : {};
+  const parsed = (resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {}) as OhjeFields;
   const img = opts.img ?? parsed.img;
   return {
     title: opts.title ?? parsed.title,
@@ -378,11 +380,7 @@ export function registerOhjeCommands(
       )
     );
 
-  const updateCmd = o
-    .command("update <helpId>")
-    .option(
-      "--body <json>"
-    )
+  const updateCmd = addJsonBodyOptions(o.command("update <helpId>"))
     .option("--title <s>")
     .option("--shorttext <s>")
     .option("--htmltext <s>")
@@ -397,6 +395,7 @@ export function registerOhjeCommands(
       helpId: string,
       opts: WriteFlags & {
         body?: string;
+        fromJson?: string;
         title?: string;
         shorttext?: string;
         htmltext?: string;

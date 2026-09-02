@@ -46,6 +46,8 @@ import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
+import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 
@@ -770,27 +772,37 @@ export function registerPersonCommands(
       })
     );
 
+  // `person`/`data` aside, every flag on `notify` is prose the shell mangles.
+  const NOTIFY_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+    objectFields: new Set(["data"]),
+  };
   const notifyCmd = p
     .command("notify <person>")
-    .requiredOption("--title <text>")
-    .requiredOption("--body <text>")
+    .option("--title <text>")
+    .option("--body <text>")
     .option(
       "--data <json>",
       "",
       (raw: string) => parseJsonBodyFlag(raw, "--data")
-    );
+    )
+    .option("--from-json <file>");
   addWriteFlagsToCommand(notifyCmd).action(
     guarded(async (
       person: string,
       opts: WriteFlags & {
-        title: string;
-        body: string;
+        title?: string;
+        body?: string;
         data?: Record<string, unknown>;
-      }
+        fromJson?: string;
+      },
+      cmd: Command
     ) => {
+      applyFromJson(cmd, opts as Record<string, unknown>, NOTIFY_FROM_JSON);
+      requireFlags(cmd, opts as Record<string, unknown>, ["title", "body"]);
       const result = await runNotificationFcmSend(
         await getClient(),
-        { person, title: opts.title, body: opts.body, data: opts.data },
+        { person, title: opts.title as string, body: opts.body as string, data: opts.data },
         opts
       );
       writeJson(result);

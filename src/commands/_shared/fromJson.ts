@@ -59,6 +59,15 @@ export interface FromJsonConfig {
    * a number (`changelog list`'s `feedbackId`).
    */
   numericTolerantCsvFields?: Set<string>;
+  /**
+   * Payload fields whose flag parses argv into an OBJECT (`--data <json>` on the
+   * FCM senders). A JSON author writing the file naturally nests the real object
+   * there rather than a string of JSON, and without this the value is rejected
+   * as "must be a string" — a message that reads like the field is unsupported
+   * when it is the one field the file format expresses better than argv does.
+   * Passed through untouched; anything non-object is rejected by name.
+   */
+  objectFields?: Set<string>;
   /** Flag name used as the error prefix (default `--from-json`). */
   flagName?: string;
 }
@@ -104,11 +113,12 @@ export function payloadKeyMap(
 export function normalizeFromJson(
   json: Record<string, unknown>,
   keys: Map<string, string>,
-  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "flagName"> = {}
+  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "objectFields" | "flagName"> = {}
 ): Record<string, unknown> {
   const numeric = cfg.numericFields ?? new Set<string>();
   const csv = cfg.csvFields ?? new Set<string>();
   const numericTolerant = cfg.numericTolerantCsvFields ?? new Set<string>();
+  const objects = cfg.objectFields ?? new Set<string>();
   const flagName = cfg.flagName ?? "--from-json";
   const out: Record<string, unknown> = {};
   const unknown: string[] = [];
@@ -120,6 +130,12 @@ export function normalizeFromJson(
       continue;
     }
     if (value === null || value === undefined) continue;
+    if (objects.has(key)) {
+      if (typeof value !== "object" || Array.isArray(value)) {
+        problems.push(`"${rawKey}" must be a JSON object (got ${Array.isArray(value) ? "array" : typeof value})`);
+      } else out[key] = value;
+      continue;
+    }
     if (numeric.has(key)) {
       const n = typeof value === "number" ? value : Number(value);
       if (!Number.isFinite(n)) problems.push(`"${rawKey}" must be a number`);

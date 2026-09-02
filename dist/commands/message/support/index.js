@@ -1,6 +1,8 @@
 import { failWith, writeJson } from "../../../output/json.js";
 import { assertEnum, parseId, intFlag } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { applyFromJson } from "../../_shared/fromJson.js";
+import { requireFlags } from "../../_shared/jsonBody.js";
 import { qs } from "../../../api/query.js";
 const STATUSES = ["open", "resolved", "all"];
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
@@ -92,15 +94,24 @@ export function registerMessageSupportCommands(parent, getClient) {
         .option("--status <status>", "", "open")
         .option("--limit <n>", "", intFlag("--limit", 1))
         .action(jsonAction(getClient, (client, opts) => runSupportMine(client, opts)));
+    // A support report is free Finnish prose typed by a human — exactly the
+    // payload PowerShell splits on its inner quotes.
+    const CONTACT_FROM_JSON = {
+        nonPayload: new Set(["fromJson", "dryRun", "help"]),
+        numericFields: new Set(["tarjous", "keikka"]),
+    };
     support
         .command("contact")
         .option("--tarjous <id>", "", Number)
         .option("--keikka <id>", "", Number)
-        .requiredOption("--body <text>")
+        .option("--body <text>")
+        .option("--from-json <file>")
         // client-side --dry-run (the /support routes have no server X-Dry-Run guard); no
         // audit headers — contact persists no reason and ensureSupportThread is idempotent.
         .option("--dry-run")
-        .action(guarded(async (opts) => {
+        .action(guarded(async (opts, cmd) => {
+        applyFromJson(cmd, opts, CONTACT_FROM_JSON);
+        requireFlags(cmd, opts, ["body"]);
         // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
         // bare presence check would skip this guard and fire a misleading downstream
         // error. Gate on finiteness instead. (run* keeps its own guard as defence.)

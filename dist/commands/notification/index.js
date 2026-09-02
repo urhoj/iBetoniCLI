@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { failWith, writeJson } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertEnum } from "../../targets.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { guarded } from "../_shared/action.js";
+import { applyFromJson } from "../_shared/fromJson.js";
+import { requireFlags } from "../_shared/jsonBody.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
 /**
@@ -106,27 +108,53 @@ export function registerNotificationCommands(parent, getClient) {
     const n = parent
         .command("notification")
         .description("Outbound notifications (push, email) to people");
+    // --data is the only non-prose field here; --html is a PATH, so it round-trips
+    // through a JSON string unharmed.
+    const FCM_SEND_FROM_JSON = {
+        nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+        objectFields: new Set(["data"]),
+    };
+    const EMAIL_SEND_FROM_JSON = {
+        nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+    };
     const fcm = n
         .command("fcm")
         .description("Firebase Cloud Messaging push notifications");
     const sendCmd = fcm
         .command("send")
-        .requiredOption("--person <idOrName>")
-        .requiredOption("--title <text>")
-        .requiredOption("--body <text>")
-        .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"));
-    addWriteFlagsToCommand(sendCmd).action(jsonAction(getClient, (client, opts) => runNotificationFcmSend(client, { person: opts.person, title: opts.title, body: opts.body, data: opts.data }, opts)));
+        .option("--person <idOrName>")
+        .option("--title <text>")
+        .option("--body <text>")
+        .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"))
+        .option("--from-json <file>");
+    addWriteFlagsToCommand(sendCmd).action(
+    // `guarded`, not `jsonAction`: the --from-json merge and the required-flag
+    // check must run BEFORE getClient(), so a malformed payload is exit 4 even
+    // when logged out (same ordering rule as `ib message chat edit`).
+    guarded(async (opts, cmd) => {
+        applyFromJson(cmd, opts, FCM_SEND_FROM_JSON);
+        requireFlags(cmd, opts, ["person", "title", "body"]);
+        writeJson(await runNotificationFcmSend(await getClient(), {
+            person: opts.person,
+            title: opts.title,
+            body: opts.body,
+            data: opts.data,
+        }, opts));
+    }));
     const email = n
         .command("email")
         .description("Email channel — send an email to a person or address");
     const emailSend = email
         .command("send <recipient>")
-        .requiredOption("--subject <text>")
+        .option("--subject <text>")
         .option("--body <text>")
         .option("--html <file>")
         .option("--html-body <html>")
-        .option("--from-brand <brand>", "", "betoni");
-    addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts) => {
+        .option("--from-brand <brand>", "", "betoni")
+        .option("--from-json <file>");
+    addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts, cmd) => {
+        applyFromJson(cmd, opts, EMAIL_SEND_FROM_JSON);
+        requireFlags(cmd, opts, ["subject"]);
         if (!opts.body && !opts.html && !opts.htmlBody) {
             failWith("one of --body, --html, or --html-body is required", 4);
         }

@@ -68,6 +68,7 @@ export const OHJE_SPECS: CommandSpec[] = [
       { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
+      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",

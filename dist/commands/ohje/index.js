@@ -2,7 +2,8 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, warnNote } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope } from "../../textEdit.js";
 import { intFlag } from "../../targets.js";
@@ -92,7 +93,7 @@ export async function runOhjeList(client, opts = {}) {
  * spawning the CLI.
  */
 export function buildOhjeFields(opts) {
-    const parsed = opts.body ? parseJsonBodyFlag(opts.body) : {};
+    const parsed = (resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {});
     const img = opts.img ?? parsed.img;
     return {
         title: opts.title ?? parsed.title,
@@ -237,9 +238,7 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--fields <cols>", "", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))
         .option("--sort <field:dir>"))
         .action(jsonAction(getClient, (client, opts) => runOhjeList(client, opts)));
-    const updateCmd = o
-        .command("update <helpId>")
-        .option("--body <json>")
+    const updateCmd = addJsonBodyOptions(o.command("update <helpId>"))
         .option("--title <s>")
         .option("--shorttext <s>")
         .option("--htmltext <s>")

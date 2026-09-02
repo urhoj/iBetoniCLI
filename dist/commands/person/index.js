@@ -17,6 +17,8 @@ import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { applyFromJson } from "../_shared/fromJson.js";
+import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 /**
@@ -469,12 +471,20 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         const result = await runPersonSearch(client, q, opts.limit);
         writeJson(result);
     }));
+    // `person`/`data` aside, every flag on `notify` is prose the shell mangles.
+    const NOTIFY_FROM_JSON = {
+        nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+        objectFields: new Set(["data"]),
+    };
     const notifyCmd = p
         .command("notify <person>")
-        .requiredOption("--title <text>")
-        .requiredOption("--body <text>")
-        .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"));
-    addWriteFlagsToCommand(notifyCmd).action(guarded(async (person, opts) => {
+        .option("--title <text>")
+        .option("--body <text>")
+        .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"))
+        .option("--from-json <file>");
+    addWriteFlagsToCommand(notifyCmd).action(guarded(async (person, opts, cmd) => {
+        applyFromJson(cmd, opts, NOTIFY_FROM_JSON);
+        requireFlags(cmd, opts, ["title", "body"]);
         const result = await runNotificationFcmSend(await getClient(), { person, title: opts.title, body: opts.body, data: opts.data }, opts);
         writeJson(result);
     }));

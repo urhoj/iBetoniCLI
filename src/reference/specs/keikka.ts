@@ -194,6 +194,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         required: true,
         description: "JSON object with the new keikka fields",
       },
+      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
     ],
     writeFlags: true,
     dryRunKind: "server",

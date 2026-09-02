@@ -117,6 +117,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "Message text (max 4000 chars)" },
       { name: "source", type: "string", description: "Provenance: web|cli|ai (default: IB_SOURCE env or cli)" },
+      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -214,6 +215,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "thread", type: "number", description: "Thread id the message belongs to" },
       TARJOUS_THREAD_FLAG,
       { name: "body", type: "string", required: true, description: "New message text (max 4000 chars)" },
+      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -366,6 +368,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "keikka", type: "number", description: "keikkaId this escalation is about" },
       { name: "body", type: "string", required: true, description: "The message to support" },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
     ],
     outputShape:
       "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",

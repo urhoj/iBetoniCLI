@@ -9,7 +9,8 @@ import {
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId, cappedInt, assertPositiveInt, intFlag, numFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -1151,9 +1152,7 @@ export function registerSijaintiCommands(
     run: (client, sijaintiId, address) => runSijaintiDashboard(client, { sijaintiId, address }),
   });
 
-  const createCmd = s
-    .command("create")
-    .option("--body <json>")
+  const createCmd = addJsonBodyOptions(s.command("create"))
     .option("--name <n>")
     .option("--address <a>")
     .option("--type <id>", "", intFlag("--type"))
@@ -1171,6 +1170,7 @@ export function registerSijaintiCommands(
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (opts: WriteFlags & {
       body?: string;
+      fromJson?: string;
       name?: string;
       address?: string;
       type?: number;
@@ -1186,9 +1186,7 @@ export function registerSijaintiCommands(
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       const client = await getClient();
-      const parsed = opts.body
-        ? parseJsonBodyFlag(opts.body)
-        : {};
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       const body = buildSijaintiBody(parsed, {
         name: opts.name,
         address: opts.address,
@@ -1233,9 +1231,7 @@ export function registerSijaintiCommands(
     })
   );
 
-  const updateCmd = s
-    .command("update")
-    .option("--body <json>")
+  const updateCmd = addJsonBodyOptions(s.command("update"))
     .option("--id <sijaintiId>", "", intFlag("--id"))
     .option("--name <n>")
     .option("--address <a>")
@@ -1256,6 +1252,7 @@ export function registerSijaintiCommands(
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (opts: WriteFlags & {
       body?: string;
+      fromJson?: string;
       id?: number;
       name?: string;
       address?: string;
@@ -1280,9 +1277,7 @@ export function registerSijaintiCommands(
         failWith("Pass at most one of --show-on-map / --hide-on-map", 4);
       }
       const client = await getClient();
-      const parsed = opts.body
-        ? parseJsonBodyFlag(opts.body)
-        : {};
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       const body = buildSijaintiBody(parsed, {
         id: opts.id,
         name: opts.name,

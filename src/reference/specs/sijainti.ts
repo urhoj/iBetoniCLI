@@ -159,6 +159,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
       { name: "public", type: "boolean", description: "Create the row PUBLISHED (isPublic=1, readable cross-tenant). Omit for private — the default; requires company-admin rights" },
       { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
+      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -209,7 +210,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     flags: [
       // NB: unlike `person update` / `worksite update`, this command has NO
       // --from-json, so the PowerShell escape hatch here is typed flags only.
-      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use the typed flags there (this command has no --from-json; see `ib help shell-quoting`)." },
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (see `ib help shell-quoting`)." },
       { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
       { name: "name", type: "string", description: "sijaintiNimi" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
@@ -225,6 +226,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       { name: "show-on-map", type: "boolean", description: "Show on the public /kartta map layer (showOnMap=true, \"Näytä kartalla\"). Omit BOTH flags to leave the stored map flag untouched" },
       { name: "hide-on-map", type: "boolean", description: "Hide from the /kartta map layer (showOnMap=false). Mutually exclusive with --show-on-map" },
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
+      { name: "from-json", type: "string", description: "Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body." },
     ],
     writeFlags: true,
     dryRunKind: "server",

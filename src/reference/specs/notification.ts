@@ -21,6 +21,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       { name: "title", type: "string", description: "Notification title", required: true },
       { name: "body", type: "string", description: "Notification body", required: true },
       { name: "data", type: "string", description: "Extra FCM data payload as a JSON object (e.g. '{\"url\":\"/grid\"}')" },
+      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -79,6 +80,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
         description:
           "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
       },
+      { name: "from-json", type: "string", description: "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv." },
     ],
     writeFlags: true,
     dryRunKind: "server",

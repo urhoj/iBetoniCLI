@@ -4,7 +4,9 @@ import type { ApiClient } from "../../api/client.js";
 import { failWith, writeJson } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertEnum } from "../../targets.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { guarded } from "../_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
+import { requireFlags } from "../_shared/jsonBody.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -147,40 +149,61 @@ export function registerNotificationCommands(
     .command("notification")
     .description("Outbound notifications (push, email) to people");
 
+  // --data is the only non-prose field here; --html is a PATH, so it round-trips
+  // through a JSON string unharmed.
+  const FCM_SEND_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+    objectFields: new Set(["data"]),
+  };
+  const EMAIL_SEND_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+  };
   const fcm = n
     .command("fcm")
     .description("Firebase Cloud Messaging push notifications");
 
   const sendCmd = fcm
     .command("send")
-    .requiredOption(
+    .option(
       "--person <idOrName>"
     )
-    .requiredOption("--title <text>")
-    .requiredOption("--body <text>")
+    .option("--title <text>")
+    .option("--body <text>")
     .option(
       "--data <json>",
       "",
       (raw: string) => parseJsonBodyFlag(raw, "--data")
-    );
+    )
+    .option("--from-json <file>");
   addWriteFlagsToCommand(sendCmd).action(
-    jsonAction(
-      getClient,
-      (
-        client,
-        opts: WriteFlags & {
-          person: string;
-          title: string;
-          body: string;
-          data?: Record<string, unknown>;
-        }
-      ) =>
-        runNotificationFcmSend(
-          client,
-          { person: opts.person, title: opts.title, body: opts.body, data: opts.data },
+    // `guarded`, not `jsonAction`: the --from-json merge and the required-flag
+    // check must run BEFORE getClient(), so a malformed payload is exit 4 even
+    // when logged out (same ordering rule as `ib message chat edit`).
+    guarded(async (
+      opts: WriteFlags & {
+        person?: string;
+        title?: string;
+        body?: string;
+        data?: Record<string, unknown>;
+        fromJson?: string;
+      },
+      cmd: Command
+    ) => {
+      applyFromJson(cmd, opts as Record<string, unknown>, FCM_SEND_FROM_JSON);
+      requireFlags(cmd, opts as Record<string, unknown>, ["person", "title", "body"]);
+      writeJson(
+        await runNotificationFcmSend(
+          await getClient(),
+          {
+            person: opts.person as string,
+            title: opts.title as string,
+            body: opts.body as string,
+            data: opts.data,
+          },
           opts
         )
-    )
+      );
+    })
   );
 
   const email = n
@@ -189,7 +212,7 @@ export function registerNotificationCommands(
 
   const emailSend = email
     .command("send <recipient>")
-    .requiredOption("--subject <text>")
+    .option("--subject <text>")
     .option("--body <text>")
     .option("--html <file>")
     .option(
@@ -199,18 +222,23 @@ export function registerNotificationCommands(
       "--from-brand <brand>",
       "",
       "betoni"
-    );
+    )
+    .option("--from-json <file>");
   addWriteFlagsToCommand(emailSend).action(
     guarded(async (
       recipient: string,
       opts: WriteFlags & {
-        subject: string;
+        subject?: string;
         body?: string;
         html?: string;
         htmlBody?: string;
         fromBrand?: string;
-      }
+        fromJson?: string;
+      },
+      cmd: Command
     ) => {
+      applyFromJson(cmd, opts as Record<string, unknown>, EMAIL_SEND_FROM_JSON);
+      requireFlags(cmd, opts as Record<string, unknown>, ["subject"]);
       if (!opts.body && !opts.html && !opts.htmlBody) {
         failWith("one of --body, --html, or --html-body is required", 4);
       }
@@ -221,7 +249,7 @@ export function registerNotificationCommands(
       const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
       const result = await runNotificationEmailSend(
         await getClient(),
-        { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand },
+        { recipient, subject: opts.subject as string, text: opts.body, html, fromBrand: brand },
         opts
       );
       writeJson(result);

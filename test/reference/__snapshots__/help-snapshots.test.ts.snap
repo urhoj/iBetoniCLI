@@ -1192,6 +1192,7 @@ FLAGS
   --city STRING    Billing city (laskutusKaupunki)
   --get-or-create    If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -1241,6 +1242,7 @@ FLAGS
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -1877,6 +1879,7 @@ FLAGS
   --city STRING    Billing city (laskutusKaupunki)
   --from-prh STRING    Refresh name + yTunnus + billing address from PRH (explicit flags still win)
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -6263,6 +6266,7 @@ DESCRIPTION
 
 FLAGS
   --body JSON    JSON object with the new keikka fields (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -7827,6 +7831,7 @@ FLAGS
   --thread NUMBER    Thread id the message belongs to
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --body STRING    New message text (max 4000 chars) (required)
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -8055,6 +8060,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --body STRING    Message text (max 4000 chars) (required)
   --source STRING    Provenance: web|cli|ai (default: IB_SOURCE env or cli)
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -8614,6 +8620,7 @@ FLAGS
   --keikka NUMBER    keikkaId this escalation is about
   --body STRING    The message to support (required)
   --dry-run    Print the payload without sending (client-side)
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -9021,6 +9028,7 @@ FLAGS
   --html STRING    Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)
   --html-body STRING    Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)
   --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -9074,6 +9082,7 @@ FLAGS
   --title STRING    Notification title (required)
   --body STRING    Notification body (required)
   --data STRING    Extra FCM data payload as a JSON object (e.g. '{"url":"/grid"}')
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -9245,6 +9254,7 @@ FLAGS
   --append STRING    Edit mode: append text to the target field (verbatim)
   --prepend STRING    Edit mode: prepend text to the target field (verbatim)
   --all    With --replace: substitute every occurrence
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -10522,6 +10532,7 @@ FLAGS
   --title STRING    Notification title (required)
   --body STRING    Notification body (required)
   --data STRING    Extra FCM data payload as a JSON object
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -11506,6 +11517,7 @@ FLAGS
   --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --public    Create the row PUBLISHED (isPublic=1, readable cross-tenant). Omit for private — the default; requires company-admin rights
   --geocode    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -12016,7 +12028,7 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
-  --body JSON    JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use the typed flags there (this command has no --from-json; see \`ib help shell-quoting\`).
+  --body JSON    JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (see \`ib help shell-quoting\`).
   --id NUMBER    Target sijaintiId (or include sijaintiId in --body)
   --name STRING    sijaintiNimi
   --address STRING    sijaintiOsoite1 (street)
@@ -12032,6 +12044,7 @@ FLAGS
   --show-on-map    Show on the public /kartta map layer (showOnMap=true, "Näytä kartalla"). Omit BOTH flags to leave the stored map flag untouched
   --hide-on-map    Hide from the /kartta map layer (showOnMap=false). Mutually exclusive with --show-on-map
   --geocode    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -13471,6 +13484,7 @@ DESCRIPTION
 
 FLAGS
   --body JSON    JSON object with the new tyomaa fields
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.

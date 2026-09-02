@@ -41,6 +41,7 @@ export function normalizeFromJson(json, keys, cfg = {}) {
     const numeric = cfg.numericFields ?? new Set();
     const csv = cfg.csvFields ?? new Set();
     const numericTolerant = cfg.numericTolerantCsvFields ?? new Set();
+    const objects = cfg.objectFields ?? new Set();
     const flagName = cfg.flagName ?? "--from-json";
     const out = {};
     const unknown = [];
@@ -53,6 +54,14 @@ export function normalizeFromJson(json, keys, cfg = {}) {
         }
         if (value === null || value === undefined)
             continue;
+        if (objects.has(key)) {
+            if (typeof value !== "object" || Array.isArray(value)) {
+                problems.push(`"${rawKey}" must be a JSON object (got ${Array.isArray(value) ? "array" : typeof value})`);
+            }
+            else
+                out[key] = value;
+            continue;
+        }
         if (numeric.has(key)) {
             const n = typeof value === "number" ? value : Number(value);
             if (!Number.isFinite(n))

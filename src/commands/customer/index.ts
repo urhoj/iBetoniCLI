@@ -8,7 +8,8 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, queryAliasOption, intFlag } from "../../targets.js";
@@ -237,6 +238,7 @@ export interface CustomerUpsertOptions {
   postalCode?: string;
   city?: string;
   body?: string;
+  fromJson?: string;
 }
 
 /**
@@ -800,6 +802,7 @@ export interface CustomerCreateFlags {
   postalCode?: string;
   city?: string;
   body?: string;
+  fromJson?: string;
 }
 
 /**
@@ -826,7 +829,8 @@ export function buildAsiakasCreateBody(
   if (flags.email !== undefined) body.email = flags.email;
   if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
   applyBillingFlags(body, flags);
-  if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
+  const raw = resolveJsonObjectBody({ body: flags.body, fromJson: flags.fromJson });
+  if (raw) Object.assign(body, raw);
   return body;
 }
 
@@ -895,6 +899,7 @@ export interface CustomerUpdateFlags {
   postalCode?: string;
   city?: string;
   body?: string;
+  fromJson?: string;
 }
 
 /**
@@ -939,7 +944,8 @@ export function buildAsiakasUpdateBody(
   if (flags.contactPerson !== undefined) body.asiakasContactPersonId = flags.contactPerson;
   if (flags.type !== undefined) body.asiakasTypeId = flags.type;
   applyBillingFlags(body, flags);
-  if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
+  const raw = resolveJsonObjectBody({ body: flags.body, fromJson: flags.fromJson });
+  if (raw) Object.assign(body, raw);
   return body;
 }
 
@@ -1238,8 +1244,8 @@ export function registerCustomerCommands(
     .option("--city <s>")
     .option(
       "--get-or-create"
-    )
-    .option("--body <json>");
+    );
+  addJsonBodyOptions(createCmd);
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (opts: CustomerCreateFlags & WriteFlags & { getOrCreate?: boolean }) => {
       const client = await getClient();
@@ -1294,8 +1300,8 @@ export function registerCustomerCommands(
     .option("--address <s>")
     .option("--postal-code <s>")
     .option("--city <s>")
-    .option("--from-prh <ytunnus>")
-    .option("--body <json>");
+    .option("--from-prh <ytunnus>");
+  addJsonBodyOptions(updateCmd);
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (idStr: string, opts: CustomerUpdateFlags & WriteFlags & { fromPrh?: string }) => {
       const client = await getClient();
@@ -1332,8 +1338,8 @@ export function registerCustomerCommands(
     .option("--type <id>", "", intFlag("--type", 1))
     .option("--address <s>")
     .option("--postal-code <s>")
-    .option("--city <s>")
-    .option("--body <json>");
+    .option("--city <s>");
+  addJsonBodyOptions(upsertCmd);
   addWriteFlagsToCommand(upsertCmd).action(
     async (opts: CustomerUpsertOptions & WriteFlags) => {
       try {

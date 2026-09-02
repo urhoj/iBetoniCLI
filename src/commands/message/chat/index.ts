@@ -10,6 +10,8 @@ import { writeJson, failWith } from "../../../output/json.js";
 import { addThreadTargetOption, resolveThreadId, targetFrom, threadAction } from "./resolveThread.js";
 import { parseId, resolveSearchQuery, queryAliasOption, intFlag, cappedInt } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "../../_shared/fromJson.js";
+import { requireFlags } from "../../_shared/jsonBody.js";
 import { qs } from "../../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -332,19 +334,30 @@ export function registerMessageChatCommands(
       writeJson(await run(client, id, messageId, opts));
     });
 
+  // A chat message is user prose in Finnish; --thread/--tarjous are the target
+  // selectors, which a --from-json file may equally carry.
+  const CHAT_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+    numericFields: new Set(["thread", "tarjous"]),
+  };
   const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
-    .requiredOption("--body <text>")
+    .option("--body <text>")
+    .option("--from-json <file>")
     .option("--source <src>");
   addWriteFlagsToCommand(sendCmd).action(
     guarded(async (
       threadIdStr: string | undefined,
       opts: WriteFlags & {
         tarjous?: number;
-        body: string;
+        body?: string;
+        fromJson?: string;
         source?: string;
-      }
+      },
+      cmd: Command
     ) => {
-      const body = assertMessageBody(opts.body);
+      applyFromJson(cmd, opts as Record<string, unknown>, CHAT_FROM_JSON);
+      requireFlags(cmd, opts as Record<string, unknown>, ["body"]);
+      const body = assertMessageBody(opts.body as string);
       const source = opts.source ?? process.env.IB_SOURCE ?? "cli";
       if (!["web", "cli", "ai"].includes(source)) {
         failWith(`Invalid --source "${source}" — use web|cli|ai`, 4);
@@ -374,16 +387,20 @@ export function registerMessageChatCommands(
   const editCmd = addThreadTargetOption(
     c.command("edit <messageId>").option("--thread <id>", "", intFlag("--thread", 1))
   )
-    .requiredOption("--body <text>");
+    .option("--body <text>")
+    .option("--from-json <file>");
   // Not messageAction: the body guard must stay ahead of getClient(), so a bad
   // body is exit 4 even when logged out.
   addWriteFlagsToCommand(editCmd).action(
     guarded(async (
       messageIdStr: string,
-      opts: WriteFlags & { thread?: number; tarjous?: number; body: string }
+      opts: WriteFlags & { thread?: number; tarjous?: number; body?: string; fromJson?: string },
+      cmd: Command
     ) => {
+      applyFromJson(cmd, opts as Record<string, unknown>, CHAT_FROM_JSON);
+      requireFlags(cmd, opts as Record<string, unknown>, ["body"]);
       const messageId = parseId(messageIdStr, "messageId");
-      const body = assertMessageBody(opts.body);
+      const body = assertMessageBody(opts.body as string);
       const client = await getClient();
       const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
       writeJson(await runChatEdit(client, id, messageId, {
