@@ -32,7 +32,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, strayOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -862,6 +862,21 @@ export function handleParseRejection(
           flag: longFlag(f),
           issue: "missing",
         }));
+        // Commander checks mandatory options BEFORE unknown ones, so a caller
+        // who also passed a flag this command lacks was told only about the
+        // missing one — the lower-information fault, and a misleading one: it
+        // reads as "one flag away from correct" when a flag the command cannot
+        // accept says the caller's model of the command is wrong (fb#1179).
+        // Lead with the unknown-option envelope — its sibling scan may name the
+        // command that DOES take the flag — and fold the missing flags into its
+        // hint so both faults still come back in one response.
+        const stray = strayOption(cmd);
+        if (stray) {
+          const envelope = buildUnknownOptionEnvelope(cmd, stray, getCallerTier());
+          const flags = problems.map((p) => p.flag).join(", ");
+          envelope.hint = `${envelope.hint} Also missing required ${problems.length === 1 ? "flag" : "flags"}: ${flags}.`;
+          return emitUsageEnvelope(err, envelope);
+        }
         const envelope = buildValidationEnvelope(path, problems, { spec });
         // Commander reports the missing flag BEFORE excess positionals, so a
         // caller who made both mistakes at once would never see the date hint

@@ -934,24 +934,55 @@ describe("write-safety flags explain their own idiom (fb#646)", () => {
 // which reads as "nothing like this exists" — in the `ib dev sql` case that
 // sent the session to write a scratch node probe against PRODUCTION.
 describe("descendantsOwningCompoundVerb (fb#1020)", () => {
+  const jerry = visibleSubcommands(leafByPath("jerry"), "developer");
+  const customer = visibleSubcommands(leafByPath("customer"), "developer");
+  const keikka = visibleSubcommands(leafByPath("keikka"), "developer");
+
   test("last hyphen-segment resolves the filed case", () => {
-    expect(descendantsOwningCompoundVerb("ib jerry", "company-search", "developer")).toEqual([
+    expect(descendantsOwningCompoundVerb("ib jerry", "company-search", "developer", jerry)).toEqual([
       "ib jerry admin search",
     ]);
   });
 
   test("silent on a token with no hyphen (the exact layer owns that)", () => {
-    expect(descendantsOwningCompoundVerb("ib jerry", "search", "developer")).toEqual([]);
+    expect(descendantsOwningCompoundVerb("ib jerry", "search", "developer", jerry)).toEqual([]);
   });
 
   test("silent when the leaf is AMBIGUOUS inside the group, rather than guessing one", () => {
     // `ib jerry ~ list` has 5 owners; naming an arbitrary one is the noise this
     // layer's single-owner guard exists to prevent.
-    expect(descendantsOwningCompoundVerb("ib jerry", "provider-list", "developer")).toEqual([]);
+    expect(descendantsOwningCompoundVerb("ib jerry", "provider-list", "developer", jerry)).toEqual([]);
   });
 
   test("silent on a trailing hyphen (no verb to match)", () => {
-    expect(descendantsOwningCompoundVerb("ib jerry", "company-", "developer")).toEqual([]);
+    expect(descendantsOwningCompoundVerb("ib jerry", "company-", "developer", jerry)).toEqual([]);
+  });
+
+  // fb#1154: the layer inherited the depth>=2 rule, so a DIRECT child could
+  // never be the answer — `ib customer company-list` named the deep `ib customer
+  // person list` over the obvious `ib customer list`, and `ib keikka
+  // drivers-list` discarded the real `drivers` subgroup. The token's own
+  // segments are checked in-group BEFORE any deep owner is named.
+  test("the token spelled with spaces IS a path → that path, whatever its depth (fb#1154)", () => {
+    expect(descendantsOwningCompoundVerb("ib customer", "person-list", "developer", customer)).toEqual([
+      "ib customer person list",
+    ]);
+    expect(descendantsOwningCompoundVerb("ib jerry", "admin-request-stats", "developer", jerry)).toEqual([
+      "ib jerry admin request stats",
+    ]);
+    // Prefix names a real subgroup AND the verb lives in it — the spelled path
+    // wins over the "prefix is a child → stay silent" rule below.
+    expect(descendantsOwningCompoundVerb("ib jerry", "admin-search", "developer", jerry)).toEqual([
+      "ib jerry admin search",
+    ]);
+  });
+
+  test("silent when the VERB names a direct child — that sibling is the answer (fb#1154)", () => {
+    expect(descendantsOwningCompoundVerb("ib customer", "company-list", "developer", customer)).toEqual([]);
+  });
+
+  test("silent when the PREFIX names a real subgroup that lacks the verb (fb#1154)", () => {
+    expect(descendantsOwningCompoundVerb("ib keikka", "drivers-list", "developer", keikka)).toEqual([]);
   });
 });
 
@@ -1030,5 +1061,36 @@ describe("fb#1020 envelope wiring", () => {
     const env = buildUnknownCommandEnvelope(jerry, "zzzznope", "developer");
     expect(env.availableElsewhere).toEqual([]);
     expect(env.hint).not.toContain("ARGUMENT");
+  });
+});
+
+// fb#1154: the actionable sentence must aim at the likeliest intent. Edit
+// distance cannot bridge `company-list` → `list` (it lands on `dead-list`), so
+// a compound token's own segments are matched against the group's children
+// before either the fuzzy guess or the deep-owner layer gets a say.
+describe("fb#1154 envelope wiring", () => {
+  test("`ib customer company-list` points at the direct child, not the deep owner", () => {
+    const customer = leafByPath("customer");
+    customer.args = ["company-list"];
+    const env = buildUnknownCommandEnvelope(customer, "company-list", "developer");
+    expect(env.didYouMean).toBe("list");
+    expect(env.availableElsewhere).toEqual([]);
+    expect(env.hint).not.toContain("ib customer person list");
+  });
+
+  test("`ib keikka drivers-list` keeps the real subgroup as the lead answer", () => {
+    const keikka = leafByPath("keikka");
+    keikka.args = ["drivers-list"];
+    const env = buildUnknownCommandEnvelope(keikka, "drivers-list", "developer");
+    expect(env.didYouMean).toBe("drivers");
+    expect(env.availableElsewhere).toEqual([]);
+  });
+
+  test("`ib vehicle truck-get` resolves to the direct `get` instead of dead-ending", () => {
+    const vehicle = leafByPath("vehicle");
+    vehicle.args = ["truck-get"];
+    const env = buildUnknownCommandEnvelope(vehicle, "truck-get", "developer");
+    expect(env.didYouMean).toBe("get");
+    expect(env.availableElsewhere).toEqual([]);
   });
 });

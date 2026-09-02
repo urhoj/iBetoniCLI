@@ -118,23 +118,60 @@ export function descendantsOwningVerb(group, token, tier) {
  * `ib jerry ~ get` (3), `ib betoni ~ list` (2)) where naming an arbitrary one
  * would be exactly the noise this guard exists to prevent.
  *
- * INHERITED from {@link descendantsOwningVerb}, and easy to misread — two
- * independent reviewers read this comment and both concluded the wrong thing:
- * the depth>=2 rule means a DIRECT child can never be the answer here. So
- * `ib customer company-list` does NOT stay silent and does NOT resolve to
- * `ib customer list`; it names the unique DEEP owner `ib customer person list`.
- * That shadowing is a known defect, tracked in fb#1154 along with the sibling
- * case where a meaningful prefix (`ib keikka drivers-list`) is discarded. At the
- * ROOT, ROOT_MAX_OWNERS applies before the single-owner filter.
+ * The deep scan INHERITS the depth>=2 rule from {@link descendantsOwningVerb},
+ * so on its own it could never name a DIRECT child — `ib customer company-list`
+ * named the deep `ib customer person list` over the obvious `ib customer list`,
+ * and `ib keikka drivers-list` threw away the real `drivers` subgroup (fb#1154).
+ * So the token's own segments are checked in-group FIRST, in this order:
+ *
+ *  A. Spelled with spaces, the token IS a visible path (`admin-request-stats` →
+ *     `ib jerry admin request stats`) → that path, whatever its depth. The caller
+ *     typed the real command; no child outranks it.
+ *  B. A segment names a visible child of this group — the prefix as a real
+ *     subgroup lacking the verb, or the verb as a direct child — → SILENT. That
+ *     child is the likelier intent and is what `didYouMean` names (see
+ *     {@link compoundChildOf}); a deep owner would only aim the actionable
+ *     sentence away from it.
+ *  C. Otherwise the deep single-owner scan above. At the ROOT, ROOT_MAX_OWNERS
+ *     applies before the single-owner filter.
+ *
+ * `available` is the group's VISIBLE children (the same list `didYouMean` draws
+ * from), so rule B can never suggest a leaf the caller's tier cannot see.
  */
-export function descendantsOwningCompoundVerb(group, token, tier) {
-    if (!token.includes("-"))
+export function descendantsOwningCompoundVerb(group, token, tier, available) {
+    const cut = token.lastIndexOf("-");
+    if (cut < 0)
         return [];
-    const verb = token.slice(token.lastIndexOf("-") + 1).toLowerCase();
+    const verb = token.slice(cut + 1).toLowerCase();
     if (!verb)
+        return [];
+    const spelled = `${canonicalPath(group)} ${token.toLowerCase().replace(/-/g, " ")}`;
+    const exact = COMMAND_SPECS.find((s) => s.command === spelled && !isHiddenAtTier(s, tier));
+    if (exact)
+        return [exact.command];
+    if (compoundChildOf(token, available))
         return [];
     const hits = descendantsOwningVerb(group, verb, tier);
     return hits.length === 1 ? hits : [];
+}
+/**
+ * For a COMPOUND token, the visible child its own segments name: the prefix
+ * first (`drivers-list` → `drivers` — the caller narrowed to a subgroup), then
+ * the verb (`company-list` → `list`). Edit distance cannot make that leap
+ * (`company-list` scores closer to `dead-list`), which is why
+ * {@link buildUnknownCommandEnvelope} consults this before {@link closestName}
+ * and {@link descendantsOwningCompoundVerb} stays silent when it answers
+ * (fb#1154). Null when the token is not compound or neither segment is a child.
+ */
+export function compoundChildOf(token, available) {
+    const cut = token.lastIndexOf("-");
+    if (cut < 0)
+        return null;
+    const prefix = token.slice(0, cut).toLowerCase();
+    const verb = token.slice(cut + 1).toLowerCase();
+    return (available.find((n) => n.toLowerCase() === prefix) ??
+        available.find((n) => n.toLowerCase() === verb) ??
+        null);
 }
 /**
  * The token is not a command at all but the NAME OF A POSITIONAL ARGUMENT of
@@ -278,7 +315,9 @@ export function visibleSubcommands(cmd, tier) {
 export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     const group = commandPath(cmd);
     const available = visibleSubcommands(cmd, tier);
-    const didYouMean = closestName(unknownToken, available);
+    // A compound token's own segments beat the fuzzy guess (fb#1154): `company-list`
+    // is `list`, not the edit-distance neighbour `dead-list`.
+    const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, available);
     const discover = discoverHint(group);
     const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
     const availableStr = available.length > 0
@@ -295,17 +334,18 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     const exactDescendants = curated.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
     const descendants = curated.length || exactDescendants.length
         ? exactDescendants
-        : descendantsOwningCompoundVerb(group, unknownToken, tier);
-    // Last resort, below every verb layer: the token names an ARGUMENT rather than
-    // a command (fb#1020).
-    const positional = curated.length || descendants.length
-        ? null
-        : descendantsOwningPositional(group, unknownToken, tier);
-    // Last: the token names a top-level DOMAIN (fb#386). Ranked below both — an
-    // answer inside the group the caller chose beats sending them to another one.
-    const elsewhere = curated.length || descendants.length || positional
+        : descendantsOwningCompoundVerb(group, unknownToken, tier, available);
+    // Below every in-group verb layer: the token names a top-level DOMAIN (fb#386)
+    // — an answer inside the group the caller chose beats sending them elsewhere.
+    const elsewhere = curated.length || descendants.length
         ? curated
         : topLevelDomainRedirect(group, unknownToken, available, tier);
+    // Last resort, below ALL of the above: the token names an ARGUMENT rather than
+    // a command (fb#1020). An exact domain-name match outranks this heuristic;
+    // the previous order let it pre-empt the domain redirect (fb#1154).
+    const positional = curated.length || descendants.length || elsewhere.length
+        ? null
+        : descendantsOwningPositional(group, unknownToken, tier);
     const rest = (cmd.args ?? []).slice(1).map(String);
     // "this group" is the group the caller typed — at the root there is none, so
     // the same two sentences name the owning DOMAIN instead (fb#383).
@@ -530,6 +570,35 @@ function dateFlagOf(spec) {
 export function excessPositionals(cmd) {
     const declared = cmd.registeredArguments?.length ?? 0;
     return (cmd.args ?? []).slice(declared).map(String);
+}
+/**
+ * The first token Commander would reject as an UNKNOWN OPTION on `cmd`, or null.
+ *
+ * Commander checks mandatory options BEFORE unknown ones (`_parseCommand`), so
+ * when both faults sit on one argv the caller hears only about the missing flag
+ * (fb#1179). After parse `cmd.args` is the operands followed by the unknown
+ * tail — every recognised option has been consumed — so its first option-like
+ * token is exactly what Commander's own check would have named. Mirrors
+ * `parseOptions`: a lone `-` and a negative number are operands.
+ *
+ * One shape `cmd.args` alone cannot settle: dash tokens after a `--` terminator
+ * are operands, and Commander keeps the `--` itself only when an unknown option
+ * already preceded it. So a `--` on the root argv that is absent from
+ * `cmd.args` means no unknown option was seen at all.
+ */
+export function strayOption(cmd) {
+    const args = (cmd.args ?? []).map(String);
+    let root = cmd;
+    while (root.parent)
+        root = root.parent;
+    // `rawArgs` is set on the ROOT by Commander's `_prepareUserArgs` (the full
+    // user argv) but is not in its typings.
+    const rawArgs = root.rawArgs ?? [];
+    const terminator = args.indexOf("--");
+    if (terminator < 0 && rawArgs.includes("--"))
+        return null;
+    const scan = terminator < 0 ? args : args.slice(0, terminator);
+    return (scan.find((a) => a.length > 1 && a.startsWith("-") && !/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(a)) ?? null);
 }
 /**
  * A command's spec-backed surface, resolved once: rendered path, matching spec

@@ -94,6 +94,37 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
+  // fb#1179: Commander checks mandatory options BEFORE unknown ones, so a
+  // caller who both forgot a required flag AND passed one the command lacks
+  // was told only "missing required flag" — the lower-information fault, and a
+  // misleading one: it implies the invocation is one flag away from correct
+  // when the caller's model of the command is wrong.
+  describe("unknown flag alongside a missing required flag (fb#1179)", () => {
+    test("leads with the unknown-option envelope and folds the missing flag into its hint", async () => {
+      await run(["company", "switch", "--bogus", "1"]);
+      const parsed = lastStderrJson();
+      expect(parsed.code).toBe("USAGE");
+      expect(parsed.unknownOption).toBe("--bogus");
+      expect(String(parsed.hint)).toMatch(/missing required flag.*--to/);
+      expect(process.exitCode).toBe(4);
+    });
+
+    test("a bare missing flag still gets the prescriptive envelope", async () => {
+      await run(["company", "switch"]);
+      const parsed = lastStderrJson();
+      expect(parsed.unknownOption).toBeUndefined();
+      const problems = parsed.problems as Array<{ flag: string }>;
+      expect(problems.map((p) => p.flag)).toEqual(["--to"]);
+    });
+
+    test("a dash token after the `--` terminator is an operand, not an unknown flag", async () => {
+      await run(["company", "switch", "--", "-x"]);
+      const parsed = lastStderrJson();
+      expect(parsed.unknownOption).toBeUndefined();
+      expect(String(parsed.error)).toMatch(/missing required flag: --to/);
+    });
+  });
+
   test("unknown subcommand under a group → JSON envelope by default", async () => {
     await run(["company", "8"]);
     const parsed = lastStderrJson();

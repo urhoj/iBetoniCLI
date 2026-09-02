@@ -599,11 +599,26 @@ export function resolveTypeNameTarget(
   label = "typeName"
 ): string {
   const name = positional ?? flag;
+  // Both throws carry the parser's `code: "USAGE"` (fb#1156): making the positional
+  // optional (fb#1036) moved Commander's own missing-argument check into this
+  // handler, and `ib help exit-codes` promises that code for exactly that class —
+  // it is the field AI callers discriminate on. No `hint`, so the command's spec
+  // ERRORS remedy still renders (unlike `failUsage`, which suppresses it).
   if (!name) {
-    failWith(`missing document type: pass <${label}> positionally or via --type <typeName>`, 4);
+    throw new CliError(
+      `missing document type: pass <${label}> positionally or via --type <typeName>`,
+      0,
+      { code: "USAGE" },
+      4
+    );
   }
   if (positional !== undefined && flag !== undefined && positional !== flag) {
-    failWith(`positional ${label} (${positional}) and --type (${flag}) differ — pass only one`, 4);
+    throw new CliError(
+      `positional ${label} (${positional}) and --type (${flag}) differ — pass only one`,
+      0,
+      { code: "USAGE" },
+      4
+    );
   }
   return name;
 }

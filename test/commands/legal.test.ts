@@ -496,6 +496,25 @@ describe("resolveTypeNameTarget label (fb#1036)", () => {
   });
 });
 
+// fb#1156: fb#1036 made the positional optional, which moved the "missing
+// required argument" check out of Commander and into this handler — and the
+// handler then emitted code:null where `ib help exit-codes` promises code USAGE
+// for exactly that class of error. `code` is the field AI callers were told to
+// discriminate on, so the handler-level stand-in carries the parser's code.
+describe("resolveTypeNameTarget carries the parser's USAGE code (fb#1156)", () => {
+  test("missing target", () => {
+    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
+      expect.objectContaining({ exitCode: 4, body: { code: "USAGE" } })
+    );
+  });
+
+  test("conflicting positional and --type", () => {
+    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(
+      expect.objectContaining({ exitCode: 4, body: { code: "USAGE" } })
+    );
+  });
+});
+
 // fb#1036: `--type` is the spelling the group teaches first (save/diff REQUIRE
 // it), so callers reach for it on the read commands too — two actors did so six
 // times in one session. These prove the alias is wired to the HANDLER, not just
