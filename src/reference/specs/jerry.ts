@@ -588,7 +588,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       ASIAKAS_TARGET_FLAG,
     ],
     outputShape:
-      "{ asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in.",
+      "{ asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       apiErr(404, "Company not found", "the asiakasId has no asiakas row — distinct from a real company with no Jerry config, which returns 200 with empty arrays"),

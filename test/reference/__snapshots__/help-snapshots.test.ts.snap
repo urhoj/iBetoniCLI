@@ -4613,7 +4613,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in.
+  { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
