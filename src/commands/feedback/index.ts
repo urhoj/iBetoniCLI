@@ -79,7 +79,20 @@ export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE] as const;
  * Nothing enforces that across the repo boundary; keep the two lists in sync
  * by hand when either changes.
  */
-export const GATE_KINDS = ["deploy", "soak", "legal", "owner", "backlog"] as const;
+export const GATE_KINDS = [
+  "deploy",
+  "soak",
+  "legal",
+  // Bare `owner` is LEGACY and still accepted: dropping it would invalidate
+  // every stored row mid-flight. It split into the two below because "waiting
+  // on a human" conflated a DECISION only the owner can make with an ACTION
+  // only the owner can perform — a difference that had been living in
+  // free-text gateRef, absent on 3 of the 5 owner rows when this was added.
+  "owner",
+  "owner-decision",
+  "owner-action",
+  "backlog",
+] as const;
 type GateKind = (typeof GATE_KINDS)[number];
 
 /**
@@ -270,6 +283,34 @@ function heldFilterIgnored(
   return rows.some((r) => deriveClaimState(r, me) === "free");
 }
 
+/**
+ * The `--gated` twin of {@link SEVERITY_IGNORED_HINT} (fb#1198). Moving this
+ * filter server-side is what fixed the under-reporting, but it also made the
+ * flag deploy-gated for the first time — and the silent failure points the
+ * wrong way here too: an older backend ignores the unknown param and answers
+ * with the whole active list, which under a `--gated` lens reads as "every
+ * open row is blocked", the opposite of the triage answer the flag gives.
+ */
+const GATED_IGNORED_HINT =
+  "⚠ --gated was IGNORED by this backend (ungated rows came back) — " +
+  "the filter is deploy-gated and predates the backend serving --endpoint. These results are " +
+  "UNFILTERED by gate; do NOT read them as the blocked set. Filter client-side on gateKind, " +
+  "or point --endpoint at a backend that has it.";
+
+/**
+ * True when `--gated` was requested but a returned row carries no gate (or the
+ * wrong kind) — i.e. the backend ignored the param. An empty result proves
+ * nothing either way and is not a violation: a genuinely unblocked queue and a
+ * filtered-out one look identical.
+ */
+function gatedFilterIgnored(
+  gated: string | undefined,
+  rows: Record<string, unknown>[]
+): boolean {
+  if (!gated || !rows.length) return false;
+  return rows.some((r) => r.gateKind == null || (gated !== "any" && r.gateKind !== gated));
+}
+
 /** Cap a string at MAX_FREETEXT chars, keeping HEAD+TAIL (elided middle) so an
  * appended update at the tail is never the part that gets cut (fb#714).
  * Non-strings pass through untouched. */
@@ -318,10 +359,20 @@ interface FeedbackFilterParams {
   unclaimed?: boolean;
   claimedBy?: string;
   held?: boolean;
+  /** Resolved wire value: "any" (bare --gated) or a GATE_KINDS member. */
+  gated?: string;
 }
 
-/** Everything `list` accepts: the server filters plus client-side shaping. */
-export interface FeedbackListOptions extends FeedbackFilterParams {
+/**
+ * Everything `list` accepts: the server filters plus client-side shaping.
+ *
+ * `gated` is Omit-ed from the base and redeclared because the two are genuinely
+ * different values under one flag name: here it is what Commander parsed (`true`
+ * for the bare flag), while on FeedbackFilterParams it is the RESOLVED wire
+ * value ("any" or a kind). Widening the base instead would let a raw `true`
+ * reach the query string as the literal "true", which the backend rejects.
+ */
+export interface FeedbackListOptions extends Omit<FeedbackFilterParams, "gated"> {
   unresolved?: boolean;
   all?: boolean;
   full?: boolean;
@@ -355,6 +406,9 @@ async function fetchRows(
     unclaimed: params.unclaimed ? "1" : undefined,
     claimedBy: params.claimedBy || undefined,
     held: params.held ? "1" : undefined,
+    // "any" (bare --gated) or a GATE_KINDS member. Already resolved by the
+    // caller, so no truthy-shortcut here: the backend rejects anything else.
+    gated: params.gated || undefined,
   });
   const rows = await client.get<Record<string, unknown>[]>(`/api/feedback${suffix}`);
   return Array.isArray(rows) ? rows : [];
@@ -675,14 +729,20 @@ export async function runFeedbackList(
   // rather than a bare enum dump.
   assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
   // --gated [kind]: Commander sets `true` for the bare flag, a kind string for
-  // `--gated deploy`. Validated the same way as the other enum filters, but
-  // applied CLIENT-SIDE below (see the branch further down) — unlike
-  // --severity/--held, the backend has no server-side gate filter to wait on
-  // (the gate columns are new, fb#446), and `SELECT *` already returns
-  // gateKind/gateRef/gateUntil on every row, so there is nothing to gain from
-  // a query-string param the backend would only ignore.
+  // `--gated deploy`. Sent SERVER-SIDE as `gated` (fb#1198).
+  //
+  // It used to filter client-side, on the reasoning that the backend had no
+  // gate filter and `SELECT *` already returned the gate columns. That is true
+  // and still produced a wrong answer: the filter ran over ONE 200-row page, so
+  // `--gated --all` reported 1 gated row when the table held 18. Correct only
+  // while the filtered scope fits under the cap — and since the page is
+  // newest-first, the rows it dropped were the OLDEST, i.e. exactly the
+  // longest-blocked ones the flag exists to surface.
   const gatedKind = typeof opts.gated === "string" ? opts.gated : undefined;
   if (gatedKind) assertEnum(gatedKind, GATE_KINDS, "--gated");
+  // "any" is the wire spelling of the bare flag; the backend rejects an unknown
+  // value rather than answering unfiltered, so a typo can never widen this.
+  const gated = opts.gated ? (gatedKind ?? "any") : undefined;
   const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
   if (claimFilters.length > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
@@ -712,14 +772,17 @@ export async function runFeedbackList(
     unclaimed: opts.unclaimed,
     claimedBy,
     held: opts.held,
+    gated,
   };
 
-  // --gated forces the multi-page merge path below even for a single status:
-  // the filter runs CLIENT-SIDE (see above), and slicing by the caller's
-  // limit/offset BEFORE that filter — the single-request branch's whole
-  // approach — would silently drop gated rows sitting past position `limit`
-  // in the raw, unfiltered page.
-  if (!opts.gated && (!statuses || statuses.length <= 1)) {
+  // `gated` rides in `filters` like every other server-side filter, so it needs
+  // no branch of its own. It used to force the multi-page merge path even for a
+  // single status, because filtering client-side after a limit/offset slice
+  // would drop gated rows past `limit` — that whole workaround is gone with the
+  // filter itself (fb#1198), and with it the merge path's own blind spot: for
+  // `--all` the fan-out collapses to ONE capped request, which is what made the
+  // supposedly-safe branch report 1 of 18.
+  if (!statuses || statuses.length <= 1) {
     items = await fetchRows(client, {
       ...filters,
       status: statuses?.[0],
@@ -733,8 +796,11 @@ export async function runFeedbackList(
     const effective = Math.min(opts.limit ?? FEEDBACK_LIST_DEFAULT, CAP);
     if (client.getLastListMeta?.()?.truncated || items.length >= effective) truncated = true;
   } else {
-    // null (the --all case) has no per-status query to fan out over — one
-    // request with no status filter, same as the single-request branch above.
+    // A comma-separated --status fans out one request per status and merges.
+    // (`--all` no longer reaches this branch: statuses is null there, so it
+    // takes the single-request path above — which is the correct shape for it,
+    // one unfiltered server-side query, and not the capped pseudo-fan-out that
+    // used to make --gated --all under-report. fb#1198.)
     const statusList: (string | undefined)[] = statuses ?? [undefined];
     const pages = await Promise.all(
       statusList.map((s) => fetchRows(client, { ...filters, status: s, limit: CAP }))
@@ -743,12 +809,9 @@ export async function runFeedbackList(
     // feedbackId is monotonic with createdAt, so it doubles as the merge key.
     // dir = +1 oldest-first (ASC), -1 newest-first (DESC, the default).
     const dir = opts.oldest ? 1 : -1;
-    let merged = pages
+    const merged = pages
       .flat()
       .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
-    if (opts.gated) {
-      merged = merged.filter((r) => r.gateKind != null && (!gatedKind || r.gateKind === gatedKind));
-    }
     const offset = opts.offset ?? 0;
     const limit = opts.limit ?? 50;
     if (merged.length > offset + limit) truncated = true;
@@ -757,6 +820,7 @@ export async function runFeedbackList(
 
   const severityIgnored = severityFilterIgnored(opts.severity, items);
   const heldIgnored = heldFilterIgnored(opts.held, items, me);
+  const gatedIgnored = gatedFilterIgnored(gated, items);
 
   items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
   items = downgradeDerivedMine(items, idSource, me);
@@ -787,6 +851,10 @@ export async function runFeedbackList(
   if (heldIgnored) {
     warnNote(HELD_IGNORED_HINT);
     hints.push(HELD_IGNORED_HINT);
+  }
+  if (gatedIgnored) {
+    warnNote(GATED_IGNORED_HINT);
+    hints.push(GATED_IGNORED_HINT);
   }
   if (hints.length) env.hint = hints.join("; ");
   return env;

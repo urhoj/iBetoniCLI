@@ -2124,7 +2124,7 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
  * gateKind/gateRef/gateUntil on every row, so nothing is gained by waiting on
  * a deploy the way the other filters do.
  */
-describe("ib feedback list — --gated filter", () => {
+describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
   test("an unknown --gated kind exits 4, no request sent", async () => {
     await expect(
       runFeedbackList(mockClient, { status: "open", gated: "bogus" })
@@ -2132,26 +2132,54 @@ describe("ib feedback list — --gated filter", () => {
     expect(get).not.toHaveBeenCalled();
   });
 
-  test("the bare flag (no kind) keeps every row carrying ANY gate", async () => {
-    get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf", gateUntil: null },
-      { feedbackId: 2, status: "open", gateKind: null, gateRef: null, gateUntil: null },
-      { feedbackId: 3, status: "open", gateKind: "soak", gateRef: null, gateUntil: "2026-09-01" },
-    ]);
-    const out = await runFeedbackList(mockClient, { status: "open", gated: true });
-    expect(out.items.map((r) => r.feedbackId)).toEqual([3, 1]); // newest-first, ungated row 2 dropped
+  test("the bare flag sends gated=any", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", gated: true });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&gated=any");
   });
 
-  test("a kind value narrows to that gate kind only", async () => {
+  test("a kind value is sent verbatim", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", gated: "owner-action" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&gated=owner-action");
+  });
+
+  test("the new owner-decision / owner-action kinds are accepted", async () => {
+    for (const kind of ["owner-decision", "owner-action"]) {
+      get.mockResolvedValueOnce([]);
+      await expect(runFeedbackList(mockClient, { status: "open", gated: kind })).resolves.toBeDefined();
+    }
+  });
+
+  // The bug itself. --gated used to force a "multi-page" path that, for --all,
+  // collapsed to ONE request capped at 200 and then filtered those rows in
+  // memory — reporting 1 gated row against a 1196-row table holding 18.
+  test("--all sends ONE server-filtered request and does NOT cap at 200", async () => {
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
-      { feedbackId: 2, status: "open", gateKind: "legal", gateRef: "BETONIJERRY_TOS@2" },
+      { feedbackId: 1, status: "applied", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
     ]);
-    const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
+    const out = await runFeedbackList(mockClient, { all: true, gated: "deploy" });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith("/api/feedback?gated=deploy");
     expect(out.items.map((r) => r.feedbackId)).toEqual([1]);
   });
 
-  test("every returned row carries gateKind/gateRef/gateUntil verbatim — Task 9's swap hook reads gateRef off this", async () => {
+  test("the caller's --limit is honoured, not silently replaced by the cap", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", gated: true, limit: 1 });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=1&gated=any");
+  });
+
+  test("composes with the default active-bucket fan-out (open+reviewed)", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" }]);
+    get.mockResolvedValueOnce([{ feedbackId: 2, status: "reviewed", gateKind: "soak", gateUntil: "2026-09-09" }]);
+    const out = await runFeedbackList(mockClient, { gated: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200&gated=any");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200&gated=any");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([2, 1]);
+  });
+
+  test("every returned row carries gateKind/gateRef/gateUntil verbatim — the swap hook reads gateRef off this", async () => {
     get.mockResolvedValueOnce([
       { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf", gateUntil: null },
     ]);
@@ -2163,42 +2191,42 @@ describe("ib feedback list — --gated filter", () => {
     });
   });
 
-  test("forces the multi-page (CAP-limit) fetch even for a single status, so a gated row past --limit is not dropped", async () => {
-    // The single-status branch would otherwise send the caller's small --limit
-    // straight to the backend and slice BEFORE the client-side gate filter ever
-    // runs — silently dropping a gated row sitting past position `limit` in the
-    // raw page.
-    get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", gateKind: null },
-      { feedbackId: 2, status: "open", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
-    ]);
-    const out = await runFeedbackList(mockClient, { status: "open", gated: true, limit: 1 });
-    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200"); // CAP, not the caller's 1
-    expect(out.items.map((r) => r.feedbackId)).toEqual([2]);
-  });
-
-  test("also forces the merge path under --all (no status filter)", async () => {
-    get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "applied", gateKind: "deploy", gateRef: "puminet5api@a930ccaf" },
-    ]);
-    const out = await runFeedbackList(mockClient, { all: true, gated: "deploy" });
-    expect(get).toHaveBeenCalledWith("/api/feedback?limit=200");
-    expect(out.items.map((r) => r.feedbackId)).toEqual([1]);
-  });
-
-  test("composes with the default active-bucket fan-out (open+reviewed)", async () => {
-    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" }]);
-    get.mockResolvedValueOnce([{ feedbackId: 2, status: "reviewed", gateKind: null }]);
-    const out = await runFeedbackList(mockClient, { gated: true });
-    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
-    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
-    expect(out.items.map((r) => r.feedbackId)).toEqual([1]); // row 2 has no gate
-  });
-
-  test("without --gated the single-status path is unchanged (regression guard)", async () => {
+  test("without --gated no gated param is sent (regression guard)", async () => {
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { status: "open", limit: 20 });
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=20");
+  });
+
+  // Deploy-gated and CHECKED: an older backend ignores the param and answers
+  // unfiltered, which under a gate lens reads as "every row is blocked".
+  test("warns loudly when the backend ignored the filter (ungated row came back)", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" },
+      { feedbackId: 2, status: "open", gateKind: null },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: true });
+    expect(out.hint).toMatch(/--gated was IGNORED by this backend/);
+  });
+
+  test("warns when the backend returned the WRONG kind", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", gateKind: "soak" }]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: "deploy" });
+    expect(out.hint).toMatch(/--gated was IGNORED by this backend/);
+  });
+
+  test("an EMPTY result is not treated as ignored — a genuinely unblocked queue looks identical", async () => {
+    get.mockResolvedValueOnce([]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: true });
+    expect(out.hint ?? "").not.toMatch(/--gated was IGNORED/);
+  });
+
+  test("a correctly-filtered page raises no warning", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" },
+      { feedbackId: 2, status: "open", gateKind: "owner-action" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: true });
+    expect(out.hint ?? "").not.toMatch(/--gated was IGNORED/);
   });
 });
 
