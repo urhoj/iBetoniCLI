@@ -185,7 +185,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka create",
     description:
-      "Create a new keikka. The body is forwarded verbatim to POST /api/keikka/newKeikka — see the backend route for required fields.",
+      "Create a new keikka via POST /api/keikka/newKeikka. REQUIRED in --body: personId, originId (use 1), ownerAsiakasId — a body without ownerAsiakasId is refused 403 by the tenant gate BEFORE field validation runs, so a missing field can look like a permission problem. Optional: betoniAsiakasId, pumppuAsiakasId, sourceAsiakasId, pumppuAika (ISO datetime, defaults to today 07:00), pumppuKesto (minutes, default 60), vehicleId. Every OTHER key is silently discarded — the route forwards exactly these nine. This creates a SKELETON only: asiakasId, tyomaaId and keikkaTilaId are left at 0, and no worksite, contact person or concrete line is set.",
     permissions: ["auth.page.grid.tilaus.edit"],
     flags: [
       {
@@ -198,14 +198,16 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ keikkaId, ...echoed fields } (raw backend response)",
+    outputShape:
+      "raw mssql result; the new id is in `returnValue` (keikka_create RETURNs it and never SELECTs it) — NOT in a `keikkaId` field",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(403, "ownerAsiakasId missing or you lack edit on it", "the tenant gate resolves from --body.ownerAsiakasId and runs BEFORE validation, so a MISSING field 403s rather than 400s — check the field is present before assuming a permission problem", "ei oikeuksia"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     examples: [
-      "ib keikka create --body '{\"asiakasId\":1349,\"pvm\":\"2026-06-01\"}' --reason 'manual booking'",
-      "ib keikka create --body '{...}' --dry-run",
+      "ib keikka create --body '{\"personId\":10,\"originId\":1,\"ownerAsiakasId\":8,\"pumppuAika\":\"2026-09-04T07:00:00.000Z\"}' --reason 'manual booking'",
+      "ib keikka create --body '{\"personId\":10,\"originId\":1,\"ownerAsiakasId\":8}' --dry-run",
     ],
   },
   {
