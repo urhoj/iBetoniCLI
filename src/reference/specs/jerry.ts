@@ -557,7 +557,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin search",
     description:
-      "Search companies for an Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).",
+      "Search companies for an Add picker (GET /api/admin/jerry-companies/search). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "query", type: "string", required: false, description: "name search (min 2 chars) — or pass --search" }],

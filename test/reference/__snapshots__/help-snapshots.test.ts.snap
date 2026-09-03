@@ -5364,7 +5364,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin search 
   ib jerry admin search [<query>] [flags]
 
 DESCRIPTION
-  Search companies for an Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).
+  Search companies for an Add picker (GET /api/admin/jerry-companies/search). Name LIKE match, min 2 chars, top 20. System-admin only. DEFAULTS to companies not yet fully Jerry-enabled, which is what the Jerry-enable and onboarding pickers want; --include-jerry-active drops that exclusion for the SaaS sales pipeline, where a provider already running Jerry is the best prospect (fb#816).
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
