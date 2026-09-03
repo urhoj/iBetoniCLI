@@ -61,10 +61,11 @@ export const SEVERITY_NONE = "none";
  */
 export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE];
 /**
- * The five gate kinds a feedback row can be waiting on — must stay identical
- * to `GATE_KINDS` in puminet5api's `modules/feedback/feedbackSql.js` (fb#446).
+ * The gate kinds a feedback row can be waiting on — must stay identical to
+ * `GATE_KINDS` in puminet5api's `modules/feedback/feedbackSql.js` (fb#446).
  * Nothing enforces that across the repo boundary; keep the two lists in sync
- * by hand when either changes.
+ * by hand when either changes. Deliberately no count in this sentence: the
+ * previous "five" went stale the moment the owner split landed (fb#1252).
  */
 export const GATE_KINDS = [
     "deploy",
@@ -90,8 +91,9 @@ export const GATE_KINDS = [
 export const RELATION_TYPES = ["duplicate", "same-root-cause", "related", "blocks"];
 /**
  * The subset the backend auto-closes via `POST /api/feedback/gates/clear` —
- * the only values `gate-clear --kind` accepts. The other three kinds
- * (`soak`/`owner`/`backlog`) close only by a human calling `resolve`; the
+ * the only values `gate-clear --kind` accepts. Every other kind
+ * (`soak`/`backlog` and the `owner*` family) closes only by a human calling
+ * `resolve`; the
  * backend's `clearGates` primitive enforces the same restriction server-side,
  * so this is a client-side pre-check, not the only guard.
  */
@@ -323,7 +325,7 @@ async function fetchRows(client, params) {
 }
 /**
  * Walk ONE status to the end of its rows, CAP rows per request. The merge
- * branch filters and slices CLIENT-SIDE, so its view must not stop at the
+ * branch slices CLIENT-SIDE, so its view must not stop at the
  * first page: `applied` alone holds more rows than CAP, and a filter over one
  * capped page is the fb#536/fb#1198 failure class. Stops at the first short
  * page; MAX_MERGE_PAGES bounds the walk against a backend that never returns
@@ -605,7 +607,7 @@ function downgradeDerivedMine(items, idSource, me) {
  * GET /api/feedback — developer-only. Defaults to the active bucket
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
- * `--unresolved`, and a CSV `--status` fan out to one GET per status, merged
+ * `--unresolved`, and a CSV `--status` fan out to one or more GETs per status, merged
  * newest-first (or oldest-first under `--oldest`) and sliced [offset,
  * offset+limit) client-side. Long free-text is capped at 200 chars unless
  * `--full`.
@@ -1483,7 +1485,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--error <msg>")
         .option("--severity <sev>", "", foldSeverityCase)
         .option("--complexity <n>", "", Number)
-        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner-decision|owner-action|backlog (bare owner is legacy). Empty (--gate-kind=) clears it")
         .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
         .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
         .option("--from-json <file>")
@@ -1667,7 +1669,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--severity <sev>", "", foldSeverityCase)
         .option("--complexity <n>", "", intFlag("--complexity", 1))
         .option("--description <text>")
-        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+        .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner-decision|owner-action|backlog (bare owner is legacy). Empty (--gate-kind=) clears it")
         .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
         .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
         .option("--body <text>")

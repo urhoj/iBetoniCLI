@@ -74,10 +74,11 @@ export const SEVERITY_NONE = "none";
 export const SEVERITY_FILTERS = [...SEVERITIES, SEVERITY_NONE] as const;
 
 /**
- * The five gate kinds a feedback row can be waiting on — must stay identical
- * to `GATE_KINDS` in puminet5api's `modules/feedback/feedbackSql.js` (fb#446).
+ * The gate kinds a feedback row can be waiting on — must stay identical to
+ * `GATE_KINDS` in puminet5api's `modules/feedback/feedbackSql.js` (fb#446).
  * Nothing enforces that across the repo boundary; keep the two lists in sync
- * by hand when either changes.
+ * by hand when either changes. Deliberately no count in this sentence: the
+ * previous "five" went stale the moment the owner split landed (fb#1252).
  */
 export const GATE_KINDS = [
   "deploy",
@@ -107,8 +108,9 @@ type RelationType = (typeof RELATION_TYPES)[number];
 
 /**
  * The subset the backend auto-closes via `POST /api/feedback/gates/clear` —
- * the only values `gate-clear --kind` accepts. The other three kinds
- * (`soak`/`owner`/`backlog`) close only by a human calling `resolve`; the
+ * the only values `gate-clear --kind` accepts. Every other kind
+ * (`soak`/`backlog` and the `owner*` family) closes only by a human calling
+ * `resolve`; the
  * backend's `clearGates` primitive enforces the same restriction server-side,
  * so this is a client-side pre-check, not the only guard.
  */
@@ -416,7 +418,7 @@ async function fetchRows(
 
 /**
  * Walk ONE status to the end of its rows, CAP rows per request. The merge
- * branch filters and slices CLIENT-SIDE, so its view must not stop at the
+ * branch slices CLIENT-SIDE, so its view must not stop at the
  * first page: `applied` alone holds more rows than CAP, and a filter over one
  * capped page is the fb#536/fb#1198 failure class. Stops at the first short
  * page; MAX_MERGE_PAGES bounds the walk against a backend that never returns
@@ -453,7 +455,7 @@ export interface FeedbackCreateInput {
   error?: string;
   severity?: string;
   complexity?: number;
-  /** What this row is waiting for; deploy|soak|legal|owner|backlog (see GATE_KINDS). */
+  /** What this row is waiting for; see GATE_KINDS (owner is legacy; prefer owner-decision/owner-action). */
   gateKind?: string;
   /** Gate pointer: deploy repo@sha · legal TYPE@version · owner free text. */
   gateRef?: string;
@@ -770,7 +772,7 @@ function downgradeDerivedMine(
  * GET /api/feedback — developer-only. Defaults to the active bucket
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
- * `--unresolved`, and a CSV `--status` fan out to one GET per status, merged
+ * `--unresolved`, and a CSV `--status` fan out to one or more GETs per status, merged
  * newest-first (or oldest-first under `--oldest`) and sliced [offset,
  * offset+limit) client-side. Long free-text is capped at 200 chars unless
  * `--full`.
@@ -1091,7 +1093,17 @@ export async function runFeedbackCount(
 /** One incomplete-row finding from `ib dev feedback lint`. */
 export interface FeedbackLintFinding {
   feedbackId: number;
-  issue: "ungraded" | "stale-claim" | "closed-no-resolution" | "applied-no-changelog";
+  issue:
+    | "ungraded"
+    | "stale-claim"
+    | "closed-no-resolution"
+    | "applied-no-changelog"
+    // The four gate arms (fb#446). Omitting them made a TS consumer narrowing on
+    // `issue` silently miss 13 of the 226 findings the queue returns today.
+    | "gate-elapsed"
+    | "gate-missed"
+    | "gate-untyped"
+    | "owner-blocked";
   detail: string;
   severity: "warn" | "info";
 }
@@ -1429,7 +1441,7 @@ export interface FeedbackUpdateInput {
    * alongside a full --description replace, where merging would be ambiguous.
    */
   reason?: string;
-  /** What this row is waiting for; deploy|soak|legal|owner|backlog. `""` clears it. */
+  /** What this row is waiting for; see GATE_KINDS (owner is legacy). `""` clears it. */
   gateKind?: string;
   /** Gate pointer: deploy repo@sha · legal TYPE@version · owner free text. `""` clears it. */
   gateRef?: string;
@@ -1798,7 +1810,7 @@ export function registerFeedbackCommands(
       "",
       Number
     )
-    .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+    .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner-decision|owner-action|backlog (bare owner is legacy). Empty (--gate-kind=) clears it")
     .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
     .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
     .option(
@@ -2044,7 +2056,7 @@ export function registerFeedbackCommands(
     .option("--severity <sev>", "", foldSeverityCase)
     .option("--complexity <n>", "", intFlag("--complexity", 1))
     .option("--description <text>")
-    .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner|backlog. Empty (--gate-kind=) clears it")
+    .option("--gate-kind <kind>", "What this row is waiting for: deploy|soak|legal|owner-decision|owner-action|backlog (bare owner is legacy). Empty (--gate-kind=) clears it")
     .option("--gate-ref <ref>", "Gate pointer: deploy repo@sha · legal TYPE@version (the version being superseded) · owner free text")
     .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
     .option("--body <text>")
