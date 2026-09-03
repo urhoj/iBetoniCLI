@@ -690,6 +690,14 @@ export async function runFeedbackList(client, opts) {
     // "any" is the wire spelling of the bare flag; the backend rejects an unknown
     // value rather than answering unfiltered, so a typo can never widen this.
     const gated = opts.gated ? (gatedKind ?? "any") : undefined;
+    // --ungated is the negation of bare --gated: rows with NO gate. The backend's
+    // `gated` param has no negation value (an unknown value 400s), so it filters
+    // CLIENT-SIDE — exact only over the walk branch's complete per-status fetch,
+    // which it therefore forces below (fb#1209). Together the two flags select
+    // nothing, which is a caller mistake, not a filter.
+    if (opts.ungated && opts.gated) {
+        failWith("Use only one of --gated / --ungated", 4);
+    }
     const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
     if (claimFilters.length > 1) {
         failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
@@ -726,7 +734,13 @@ export async function runFeedbackList(client, opts) {
     // filter itself (fb#1198), and with it the merge path's own blind spot: for
     // `--all` the fan-out collapses to ONE capped request, which is what made the
     // supposedly-safe branch report 1 of 18.
-    if (!statuses || statuses.length <= 1) {
+    //
+    // --ungated is the one filter that forces the walk the other way: it is
+    // CLIENT-SIDE (no backend param), and filtering a single capped page is the
+    // fb#536/fb#1198 failure class, so it takes the complete per-status fetch —
+    // a lone status walks alone, --all fans out over all four statuses.
+    const walkStatuses = statuses ?? [...STATUSES];
+    if (!opts.ungated && (!statuses || statuses.length <= 1)) {
         items = await fetchRows(client, {
             ...filters,
             status: statuses?.[0],
@@ -743,15 +757,17 @@ export async function runFeedbackList(client, opts) {
     }
     else {
         // A multi-status scope (the default active bucket, --unresolved, a CSV
-        // --status) fans out one request per status and merges. (`--all` no longer
-        // reaches this branch: statuses is null there, so it takes the single-
-        // request path above — one unfiltered server-side query, and not the
-        // capped pseudo-fan-out that used to make --gated --all under-report.
-        // fb#1198.) Each status WALKS its pages to the end: one status alone
-        // (applied) already holds more rows than CAP, and this branch slices
-        // CLIENT-SIDE at the end, so a one-page fetch would silently drop rows
-        // past the cap out of the merge — the fb#536 class.
-        const walks = await Promise.all(statuses.map((s) => fetchStatusWalk(client, filters, s)));
+        // --status, or ANY --ungated call) fans out one request per status and
+        // merges. (Bare --all without --ungated does not reach this branch:
+        // statuses is null there, so it takes the single-request path above — one
+        // unfiltered server-side query, and not the capped pseudo-fan-out that
+        // used to make --gated --all under-report. fb#1198.) Each status WALKS its
+        // pages to the end: one status alone (applied) already holds more rows
+        // than CAP, and this branch slices CLIENT-SIDE at the end, so a one-page
+        // fetch would silently drop rows past the cap out of the merge — the
+        // fb#536 class. --ungated needs that completeness for the same reason:
+        // its predicate runs over the merged rows below (fb#1209).
+        const walks = await Promise.all(walkStatuses.map((s) => fetchStatusWalk(client, filters, s)));
         if (walks.some((w) => w.walkCut))
             truncated = true;
         // feedbackId is monotonic with createdAt, so it doubles as the merge key.
@@ -760,11 +776,14 @@ export async function runFeedbackList(client, opts) {
         const merged = walks
             .flatMap((w) => w.rows)
             .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
+        // The --ungated predicate runs BEFORE the offset/limit slice: slicing
+        // first would let gated rows count against the window and starve it.
+        const filtered = opts.ungated ? merged.filter((r) => r.gateKind == null) : merged;
         const offset = opts.offset ?? 0;
         const limit = opts.limit ?? 50;
-        if (merged.length > offset + limit)
+        if (filtered.length > offset + limit)
             truncated = true;
-        items = merged.slice(offset, offset + limit);
+        items = filtered.slice(offset, offset + limit);
     }
     const severityIgnored = severityFilterIgnored(opts.severity, items);
     const heldIgnored = heldFilterIgnored(opts.held, items, me);
@@ -789,8 +808,9 @@ export async function runFeedbackList(client, opts) {
         hints.push(TRUNCATE_HINT);
     // `--complexity none` SELECTS the unestimated rows, so the exclusion hint
     // would describe the opposite of what was asked — and advise re-running
-    // with the very flag just passed (fb#1193).
-    if ((opts.complexity !== undefined && opts.complexity !== "none") || opts.maxComplexity !== undefined)
+    // with the very flag just passed (fb#1193). The sentinel is SEVERITY_NONE
+    // (the parser emits it), so the check keys on the parsed NUMBER shape.
+    if (typeof opts.complexity === "number" || opts.maxComplexity !== undefined)
         hints.push(COMPLEXITY_NULL_HINT);
     if (severityIgnored) {
         warnNote(SEVERITY_IGNORED_HINT);
@@ -1589,8 +1609,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         // Not a bare `Number` like its --max-complexity sibling: `none` is a real
         // value here (select the UNESTIMATED rows), and Number("none") is NaN, which
         // the backend's parseInt guard would drop as "no filter" — returning the whole
-        // table as if nothing had been asked for (fb#535).
-        .option("--complexity <n>", "", (v) => (v.toLowerCase() === "none" ? "none" : Number(v)))
+        // table as if nothing had been asked for (fb#535). The sentinel is the shared
+        // SEVERITY_NONE so a respelling cannot break one filter and not the other.
+        .option("--complexity <n>", "", (v) => v.toLowerCase() === SEVERITY_NONE ? SEVERITY_NONE : Number(v))
         .option("--max-complexity <n>", "", intFlag("--max-complexity", 1))
         // See foldSeverityCase: one case policy across list/create/update.
         .option("--severity <s>", "", foldSeverityCase)
@@ -1602,6 +1623,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--claimed-by <label>", "", String)
         .option("--held")
         .option("--gated [kind]", "Only rows carrying a gate; optionally restrict to one kind")
+        .option("--ungated", "Only rows carrying NO gate; mutually exclusive with --gated")
         .action(jsonAction(getClient, (client, opts) => runFeedbackList(client, opts)));
     // Mirrors `ib glossary lint`: read-only audit, `--strict` exits 1 on any
     // warn-level finding so CI / a scheduled runner can gate on it. Only the

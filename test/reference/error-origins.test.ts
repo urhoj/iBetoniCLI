@@ -487,3 +487,21 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
     );
   });
 });
+
+/**
+ * fb#1224 — the owner gate split shipped in the CLI before the backend swap,
+ * and the production 400 the agent hit ("gateKind must be one of: deploy,
+ * soak, legal, owner, backlog") had no ERRORS row: the workaround (fall back
+ * to bare --gate-kind owner) was found by hand. The row keys on the 400 so
+ * the same gap — any deploy window, any lagging endpoint — carries the
+ * remedy instead of a bare validation dump.
+ */
+describe("feedback create/update answer the pre-split gateKind 400 (fb#1224)", () => {
+  const msg = "gateKind must be one of: deploy, soak, legal, owner, backlog";
+  test.each(["ib dev feedback create", "ib dev feedback update"])(
+    "%s reaches the legacy-owner remedy",
+    (cmd) => {
+      expect(hintForError(server(msg, 400), rowsOf(cmd))).toMatch(/--gate-kind owner/);
+    }
+  );
+});

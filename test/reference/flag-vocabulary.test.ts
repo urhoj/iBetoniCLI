@@ -76,8 +76,7 @@ describe("no new naming outliers", () => {
    * `--today` vs `--to` (a date bound vs a keyword), `--address2` vs
    * `--address` (postal line 2), `--all-companies` / `--allow-big-merge` vs
    * `--all`, `--from-brand` vs `--from` (sender identity vs date bound),
-   * `--sijainti-types` vs `--sijainti` (a type filter vs an id). (`--top` sat
-   * here until fb#1138 renamed it to the house `--limit`.)
+   * `--sijainti-types` vs `--sijainti` (a type filter vs an id).
    */
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",

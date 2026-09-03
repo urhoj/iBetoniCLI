@@ -1715,6 +1715,12 @@ describe("complexity filters announce their NULL blind spot (fb#362)", () => {
     expect(env.hint).toBeUndefined();
   });
 
+  test("a numeric --complexity carries the exclusion hint (the typeof guard, fb#1212)", async () => {
+    get.mockResolvedValue([{ feedbackId: 1, complexity: 3, status: "open" }]);
+    const env = await runFeedbackList(mockClient as never, { complexity: 3, status: "open" });
+    expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
+  });
+
   test("the truncation hint and the complexity hint coexist", async () => {
     get.mockResolvedValue([
       { feedbackId: 1, complexity: 2, status: "open", description: "x".repeat(300) },
@@ -2388,6 +2394,105 @@ describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
     await expect(
       runFeedbackCreate(mockClient, { description: "x", gateKind: "owner-any" })
     ).rejects.toMatchObject({ exitCode: 4 });
+  });
+});
+
+/**
+ * --ungated (fb#1209) — the complement of bare --gated: rows with NO gate,
+ * the "workable right now" half of a fix-session slice. The backend's `gated`
+ * param has no negation value (an unknown value 400s), so this filters
+ * CLIENT-SIDE — and is therefore routed over the walk branch's complete
+ * per-status fetch, because filtering one capped page is the fb#536/fb#1198
+ * under-report class. A lone --status walks that status, --all fans out over
+ * all four statuses, and the predicate runs BEFORE the offset/limit slice.
+ */
+describe("ib feedback list — --ungated filter (client-side over the walk, fb#1209)", () => {
+  test("combining --gated and --ungated exits 4, no request sent", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open", gated: true, ungated: true })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/only one of --gated \/ --ungated/) });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("no gated param is sent — the filter is client-side", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", ungated: true });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200");
+  });
+
+  test("a lone explicit status walks that status instead of the single capped request", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "deploy", gateRef: "a@1" },
+      { feedbackId: 2, status: "open", gateKind: null },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", ungated: true });
+    // The walk's CAP-sized page, not a limit-shaped single request — the
+    // complete fetch is what makes the client-side filter exact.
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([2]);
+  });
+
+  test("composes with the default active-bucket fan-out (open+reviewed)", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", gateKind: null }]);
+    get.mockResolvedValueOnce([{ feedbackId: 2, status: "reviewed", gateKind: "soak", gateUntil: "2026-09-09" }]);
+    const out = await runFeedbackList(mockClient, { ungated: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([1]);
+  });
+
+  test("--all fans out over all four statuses", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 4, status: "open", gateKind: null }]);
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([{ feedbackId: 2, status: "applied", gateKind: "legal" }]);
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "dismissed", gateKind: null }]);
+    const out = await runFeedbackList(mockClient, { all: true, ungated: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
+    expect(get).toHaveBeenNthCalledWith(3, "/api/feedback?status=applied&limit=200");
+    expect(get).toHaveBeenNthCalledWith(4, "/api/feedback?status=dismissed&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([4, 1]);
+  });
+
+  test("the predicate runs BEFORE the offset/limit slice — gated rows cannot starve the window", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 5, status: "open", gateKind: "deploy", gateRef: "a@1" },
+      { feedbackId: 4, status: "open", gateKind: null },
+      { feedbackId: 3, status: "open", gateKind: null },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", ungated: true, limit: 2 });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([4, 3]);
+  });
+
+  test("truncated reflects the FILTERED set", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 9, status: "open", gateKind: null },
+      { feedbackId: 8, status: "open", gateKind: null },
+      { feedbackId: 7, status: "open", gateKind: null },
+      { feedbackId: 6, status: "open", gateKind: "deploy" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", ungated: true, limit: 2 });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([9, 8]);
+    expect(out.truncated).toBe(true);
+  });
+
+  test("walks past the 200-row cap so ungated rows on page two survive (the fb#536 class)", async () => {
+    const pageOne = Array.from({ length: 200 }, (_, i) => ({
+      feedbackId: 1000 - i,
+      status: "open",
+      gateKind: i % 2 === 0 ? "deploy" : null,
+    }));
+    get.mockResolvedValueOnce(pageOne); // open, page 1 — full, walk on
+    get.mockResolvedValueOnce([{ feedbackId: 7, status: "open", gateKind: null }]); // open, page 2
+    const out = await runFeedbackList(mockClient, { status: "open", ungated: true, oldest: true, limit: 200 });
+    expect(get).toHaveBeenNthCalledWith(
+      2,
+      "/api/feedback?status=open&limit=200&offset=200&orderBy=createdAt&orderDirection=ASC"
+    );
+    // Page one alone already fills a naive single-page fetch; fb 7 must still
+    // land in the window, and --oldest puts it first.
+    expect(out.items[0]).toMatchObject({ feedbackId: 7, status: "open" });
   });
 });
 

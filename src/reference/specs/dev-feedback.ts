@@ -69,6 +69,12 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "unknown option", meaning: "unknown option — when the rejected token is not a flag name anybody would type (`->`, `--`-prefixed punctuation), it is a FRAGMENT of your description that the shell split off as its own argument, not a bad flag (fb#702)", remedy: "Check the rejected token before re-reading the flag list: if it is a piece of your prose, your flags are fine and the shell is the problem — pass the report via --from-json <file|->. A genuinely mistyped flag gets a did-you-mean instead" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
+      apiErr(
+        400,
+        "Backend predates the owner gate split",
+        "this backend's gateKind vocabulary has no owner-decision/owner-action (they ship in puminet5api@1.33.1, production since 2026-09-03) — against it use bare --gate-kind owner, the legacy value it still accepts (fb#1224)",
+        "gatekind must be one of"
+      ),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -120,6 +126,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "claimed-by", type: "string", description: "Only items held by this label, and only while the claim is still LIVE" },
       { name: "held", type: "boolean", description: "Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes)." },
       { name: "gated", type: "string", description: "Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated owner-action), or `owner-any` for the whole human-blocked family (owner + owner-decision + owner-action). Use owner-any whenever you mean 'waiting on a person': bare `owner` is the LEGACY value only, so naming it answers 0 on a queue whose rows have been reclassified, which reads as 'nothing is blocked'. Filtered SERVER-SIDE since fb#1198 — it previously filtered client-side over one 200-row page, so `--gated --all` answered 1 when the table held 18, and because the page is newest-first the rows it dropped were the OLDEST, i.e. the longest-blocked. Deploy-gated but CHECKED like --severity: an older backend ignores the param and answers unfiltered, which under a gate lens reads as 'every row is blocked', so a mismatch raises a loud stderr warning plus an envelope hint.", allowed: [...FEEDBACK_GATED_FILTERS] },
+      { name: "ungated", type: "boolean", description: "Only rows carrying NO gate (gateKind IS NULL) — the complement of bare --gated, and the 'workable right now' half of a fix-session slice (pair it with --unclaimed --max-complexity N). Filtered CLIENT-SIDE — the backend's gated param has no negation value — and therefore routed over the complete per-status walk, so no row is dropped to the 200-row cap: a lone --status walks that status, --all fans out over all four. Mutually exclusive with --gated (exit 4) (fb#1209)." },
     ],
     outputShape:
       "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries `changelogLinks: [{changelogId, role}]` — the same shape `get` returns — so a PARTLY-shipped row is visible before you claim it (fb#647). Every row ALSO carries gateKind/gateRef/gateUntil (null on an ungated row) — `npm run swap`'s gate-clear hook reads gateRef off this to decide which rows a release actually cleared.",
@@ -128,7 +135,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
     prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
-      { origin: "client", exit: 4, match: ["use only one of", "must be one of"], meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held); --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
+      { origin: "client", exit: 4, match: ["use only one of", "must be one of"], meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held) and only one of --gated / --ungated; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
       intParseErr("--max-complexity", "pass an integer 1-5"),
       limitErr("pass a positive integer; this command caps at 200 — page past it with --offset"),
       intParseErr("--offset", "pass a non-negative integer row offset", 0),
@@ -143,6 +150,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "--oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. `--kind bug --oldest`) to keep breakages ahead of age.",
       "Each row carries claimState (free|held|mine). An expired claim reads as `free` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically. A row that would read `mine` instead reads `held` (+ a stderr warning) when the caller's identity is the derived user@host fallback (no $IB_CLAIM_ID/--by/ctx set) — that label is shared by every such session on the host, so `mine` cannot be proven (fb#901).",
       "--held (fb#886) is deploy-gated with the same CHECKED contract as --severity, because its silent-ignore also points the wrong way: an older backend ignores the param and answers unfiltered, which reads as 'everything is claimed'. On a mismatch (a returned row with no live lease) the CLI emits a loud stderr warning plus an envelope `hint`; filter client-side on claimState there instead.",
+      "--ungated (fb#1209) has NO server-side param — the backend's gated filter has no negation value — so it runs CLIENT-SIDE over the complete per-status walk (a lone --status walks that status, --all fans out over all four). That routing is what keeps it exact against the 200-row cap; filtering one capped page is the fb#536/fb#1198 under-report class.",
       "PARTLY-SHIPPED ROWS (fb#647): a row can carry `changelogLinks` and still be open — that is a fix recorded with `ib dev changelog add --feedback <id> --no-resolve`, which links the shipped half WITHOUT closing the row. Any linked row that is still OPEN or REVIEWED is also named in a one-line stderr note (a closed row always has a `resolves` link, so those are not worth saying). Read the entry (`ib dev changelog get <id>`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.",
     ],
     examples: [
@@ -159,6 +167,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback list --gated owner-decision",
       "ib dev feedback list --gated owner-action --all",
       "ib dev feedback list --gated owner-any --unresolved",
+      "ib dev feedback list --ungated --unclaimed --max-complexity 2",
       "ib dev feedback list --severity critical --unresolved",
       "ib dev feedback list --held",
     ],
@@ -389,6 +398,12 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "the error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names" },
+      apiErr(
+        400,
+        "Backend predates the owner gate split",
+        "this backend's gateKind vocabulary has no owner-decision/owner-action (they ship in puminet5api@1.33.1, production since 2026-09-03) — against it use bare --gate-kind owner, the legacy value it still accepts (fb#1224)",
+        "gatekind must be one of"
+      ),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
