@@ -481,7 +481,7 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
   test("the two previously-undocumented guards now reach a remedy", () => {
     expect(
       hintForError(client4("update requires sijaintiId — pass --id or include it in --body"), rowsOf("ib sijainti update"))
-    ).toMatch(/--id <sijaintiId>/);
+    ).toMatch(/<sijaintiId> positionally/);
     expect(hintForError(client4("create requires: --first, --last"), rowsOf("ib person create"))).toMatch(
       /--first and --last/
     );

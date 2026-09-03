@@ -205,13 +205,21 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. --max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
+      "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via the <sijaintiId> positional, --id, or in --body — pass at most one of the positional/--id pair (they must agree if both given). Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. --max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
+    args: [
+      {
+        name: "sijaintiId",
+        type: "number",
+        required: false,
+        description: "Target sijaintiId (alias of --id; fb#1108 — matches the positional-id pattern used by get/set-jerry/set-public/delete)",
+      },
+    ],
     flags: [
       // NB: unlike `person update` / `worksite update`, this command has NO
       // --from-json, so the PowerShell escape hatch here is typed flags only.
       { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (see `ib help shell-quoting`)." },
-      { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
+      { name: "id", type: "number", description: "Target sijaintiId — alias of the <sijaintiId> positional (or include sijaintiId in --body)" },
       { name: "name", type: "string", description: "sijaintiNimi" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
       { name: "type", type: "number", description: "sijaintiTypeId" },
@@ -245,19 +253,22 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
       puomiErr(" — would otherwise clear the stored bound"),
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
       { origin: "client", exit: 4, match: "at most one of --show-on-map", meaning: "Both --show-on-map and --hide-on-map given", remedy: "pass at most one — omit both to leave the stored map flag untouched" },
+      // fb#1108: positional <sijaintiId> and --id are two spellings of the same
+      // target; allowed together only when they agree.
+      { origin: "client", exit: 4, match: "positional sijaintiid", meaning: "The <sijaintiId> positional and --id were both given and disagree", remedy: "pass only one of the positional or --id" },
       // Previously undocumented, so it fell through to no hint at all.
       // `--body` only: this command does NOT register --from-json (person/worksite
       // update do). Naming it here would send the caller to an unknown-option
       // exit 4 — the guard's own message names only --body, and so does this.
-      { origin: "client", exit: 4, match: "update requires sijaintiid", meaning: "No sijaintiId given (neither --id nor a sijaintiId in --body)", remedy: "pass --id <sijaintiId>, or include sijaintiId in --body" },
+      { origin: "client", exit: 4, match: "update requires sijaintiid", meaning: "No sijaintiId given (neither the positional, --id, nor a sijaintiId in --body)", remedy: "pass <sijaintiId> positionally, via --id, or include sijaintiId in --body" },
       apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`", SIJAINTI_PUBLIC_403_MATCH),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      'ib sijainti update --id 42 --name "Renamed depot"',
+      'ib sijainti update 42 --name "Renamed depot"',
       'ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode',
       "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
-      "ib sijainti update --id 42 --public --reason 'open this plant to customers'",
+      "ib sijainti update 42 --public --reason 'open this plant to customers'",
       "ib sijainti update --id 42 --show-on-map --reason 'plant visible on the public map'",
     ],
   },

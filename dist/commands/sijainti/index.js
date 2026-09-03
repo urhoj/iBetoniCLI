@@ -6,7 +6,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId, cappedInt, assertPositiveInt, intFlag, numFlag } from "../../targets.js";
+import { parseId, parseOptionalId, cappedInt, assertPositiveInt, intFlag, numFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { flattenGeocodeResult } from "../_shared/geocode.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
@@ -872,7 +872,7 @@ export function registerSijaintiCommands(parent, getClient) {
             : undefined;
         writeJson(await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, opts));
     }));
-    const updateCmd = addJsonBodyOptions(s.command("update"))
+    const updateCmd = addJsonBodyOptions(s.command("update [sijaintiId]"))
         .option("--id <sijaintiId>", "", intFlag("--id"))
         .option("--name <n>")
         .option("--address <a>")
@@ -888,7 +888,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--show-on-map")
         .option("--hide-on-map")
         .option("--geocode");
-    addWriteFlagsToCommand(updateCmd).action(guarded(async (opts) => {
+    addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         assertPuomiFlags(opts.puomiMin, opts.puomiMax);
         if (opts.public && opts.private) {
             failWith("Pass at most one of --public / --private", 4);
@@ -896,10 +896,18 @@ export function registerSijaintiCommands(parent, getClient) {
         if (opts.showOnMap && opts.hideOnMap) {
             failWith("Pass at most one of --show-on-map / --hide-on-map", 4);
         }
+        // <sijaintiId> positional and --id are two spellings of the same target
+        // (fb#1108 — get/set-jerry/set-public/delete are positional-only, update
+        // was the one flag-only holdout). Both allowed only when they agree; a
+        // sijaintiId embedded in --body/--from-json is still resolved below.
+        const positionalId = parseOptionalId(idStr, "sijaintiId");
+        if (positionalId !== undefined && opts.id !== undefined && positionalId !== opts.id) {
+            failWith(`positional sijaintiId (${positionalId}) and --id (${opts.id}) differ — pass only one`, 4);
+        }
         const client = await getClient();
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         const body = buildSijaintiBody(parsed, {
-            id: opts.id,
+            id: positionalId ?? opts.id,
             name: opts.name,
             address: opts.address,
             type: opts.type,
@@ -917,7 +925,7 @@ export function registerSijaintiCommands(parent, getClient) {
             showOnMap: opts.showOnMap ? true : opts.hideOnMap ? false : undefined,
         });
         if (body.sijaintiId === undefined) {
-            failWith("update requires sijaintiId — pass --id or include it in --body/--from-json", 4);
+            failWith("update requires sijaintiId — pass it positionally, via --id, or include it in --body/--from-json", 4);
         }
         const { result, merged, geocodeFailed } = await runSijaintiUpdate(client, body, opts, !!opts.geocode);
         // The save proc drops lat/lng; persist them via the dedicated updateLatLng
