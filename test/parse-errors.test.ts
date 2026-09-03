@@ -96,11 +96,7 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
-  // fb#1179: Commander checks mandatory options BEFORE unknown ones, so a
-  // caller who both forgot a required flag AND passed one the command lacks
-  // was told only "missing required flag" — the lower-information fault, and a
-  // misleading one: it implies the invocation is one flag away from correct
-  // when the caller's model of the command is wrong.
+  // fb#1179 — see `firstUnknownOption` in src/output/unknownCommand.ts.
   describe("unknown flag alongside a missing required flag (fb#1179)", () => {
     test("leads with the unknown-option envelope and folds the missing flag into its hint", async () => {
       await run(["company", "switch", "--bogus", "1"]);

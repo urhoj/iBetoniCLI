@@ -1069,19 +1069,17 @@ describe("fb#1020 envelope wiring", () => {
 // a compound token's own segments are matched against the group's children
 // before either the fuzzy guess or the deep-owner layer gets a say.
 describe("fb#1154 envelope wiring", () => {
-  test("`ib customer company-list` points at the direct child, not the deep owner", () => {
-    const customer = leafByPath("customer");
-    customer.args = ["company-list"];
-    const env = buildUnknownCommandEnvelope(customer, "company-list", "developer");
-    expect(env.didYouMean).toBe("list");
-    expect(env.availableElsewhere).toEqual([]);
-  });
-
-  test("`ib keikka drivers-list` keeps the real subgroup as the lead answer", () => {
-    const keikka = leafByPath("keikka");
-    keikka.args = ["drivers-list"];
-    const env = buildUnknownCommandEnvelope(keikka, "drivers-list", "developer");
-    expect(env.didYouMean).toBe("drivers");
+  // Both segment rules are load-bearing: `drivers-list` pins prefix-before-verb
+  // (`list` is a keikka child too), `company-list` / `truck-get` pin the verb.
+  test.each([
+    ["customer", "company-list", "list"],
+    ["keikka", "drivers-list", "drivers"],
+    ["vehicle", "truck-get", "get"],
+  ])("`ib %s %s` names the in-group child `%s`, not a deep owner", (group, token, child) => {
+    const cmd = leafByPath(group);
+    cmd.args = [token];
+    const env = buildUnknownCommandEnvelope(cmd, token, "developer");
+    expect(env.didYouMean).toBe(child);
     expect(env.availableElsewhere).toEqual([]);
   });
 });

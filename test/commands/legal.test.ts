@@ -480,28 +480,22 @@ describe("ib legal writes", () => {
 });
 
 describe("resolveTypeNameTarget label (fb#1036) + USAGE code (fb#1156)", () => {
-  // `get` takes <documentIdOrType>, not <typeName> — a shared resolver that
-  // hard-codes one name misdescribes the other command's own signature. Both
-  // throws also carry the parser's `code: "USAGE"` (fb#1156): fb#1036 moved
-  // Commander's own missing-argument check into this handler, and `code` is the
-  // envelope field `ib help exit-codes` tells AI callers to discriminate on.
-  const usage = { exitCode: 4, body: { code: "USAGE" } };
+  // `get` takes <documentIdOrType>, not <typeName>; every throw carries the
+  // parser's code USAGE — see `failParseUsage` in src/output/json.ts.
+  const usageError = (message: string) =>
+    expect.objectContaining({ exitCode: 4, body: { code: "USAGE" }, message: expect.stringContaining(message) });
   test("default label names typeName in the missing-target error", () => {
-    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
-      expect.objectContaining({ ...usage, message: expect.stringContaining("<typeName>") })
-    );
+    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(usageError("<typeName>"));
   });
   test("conflicting positional and --type under the default label", () => {
-    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(
-      expect.objectContaining({ ...usage, message: expect.stringContaining("pass only one") })
-    );
+    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(usageError("pass only one"));
   });
   test("custom label is used in both error paths", () => {
     expect(() => resolveTypeNameTarget(undefined, undefined, "documentIdOrType")).toThrowError(
-      expect.objectContaining({ ...usage, message: expect.stringContaining("<documentIdOrType>") })
+      usageError("<documentIdOrType>")
     );
     expect(() => resolveTypeNameTarget("12", "TOS", "documentIdOrType")).toThrowError(
-      expect.objectContaining({ ...usage, message: expect.stringContaining("positional documentIdOrType") })
+      usageError("positional documentIdOrType")
     );
   });
 });
