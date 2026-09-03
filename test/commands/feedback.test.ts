@@ -2348,6 +2348,47 @@ describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
     const out = await runFeedbackList(mockClient, { status: "open", gated: true });
     expect(out.hint ?? "").not.toMatch(/--gated was IGNORED/);
   });
+
+  // fb#1251. owner-any is the one accepted value that is NOT a stored kind: it
+  // selects the whole human-blocked family, so an operator asking "what is
+  // waiting on a person" cannot get 0 by naming the legacy `owner` after the
+  // stored rows are reclassified.
+  test("--gated owner-any rides to the server as its own value", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", gated: "owner-any" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&gated=owner-any");
+  });
+
+  test("owner-any accepts every kind in the owner family without warning", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "owner" },
+      { feedbackId: 2, status: "open", gateKind: "owner-decision" },
+      { feedbackId: 3, status: "open", gateKind: "owner-action" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: "owner-any" });
+    // The regression this pins: comparing owner-any by EQUALITY makes every
+    // correctly-filtered row look like a mismatch, so the "backend ignored
+    // --gated" warning would fire on every single owner-any query.
+    expect(out.hint ?? "").not.toMatch(/--gated was IGNORED/);
+    expect(out.items).toHaveLength(3);
+  });
+
+  test("owner-any still warns when a NON-owner gate comes back", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", gateKind: "owner-action" },
+      { feedbackId: 2, status: "open", gateKind: "soak" },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", gated: "owner-any" });
+    expect(out.hint).toMatch(/--gated was IGNORED by this backend/);
+  });
+
+  test("owner-any is NOT accepted where a real gateKind is stored", async () => {
+    // `create --gate-kind owner-any` would persist a value no row should carry
+    // and no narrow filter would ever match.
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", gateKind: "owner-any" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+  });
 });
 
 describe("ib feedback lint", () => {

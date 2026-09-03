@@ -97,6 +97,25 @@ export const GATE_KINDS = [
 type GateKind = (typeof GATE_KINDS)[number];
 
 /**
+ * Every gate meaning "a human must act" — mirror of `feedbackSql.OWNER_GATE_KINDS`.
+ * Anything reasoning about human-blocked rows must use this rather than the bare
+ * `owner` value, or the split silently narrows what it sees.
+ */
+export const OWNER_GATE_KINDS = ["owner", "owner-decision", "owner-action"] as const;
+
+/**
+ * What `--gated` accepts: every stored kind, plus `owner-any` for the whole
+ * OWNER_GATE_KINDS set.
+ *
+ * `owner-any` is the one value that is NOT a stored gateKind. Without it the
+ * only way to ask "what is waiting on a person" is to name one of the three
+ * owner values, and naming the legacy `owner` answers 0 once the stored rows
+ * are reclassified — an empty blocked queue that reads as "nothing is waiting
+ * on me" while the queue sits under the other two (fb#1251).
+ */
+export const GATED_FILTERS = [...GATE_KINDS, "owner-any"] as const;
+
+/**
  * Relation vocabulary — mirror of `feedbackSql.RELATION_TYPES` in puminet5api
  * (relations design 2026-08-31). `duplicate`/`blocks` are DIRECTED (A→B reads
  * "A duplicates/blocks B"); `same-root-cause`/`related` are symmetric. Nothing
@@ -310,7 +329,19 @@ function gatedFilterIgnored(
   rows: Record<string, unknown>[]
 ): boolean {
   if (!gated || !rows.length) return false;
-  return rows.some((r) => r.gateKind == null || (gated !== "any" && r.gateKind !== gated));
+  return rows.some((r) => r.gateKind == null || !gateValueMatches(gated, r.gateKind));
+}
+
+/**
+ * Does one row's stored gateKind satisfy the requested filter value? Split out
+ * because `owner-any` is a SET, not a kind: comparing it by equality would
+ * declare every correctly-filtered owner row a mismatch and fire the
+ * "backend ignored --gated" warning on every single owner-any query (fb#1251).
+ */
+function gateValueMatches(gated: string, gateKind: unknown): boolean {
+  if (gated === "any") return true;
+  if (gated === "owner-any") return (OWNER_GATE_KINDS as readonly string[]).includes(String(gateKind));
+  return gateKind === gated;
 }
 
 /** Cap a string at MAX_FREETEXT chars, keeping HEAD+TAIL (elided middle) so an
@@ -361,7 +392,7 @@ interface FeedbackFilterParams {
   unclaimed?: boolean;
   claimedBy?: string;
   held?: boolean;
-  /** Resolved wire value: "any" (bare --gated) or a GATE_KINDS member. */
+  /** Resolved wire value: "any" (bare --gated) or a GATED_FILTERS member. */
   gated?: string;
 }
 
@@ -379,7 +410,7 @@ export interface FeedbackListOptions extends Omit<FeedbackFilterParams, "gated">
   all?: boolean;
   full?: boolean;
   mine?: boolean;
-  /** Commander shape: `true` for the bare flag, a GATE_KINDS string to narrow. */
+  /** Commander shape: `true` for the bare flag, a GATED_FILTERS string to narrow. */
   gated?: boolean | string;
 }
 
@@ -408,7 +439,7 @@ async function fetchRows(
     unclaimed: params.unclaimed ? "1" : undefined,
     claimedBy: params.claimedBy || undefined,
     held: params.held ? "1" : undefined,
-    // "any" (bare --gated) or a GATE_KINDS member. Already resolved by the
+    // "any" (bare --gated) or a GATED_FILTERS member. Already resolved by the
     // caller, so no truthy-shortcut here: the backend rejects anything else.
     gated: params.gated || undefined,
   });
@@ -822,7 +853,9 @@ export async function runFeedbackList(
   // newest-first, the rows it dropped were the OLDEST, i.e. exactly the
   // longest-blocked ones the flag exists to surface.
   const gatedKind = typeof opts.gated === "string" ? opts.gated : undefined;
-  if (gatedKind) assertEnum(gatedKind, GATE_KINDS, "--gated");
+  // GATED_FILTERS, not GATE_KINDS: `--gated owner-any` selects the whole
+  // human-blocked set and is not itself a storable kind (fb#1251).
+  if (gatedKind) assertEnum(gatedKind, GATED_FILTERS, "--gated");
   // "any" is the wire spelling of the bare flag; the backend rejects an unknown
   // value rather than answering unfiltered, so a typo can never widen this.
   const gated = opts.gated ? (gatedKind ?? "any") : undefined;
