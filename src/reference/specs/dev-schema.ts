@@ -136,7 +136,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         flags: [],
         outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
         errors: [...devErrors, invalidNameErr, apiErr(404, "Trigger not found", "check the name via `ib dev schema triggers` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it")],
-        examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,tyomaaPerson_after_ins_trig"],
+        examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,asiakasPerson_after_del_trig"],
       },
       {
         command: "ib dev schema rows",

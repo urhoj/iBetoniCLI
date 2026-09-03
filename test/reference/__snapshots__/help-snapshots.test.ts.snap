@@ -4090,7 +4090,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev schema trigger keikka_after_ins_trig
-  ib dev schema trigger keikka_after_ins_trig,tyomaaPerson_after_ins_trig
+  ib dev schema trigger keikka_after_ins_trig,asiakasPerson_after_del_trig
 "
 `;
 
