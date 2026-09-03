@@ -318,7 +318,7 @@ export async function runJerryAdminList(client, withNotification = false) {
     return toListEnvelope(await client.get(`/api/admin/jerry-companies${qs({ withNotification: withNotification ? 1 : undefined })}`));
 }
 /**
- * Companies for an "Add company" picker (GET /api/admin/jerry-companies/search?q=).
+ * Companies for an "Add company" picker (GET /api/admin/jerry-companies/search).
  * System-admin only.
  *
  * Jerry-active companies are EXCLUDED by default, which is what the Jerry-enable
