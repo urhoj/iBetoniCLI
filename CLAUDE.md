@@ -59,7 +59,7 @@ Run from the `betonicli/` directory:
 
 Adding a domain means adding a row to `DOMAIN_REGISTRARS` — `test/domains.test.ts` fails if a root subcommand has no token (it would silently fall back to loading everything) or if a token's subtree differs from the full build's. `reference` and `commands` are wired inline in `program.ts` (they close over its helpers) and are listed in `STATIC_DOMAIN_TOKENS`. The value-taking global flags are derived from the `GLOBAL_OPTIONS` table in `src/globals.ts`, so a new global with an argument can't desync the scanner. A domain module that fails to import propagates — deliberately not swallowed into a full-tree rebuild, which would turn a broken install into a misleading "unknown command".
 
-The `getClient: () => Promise<ApiClient>` factory is passed into every domain registrar. It lazily builds the authenticated client and exits `2` with "Not logged in" if no auth resolves — so command actions never deal with the unauthenticated case. `auth` commands are the exception: they touch the credential store directly and take no `getClient`.
+The `getClient: () => Promise<ApiClient>` factory is passed into every domain registrar. It lazily builds the authenticated client and exits `2` if no auth resolves — the message is endpoint-aware with a sessions hint (`notLoggedInMessage()`, see Auth & credentials below), not a bare "Not logged in" string — so command actions never deal with the unauthenticated case. `auth` commands are the exception: they touch the credential store directly and take no `getClient`.
 
 ### Command implementation pattern
 
@@ -158,7 +158,7 @@ On the **first write** of a process (the first non-GET that passes the read-only
 
 ### `ib doctor`
 
-One aggregated health report (`src/commands/doctor/index.ts`). Derives identity from the active JWT (works for both file- and `IB_TOKEN`-sessions, unlike `auth whoami` which reads the credentials file), reports token expiry, reuses `runVersion` for connectivity + deployed build, and does one authenticated read (`runCompanyList`) to prove the token works against the endpoint. Read-only; exits `1` when the aggregate `ok` is false.
+One aggregated health report (`src/commands/doctor/index.ts`). Derives identity from the active JWT (works for both file- and `IB_TOKEN`-sessions — same `resolveAuth` resolution `auth whoami` uses), reports token expiry, reuses `runVersion` for connectivity + deployed build, and does one authenticated read (`runCompanyList`) to prove the token works against the endpoint. Read-only; exits `1` when the aggregate `ok` is false.
 
 ### `ib help <topic>`
 
