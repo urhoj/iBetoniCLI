@@ -2,8 +2,8 @@
  * `ib changelog` — development changelog entry management.
  *
  * Entries are the authoritative source for the monthly report.
- * Each entry records a feature, improvement, or bugfix with metadata
- * (type, area, files, commit SHAs, linked cliFeedback id, etc.).
+ * Each entry records a feature, improvement, bugfix, or docs change with
+ * metadata (type, area, files, commit SHAs, linked cliFeedback id, etc.).
  *
  * Commands:
  *   add      POST   /api/changelog   (developer-only; --dry-run is server-side via X-Dry-Run)
