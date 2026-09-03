@@ -188,7 +188,7 @@ describe("normalizeType conventional-commit synonyms (fb#188)", () => {
     expect(err.exitCode).toBe(4);
     const p = err.body?.problems?.[0];
     expect(p).toMatchObject({ flag: "--type", issue: "invalid", got: "nonsense" });
-    expect(p?.allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(p?.allowed).toEqual(["feature", "improvement", "bugfix", "docs"]);
     expect(p?.synonyms).toMatchObject({ fix: "bugfix", feat: "feature" });
     expect(err.body?.sample).toContain("ib dev changelog add");
   });
@@ -1151,7 +1151,7 @@ describe("changelog add/update --from-json (fb#300)", () => {
     expect(exitCode).toBe(4);
     const problems = envelope.problems as Array<{ flag: string; allowed?: string[] }>;
     expect(problems.map((p) => p.flag)).toEqual(["--type", "--area", "--title", "--description"]);
-    expect(problems[0].allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(problems[0].allowed).toEqual(["feature", "improvement", "bugfix", "docs"]);
     expect(String(envelope.sample)).toContain("ib dev changelog add");
     expect(asPost()).not.toHaveBeenCalled();
   });

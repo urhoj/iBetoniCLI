@@ -18,8 +18,10 @@ const DUMP_LIMIT_BYTES = 700_000; // measured 665,945 B on 2026-08-31 after the 
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
-// further). Third place is 8,335 B (ib dev feedback create).
-const PER_SPEC_LIMIT_BYTES = 12_000;
+// further). Third place is 8,335 B (ib dev feedback create). Bumped
+// 12,000 -> 12,100 on 2026-09-03 (fb#1271): --type gained a fourth accepted
+// value (docs), 12,003 B measured on `ib dev changelog add`.
+const PER_SPEC_LIMIT_BYTES = 12_100;
 
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {

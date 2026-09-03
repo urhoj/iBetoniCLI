@@ -49,7 +49,7 @@ import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
-const TYPES = ["feature", "improvement", "bugfix"];
+const TYPES = ["feature", "improvement", "bugfix", "docs"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd", "workspace"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
@@ -1346,7 +1346,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     command: "ib dev changelog add",
     aliases: ["ib dev changelog create"],
     description:
-      "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all. Already-resolved rows keep their resolver unless --take-resolve (fb#880).",
+      "Add a change entry (feature|improvement|bugfix|docs). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all. Already-resolved rows keep their resolver unless --take-resolve (fb#880).",
     auth: "any",
     tier: "developer",
     args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
@@ -1357,7 +1357,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         required: true,
         allowed: TYPES,
         synonyms: TYPE_SYNONYMS,
-        description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
+        description: "feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
       },
       {
         name: "area",
@@ -1532,7 +1532,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "type",
         type: "string",
-        description: "feature|improvement|bugfix",
+        description: "feature|improvement|bugfix|docs",
       },
       {
         name: "area",
@@ -1678,7 +1678,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         allowed: TYPES,
         synonyms: TYPE_SYNONYMS,
-        description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
+        description: "feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
       },
       {
         name: "area",

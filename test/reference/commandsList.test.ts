@@ -481,7 +481,7 @@ describe("ib commands --signatures (fb#779, call-shape tier)", () => {
   test("real catalogue: a required enum flag renders inline with its values", () => {
     const env = buildCommandsList({ domain: "changelog", signatures: true }, "developer");
     const add = env.items.find((i) => i.command === "ib dev changelog add");
-    expect(add?.flags).toContain("--type <feature|improvement|bugfix>!");
+    expect(add?.flags).toContain("--type <feature|improvement|bugfix|docs>!");
   });
 
   test("composes with --find and --reads", () => {

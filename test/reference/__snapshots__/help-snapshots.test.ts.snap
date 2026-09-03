@@ -2238,7 +2238,7 @@ exports[`Help snapshots — contract stability > help for ib dev changelog add m
   (also: ib dev changelog create)
 
 DESCRIPTION
-  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from \`open\`; a status set deliberately (e.g. \`reviewed\`) is preserved, and --no-resolve links without touching the status at all. Already-resolved rows keep their resolver unless --take-resolve (fb#880).
+  Add a change entry (feature|improvement|bugfix|docs). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from \`open\`; a status set deliberately (e.g. \`reviewed\`) is preserved, and --no-resolve links without touching the status at all. Already-resolved rows keep their resolver unless --take-resolve (fb#880).
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -2246,7 +2246,7 @@ ARGUMENTS
   <description> STRING    Kuvaus (or pass as --description) — free length, the column is nvarchar(max) (required)
 
 FLAGS
-  --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
+  --type STRING    feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
   --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas. (required)
   --title STRING    Entry title (max 300 chars) (required)
   --description STRING    Alias for the positional description; one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
@@ -2404,7 +2404,7 @@ DESCRIPTION
 
 FLAGS
   --month STRING    YYYY-MM
-  --type STRING    feature|improvement|bugfix
+  --type STRING    feature|improvement|bugfix|docs
   --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --repo STRING    Repo/submodule — matches entries whose --repo CSV CONTAINS this token, so \`--repo betonicli\` also returns cross-lane rows recorded as "puminet5api,betonicli" (deploy-gated: against an older backend this is an exact string match and those rows are invisible). Aliases resolve (\`cli\` → betonicli); a CSV here matches rows containing ANY of the tokens.
   --feedback NUMBER    linked feedback id
@@ -2567,7 +2567,7 @@ ARGUMENTS
   <changelogId> NUMBER    Entry id — accepts an optional \`cl#\` anchor (e.g. \`cl#858\`); a \`fb#\` id is rejected (exit 4) with the feedback command to use (feedback #230) (required)
 
 FLAGS
-  --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
+  --type STRING    feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
   --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --title STRING    New title (max 300 chars)
   --description STRING    New description — REPLACES the whole text (destructive; use --append-description to add to it instead)

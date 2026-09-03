@@ -83,7 +83,7 @@ describe("parser errors → JSON envelope", () => {
     const byFlag = Object.fromEntries(problems.map((p) => [p.flag, p]));
     // Allowed values are pulled from the command spec so the caller re-runs
     // correctly without a --help round-trip (fb#204).
-    expect(byFlag["--type"].allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(byFlag["--type"].allowed).toEqual(["feature", "improvement", "bugfix", "docs"]);
     expect(byFlag["--area"].allowed).toEqual([
       "frontend",
       "backend",

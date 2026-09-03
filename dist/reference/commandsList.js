@@ -58,8 +58,8 @@ function argSignature(a) {
     return a.required === false ? `[${a.name}:${a.type}]` : `<${a.name}:${a.type}>`;
 }
 /** An enum short enough to inline beats a bare type name; longer lists stay
- *  `<string>`. 28 deliberately covers `feature|improvement|bugfix` (26). */
-const ENUM_SIG_MAX = 28;
+ *  `<string>`. 32 deliberately covers `feature|improvement|bugfix|docs` (31). */
+const ENUM_SIG_MAX = 32;
 /** Compact per-flag call shape: `--name` (boolean), `--name <a|b|c>` (short enum),
  *  `--name <type>`; suffix `!` = required, `*` = one of a required group. The
  *  notation is spelled out in the signatures envelope's `hint`. */
