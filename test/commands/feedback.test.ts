@@ -19,9 +19,13 @@ import {
   runFeedbackUnlink,
   runFeedbackCluster,
   RELATION_TYPES,
+  CREATE_FROM_JSON,
+  IMPORT_ENTRY_KEYS,
   type FeedbackResolveInput,
   type FeedbackUpdateInput,
 } from "../../src/commands/feedback/index.js";
+import { payloadKeyMap } from "../../src/commands/_shared/fromJson.js";
+import { buildProgram } from "../../src/program.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1505,6 +1509,26 @@ describe("ib feedback resolve/update — claim-lease advisory warning", () => {
   });
 });
 
+// ─── import ⇄ create key-contract lockstep (fb#1257) ─────────────────────────
+
+describe("import entry keys stay in lockstep with create --from-json", () => {
+  test("IMPORT_ENTRY_KEYS equals create's derived payloadKeyMap", async () => {
+    // IMPORT_ENTRY_KEYS hand-mirrors what payloadKeyMap derives from the
+    // REGISTERED create command — deliberately, because create's Command
+    // instance only exists inside registerFeedbackCommands. Verified
+    // entry-for-entry when written; this pin makes a future create flag added
+    // without updating import FAIL LOUDLY instead of drifting into another
+    // silent-drop bug (the fb#1085 class it exists to end).
+    const program = await buildProgram();
+    const byName = (parent: Command, name: string) =>
+      parent.commands.find((c) => c.name() === name);
+    const create = byName(byName(byName(program, "dev")!, "feedback")!, "create");
+    expect(create).toBeDefined();
+    const derived = payloadKeyMap(create!, CREATE_FROM_JSON);
+    expect(new Map([...IMPORT_ENTRY_KEYS])).toEqual(new Map([...derived]));
+  });
+});
+
 // ─── count ───────────────────────────────────────────────────────────────────
 
 describe("ib feedback count", () => {
@@ -2186,10 +2210,12 @@ describe("ib feedback list — claimState under a derived identity (fb#901)", ()
 
 /**
  * --gated (fb#446, fb#1198). The value rides to the server (gated=any|<kind>),
- * where a new-enough backend filters in SQL before OFFSET/FETCH; an older
- * backend ignores the param and the client-side filter below the merge branch
- * is the fallback — correct because the per-status walk fetches every row in
- * scope, never one capped page.
+ * where a new-enough backend filters in SQL before OFFSET/FETCH. An older
+ * backend ignores the param and answers unfiltered — that is DETECTED (a
+ * returned row with no gate / the wrong kind) and surfaced as a loud stderr
+ * warning plus an envelope hint, the --severity/--held contract; there is NO
+ * client-side gate filter. The per-status walk matters separately: it keeps
+ * the merge branch from dropping rows past the 200-row cap.
  */
 describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
   test("an unknown --gated kind exits 4, no request sent", async () => {

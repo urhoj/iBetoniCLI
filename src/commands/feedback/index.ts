@@ -501,7 +501,7 @@ export function resolveFeedbackCreateDescription(input: {
  * field, and templating a --from-json file off a row from `ib dev feedback get`
  * is the natural way to author one (feedback #357).
  */
-const CREATE_FROM_JSON: FromJsonConfig = {
+export const CREATE_FROM_JSON: FromJsonConfig = {
   nonPayload: new Set(["fromJson", "dryRun", "help"]),
   readShapeAliases: { errorText: "error" },
   numericFields: new Set(["complexity"]),
@@ -519,7 +519,7 @@ const CREATE_FROM_JSON: FromJsonConfig = {
  * spellings mirror payloadKeyMap (camelCase attribute + literal flag), and the
  * `errorText` alias is create's readShapeAliases (fb#357).
  */
-const IMPORT_ENTRY_KEYS = new Map<string, string>([
+export const IMPORT_ENTRY_KEYS = new Map<string, string>([
   ["description", "description"],
   ["body", "body"],
   ["title", "title"],
@@ -656,7 +656,9 @@ export async function runFeedbackImport(
           // wrong-typed key fails THIS entry (failUsage throws; the catch
           // below records it) instead of vanishing silently (fb#1085).
           const entry = normalizeFromJson(e, IMPORT_ENTRY_KEYS, {
-            numericFields: new Set(["complexity"]),
+            // The SAME contract object create --from-json validates with —
+            // expressed in code, not duplicated (fb#1257).
+            numericFields: CREATE_FROM_JSON.numericFields,
             flagName: `import entry ${i}`,
           });
           const description = resolveFeedbackCreateDescription({
@@ -778,7 +780,8 @@ function downgradeDerivedMine(
  * GET /api/feedback — developer-only. Defaults to the active bucket
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
- * `--unresolved`, and a CSV `--status` fan out to one or more GETs per status, merged
+ * `--unresolved`, and a CSV `--status` fan out to one page-WALK per status —
+ * each walked past the 200-row cap to the end of that status's rows — merged
  * newest-first (or oldest-first under `--oldest`) and sliced [offset,
  * offset+limit) client-side. Long free-text is capped at 200 chars unless
  * `--full`.
@@ -1027,6 +1030,20 @@ export async function runFeedbackCluster(
 }
 
 /**
+ * What `count` accepts (fb#1192): the two SQL dimensions plus the status
+ * scope that mirrors `list` — including the active-bucket DEFAULT. Named,
+ * house-style, because the same shape rides twice: the runner's signature
+ * and the registration lambda below.
+ */
+export interface FeedbackCountOptions {
+  kind?: string;
+  scope?: string;
+  status?: string;
+  unresolved?: boolean;
+  all?: boolean;
+}
+
+/**
  * Aggregate counts, server-side (GET /api/feedback/stats).
  *
  * This used to bucket a client-side page in JS, which was correct only while the
@@ -1059,7 +1076,7 @@ export async function runFeedbackCluster(
  */
 export async function runFeedbackCount(
   client: ApiClient,
-  opts: { kind?: string; scope?: string; status?: string; unresolved?: boolean; all?: boolean }
+  opts: FeedbackCountOptions
 ): Promise<Record<string, unknown>> {
   // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
   assertEnum(opts.kind, KINDS, "--kind");
@@ -1169,7 +1186,7 @@ async function countClientSide(
   if (pages.some((p) => p.length >= CAP)) {
     out.truncated = true;
     out.hint =
-      "count is a lower bound — this backend has no /api/feedback/stats, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
+      "count is a lower bound — this backend has no /api/feedback/stats or ignored the status scope, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
   }
   return out;
 }
@@ -2170,16 +2187,13 @@ export function registerFeedbackCommands(
     .option("--kind <kind>")
     .option("--scope <scope>")
     // Status scope mirrors `list` (fb#1192) — including the active-bucket
-    // DEFAULT; `--all` restores the whole-table number count used to report.
+    // DEFAULT; `--all` restores the whole-table number count reported
+    // before fb#1192.
     .option("--status <status>")
     .option("--unresolved")
     .option("--all")
     .action(
-      jsonAction(
-        getClient,
-        (client, opts: { kind?: string; scope?: string; status?: string; unresolved?: boolean; all?: boolean }) =>
-          runFeedbackCount(client, opts)
-      )
+      jsonAction(getClient, (client, opts: FeedbackCountOptions) => runFeedbackCount(client, opts))
     );
 
   // POST /api/feedback/gates/clear — called by `npm run swap`, not typed by
