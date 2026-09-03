@@ -554,10 +554,14 @@ function resolveStatuses(opts) {
     if (opts.all)
         return null;
     if (opts.status) {
-        const list = opts.status
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+        // Dedupe: a repeated status would otherwise fan out to the same page twice
+        // in the client-side fallback path, doubling counts (fb#1254).
+        const list = [
+            ...new Set(opts.status
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)),
+        ];
         assertEnumCsv(list, STATUSES, "--status");
         if (list.length)
             return list;
