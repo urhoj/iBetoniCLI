@@ -93,9 +93,10 @@ export const OWNER_GATE_KINDS = ["owner", "owner-decision", "owner-action"];
  *
  * `owner-any` is the one value that is NOT a stored gateKind. Without it the
  * only way to ask "what is waiting on a person" is to name one of the three
- * owner values, and naming the legacy `owner` answers 0 once the stored rows
- * are reclassified — an empty blocked queue that reads as "nothing is waiting
- * on me" while the queue sits under the other two (fb#1251).
+ * owner values — and bare `owner` is the LEGACY value, carried by almost no
+ * live row, so naming it answers ~0: an empty blocked queue that reads as
+ * "nothing is waiting on me" while the queue sits under the other two
+ * (fb#1251).
  */
 export const GATED_FILTERS = [...GATE_KINDS, "owner-any"];
 /**

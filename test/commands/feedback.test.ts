@@ -2351,8 +2351,8 @@ describe("ib feedback list — --gated filter (server-side, fb#1198)", () => {
 
   // fb#1251. owner-any is the one accepted value that is NOT a stored kind: it
   // selects the whole human-blocked family, so an operator asking "what is
-  // waiting on a person" cannot get 0 by naming the legacy `owner` after the
-  // stored rows are reclassified.
+  // waiting on a person" cannot get 0 by naming the legacy `owner`, which
+  // almost no live row carries.
   test("--gated owner-any rides to the server as its own value", async () => {
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { status: "open", gated: "owner-any" });

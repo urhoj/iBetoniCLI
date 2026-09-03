@@ -158,6 +158,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback list --gated deploy",
       "ib dev feedback list --gated owner-decision",
       "ib dev feedback list --gated owner-action --all",
+      "ib dev feedback list --gated owner-any --unresolved",
       "ib dev feedback list --severity critical --unresolved",
       "ib dev feedback list --held",
     ],
