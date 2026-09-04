@@ -170,6 +170,26 @@ export async function runKeikkaCreate(client, body, flags) {
     });
 }
 /**
+ * POST /api/cli/keikka/intake/resolve — READ. Turns a model-extracted draft into
+ * database ids with confidence and ambiguities. Creates nothing, so the /ai loop
+ * runs it without a confirmation card.
+ */
+export async function runKeikkaIntakeResolve(client, body, flags) {
+    return client.post("/api/cli/keikka/intake/resolve", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
+ * POST /api/cli/keikka/intake/commit — WRITE. Builds ONE complete order in a
+ * single transaction. One order per call: one Idempotency-Key covers a whole
+ * request, so a partially-successful batch would duplicate rows on retry.
+ */
+export async function runKeikkaIntakeCommit(client, body, flags) {
+    return client.post("/api/cli/keikka/intake/commit", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
  * Update a keikka. v1.0 supports only `--status` (the lifecycle keikkaTilaId);
  * other fields are deferred until the dedicated CLI mutation routes ship (v1.1).
  * Posts the numeric keikkaTilaId to `/api/keikka/tila/set` with the universal
@@ -414,6 +434,23 @@ export function registerKeikkaCommands(parent, getClient) {
         const parsed = resolveJsonBody(cmd, opts, { required: true });
         const client = await getClient();
         const result = await runKeikkaCreate(client, parsed, opts);
+        writeJson(result);
+    }));
+    const intake = k
+        .command("intake")
+        .description("Create orders from free-form pasted text (resolve, then commit)");
+    const intakeResolveCmd = addJsonBodyOptions(intake.command("resolve"));
+    intakeResolveCmd.action(guarded(async (opts, cmd) => {
+        const parsed = resolveJsonBody(cmd, opts, { required: true });
+        const client = await getClient();
+        const result = await runKeikkaIntakeResolve(client, parsed, {});
+        writeJson(result);
+    }));
+    const intakeCommitCmd = addJsonBodyOptions(intake.command("commit"));
+    addWriteFlagsToCommand(intakeCommitCmd).action(guarded(async (opts, cmd) => {
+        const parsed = resolveJsonBody(cmd, opts, { required: true });
+        const client = await getClient();
+        const result = await runKeikkaIntakeCommit(client, parsed, opts);
         writeJson(result);
     }));
     const updateCmd = k

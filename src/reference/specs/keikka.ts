@@ -211,6 +211,49 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib keikka intake resolve",
+    description:
+      "Resolve free-form order text into database ids. Takes a --body of {orders:[...]} where each order carries the fields extracted from the pasted text (customer, worksiteAddress, contact{name,phone}, vehiclePlate, sourceCustomer, loadingPlant, loadingTime, pourStart, date, boomMin, lineLength, concrete[{m3,spec}], note, externalRef). Returns matched ids with per-field confidence, candidate lists and an `ambiguities` array. READ-ONLY: it never creates a customer, worksite or person. Max 10 orders per call.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    flags: [
+      { name: "body", type: "json", required: true, description: "{ orders: [...] } — the extracted draft" },
+      FROM_JSON_BODY_FLAG,
+    ],
+    mutates: false,
+    outputShape:
+      "{ orders: [{ ref, ownerAsiakasId, resolved:{customer,worksite,contact,vehicle,source,betoniSupplier,plant}, keikka, betoni:[], ambiguities:[] }] }",
+    errors: [
+      apiErr(400, "orders missing, empty, or more than 10", "send 1-10 orders in --body.orders"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    seeAlso: ["ib keikka intake commit"],
+    examples: [
+      "ib keikka intake resolve --body '{\"orders\":[{\"ref\":\"1\",\"customer\":\"Aapa Ky\",\"worksiteAddress\":\"Länsikaari 3 Inkoo\",\"date\":\"2026-09-04\",\"pourStart\":\"07:00\",\"concrete\":[{\"m3\":5,\"spec\":\"RAPID LATTIA C25/30 16mm hieno S3 - XC1 XC2 - 50 VUOTTA\"}]}]}'",
+    ],
+  },
+  {
+    command: "ib keikka intake commit",
+    description:
+      "Create ONE complete order from a resolved intake payload, in a single transaction: keikka, keikkaTyomaa snapshot, keikkaPerson grant and every concrete line. Takes --body {order:{...}} — one order per call, never a batch. Refuses an order that still carries unresolved `ambiguities`. The order lands as keikkaTilaId 0 (Luonnos) for a dispatcher to promote.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    flags: [
+      { name: "body", type: "json", required: true, description: "{ order: <one resolved order from intake resolve> }" },
+      FROM_JSON_BODY_FLAG,
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ keikkaId, ref }",
+    errors: [
+      apiErr(400, "order missing, a batch was sent, or ambiguities remain", "send one `order`, and answer every ambiguity first"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    seeAlso: ["ib keikka intake resolve"],
+    examples: [
+      "ib keikka intake commit --body '{\"order\":{...}}' --reason 'AI intake from Swerock email'",
+      "ib keikka intake commit --body '{\"order\":{...}}' --dry-run",
+    ],
+  },
+  {
     command: "ib keikka update",
     description:
       "Update a keikka. v1.0 supports only `--status` (the numeric keikkaTilaId, posted to POST /api/keikka/tila/set). Other field-setters land in v1.1.",

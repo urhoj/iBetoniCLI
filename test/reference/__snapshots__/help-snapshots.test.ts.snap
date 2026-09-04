@@ -6384,6 +6384,79 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka intake commit matches snapshot 1`] = `
+"USAGE
+  ib keikka intake commit --body <body> [flags]
+
+DESCRIPTION
+  Create ONE complete order from a resolved intake payload, in a single transaction: keikka, keikkaTyomaa snapshot, keikkaPerson grant and every concrete line. Takes --body {order:{...}} — one order per call, never a batch. Refuses an order that still carries unresolved \`ambiguities\`. The order lands as keikkaTilaId 0 (Luonnos) for a dispatcher to promote.
+  Permissions: requires auth.page.grid.tilaus.edit.
+
+FLAGS
+  --body JSON    { order: <one resolved order from intake resolve> } (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { keikkaId, ref }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  order missing, a batch was sent, or ambiguities remain → send one \`order\`, and answer every ambiguity first
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib keikka intake resolve
+
+EXAMPLES
+  ib keikka intake commit --body '{"order":{...}}' --reason 'AI intake from Swerock email'
+  ib keikka intake commit --body '{"order":{...}}' --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka intake resolve matches snapshot 1`] = `
+"USAGE
+  ib keikka intake resolve --body <body> [flags]
+
+DESCRIPTION
+  Resolve free-form order text into database ids. Takes a --body of {orders:[...]} where each order carries the fields extracted from the pasted text (customer, worksiteAddress, contact{name,phone}, vehiclePlate, sourceCustomer, loadingPlant, loadingTime, pourStart, date, boomMin, lineLength, concrete[{m3,spec}], note, externalRef). Returns matched ids with per-field confidence, candidate lists and an \`ambiguities\` array. READ-ONLY: it never creates a customer, worksite or person. Max 10 orders per call.
+  Permissions: requires auth.page.grid.tilaus.edit.
+
+FLAGS
+  --body JSON    { orders: [...] } — the extracted draft (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { orders: [{ ref, ownerAsiakasId, resolved:{customer,worksite,contact,vehicle,source,betoniSupplier,plant}, keikka, betoni:[], ambiguities:[] }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  orders missing, empty, or more than 10 → send 1-10 orders in --body.orders
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib keikka intake commit
+
+EXAMPLES
+  ib keikka intake resolve --body '{"orders":[{"ref":"1","customer":"Aapa Ky","worksiteAddress":"Länsikaari 3 Inkoo","date":"2026-09-04","pourStart":"07:00","concrete":[{"m3":5,"spec":"RAPID LATTIA C25/30 16mm hieno S3 - XC1 XC2 - 50 VUOTTA"}]}]}'
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka latest matches snapshot 1`] = `
 "USAGE
   ib keikka latest [flags]
