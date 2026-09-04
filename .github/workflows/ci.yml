@@ -31,6 +31,16 @@ jobs:
           # vitest 4 / rolldown imports `styleText` from node:util (Node >= 20.12).
           node-version: "22.x"
 
+      # npm 10.9.8 (bundled with Node 22) crashes in its peer resolver on the
+      # vitest -> vite -> @vitejs/devtools -> @vitejs/devtools-vitest -> vitest@*
+      # optional-peer cycle once vitest@* resolves to a different major than the
+      # vitest already placed (5.0.0 became `latest` 2026-09-03). A dev tree that
+      # only reaches vite as vitest's peer hits it; npm 11 (what Node 24 bundles,
+      # i.e. local dev) resolves the same tree. "Cannot read properties of null
+      # (reading 'edgesOut')" is the tell.
+      - name: Upgrade npm (10.9.8 crashes on vitest's optional-peer cycle)
+        run: npm install -g npm@11 && npm --version
+
       - name: Resolve private @ibetoni packages from the checkout (CI only)
         run: |
           node -e "const fs=require('fs');const p=require('./package.json');p.dependencies['@ibetoni/auth']='file:./ibetoni_packages/auth';p.dependencies['@ibetoni/constants']='file:./ibetoni_packages/constants';fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');"
