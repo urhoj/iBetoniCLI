@@ -234,7 +234,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka intake commit",
     description:
-      "Create ONE complete order from a resolved intake payload, in a single transaction: keikka, keikkaTyomaa snapshot, keikkaPerson grant and every concrete line. Takes --body {order:{...}} — one order per call, never a batch. Refuses an order that still carries unresolved `ambiguities`. The order lands as keikkaTilaId 0 (Luonnos) for a dispatcher to promote.",
+      "Create ONE complete order from a resolved intake payload, in a single transaction: keikka, keikkaTyomaa snapshot, keikkaPerson grant and every concrete line. Takes --body {order:{...}} — one order per call, never a batch. Refuses an order that still carries unresolved `ambiguities`. The status is FORCED server-side to keikkaTilaId 0 (Luonnos) for a dispatcher to promote — a `keikkaTilaId` sent in --body is IGNORED, not honoured, so do not send one.",
     permissions: ["auth.page.grid.tilaus.edit"],
     flags: [
       { name: "body", type: "json", required: true, description: "{ order: <one resolved order from intake resolve> }" },
@@ -249,8 +249,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib keikka intake resolve"],
     examples: [
-      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\",\"keikkaTilaId\":0},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --reason 'AI intake from Swerock email'",
-      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\",\"keikkaTilaId\":0},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --dry-run",
+      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\"},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --reason 'AI intake from Swerock email'",
+      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\"},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --dry-run",
     ],
   },
   {
