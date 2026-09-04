@@ -14,16 +14,55 @@ describe("ib keikka intake resolve/commit", () => {
     mockClient.post.mockReset();
   });
 
-  test("runKeikkaIntakeResolve POSTs to /api/cli/keikka/intake/resolve", async () => {
+  // `read: true` is not cosmetic and not a duplicate of the spec assertions
+  // below — it is the OTHER half of the same contract, enforced in a different
+  // process layer. The spec says `mutates: false`, which makes the backend
+  // catalog classify resolve as a read, which makes the /ai loop run the child
+  // with `readOnly: true` (askWithFunctions2.js) → `IB_READ_ONLY=1`. The CLI's
+  // own write-lock in src/api/client.ts then refuses every non-GET that is not
+  // `meta` or `read`, throwing READ_ONLY_BLOCKED with exit 3 BEFORE the request
+  // leaves the process. So a resolve without `read: true` cannot run in the very
+  // loop it was built for: step 1 of the feature fails 100% of the time.
+  //
+  // It is untestable end-to-end from here (the failure needs the deployed
+  // catalog plus a live /ai turn), and it is currently INVISIBLE in practice
+  // only because puminet5api's vendored betonicli pointer is stale, so the
+  // command is absent from the catalog and classification fails closed to
+  // `write: true` — i.e. bumping that pointer, which shipping this feature
+  // REQUIRES, is what arms the bug. Hence a unit assertion on the exact opts.
+  test("runKeikkaIntakeResolve POSTs to /api/cli/keikka/intake/resolve as a READ", async () => {
     mockClient.post.mockResolvedValueOnce({ orders: [] });
     const body = { orders: [] };
     const result = await runKeikkaIntakeResolve(mockClient, body, {});
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/cli/keikka/intake/resolve",
       body,
-      { headers: {} }
+      { headers: {}, read: true }
     );
     expect(result).toEqual({ orders: [] });
+  });
+
+  // Every other read-over-POST in this CLI tags itself the same way
+  // (`ib person search`, `ib worksite search`, `ib jerry checkAddress`,
+  // `ib dev schema query`). Assert the flag survives alongside write-flag
+  // headers too, so a future edit cannot drop it while the headers keep passing.
+  test("runKeikkaIntakeResolve keeps read: true when write flags are present", async () => {
+    mockClient.post.mockResolvedValueOnce({ orders: [] });
+    await runKeikkaIntakeResolve(mockClient, { orders: [] }, { reason: "AI intake" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/intake/resolve",
+      { orders: [] },
+      { headers: { "X-Action-Reason": "AI intake" }, read: true }
+    );
+  });
+
+  // The mirror-image assertion: commit is a real write and must NEVER carry
+  // `read: true`, which would punch it straight through the read-only lock.
+  test("runKeikkaIntakeCommit does NOT carry read: true", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 1, ref: "1" });
+    await runKeikkaIntakeCommit(mockClient, { order: {} }, {});
+    const opts = mockClient.post.mock.calls[0][2] as Record<string, unknown>;
+    expect(opts).not.toHaveProperty("read");
   });
 
   test("runKeikkaIntakeCommit POSTs to /api/cli/keikka/intake/commit and forwards write flags", async () => {

@@ -173,10 +173,23 @@ export async function runKeikkaCreate(client, body, flags) {
  * POST /api/cli/keikka/intake/resolve — READ. Turns a model-extracted draft into
  * database ids with confidence and ambiguities. Creates nothing, so the /ai loop
  * runs it without a confirmation card.
+ *
+ * `{ read: true }` is REQUIRED, not decorative, and it is what makes the
+ * sentence above true. Because the spec pins this command as a read
+ * (`mutates: false`, no `writeFlags`), the backend catalog classifies it
+ * `write: false`, and the /ai loop's read branch therefore runs the child with
+ * `readOnly: true` → `IB_READ_ONLY=1`. The client's write-lock refuses every
+ * non-GET that is not `meta` or `read` (`READ_ONLY_BLOCKED`, exit 3) before the
+ * request leaves the process — so without this flag step 1 of the whole intake
+ * flow fails every time, in exactly the loop it was designed for. This is a
+ * POST only because a multi-order draft is too large for a query string; it
+ * mutates nothing. Same tag as every other read-over-POST here:
+ * `ib person search`, `ib worksite search`, `ib jerry checkAddress`.
  */
 export async function runKeikkaIntakeResolve(client, body, flags) {
     return client.post("/api/cli/keikka/intake/resolve", body, {
         headers: writeFlagsToHeaders(flags),
+        read: true,
     });
 }
 /**
