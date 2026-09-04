@@ -500,6 +500,13 @@ describe("changelog add --no-resolve (fb#441/fb#517)", () => {
     expect(body).not.toHaveProperty("feedbackId");
   });
 
+  test("`--feedback \"\"` behaves exactly like no --feedback: no key sent, no resolved-row pre-check (fb#1284)", async () => {
+    const body = await addWith(["--feedback", ""]);
+    expect(body).not.toHaveProperty("feedbackId");
+    // The pre-check GETs each id — with no ids there is nothing to look up.
+    expect(asGet()).not.toHaveBeenCalled();
+  });
+
   test("`resolve` is NOT an accepted --from-json key (fb#541)", () => {
     // Registering --no-resolve exposed Commander attribute `resolve`, which the
     // derived key map picked up for free. normalizeFromJson only accepts strings,
@@ -1758,6 +1765,12 @@ describe("intCsvFlag", () => {
   });
   it("exits 4 on an empty element (e.g. a trailing/double comma)", () => {
     expect(() => intCsvFlag("--feedback")("541,,544")).toThrow(/must be an integer/);
+  });
+  it("reads a blank value as the flag being omitted — an empty list, not exit 4 (fb#1284)", () => {
+    // `--feedback ""` is what an unset shell variable interpolates to; for an
+    // OPTIONAL CSV flag that is "no ids", not a malformed id.
+    expect(intCsvFlag("--feedback")("")).toEqual([]);
+    expect(intCsvFlag("--feedback")("   ")).toEqual([]);
   });
 });
 

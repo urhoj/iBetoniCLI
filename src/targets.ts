@@ -69,16 +69,27 @@ export function assertEnum(
  * {@link assertEnum}. Reports ALL unknown values at once (failing on just the
  * first bad token invites a retry-per-token loop), exit 4, client-origin via
  * {@link failWith}. `undefined`/empty in → no-op.
+ *
+ * Carries the same did-you-mean as {@link assertEnum} (fb#1310): a `synonyms`
+ * map first — for the vocabulary collisions edit distance cannot bridge
+ * (`confirmed` → `accepted` on jerry request status, where `ib jerry offer
+ * confirm` puts the wrong word in the caller's head) — then `closestName`.
+ * A synonym is a HINT, never a silent rewrite (fb#369).
  */
 export function assertEnumCsv(
   values: readonly string[] | undefined,
   allowed: readonly string[],
-  flag: string
+  flag: string,
+  synonyms?: Record<string, string>
 ): void {
   const unknown = values?.filter((v) => !allowed.includes(v)) ?? [];
   if (unknown.length) {
+    const guesses = unknown
+      .map((v) => synonyms?.[v.trim().toLowerCase()] ?? closestName(v, [...allowed]))
+      .filter((g): g is string => !!g && allowed.includes(g));
+    const hint = guesses.length ? ` — did you mean ${[...new Set(guesses)].join(", ")}?` : "";
     failWith(
-      `${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}`,
+      `${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}${hint}`,
       4
     );
   }
@@ -144,13 +155,18 @@ export function intFlag(
  * A bad element voids the WHOLE list: linking two of three ids and reporting
  * success is the silent-partial-write class this CLI's validation exists to
  * prevent, and the response has no shape that could say which two landed.
+ *
+ * A BLANK value (`--feedback ""`, what an unset shell variable interpolates to)
+ * is the flag being omitted, not a malformed id — it yields `[]` (fb#1284). Only
+ * an empty element INSIDE a list (`541,,544`) is a malformed id.
  */
 export function intCsvFlag(
   flag: string,
   min = 1
 ): (value: string) => number[] {
   return (value: string) => {
-    const parts = (value ?? "").split(",");
+    if (!(value ?? "").trim()) return [];
+    const parts = value.split(",");
     return parts.map((p) => {
       const s = p.trim();
       if (!s) failWith(`${flag} must be an integer >= ${min} (empty element in "${value}")`, 4);

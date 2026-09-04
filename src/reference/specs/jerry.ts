@@ -808,7 +808,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", description: "Status CSV: draft,open,no_supply,pending_verification,accepted,cancelled,expired", allowed: [...ADMIN_REQUEST_STATUSES] },
+      { name: "status", type: "string", description: "Status CSV: draft,open,no_supply,pending_verification,accepted,cancelled,expired — the confirmed/won state is `accepted` (there is no `confirmed`; fb#1310)", allowed: [...ADMIN_REQUEST_STATUSES] },
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
       { name: "customer", type: "number", description: "Customer asiakasId" },

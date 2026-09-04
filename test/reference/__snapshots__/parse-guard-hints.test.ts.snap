@@ -302,10 +302,6 @@ ib cache invalidate --id <n>
   > pass a positive entity id
 
 ib changelog add --feedback <ids>
-  ! --feedback must be an integer >= 1 (empty element in "")
-  > (no hint)
-
-ib changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (got "-5")
   > (no hint)
 
@@ -326,19 +322,11 @@ ib changelog list --offset <n>
   > pass a non-negative integer row offset
 
 ib changelog update --feedback <ids>
-  ! --feedback must be an integer >= 1 (empty element in "")
-  > (no hint)
-
-ib changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "-5")
   > (no hint)
 
 ib changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "abc")
-  > (no hint)
-
-ib changelog update --unlink <ids>
-  ! --unlink must be an integer >= 1 (empty element in "")
   > (no hint)
 
 ib changelog update --unlink <ids>
@@ -434,10 +422,6 @@ ib dev cache invalidate --id <n>
   > pass a positive entity id
 
 ib dev changelog add --feedback <ids>
-  ! --feedback must be an integer >= 1 (empty element in "")
-  > (no hint)
-
-ib dev changelog add --feedback <ids>
   ! --feedback must be an integer >= 1 (got "-5")
   > (no hint)
 
@@ -458,19 +442,11 @@ ib dev changelog list --offset <n>
   > pass a non-negative integer row offset
 
 ib dev changelog update --feedback <ids>
-  ! --feedback must be an integer >= 1 (empty element in "")
-  > (no hint)
-
-ib dev changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "-5")
   > (no hint)
 
 ib dev changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "abc")
-  > (no hint)
-
-ib dev changelog update --unlink <ids>
-  ! --unlink must be an integer >= 1 (empty element in "")
   > (no hint)
 
 ib dev changelog update --unlink <ids>

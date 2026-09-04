@@ -967,8 +967,10 @@ export function registerJerryCommands(parent, getClient) {
         .option("--limit <n>", "", cappedInt(300))
         .action(guarded(async (opts) => {
         // Guarded here to skip the round-trip; see ADMIN_REQUEST_STATUSES.
+        // `confirmed` is the word `ib jerry offer confirm` teaches, but the
+        // request status is `accepted` — a hint, never a rewrite (fb#1310).
         if (opts.status) {
-            assertEnumCsv(opts.status.split(",").map((s) => s.trim()).filter(Boolean), ADMIN_REQUEST_STATUSES, "--status");
+            assertEnumCsv(opts.status.split(",").map((s) => s.trim()).filter(Boolean), ADMIN_REQUEST_STATUSES, "--status", { confirmed: "accepted" });
         }
         const client = await getClient();
         writeJson(await runJerryAdminRequests(client, opts));

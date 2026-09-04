@@ -20,8 +20,10 @@ const DUMP_LIMIT_BYTES = 700_000; // measured 665,945 B on 2026-08-31 after the 
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
 // further). Third place is 8,335 B (ib dev feedback create). Bumped
 // 12,000 -> 12,100 on 2026-09-03 (fb#1271): --type gained a fourth accepted
-// value (docs), 12,003 B measured on `ib dev changelog add`.
-const PER_SPEC_LIMIT_BYTES = 12_100;
+// value (docs), 12,003 B measured on `ib dev changelog add`. 12,100 -> 12,200
+// on 2026-09-04 (fb#1294): one note saying --type/--area are server-validated
+// and can lag a fresh CLI release, 12,183 B measured on `ib dev changelog add`.
+const PER_SPEC_LIMIT_BYTES = 12_200;
 
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {

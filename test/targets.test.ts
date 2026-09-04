@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   addOwnerOption,
   assertEnum,
+  assertEnumCsv,
   numFlag,
   parseId,
   parseOptionalId,
@@ -319,6 +320,29 @@ describe("zeroOneFlag (fb#905 — 0|1 columns: out-of-range values silently fold
     expect(errorOf(() => zeroOneFlag("--liita-laskuun")("2"))?.message).toBe(
       "--liita-laskuun must be 0 or 1"
     );
+  });
+});
+
+describe("assertEnumCsv did-you-mean (fb#1310 — a vocabulary collision, not a typo)", () => {
+  const STATUSES = ["draft", "open", "no_supply", "pending_verification", "accepted", "cancelled", "expired"] as const;
+
+  test("a synonym names the intended value — 'confirmed' is 7 edits from 'accepted', no fuzzy route reaches it", () => {
+    const err = errorOf(() => assertEnumCsv(["confirmed"], STATUSES, "--status", { confirmed: "accepted" }));
+    expect(err?.exitCode).toBe(4);
+    expect(err?.message).toContain("--status: unknown value(s) confirmed");
+    expect(err?.message).toContain("did you mean accepted?");
+  });
+
+  test("a near miss still gets the edit-distance guess without a synonym table", () => {
+    expect(errorOf(() => assertEnumCsv(["acepted"], STATUSES, "--status"))?.message).toContain(
+      "did you mean accepted?"
+    );
+  });
+
+  test("no guess, no hint — the bare enum list is not padded with a wrong suggestion", () => {
+    const msg = errorOf(() => assertEnumCsv(["zzzzzzzz"], STATUSES, "--status"))?.message ?? "";
+    expect(msg).toContain("must be one of");
+    expect(msg).not.toContain("did you mean");
   });
 });
 

@@ -60,11 +60,21 @@ export function assertEnum(value, allowed, flag, synonyms) {
  * {@link assertEnum}. Reports ALL unknown values at once (failing on just the
  * first bad token invites a retry-per-token loop), exit 4, client-origin via
  * {@link failWith}. `undefined`/empty in → no-op.
+ *
+ * Carries the same did-you-mean as {@link assertEnum} (fb#1310): a `synonyms`
+ * map first — for the vocabulary collisions edit distance cannot bridge
+ * (`confirmed` → `accepted` on jerry request status, where `ib jerry offer
+ * confirm` puts the wrong word in the caller's head) — then `closestName`.
+ * A synonym is a HINT, never a silent rewrite (fb#369).
  */
-export function assertEnumCsv(values, allowed, flag) {
+export function assertEnumCsv(values, allowed, flag, synonyms) {
     const unknown = values?.filter((v) => !allowed.includes(v)) ?? [];
     if (unknown.length) {
-        failWith(`${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}`, 4);
+        const guesses = unknown
+            .map((v) => synonyms?.[v.trim().toLowerCase()] ?? closestName(v, [...allowed]))
+            .filter((g) => !!g && allowed.includes(g));
+        const hint = guesses.length ? ` — did you mean ${[...new Set(guesses)].join(", ")}?` : "";
+        failWith(`${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}${hint}`, 4);
     }
 }
 /**
@@ -121,10 +131,16 @@ export function intFlag(flag, min = 1, hint) {
  * A bad element voids the WHOLE list: linking two of three ids and reporting
  * success is the silent-partial-write class this CLI's validation exists to
  * prevent, and the response has no shape that could say which two landed.
+ *
+ * A BLANK value (`--feedback ""`, what an unset shell variable interpolates to)
+ * is the flag being omitted, not a malformed id — it yields `[]` (fb#1284). Only
+ * an empty element INSIDE a list (`541,,544`) is a malformed id.
  */
 export function intCsvFlag(flag, min = 1) {
     return (value) => {
-        const parts = (value ?? "").split(",");
+        if (!(value ?? "").trim())
+            return [];
+        const parts = value.split(",");
         return parts.map((p) => {
             const s = p.trim();
             if (!s)

@@ -1,6 +1,9 @@
 import { describe, test, expect, beforeEach } from "vitest";
+import { Command } from "commander";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { captureActionError } from "../helpers/stderr.js";
 import {
+  registerJerryCommands,
   runJerryRequestList,
   runJerryRequestGet,
   runJerryRequestOffers,
@@ -440,6 +443,19 @@ describe("ib jerry admin", () => {
       {},
       { headers: { "X-Dry-Run": "1" } }
     );
+  });
+
+  test("admin request list --status confirmed is hinted to `accepted` before any request (fb#1310)", async () => {
+    // `ib jerry offer confirm` puts "confirmed" in the caller's head; the
+    // request status enum says "accepted". Two agents guessed it in one run.
+    const program = new Command();
+    registerJerryCommands(program, async () => mockClient);
+    const { exitCode, envelope } = await captureActionError(() =>
+      program.parseAsync(["jerry", "admin", "request", "list", "--status", "confirmed"], { from: "user" })
+    );
+    expect(exitCode).toBe(4);
+    expect(String(envelope.error)).toContain("did you mean accepted?");
+    expect(mockClient.get).not.toHaveBeenCalled();
   });
 
   test("admin request list forwards filters and wraps requests in an envelope", async () => {
