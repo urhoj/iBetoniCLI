@@ -249,8 +249,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib keikka intake resolve"],
     examples: [
-      "ib keikka intake commit --body '{\"order\":{...}}' --reason 'AI intake from Swerock email'",
-      "ib keikka intake commit --body '{\"order\":{...}}' --dry-run",
+      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\",\"keikkaTilaId\":0},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --reason 'AI intake from Swerock email'",
+      "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\",\"keikkaTilaId\":0},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --dry-run",
     ],
   },
   {
