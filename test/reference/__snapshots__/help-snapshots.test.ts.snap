@@ -13104,6 +13104,51 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle fleet-day matches snapshot 1`] = `
+"USAGE
+  ib vehicle fleet-day [<date>] [flags]
+
+DESCRIPTION
+  The /kentta fleet-stage day board for the active company: depots (isMain + rule), factories of the day, huolto, orders with factory distance/weather/presence, roster with day drivers, crew with personPvm status, and today's collapsed place transitions. Company-admin only.
+  Permissions: requires asiakasAdmin (server-enforced hasCompanyRole admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
+
+FLAGS
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[…], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a company admin of the active tenant → switch to a company where you are asiakasAdmin (\`ib company switch\`) or ask an admin
+  exit 4 (HTTP 400)  date is not a real YYYY-MM-DD calendar date → pass --date YYYY-MM-DD, or today/tomorrow/yesterday
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Same data the /kentta page polls every 30 s; the endpoint reads ONLY \`date\` — the page's \`?varikko=\` override is client-side.
+  - transitions are collapsed in SQL (LAG over vehicle_location_snapshots) and capped at 2 000 rows keeping each vehicle's last run; fleetFeed.transitionsTruncated says when the cap bit.
+  - presence is a server-side floor from snapshot tags (null = no tenant snapshots for that vehicle today); the page derives its own from live pings.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
+  - Deploy-gated: 404 until puminet5api ships /api/dashboard/kentta.
+
+SEE ALSO
+  ib vehicle locations, ib vehicle driver board, ib person absences
+
+EXAMPLES
+  ib vehicle fleet-day
+  ib vehicle fleet-day 2026-09-05
+  ib vehicle fleet-day --date tomorrow
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle get matches snapshot 1`] = `
 "USAGE
   ib vehicle get <vehicleId> [flags]

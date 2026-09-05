@@ -147,6 +147,20 @@ export async function runVehicleLocations(
   );
 }
 
+/**
+ * GET /api/dashboard/kentta?date= — the /kentta fleet-stage day board: depots
+ * (with the main-depot rule), factories of the day, huolto, orders with factory
+ * distance and stored weather, roster with day drivers, crew with personPvm
+ * status, and today's SQL-collapsed place transitions. Company-admin only
+ * (server-gated). Pass-through: the backend shapes everything.
+ */
+export async function runVehicleFleetDay(
+  client: ApiClient,
+  opts: { date?: string }
+): Promise<Record<string, unknown>> {
+  return client.get<Record<string, unknown>>(`/api/dashboard/kentta${qs({ date: opts.date || undefined })}`);
+}
+
 /** One per-day GPS read; the two exported leaves differ only in the path segment. */
 const gpsDayRead =
   (kind: "timeline" | "route") =>
@@ -629,6 +643,14 @@ export function registerVehicleCommands(
     .action(
       jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
         runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
+      )
+    );
+
+  v.command("fleet-day [date]")
+    .option("--date <date>")
+    .action(
+      jsonAction(getClient, (client, date: string | undefined, opts: { date?: string }) =>
+        runVehicleFleetDay(client, { date: resolveDate(date ?? opts.date) })
       )
     );
 

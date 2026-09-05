@@ -78,6 +78,16 @@ export async function runVehicleStatus(client, vehicleId) {
 export async function runVehicleLocations(client) {
     return client.get("/api/cli/vehicle/locations");
 }
+/**
+ * GET /api/dashboard/kentta?date= — the /kentta fleet-stage day board: depots
+ * (with the main-depot rule), factories of the day, huolto, orders with factory
+ * distance and stored weather, roster with day drivers, crew with personPvm
+ * status, and today's SQL-collapsed place transitions. Company-admin only
+ * (server-gated). Pass-through: the backend shapes everything.
+ */
+export async function runVehicleFleetDay(client, opts) {
+    return client.get(`/api/dashboard/kentta${qs({ date: opts.date || undefined })}`);
+}
 /** One per-day GPS read; the two exported leaves differ only in the path segment. */
 const gpsDayRead = (kind) => (client, vehicleId, opts) => client.get(`/api/cli/vehicle/${kind}/${vehicleId}${qs({ date: opts.date || undefined })}`);
 /** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
@@ -411,6 +421,9 @@ export function registerVehicleCommands(parent, getClient) {
     v.command("timeline <vehicleId>")
         .option("--date <date>", "", "today")
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
+    v.command("fleet-day [date]")
+        .option("--date <date>")
+        .action(jsonAction(getClient, (client, date, opts) => runVehicleFleetDay(client, { date: resolveDate(date ?? opts.date) })));
     const createCmd = addVehicleFieldFlags(v.command("create"), "create");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const result = await runVehicleCreate(await getClient(), vehicleFieldsFromOpts(opts), opts);
