@@ -279,9 +279,10 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.vehicle.read"],
     flags: [],
     outputShape:
-      "ListEnvelope<{ vehicleId|null, matched, plate, objectName, lat, lng, speed, direction, engineState, address, at, ageMinutes|null, stale }> & { gpsAvailable, staleAfterMinutes }",
+      "ListEnvelope<{ vehicleId|null, matched, plate, objectName, lat, lng, speed, direction, engineState, address, at, lastEngineOnAt:ISO-UTC|null, ageMinutes|null, stale }> & { gpsAvailable, gpsStatus:\"ok|disabled|rate_limited|error\", resetAt, period, staleAfterMinutes }",
     errors: permErrors("auth.page.vehicle.read"),
     notes: [
+      "gpsStatus distinguishes a blown Ecofleet budget (rate_limited, with resetAt/period from the limiter) from 'no trucks'; gpsAvailable is kept for older callers (false only when the tenant has no Ecofleet config).",
       "Rows are Ecofleet OBJECTS, not vehicles: an object whose plate matches no dbo.vehicle row of the active company (retired truck, subcontractor unit, typo'd reg-no) returns vehicleId:null with matched:false. That is expected data, not an error — filter on `matched`, don't treat the null as a failure.",
       "`stale:true` means the TRACKER stopped reporting (ageMinutes > staleAfterMinutes, default 60), so the coordinates say where the vehicle was, not where it is. A months-old ping still carries its last speed/direction, so without this flag a dead tracker reads as a truck currently driving.",
       "`stale` is about the tracker, not the truck: a depot-parked vehicle whose tracker pinged 20 minutes ago is fresh (stale:false) with speed 0. Use `ageMinutes` to apply your own threshold — `staleAfterMinutes` echoes the one behind the boolean.",
