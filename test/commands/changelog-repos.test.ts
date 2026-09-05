@@ -95,9 +95,20 @@ describe("changelog add --repo fail-safe warning (fb#228)", () => {
     expect(failSafeWarned()).toBe(false);
   });
 
-  test("fully unresolved --repo DOES warn", async () => {
+  test("recognized standalone-lane --repo betonipumppu does NOT warn (fb#1350)", async () => {
+    await add("betonipumppu");
+    expect(failSafeWarned()).toBe(false);
+  });
+
+  // fb#1351: this used to warn about a deploy-time fail-safe that can never
+  // actually apply to a non-blank unresolved token — the server hard-rejects
+  // it at add-time instead (see the new dedicated errors[] row), so the warn
+  // branch was removed rather than reworded. Kept as a regression guard: the
+  // mocked POST here always "succeeds", so this proves the CLI itself no
+  // longer prints a now-inaccurate warning, independent of the real 400.
+  test("fully unresolved --repo no longer warns (fb#1351) — it is hard-rejected server-side instead", async () => {
     await add("totally-unknown-repo");
-    expect(failSafeWarned()).toBe(true);
+    expect(failSafeWarned()).toBe(false);
   });
 
   test("unresolved --repo with --bump-level none does NOT warn", async () => {

@@ -29,7 +29,8 @@ import { buildProgram } from "../../src/program.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CliError, exitCodeFromStatus } from "../../src/api/errors.js";
+import { CliError, exitCodeFromStatus, hintDetailForError } from "../../src/api/errors.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { captureActionError, captureStderr, type StderrCapture } from "../helpers/stderr.js";
 
 /**
@@ -726,6 +727,55 @@ describe("ib feedback list", () => {
       runFeedbackList(mockClient, { status: "resolved" })
     ).rejects.toThrow(/did you mean applied/);
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * fb#1328: the mutual-exclusion errors used to share ONE spec row (matched on
+ * the substring "use only one of"), so any of the three violations below got
+ * the entire combined remedy — including a restatement of rules the caller did
+ * not break. Each now resolves to its OWN row; these drive the REAL thrown
+ * message shapes through hintDetailForError (the same resolution --json output
+ * uses) and assert cross-contamination is gone.
+ */
+describe("ib dev feedback list — mutual-exclusion errors resolve to their OWN remedy (fb#1328)", () => {
+  const spec = COMMAND_SPECS.find((s) => s.command === "ib dev feedback list")!;
+
+  test("status-selector conflict does not carry the gated/claim-filter rules", () => {
+    const err = new CliError("Use only one of --all, --status", 0, null, 4);
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/--all \/ --unresolved \/ --status/);
+    expect(hint).not.toMatch(/--gated/);
+    expect(hint).not.toMatch(/--unclaimed/);
+  });
+
+  test("--gated/--ungated conflict does not carry the status-selector or claim-filter rules", () => {
+    const err = new CliError("Use only one of --gated / --ungated", 0, null, 4);
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/complements/);
+    expect(hint).not.toMatch(/--all \/ --unresolved/);
+    expect(hint).not.toMatch(/--unclaimed/);
+  });
+
+  test("claim-filter conflict does not carry the status-selector or gated rules", () => {
+    const err = new CliError(
+      "Use only one of --unclaimed / --mine / --claimed-by / --held",
+      0,
+      null,
+      4
+    );
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/--unclaimed \/ --mine \/ --claimed-by/);
+    expect(hint).not.toMatch(/--gated \/ --ungated/);
+    expect(hint).not.toMatch(/--all \/ --unresolved \/ --status/);
+  });
+
+  test("an enum-value rejection still resolves to the enum remedy, unaffected by the split", () => {
+    const err = new CliError("--kind must be one of: improvement, bug, idea, legal", 0, null, 4);
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/improvement/);
+    expect(hint).not.toMatch(/--gated \/ --ungated/);
+    expect(hint).not.toMatch(/--unclaimed \/ --mine/);
   });
 });
 

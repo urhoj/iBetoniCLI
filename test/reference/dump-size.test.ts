@@ -23,7 +23,14 @@ const DUMP_LIMIT_BYTES = 700_000; // measured 665,945 B on 2026-08-31 after the 
 // value (docs), 12,003 B measured on `ib dev changelog add`. 12,100 -> 12,200
 // on 2026-09-04 (fb#1294): one note saying --type/--area are server-validated
 // and can lag a fresh CLI release, 12,183 B measured on `ib dev changelog add`.
-const PER_SPEC_LIMIT_BYTES = 12_200;
+// 12,200 -> 12,500 on 2026-09-05 (fb#1350/1351/1328): `ib dev changelog add`
+// gained the betonipumppu tier-2 token plus a previously-MISSING errors[] row
+// for its own repo-token rejection (12,469 B); `ib dev feedback list`'s single
+// combined mutual-exclusion errors row (whose remedy bled into every violation
+// regardless of which was actually hit) was split into 4 rows each carrying
+// only its own remedy (12,337 B) — both trimmed hard first (REPO_FLAG_DESC and
+// every new remedy shortened) before reaching for this bump.
+const PER_SPEC_LIMIT_BYTES = 12_500;
 
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {

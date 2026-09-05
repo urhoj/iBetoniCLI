@@ -36,7 +36,7 @@ import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId, assertEnum, intFlag, intCsvFlag, cappedInt } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
-import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
+import { normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { explicitFlags, foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import {
@@ -77,6 +77,15 @@ const SERVER_ENUM_NOTE =
 // believed a routine standalone-lane entry had armed a five-repo bump and filed
 // it (feedback #354). Spell the three tiers out, since only the third is armed.
 //
+// fb#1351 correction: tier (3) as originally written ("a value resolving to NO
+// known repo … fail-safe-bumps EVERY coordinated repo") is itself imprecise for
+// a NON-BLANK token — canonicalizeRepo (puminet5api modules/changelog/changelog.js)
+// hard-rejects any unresolved, non-blank token at add-time (400 / exit 4), so it
+// can never reach computeReleasePlan's Step 0 fail-safe at all. That fail-safe
+// only ever fires for a BLANK/omitted --repo on an already-persisted row — a
+// distinct case from "a value that resolves to nothing." REPO_FLAG_DESC below
+// was reworded accordingly (2026-09) — keep the two in sync.
+//
 // Lead with "(CSV)" like the sibling --files/--sha/--commit descriptions do
 // (fb#408): --repo has always accepted a CSV (csvFields below; the backend
 // canonicalizes per token and computeReleasePlan bumps EVERY coordinated token),
@@ -85,7 +94,7 @@ const SERVER_ENUM_NOTE =
 // is not an edge case — the versioning model HAS two lanes, and any CLI change
 // needing a backend route touches both.
 const REPO_FLAG_DESC =
-  "Repo(s) this entry ships in (CSV). Every token is resolved on its own, so a cross-lane change names BOTH repos — `--repo \"puminet5api,betonicli\"` — instead of demoting one to a --files path. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
+  "Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. `--repo \"puminet5api,betonicli\"`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via `npm run final`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none.";
 const AREA_FLAG_DESC =
   "Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
 // Scope-shaped values agents predictably pass to --area (`ib dev feedback
@@ -1062,24 +1071,18 @@ export function registerChangelogCommands(
       if (o.severity) body.severity = o.severity;
       if (o.files) body.files = filesToJson(o.files);
       if (o.repo) body.repo = o.repo;
-      // fb#228: warn only when the deploy planner would actually fail-safe-bump
-      // (computeReleasePlan: coordinated=[] AND canonical=[] — nothing in the
-      // CSV recognized). Per-token semantics, not a whole-CSV membership test.
+      // fb#1351: the fully-unresolved (non-blank) branch that used to live here
+      // is REMOVED, not reworded — it warned about a deferred deploy-time
+      // fail-safe that can never actually happen for a non-blank token
+      // (canonicalizeRepo hard-rejects it at add-time, 400/exit 4, before the
+      // entry is ever persisted), so the POST below fails outright instead and
+      // that rejection now carries its own errors[] row/remedy. A pre-emptive
+      // warning here would just restate an inevitable failure with the wrong
+      // explanation. Only the RECOGNIZED-STANDALONE reassurance still applies
+      // client-side (feedback #354/#466 — read as reassurance, not rejection).
       if (o.repo && (o.bumpLevel || "patch") !== "none") {
         const { coordinated, canonical } = normalizeRepoCsv(o.repo);
-        if (coordinated.length === 0 && canonical.length === 0)
-          warnNote(
-            `[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(
-              ", "
-            )}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`
-          );
-        // Recognized standalone lane: the planner skips it entirely, so the
-        // --bump-level just recorded will never move a version (feedback #354).
-        // Must read as REASSURANCE, not rejection — the old wording ("repos are
-        // …; pass --bump-level none") landed as "unknown repo → fail-safe bump
-        // of everything" and cost a caller an investigation (fb#466). Keep the
-        // alarm tone for the genuinely-unrecognized ⚠ branch above only.
-        else if (coordinated.length === 0)
+        if (coordinated.length === 0 && canonical.length > 0)
           warnNote(
             `[ib] note: --repo "${o.repo}" is a recognized standalone package, not a coordinated release repo — this entry bumps no app version, so --bump-level ${o.bumpLevel || "patch"} is inert (standalone packages are auto-bumped by \`npm run final\`). This is fine; nothing to do.`
           );
@@ -1471,6 +1474,13 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         exit: 3,
         meaning: "Developer access required",
         remedy: "use a developer token",
+      },
+      {
+        http: 400,
+        exit: 4,
+        match: ["repo has unknown token"],
+        meaning: "Validation (unresolved --repo token)",
+        remedy: "unrecognized token — see --help for the accepted tiers, or leave --repo blank for the deploy-time fail-safe instead. Matched case-insensitively against a fixed alias table, not fuzzy.",
       },
       {
         http: 400,

@@ -32,6 +32,7 @@ const ALIASES = {
     // Standalone-lane site submodules (own repos/releases, no coordinated bump — feedback #214).
     "ibetoni-site": "ibetoni-site", site: "ibetoni-site", ibetonisite: "ibetoni-site",
     bsg2: "bsg2",
+    betonipumppu: "betonipumppu",
 };
 /** One token -> canonical name, or null if unknown. `dbo.*` / `@ibetoni/*` pass through verbatim. */
 export function normalizeRepoToken(token) {

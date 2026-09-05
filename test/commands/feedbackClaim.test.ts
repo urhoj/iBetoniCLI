@@ -230,6 +230,26 @@ describe("release — derived-identity diagnosis (fb#652/fb#695)", () => {
     await expect(runFeedbackRelease(client, 999, {})).rejects.toThrow(err);
     expect(warnings()).not.toContain("DERIVED");
   });
+
+  // fb#1359: the backend now answers 200 released:false (idempotent no-op)
+  // instead of 409 when nobody holds the claim — this must pass through
+  // untouched, and must NOT trigger the DERIVED-identity warning (that warning
+  // is scoped to an actual 409, which this response is not).
+  test("a 200 with released:false (idempotent no-op) passes through untouched — no DERIVED warning", async () => {
+    const client = mockClient();
+    (client as never as { delete: ReturnType<typeof vi.fn> }).delete.mockResolvedValueOnce({
+      feedbackId: 572,
+      released: false,
+      note: "no active claim to release (already released, expired, or closed)",
+    });
+    const row = await runFeedbackRelease(client, 572, {});
+    expect(row).toEqual({
+      feedbackId: 572,
+      released: false,
+      note: "no active claim to release (already released, expired, or closed)",
+    });
+    expect(warnings()).not.toContain("DERIVED");
+  });
 });
 
 /**

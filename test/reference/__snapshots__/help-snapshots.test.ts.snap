@@ -2257,7 +2257,7 @@ FLAGS
   --status STRING    Tila (Julkaistu/Korjattu/...) (max 30 chars)
   --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
-  --repo STRING    Repo(s) this entry ships in (CSV). Every token is resolved on its own, so a cross-lane change names BOTH repos — \`--repo "puminet5api,betonicli"\` — instead of demoting one to a --files path. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via \`npm run final\`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none. (max 200 chars)
+  --repo STRING    Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. \`--repo "puminet5api,betonicli"\`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via \`npm run final\`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none. (max 200 chars)
   --sha STRING    Commit SHAs (CSV) (max 500 chars)
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
@@ -2286,6 +2286,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
+  exit 4 (HTTP 400)  Validation (unresolved --repo token) → unrecognized token — see --help for the accepted tiers, or leave --repo blank for the deploy-time fail-safe instead. Matched case-insensitively against a fixed alias table, not fuzzy.
   exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell) → Pass the whole entry via --from-json <file|-> instead of argv
@@ -3245,7 +3246,10 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries \`changelogLinks: [{changelogId, role}]\` — the same shape \`get\` returns — so a PARTLY-shipped row is visible before you claim it (fb#647). Every row ALSO carries gateKind/gateRef/gateUntil (null on an ungated row) — \`npm run swap\`'s gate-clear hook reads gateRef off this to decide which rows a release actually cleared.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held) and only one of --gated / --ungated; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
+  exit 4 (client-side)  Validation (status-selector conflict) → pass only ONE of --all / --unresolved / --status — no flag is already --unresolved
+  exit 4 (client-side)  Validation (--gated/--ungated conflict) → pass only one of --gated [kind] or --ungated — complements, cannot both apply
+  exit 4 (client-side)  Validation (claim-filter conflict) → pass only one of --unclaimed / --mine / --claimed-by <label> / --held
+  exit 4 (client-side)  Validation (enum value rejected) → --status: open|reviewed|applied|dismissed; --kind: improvement|bug|idea|legal; --scope: cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --severity: critical|major|minor|cosmetic|none; --gated value: deploy|soak|legal|owner|owner-decision|owner-action|backlog|owner-any — STRICT server filters, unknown value -> empty list, not an error
   exit 4 (client-side)  --max-complexity is not an integer >= 1, rejected locally before any request → pass an integer 1-5
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200 — page past it with --offset
   exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass a non-negative integer row offset
@@ -3305,13 +3309,13 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { feedbackId, released:true } for one row; { by, released:<count> } with --all.
+  { feedbackId, released:true } for one row (released:false + note when there was nothing to release — already released/expired/closed, fb#1359); { by, released:<count> } with --all.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → pass a feedbackId, or --all to release every claim
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
-  exit 4 (HTTP 409)  You do not hold that claim → the label you asked as does not match the holder. Set $IB_CLAIM_ID to the label you claimed under and retry — that is the mechanism \`resolve\`/\`update\` also prove holdership with, and they have no --by flag at all. \`--by <label>\` overrides it for a one-off call. Check the current holder with \`ib dev feedback get <id>\`
+  exit 4 (HTTP 409)  You do not hold that claim → the label you asked with does not match the holder. Set $IB_CLAIM_ID to the label you claimed under and retry — that is the mechanism \`resolve\`/\`update\` also prove holdership with, and they have no --by flag at all. \`--by <label>\` overrides it for a one-off call. Check the current holder with \`ib dev feedback get <id>\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
@@ -3921,7 +3925,7 @@ exports[`Help snapshots — contract stability > help for ib dev schema rows mat
   ib dev schema rows <table> [flags]
 
 DESCRIPTION
-  Sample rows from an allowlisted reference lookup table. Developer-only; table names are validated against a curated allowlist of small, static, tenant-free enum tables: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila. The keikka trio is what decodes ids the codebase interpolates as bare literals — keikkaPersonSourceId separates a named link from bulk membership fan-out (10/20), contactPersonTypeId 1 is the driver marker, and keikkaTilaId is the status enum behind the 4 / 5,9,12,13,100 magic numbers.
+  Sample rows from an allowlisted reference lookup table. Developer-only; table names are validated against a curated allowlist of small, static, tenant-free enum tables: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila, betoniLaatuNames, betoniLujuus, betoniRaeKoko, betoniNotkeus, betoniKayttoIka. The keikka trio is what decodes ids the codebase interpolates as bare literals — keikkaPersonSourceId separates a named link from bulk membership fan-out (10/20), contactPersonTypeId 1 is the driver marker, and keikkaTilaId is the status enum behind the 4 / 5,9,12,13,100 magic numbers. The concrete-mix quintet backs betoniLaatu's mix-design columns (strength class, aggregate size, consistency, service-life class); betoniLaatu itself is NOT allowlisted here — it carries a tenant column (asiakasId), so read it via the tenant-scoped \`ib betoni laatu list\`/\`get\` instead.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
@@ -3939,7 +3943,7 @@ OUTPUT (JSON, stdout)
   { items: [{ column1, column2, … }], nextCursor: null, count, truncated?, hint? } — row shape depends on the table being queried.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Table not on allowlist → use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila
+  exit 4 (HTTP 400)  Table not on allowlist → use an allowlisted table: personSettingTypes, asiakasSettingTypes, asiakasPersonSettingTypes, vehicleTypes, keikkaPersonSource, contactPersonTypes, keikkaTila, betoniLaatuNames, betoniLujuus, betoniRaeKoko, betoniNotkeus, betoniKayttoIka. For any OTHER table (including betoniLaatu, which is tenant-scoped — use \`ib betoni laatu list\`/\`get\` for it), use the read-only escape hatch \`ib dev schema query "SELECT * FROM <table>"\` instead
   exit 5 (HTTP 404)  Table not found        → verify the table name with \`ib dev schema tables\`
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; max is 1000
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3955,6 +3959,7 @@ EXAMPLES
   ib dev schema rows asiakasSettingTypes --search admin
   ib dev schema rows keikkaPersonSource
   ib dev schema rows keikkaTila --search peruttu
+  ib dev schema rows betoniLaatuNames
 "
 `;
 

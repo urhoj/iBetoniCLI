@@ -135,7 +135,19 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
     prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
-      { origin: "client", exit: 4, match: ["use only one of", "must be one of"], meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; likewise only one claim filter (--unclaimed / --mine / --claimed-by / --held) and only one of --gated / --ungated; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
+      // fb#1328: was ONE row matching "use only one of" — a substring of all
+      // three distinct mutual-exclusion violations below — so EVERY one of them
+      // got this row's entire combined remedy, including a literal restatement
+      // of whichever OTHER rule the caller did not violate. Split so each
+      // violation resolves to ONLY its own remedy; `match` substrings are chosen
+      // to be unique to each violation's real message shape (resolveStatuses'
+      // selectors.join(", ") is order-fixed --all,--unresolved,--status, so the
+      // 3-substring set below covers all 2-or-3-of-3 combinations without
+      // colliding with the other rows or with an enum-value message).
+      { origin: "client", exit: 4, match: ["--all, --unresolved", "--all, --status", "--unresolved, --status"], meaning: "Validation (status-selector conflict)", remedy: "pass only ONE of --all / --unresolved / --status — no flag is already --unresolved" },
+      { origin: "client", exit: 4, match: ["--gated / --ungated"], meaning: "Validation (--gated/--ungated conflict)", remedy: "pass only one of --gated [kind] or --ungated — complements, cannot both apply" },
+      { origin: "client", exit: 4, match: ["--unclaimed / --mine / --claimed-by / --held"], meaning: "Validation (claim-filter conflict)", remedy: "pass only one of --unclaimed / --mine / --claimed-by <label> / --held" },
+      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: `--status: ${FEEDBACK_STATUSES.join("|")}; --kind: ${FEEDBACK_KINDS.join("|")}; --scope: ${FEEDBACK_SCOPES.join("|")}; --severity: ${FEEDBACK_SEVERITY_FILTERS.join("|")}; --gated value: ${FEEDBACK_GATED_FILTERS.join("|")} — STRICT server filters, unknown value -> empty list, not an error` },
       intParseErr("--max-complexity", "pass an integer 1-5"),
       limitErr("pass a positive integer; this command caps at 200 — page past it with --offset"),
       intParseErr("--offset", "pass a non-negative integer row offset", 0),
@@ -482,12 +494,12 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "Release EVERY claim held by this label instead of one row" },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
     ],
-    outputShape: "{ feedbackId, released:true } for one row; { by, released:<count> } with --all.",
+    outputShape: "{ feedbackId, released:true } for one row (released:false + note when there was nothing to release — already released/expired/closed, fb#1359); { by, released:<count> } with --all.",
     errors: [
       { origin: "client", exit: 4, match: "provide a feedbackid", meaning: "Validation", remedy: "pass a feedbackId, or --all to release every claim" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
-      apiErr(409, "You do not hold that claim", "the label you asked as does not match the holder. Set $IB_CLAIM_ID to the label you claimed under and retry — that is the mechanism `resolve`/`update` also prove holdership with, and they have no --by flag at all. `--by <label>` overrides it for a one-off call. Check the current holder with `ib dev feedback get <id>`"),
+      apiErr(409, "You do not hold that claim", "the label you asked with does not match the holder. Set $IB_CLAIM_ID to the label you claimed under and retry — that is the mechanism `resolve`/`update` also prove holdership with, and they have no --by flag at all. `--by <label>` overrides it for a one-off call. Check the current holder with `ib dev feedback get <id>`"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
