@@ -13124,7 +13124,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[…], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }
+  { date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[{sijaintiId,nimi,lat,lng,radiusM}], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -13136,7 +13136,7 @@ NOTES
   - Same data the /kentta page polls every 30 s; the endpoint reads ONLY \`date\` — the page's \`?varikko=\` override is client-side.
   - transitions are collapsed in SQL (LAG over vehicle_location_snapshots) and capped at 2 000 rows keeping each vehicle's last run; fleetFeed.transitionsTruncated says when the cap bit.
   - presence is a server-side floor from snapshot tags (null = no tenant snapshots for that vehicle today); the page derives its own from live pings.
-  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
+  - \`[date]\` and \`--date\` are aliases (today/tomorrow/yesterday or YYYY-MM-DD); omit both and the SERVER resolves today in Europe/Helsinki — unlike \`ib vehicle driver …\`, omitting the date is not an error here.
   - Deploy-gated: 404 until puminet5api ships /api/dashboard/kentta.
 
 SEE ALSO

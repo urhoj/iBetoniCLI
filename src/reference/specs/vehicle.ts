@@ -385,7 +385,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     args: [DRIVER_DATE_ARG],
     flags: [DRIVER_DATE_FLAG],
     outputShape:
-      "{ date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[…], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }",
+      "{ date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[{sijaintiId,nimi,lat,lng,radiusM}], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }",
     errors: authErrors(
       apiErr(403, "Not a company admin of the active tenant", "switch to a company where you are asiakasAdmin (`ib company switch`) or ask an admin"),
       apiErr(400, "date is not a real YYYY-MM-DD calendar date", "pass --date YYYY-MM-DD, or today/tomorrow/yesterday")
@@ -394,7 +394,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       "Same data the /kentta page polls every 30 s; the endpoint reads ONLY `date` — the page's `?varikko=` override is client-side.",
       "transitions are collapsed in SQL (LAG over vehicle_location_snapshots) and capped at 2 000 rows keeping each vehicle's last run; fleetFeed.transitionsTruncated says when the cap bit.",
       "presence is a server-side floor from snapshot tags (null = no tenant snapshots for that vehicle today); the page derives its own from live pings.",
-      DRIVER_DATE_NOTE,
+      "`[date]` and `--date` are aliases (today/tomorrow/yesterday or YYYY-MM-DD); omit both and the SERVER resolves today in Europe/Helsinki — unlike `ib vehicle driver …`, omitting the date is not an error here.",
       "Deploy-gated: 404 until puminet5api ships /api/dashboard/kentta.",
     ],
     seeAlso: ["ib vehicle locations", "ib vehicle driver board", "ib person absences"],
