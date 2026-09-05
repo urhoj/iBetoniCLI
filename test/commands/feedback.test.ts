@@ -2587,6 +2587,194 @@ describe("ib feedback list — --ungated filter (client-side over the walk, fb#1
   });
 });
 
+/**
+ * --min-age (fb#1421) — exclude rows filed in the last <duration>.
+ *
+ * A row filed minutes ago is usually still OWNED by the session that filed it:
+ * /post-impl-verify files its deferred findings and its /finalize follow-up
+ * fixes them. A batch-fix session browsing `--unclaimed` sees those rows before
+ * their filer has claimed anything, and the default order is NEWEST-FIRST, so
+ * picking from the top of the page selects precisely the freshest rows. That
+ * really happened: on 2026-09-05 a session shortlisted fb#1394/fb#1396, both
+ * filed 2.7h earlier by a /kentta design pass that was still in progress.
+ *
+ * Client-side (createdAt already rides on every row, so nothing is deploy-gated)
+ * and therefore routed over the walk branch's complete per-status fetch, for the
+ * same reason --ungated is: filtering one capped page is the fb#536/fb#1198
+ * under-report class, and here it bites harder — dropping the NEWEST rows from a
+ * newest-first page SHORTENS the page instead of pulling the older rows that
+ * should fill it.
+ */
+describe("ib feedback list — --min-age filter (client-side over the walk, fb#1421)", () => {
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+
+  test("rejects a bare number — the unit is what makes it unambiguous", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open", minAge: "2" })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/--min-age/) });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("rejects an unparseable duration", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open", minAge: "soon" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("accepts m / h / d units", async () => {
+    for (const v of ["30m", "2h", "1d"]) {
+      get.mockReset();
+      get.mockResolvedValueOnce([]);
+      await runFeedbackList(mockClient, { status: "open", minAge: v });
+      expect(get).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test("no age param is sent — the filter is client-side", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", minAge: "2h" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200");
+  });
+
+  test("drops rows younger than the duration and keeps the rest", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 3, status: "open", createdAt: hoursAgo(0.5) },
+      { feedbackId: 2, status: "open", createdAt: hoursAgo(3) },
+      { feedbackId: 1, status: "open", createdAt: hoursAgo(48) },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", minAge: "2h" });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([2, 1]);
+  });
+
+  test("a lone explicit status walks that status instead of the single capped request", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", createdAt: hoursAgo(48) }]);
+    await runFeedbackList(mockClient, { status: "open", minAge: "2h" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&limit=200");
+  });
+
+  test("the predicate runs BEFORE the offset/limit slice — fresh rows cannot starve the window", async () => {
+    // Newest-first: without the pre-slice filter, the two fresh rows would eat
+    // the whole limit-2 window and the page would come back empty of workable
+    // rows while older, claimable ones sat right behind them.
+    get.mockResolvedValueOnce([
+      { feedbackId: 5, status: "open", createdAt: hoursAgo(0.2) },
+      { feedbackId: 4, status: "open", createdAt: hoursAgo(0.3) },
+      { feedbackId: 3, status: "open", createdAt: hoursAgo(20) },
+      { feedbackId: 2, status: "open", createdAt: hoursAgo(30) },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", minAge: "2h", limit: 2 });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([3, 2]);
+  });
+
+  test("a row with no usable createdAt is KEPT — absence is not freshness", async () => {
+    // Both unusable shapes: the key absent entirely, and a present-but-
+    // unparseable value. Neither is evidence of freshness, so neither may be
+    // hidden from a caller who asked to see the workable rows.
+    get.mockResolvedValueOnce([
+      { feedbackId: 3, status: "open" },
+      { feedbackId: 2, status: "open", createdAt: "not-a-date" },
+      { feedbackId: 1, status: "open", createdAt: hoursAgo(0.1) },
+    ]);
+    const out = await runFeedbackList(mockClient, { status: "open", minAge: "2h" });
+    expect(out.items.map((r) => r.feedbackId)).toEqual([3, 2]);
+  });
+
+  test("composes with --unclaimed and --max-complexity (the batch-fix slice)", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", createdAt: hoursAgo(48) }]);
+    await runFeedbackList(mockClient, {
+      status: "open",
+      unclaimed: true,
+      maxComplexity: 2,
+      minAge: "12h",
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/feedback?status=open&maxComplexity=2&limit=200&unclaimed=1"
+    );
+  });
+});
+
+/**
+ * The freshness NOTE (fb#1421) — the half that reaches a session which is not
+ * thinking about any of this.
+ *
+ * --min-age only helps a caller who already knows to pass it, which is the same
+ * "the filer must remember" hole that made a filer-side gate insufficient. So
+ * `list` ALWAYS says when the page it just returned contains fresh rows. stderr
+ * only, exactly like warnPartlyShipped — the JSON stdout contract is untouched.
+ */
+describe("ib feedback list — freshness note (fb#1421)", () => {
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+  let cap: StderrCapture;
+  beforeEach(() => {
+    cap = captureStderr();
+  });
+  afterEach(() => cap.restore());
+
+  test("names the fresh rows and points at the flag", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 9, status: "open", createdAt: hoursAgo(1) },
+      { feedbackId: 8, status: "open", createdAt: hoursAgo(3) },
+      { feedbackId: 7, status: "open", createdAt: hoursAgo(200) },
+    ]);
+    await runFeedbackList(mockClient, { status: "open" });
+    const out = cap.text();
+    expect(out).toMatch(/2 of 3/);
+    expect(out).toMatch(/fb#9/);
+    expect(out).toMatch(/fb#8/);
+    expect(out).not.toMatch(/fb#7/);
+    expect(out).toMatch(/--min-age/);
+  });
+
+  test("stays silent when every row is old enough", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", createdAt: hoursAgo(500) }]);
+    await runFeedbackList(mockClient, { status: "open" });
+    expect(cap.text()).not.toMatch(/min-age/);
+  });
+
+  test("stays silent when the caller already passed --min-age", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 9, status: "open", createdAt: hoursAgo(1) },
+      { feedbackId: 7, status: "open", createdAt: hoursAgo(200) },
+    ]);
+    await runFeedbackList(mockClient, { status: "open", minAge: "30m" });
+    // fb#9 survives a 30m floor but is still inside the 12h window; the caller
+    // chose their own threshold, so re-advising them is noise.
+    expect(cap.text()).not.toMatch(/min-age/);
+  });
+
+  test("counts only ACTIVE rows — a fresh applied row is not claimable", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 9, status: "applied", createdAt: hoursAgo(1) },
+      { feedbackId: 8, status: "dismissed", createdAt: hoursAgo(1) },
+    ]);
+    await runFeedbackList(mockClient, { status: "applied,dismissed" });
+    expect(cap.text()).not.toMatch(/min-age/);
+  });
+
+  test("a row with no usable createdAt never counts as fresh", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 9, status: "open" },
+      { feedbackId: 8, status: "open", createdAt: "not-a-date" },
+    ]);
+    await runFeedbackList(mockClient, { status: "open" });
+    expect(cap.text()).not.toMatch(/min-age/);
+  });
+
+  test("summarises the rest past the named cap", async () => {
+    get.mockResolvedValueOnce(
+      Array.from({ length: 8 }, (_, i) => ({
+        feedbackId: 100 - i,
+        status: "open",
+        createdAt: hoursAgo(1),
+      }))
+    );
+    await runFeedbackList(mockClient, { status: "open" });
+    expect(cap.text()).toMatch(/\+3 more/);
+  });
+});
+
+
 describe("ib feedback lint", () => {
   test("GETs the server-side audit and wraps it in the list envelope", async () => {
     // Thin by design: the value is that the audit runs server-side over the

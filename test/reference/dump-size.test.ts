@@ -29,8 +29,14 @@ const DUMP_LIMIT_BYTES = 700_000; // measured 665,945 B on 2026-08-31 after the 
 // combined mutual-exclusion errors row (whose remedy bled into every violation
 // regardless of which was actually hit) was split into 4 rows each carrying
 // only its own remedy (12,337 B) — both trimmed hard first (REPO_FLAG_DESC and
-// every new remedy shortened) before reaching for this bump.
-const PER_SPEC_LIMIT_BYTES = 12_500;
+// every new remedy shortened) before reaching for this bump. 12,500 -> 13,400
+// on 2026-09-05 (fb#1421): `ib dev feedback list` gained --min-age plus its
+// errors[] row and one freshness note (13,373 B). This spec was ALREADY within
+// ~120 B of the cap, so any new flag on it required a bump; the prose was cut
+// three times first (the flag description and note both roughly halved, the
+// incident rationale moved out of the spec entirely) and only the operational
+// contract kept.
+const PER_SPEC_LIMIT_BYTES = 13_400;
 
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {

@@ -3239,6 +3239,7 @@ FLAGS
   --held    Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes).
   --gated STRING    Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated owner-action), or \`owner-any\` for the whole human-blocked family (owner + owner-decision + owner-action). Use owner-any whenever you mean 'waiting on a person': bare \`owner\` is the LEGACY value only, so naming it answers 0 on a queue whose rows have been reclassified, which reads as 'nothing is blocked'. Filtered SERVER-SIDE since fb#1198 — it previously filtered client-side over one 200-row page, so \`--gated --all\` answered 1 when the table held 18, and because the page is newest-first the rows it dropped were the OLDEST, i.e. the longest-blocked. Deploy-gated but CHECKED like --severity: an older backend ignores the param and answers unfiltered, which under a gate lens reads as 'every row is blocked', so a mismatch raises a loud stderr warning plus an envelope hint.
   --ungated    Only rows carrying NO gate (gateKind IS NULL) — the complement of bare --gated, and the 'workable right now' half of a fix-session slice (pair it with --unclaimed --max-complexity N). Filtered CLIENT-SIDE — the backend's gated param has no negation value — and therefore routed over the complete per-status walk, so no row is dropped to the 200-row cap: a lone --status walks that status, --all fans out over all four. Mutually exclusive with --gated (exit 4) (fb#1209).
+  --min-age STRING    Exclude rows filed within this duration — <n>m|<n>h|<n>d; a bare number exits 4 rather than being guessed at. Drops rows their filer still owns: a just-filed row carries NO claim yet, so --unclaimed cannot tell it from an abandoned one, and newest-first puts exactly those on top. Client-side over the complete walk like --ungated. A row with no parseable createdAt is KEPT (fb#1421).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -3250,6 +3251,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation (status-selector conflict) → pass only ONE of --all / --unresolved / --status — no flag is already --unresolved
   exit 4 (client-side)  Validation (--gated/--ungated conflict) → pass only one of --gated [kind] or --ungated — complements, cannot both apply
+  exit 4 (client-side)  --min-age has no unit or is unparseable (client-side, before any request) → pass <n>m, <n>h or <n>d, e.g. --min-age 12h — a bare number is refused, not guessed: minutes vs hours is a silent 60x
   exit 4 (client-side)  Validation (claim-filter conflict) → pass only one of --unclaimed / --mine / --claimed-by <label> / --held
   exit 4 (client-side)  Validation (enum value rejected) → --status: open|reviewed|applied|dismissed; --kind: improvement|bug|idea|legal; --scope: cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --severity: critical|major|minor|cosmetic|none; --gated value: deploy|soak|legal|owner|owner-decision|owner-action|backlog|owner-any — STRICT server filters, unknown value -> empty list, not an error
   exit 4 (client-side)  --max-complexity is not an integer >= 1, rejected locally before any request → pass an integer 1-5
@@ -3267,6 +3269,7 @@ NOTES
   - --oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. \`--kind bug --oldest\`) to keep breakages ahead of age.
   - Each row carries claimState (free|held|mine). An expired claim reads as \`free\` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically. A row that would read \`mine\` instead reads \`held\` (+ a stderr warning) when the caller's identity is the derived user@host fallback (no $IB_CLAIM_ID/--by/ctx set) — that label is shared by every such session on the host, so \`mine\` cannot be proven (fb#901).
   - --held (fb#886) is deploy-gated with the same CHECKED contract as --severity, because its silent-ignore also points the wrong way: an older backend ignores the param and answers unfiltered, which reads as 'everything is claimed'. On a mismatch (a returned row with no live lease) the CLI emits a loud stderr warning plus an envelope \`hint\`; filter client-side on claimState there instead.
+  - FRESHNESS NOTE (fb#1421): a stderr note names ACTIVE rows filed in the last 12h; nothing is hidden, and it is suppressed under --min-age. \`--unclaimed --ungated --max-complexity 2 --min-age 12h\` = the fully-workable batch-fix slice.
   - --ungated (fb#1209) has NO server-side param — the backend's gated filter has no negation value — so it runs CLIENT-SIDE over the complete per-status walk (a lone --status walks that status, --all fans out over all four). That routing is what keeps it exact against the 200-row cap; filtering one capped page is the fb#536/fb#1198 under-report class.
   - PARTLY-SHIPPED ROWS (fb#647): a row can carry \`changelogLinks\` and still be open — that is a fix recorded with \`ib dev changelog add --feedback <id> --no-resolve\`, which links the shipped half WITHOUT closing the row. Any linked row that is still OPEN or REVIEWED is also named in a one-line stderr note (a closed row always has a \`resolves\` link, so those are not worth saying). Read the entry (\`ib dev changelog get <id>\`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.
 
@@ -3285,6 +3288,7 @@ EXAMPLES
   ib dev feedback list --gated owner-action --all
   ib dev feedback list --gated owner-any --unresolved
   ib dev feedback list --ungated --unclaimed --max-complexity 2
+  ib dev feedback list --unclaimed --ungated --max-complexity 2 --min-age 12h
   ib dev feedback list --severity critical --unresolved
   ib dev feedback list --held
 "

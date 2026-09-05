@@ -431,6 +431,61 @@ export interface FeedbackListOptions extends Omit<FeedbackFilterParams, "gated">
   gated?: boolean | string;
   /** The negation of bare --gated: only rows with NO gate (fb#1209). Client-side. */
   ungated?: boolean;
+  /** Exclude rows filed within this duration (`30m`/`2h`/`1d`, fb#1421). Client-side. */
+  minAge?: string;
+}
+
+/**
+ * How fresh a row has to be for `list` to say so unprompted (fb#1421).
+ *
+ * 12h, not the 2h that first suggested itself: the window has to outlive a
+ * WORKING SESSION, not a single command. The rows that prompted this
+ * (fb#1394/fb#1396) were filed 2.7h into a /kentta design pass that was still
+ * running hours later — a 2h window would have stayed silent on exactly the
+ * collision it exists to prevent.
+ */
+export const FRESH_ROW_WINDOW_H = 12;
+
+/** How many fresh rows the note names before it summarises the rest. */
+const FRESH_ROWS_NAMED = 5;
+
+const DURATION_RE = /^(\d+(?:\.\d+)?)([mhd])$/;
+
+/**
+ * Parse `30m` / `2h` / `1d` into milliseconds.
+ *
+ * A BARE NUMBER is rejected rather than assumed to be hours: this value decides
+ * which rows a batch-fix agent never sees, and "2" meaning minutes to the caller
+ * and hours to the CLI is a silent 60x. Exit 4 names the unit forms, so the
+ * remedy is in the refusal.
+ */
+export function parseDurationMs(raw: string, flag: string): number {
+  const m = DURATION_RE.exec(raw.trim());
+  if (!m) {
+    failWith(
+      `${flag} must be a duration with a unit — <n>m (minutes), <n>h (hours) or <n>d (days), e.g. ${flag} 12h`,
+      4
+    );
+  }
+  const n = Number(m![1]);
+  const unit = m![2] as "m" | "h" | "d";
+  const scale = unit === "m" ? 60_000 : unit === "h" ? 3_600_000 : 86_400_000;
+  return n * scale;
+}
+
+/**
+ * Row age in ms, or null when the row carries no usable `createdAt`.
+ *
+ * Null is deliberately NOT treated as fresh anywhere: an unparseable or absent
+ * timestamp is missing evidence, and the safe reading of missing evidence is
+ * "this is an ordinary row" — hiding it from `--min-age`, or accusing it in the
+ * note, would both be inventions.
+ */
+function rowAgeMs(row: Record<string, unknown>, now: number): number | null {
+  const raw = row.createdAt;
+  if (typeof raw !== "string" && typeof raw !== "number") return null;
+  const t = Date.parse(String(raw));
+  return Number.isNaN(t) ? null : now - t;
 }
 
 /** Build the query string and GET a page of feedback rows (always an array). */
@@ -886,6 +941,12 @@ export async function runFeedbackList(
   if (opts.ungated && opts.gated) {
     failWith("Use only one of --gated / --ungated", 4);
   }
+  // --min-age is CLIENT-SIDE (createdAt already rides on every row, so there is
+  // nothing to deploy-gate) and is parsed HERE, before any request goes out: a
+  // malformed duration must cost zero round-trips, and exiting after the fetch
+  // would leave the caller wondering whether the filter had partly applied.
+  const minAgeMs = opts.minAge === undefined ? undefined : parseDurationMs(opts.minAge, "--min-age");
+
   const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy, opts.held].filter(Boolean);
   if (claimFilters.length > 1) {
     failWith("Use only one of --unclaimed / --mine / --claimed-by / --held", 4);
@@ -930,8 +991,14 @@ export async function runFeedbackList(
   // CLIENT-SIDE (no backend param), and filtering a single capped page is the
   // fb#536/fb#1198 failure class, so it takes the complete per-status fetch —
   // a lone status walks alone, --all fans out over all four statuses.
+  // --min-age forces the walk for the same reason --ungated does, only more
+  // sharply: it is client-side, and the default order is NEWEST-first, so
+  // dropping fresh rows out of one capped page SHORTENS that page instead of
+  // pulling the older rows that should fill it — the caller asks for the 50
+  // workable rows and gets 35, with no signal that the rest were never fetched.
   const walkStatuses = statuses ?? [...STATUSES];
-  if (!opts.ungated && (!statuses || statuses.length <= 1)) {
+  const clientSideFilter = opts.ungated || minAgeMs !== undefined;
+  if (!clientSideFilter && (!statuses || statuses.length <= 1)) {
     items = await fetchRows(client, {
       ...filters,
       status: statuses?.[0],
@@ -964,9 +1031,20 @@ export async function runFeedbackList(
     const merged = walks
       .flatMap((w) => w.rows)
       .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
-    // The --ungated predicate runs BEFORE the offset/limit slice: slicing
-    // first would let gated rows count against the window and starve it.
-    const filtered = opts.ungated ? merged.filter((r) => r.gateKind == null) : merged;
+    // The client-side predicates run BEFORE the offset/limit slice: slicing
+    // first would let excluded rows count against the window and starve it.
+    // Under --min-age that starvation is the normal case, not an edge one —
+    // the excluded rows are the NEWEST, which is where a newest-first page
+    // begins.
+    const now = Date.now();
+    const filtered = merged.filter((r) => {
+      if (opts.ungated && r.gateKind != null) return false;
+      if (minAgeMs !== undefined) {
+        const age = rowAgeMs(r, now);
+        if (age !== null && age < minAgeMs) return false;
+      }
+      return true;
+    });
     const offset = opts.offset ?? 0;
     const limit = opts.limit ?? 50;
     if (filtered.length > offset + limit) truncated = true;
@@ -989,6 +1067,7 @@ export async function runFeedbackList(
     });
   }
   warnPartlyShipped(items);
+  warnFreshRows(items, minAgeMs !== undefined);
 
   const env = listEnvelope(items);
   if (truncated) env.truncated = true;
@@ -1336,6 +1415,51 @@ function warnPartlyShipped(items: Record<string, unknown>[]): void {
   warnNote(
     `[ib] note: ${linked.length} of ${active.length} un-closed rows already carry changelog links (${named}${rest > 0 ? `, +${rest} more` : ""}) — ` +
       `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`
+  );
+}
+
+/**
+ * Say when the page contains rows nobody has had a chance to claim yet (fb#1421).
+ *
+ * A freshly-filed row is usually still OWNED by the session that filed it —
+ * /post-impl-verify files its deferred findings and the /finalize follow-up
+ * works them — but it carries no claim during that window, so on a `--unclaimed`
+ * browse it is indistinguishable from an abandoned one. Newest-first ordering
+ * makes it worse than neutral: the freshest rows are the ones at the TOP of the
+ * page, so an agent picking from the top picks exactly the contested ones. That
+ * really happened on 2026-09-05 (fb#1394/fb#1396, mid-/kentta-design).
+ *
+ * Why a note and not a default exclusion: silently dropping rows is the failure
+ * mode this command keeps getting bitten by (--gated answering 1 of 18, fb#1198).
+ * The note hides nothing — it names the ids and the flag, and the caller decides.
+ *
+ * Silent once the caller passes --min-age: they have chosen their own threshold,
+ * and re-advising them about rows they deliberately kept is noise.
+ *
+ * Only ACTIVE rows count, like warnPartlyShipped: a fresh `applied` row is not
+ * claimable, so naming it would be a warning about nothing.
+ *
+ * stderr, never stdout: the JSON data contract is untouched.
+ */
+function warnFreshRows(items: Record<string, unknown>[], minAgeGiven: boolean): void {
+  if (minAgeGiven) return;
+  const now = Date.now();
+  const windowMs = FRESH_ROW_WINDOW_H * 3_600_000;
+  const active = items.filter((r) => ACTIVE_STATUSES.includes(r.status as never));
+  const fresh = active.filter((r) => {
+    const age = rowAgeMs(r, now);
+    return age !== null && age < windowMs;
+  });
+  if (!fresh.length) return;
+  const named = fresh
+    .slice(0, FRESH_ROWS_NAMED)
+    .map((r) => `fb#${r.feedbackId}`)
+    .join(", ");
+  const rest = fresh.length - Math.min(fresh.length, FRESH_ROWS_NAMED);
+  warnNote(
+    `[ib] note: ${fresh.length} of ${active.length} active rows were filed in the last ${FRESH_ROW_WINDOW_H}h ` +
+      `(${named}${rest > 0 ? `, +${rest} more` : ""}) — a fresh row is usually still owned by the session that ` +
+      `filed it, even though nothing holds a claim yet. Pass --min-age ${FRESH_ROW_WINDOW_H}h to exclude them.`
   );
 }
 
@@ -2016,6 +2140,10 @@ export function registerFeedbackCommands(
     .option("--held")
     .option("--gated [kind]", "Only rows carrying a gate; optionally restrict to one kind")
     .option("--ungated", "Only rows carrying NO gate; mutually exclusive with --gated")
+    .option(
+      "--min-age <duration>",
+      `Exclude rows filed within this duration (<n>m|<n>h|<n>d) — the rows still likely owned by the session that filed them. ${FRESH_ROW_WINDOW_H}h is the suggested floor for a batch-fix slice`
+    )
     .action(
       jsonAction(getClient, (client, opts: FeedbackListOptions) => runFeedbackList(client, opts))
     );
