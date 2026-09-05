@@ -271,6 +271,55 @@ describe("ib schema", () => {
       expect(msg).toContain("ib dev schema query");
       expect(msg).toContain("GROUP BY");
     });
+
+    /**
+     * fb#1326 — this command runs on the db_datareader-only `ib_readonly`
+     * login, so the routine-bearing catalogs come back near-empty with NO
+     * error: sys.procedures reports 6 of ~200. A caller reading that as "the
+     * proc does not exist" is the failure this hint prevents.
+     */
+    describe("metadata-filtered catalog hint (fb#1326)", () => {
+      test("a sys.procedures read is flagged, naming the login and the command that can settle existence", async () => {
+        post().mockResolvedValueOnce({ ...complete, rows: [{ n: 6 }] });
+        const result = await runSchemaQuery(mockClient, "SELECT COUNT(*) AS n FROM sys.procedures");
+        expect(result.hint).toContain("ib_readonly");
+        expect(result.hint).toContain("ib dev schema procs|proc|table|view");
+      });
+
+      test("sys.objects is flagged — the original trap listed tables but no procs", async () => {
+        post().mockResolvedValueOnce(complete);
+        const result = await runSchemaQuery(
+          mockClient,
+          "SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'"
+        );
+        expect(result.hint).toBeDefined();
+      });
+
+      test("INFORMATION_SCHEMA.ROUTINES is flagged case-insensitively", async () => {
+        post().mockResolvedValueOnce(complete);
+        const result = await runSchemaQuery(mockClient, "select * from information_schema.routines");
+        expect(result.hint).toBeDefined();
+      });
+
+      /**
+       * The cry-wolf guard. These catalogs were MEASURED complete under this
+       * login (db_datareader implies metadata visibility on the tables it can
+       * read), so warning on them would be substantively false — and a warning
+       * that is false on correct queries is one callers learn to ignore.
+       */
+      test.each([
+        ["sys.tables", "SELECT COUNT(*) AS n FROM sys.tables"],
+        ["sys.columns", "SELECT name FROM sys.columns WHERE object_id = 1"],
+        ["INFORMATION_SCHEMA.TABLES", "SELECT * FROM INFORMATION_SCHEMA.TABLES"],
+        ["a plain user table", "SELECT COUNT(*) AS n FROM keikka"],
+      ])("%s is NOT flagged", async (_label, sql) => {
+        post().mockResolvedValueOnce(complete);
+        const result = await runSchemaQuery(mockClient, sql);
+        // Absent, not undefined: stdout key order is part of the contract.
+        expect("hint" in result).toBe(false);
+        expect(result).toEqual(complete);
+      });
+    });
   });
 
   describe("resolveSqlInput (fb#968)", () => {

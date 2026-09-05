@@ -81,6 +81,46 @@ export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
 }
 /**
+ * Catalog views that UNDER-REPORT under this command's login (fb#1326).
+ *
+ * `ib dev schema query` runs on the `ib_readonly` principal, which holds
+ * db_datareader and nothing else, while every OTHER `ib dev schema *` command
+ * runs as the app login. SQL Server filters catalog views by metadata
+ * permission, and db_datareader confers no permission on procedures — so the
+ * routine-bearing catalogs come back nearly empty with no error at all. That
+ * is the dangerous shape: a plausible answer, not a permission failure.
+ *
+ * Measured 2026-09-05 against production: sys.procedures 6 vs ~200 real,
+ * INFORMATION_SCHEMA.ROUTINES 7, sys.parameters 18. The exact trap this hint
+ * exists to stop: `SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'`
+ * returns 27 rows of tables, keys, defaults and triggers and NO stored
+ * procedure, so `keikkaPerson_add` reads as missing while two shipped modules
+ * EXEC it by name.
+ *
+ * Deliberately NOT matched: sys.tables, sys.views, sys.columns, sys.triggers,
+ * sys.indexes, sys.foreign_keys and INFORMATION_SCHEMA.TABLES/COLUMNS — those
+ * were measured COMPLETE under this login (db_datareader implies metadata
+ * visibility on the user tables it can read), and a warning that is false on a
+ * correct query is one callers learn to ignore.
+ *
+ * Matching is a regex over raw SQL text, so a CTE aliased `sys` or the literal
+ * string 'INFORMATION_SCHEMA' inside a WHERE will trip it. That is acceptable
+ * and has precedent — the backend's own read-only guard is likewise documented
+ * as not parsing T-SQL string literals — because this is advisory only and
+ * never rejects a query.
+ */
+const METADATA_FILTERED_CATALOGS = /\b(?:sys\.(?:procedures|objects|all_objects|sql_modules|parameters)|information_schema\.(?:routines|parameters))\b/i;
+export const CATALOG_FILTER_HINT = "This query reads a catalog view that SQL Server filters by METADATA PERMISSION. " +
+    "`ib dev schema query` runs under the db_datareader-only `ib_readonly` login, which holds no " +
+    "permission on stored procedures — sys.procedures reports 6 of ~200, and sys.objects lists " +
+    "tables normally while omitting every proc. An empty or short result here is NOT evidence that " +
+    "an object is missing. Confirm existence with `ib dev schema procs|proc|table|view`, which run " +
+    "under the app login and see the real catalogue.";
+/** The hint earned by `sql`, or undefined when it reads no filtered catalog. */
+export function catalogFilterHint(sql) {
+    return METADATA_FILTERED_CATALOGS.test(sql) ? CATALOG_FILTER_HINT : undefined;
+}
+/**
  * Fold the `<sql>` positional and `--sql` flag alias into one value (fb#968) —
  * an agent pattern-matching on sibling commands (`changelog add [description]`,
  * `feedback create <description>`) reaches for the positional first and wasted
@@ -112,7 +152,10 @@ export async function runSchemaQuery(client, sql) {
             hint: `results are hard-capped at ${result.cap} rows — narrow with WHERE, or aggregate (COUNT/GROUP BY) instead of selecting raw rows`,
         }, "ib dev schema query");
     }
-    return result;
+    // Appended, never an always-present key: stdout JSON key order is part of the
+    // observable contract, so an inapplicable hint must be absent, not undefined.
+    const hint = catalogFilterHint(sql);
+    return hint ? { ...result, hint } : result;
 }
 /**
  * Migration snapshot tables + their retention state (fb#440). No `search` —
