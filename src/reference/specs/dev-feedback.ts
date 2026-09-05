@@ -538,7 +538,12 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "DEPLOY-GATED (fb#536): needs /api/feedback/stats; an older backend falls back to the client-side rollup over 200-row pages and sets `truncated` with a hint — a LOWER BOUND whose drops are the OLDEST rows (`open` understated most).",
     ],
     errors: [
-      { origin: "client", exit: 4, match: ["must be one of", "use only one of"], meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal, --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --status values open|reviewed|applied|dismissed (all STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error). Use only one of --all / --unresolved / --status" },
+      // fb#1385: was one combined row (same class of bug fb#1328 fixed for
+      // `list` in this file) — split so a status-selector conflict does not
+      // carry the enum remedy and vice versa. `count` has no --gated/claim
+      // flags, so only these two rows are needed here (contrast `list`'s 4).
+      { origin: "client", exit: 4, match: ["--all, --unresolved", "--all, --status", "--unresolved, --status"], meaning: "Validation (status-selector conflict)", remedy: "pass only ONE of --all / --unresolved / --status — no flag is already --unresolved" },
+      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: "--kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — all STRICT server-side filters, an unknown value reports total:0, not an error" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],

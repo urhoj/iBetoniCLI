@@ -2609,6 +2609,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4 (HTTP 400)  Validation (unresolved --repo token) → unrecognized token — see \`ib dev changelog add --help\` for the accepted tiers, or leave --repo blank for the deploy-time fail-safe instead. Matched case-insensitively against a fixed alias table, not fuzzy.
   exit 4 (HTTP 400)  Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped) → For enums the error names the allowed values (language must be fi|en). For a released entry leave the level as recorded — every other field is still editable; only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
@@ -2915,7 +2916,8 @@ OUTPUT (JSON, stdout)
   { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, bySeverity, byClaim: { held, free }, unestimated, ungraded, truncated?, hint? }. EVERY key counts the STATUS SCOPE — the active bucket (open+reviewed) by default, the whole table under --all — so the completeness scalars finally answer "what still needs triage": \`unestimated\` = complexity IS NULL in scope (pair with \`list --complexity none\`), \`ungraded\` = severity IS NULL in scope (pair with \`list --severity none\`); \`bySeverity\` buckets the graded rows and carries the NULLs under the key \`ungraded\`. \`byClaim\` (fb#888) is a live-lease split — \`held\` = claimedBy set AND unexpired, \`free\` = everything else including an expired lease — answering "what is being worked right now?" without pulling a page. bySeverity/byClaim/ungraded are deploy-gated: absent on an older backend, which is NOT the same as zero.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → --kind must be improvement|bug|idea|legal, --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --status values open|reviewed|applied|dismissed (all STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error). Use only one of --all / --unresolved / --status
+  exit 4 (client-side)  Validation (status-selector conflict) → pass only ONE of --all / --unresolved / --status — no flag is already --unresolved
+  exit 4 (client-side)  Validation (enum value rejected) → --kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — all STRICT server-side filters, an unknown value reports total:0, not an error
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

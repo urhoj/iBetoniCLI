@@ -1793,6 +1793,17 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         remedy: "dev token",
       },
       {
+        // fb#1384: update shares canonicalizeRepo with add (same validator,
+        // same message), so the same dedicated row belongs here too — see
+        // add's identical row for why it needs its own `match` rather than
+        // folding into the catch-all below.
+        http: 400,
+        exit: 4,
+        match: ["repo has unknown token"],
+        meaning: "Validation (unresolved --repo token)",
+        remedy: "unrecognized token — see `ib dev changelog add --help` for the accepted tiers, or leave --repo blank for the deploy-time fail-safe instead. Matched case-insensitively against a fixed alias table, not fuzzy.",
+      },
+      {
         // ONE row per status was once forced: hintForError served the FIRST http
         // match, so a second 400 row was dead and mis-remedied the other case
         // (fb#374). A second row is now possible IF it carries `match` (fb#485) —

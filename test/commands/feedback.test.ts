@@ -1755,6 +1755,29 @@ describe("ib feedback count", () => {
   });
 });
 
+/**
+ * fb#1385: `count` had the identical combined-remedy bug fb#1328 fixed for
+ * `list` in this file. Same verification shape — drive the real thrown
+ * message shapes through hintDetailForError and confirm no cross-contamination.
+ */
+describe("ib dev feedback count — mutual-exclusion errors resolve to their OWN remedy (fb#1385)", () => {
+  const spec = COMMAND_SPECS.find((s) => s.command === "ib dev feedback count")!;
+
+  test("status-selector conflict does not carry the enum remedy", () => {
+    const err = new CliError("Use only one of --all, --status", 0, null, 4);
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/--all \/ --unresolved \/ --status/);
+    expect(hint).not.toMatch(/improvement\|bug\|idea\|legal/);
+  });
+
+  test("an enum-value rejection does not carry the status-selector remedy", () => {
+    const err = new CliError("--kind must be one of: improvement, bug, idea, legal", 0, null, 4);
+    const { hint } = hintDetailForError(err, spec.errors);
+    expect(hint).toMatch(/improvement/);
+    expect(hint).not.toMatch(/only ONE of --all/);
+  });
+});
+
 describe("complexity filters announce their NULL blind spot (fb#362)", () => {
   test("--max-complexity adds the exclusion hint", async () => {
     get.mockResolvedValue([{ feedbackId: 1, complexity: 2, status: "open" }]);
