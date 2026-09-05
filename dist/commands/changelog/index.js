@@ -1,5 +1,5 @@
 import { cappedListEnvelope } from "../../api/envelopes.js";
-import { CHANGELOG_LIST_CAP, CHANGELOG_LIST_DEFAULT, warnIfLimitCapped, } from "../../api/listCaps.js";
+import { CHANGELOG_LIST_CAP, CHANGELOG_LIST_DEFAULT, warnIfLimitCapped, warnIfCapReached, } from "../../api/listCaps.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
@@ -166,12 +166,21 @@ export async function runChangelogList(client, opts) {
         p.hasSentry = "1";
     const rows = await client.get(`/api/changelog${qs(p)}`);
     warnIfLimitCapped(opts.limit, CHANGELOG_LIST_CAP, "ib dev changelog list");
-    return cappedListEnvelope(rows, {
+    const env = cappedListEnvelope(rows, {
         requested: opts.limit,
         serverCap: CHANGELOG_LIST_CAP,
         serverDefault: CHANGELOG_LIST_DEFAULT,
         meta: client.getLastListMeta?.(),
     });
+    // Same gap as feedback list (fb#1439): warnIfLimitCapped fires only when the
+    // caller over-asked, so a page returned AT the 500 cap — or at the 100 default
+    // — said nothing while being just as incomplete.
+    warnIfCapReached(env, {
+        effective: Math.min(Number(opts.limit) || CHANGELOG_LIST_DEFAULT, CHANGELOG_LIST_CAP),
+        cap: CHANGELOG_LIST_CAP,
+        command: "ib dev changelog list",
+    });
+    return env;
 }
 export async function runChangelogGet(client, id) {
     return client.get(`/api/changelog/${id}`);
@@ -1382,7 +1391,7 @@ export const CHANGELOG_SPECS = [
                 name: "limit",
                 type: "number",
                 default: "100",
-                description: "Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured — you get 500 rows and a stderr warning; `truncated: true` in the envelope says the page was capped (fb#605). Page the rest with --offset.",
+                description: "Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets `truncated: true` — not only an over-ask: hitting the cap at `--limit 500`, or the 100 default, is just as incomplete and was silent until fb#1439 (fb#605). Page the rest with --offset.",
             },
             {
                 name: "offset",

@@ -3323,3 +3323,50 @@ describe("ib dev feedback resolve --also — argv parsing", () => {
     expect(putPaths).toEqual(["/api/feedback/1", "/api/feedback/2", "/api/feedback/3"]);
   });
 });
+
+/**
+ * fb#1439 — the wiring half. The helper existing is not the fix; the fix is that
+ * the two hard-capped list routes actually call it.
+ */
+describe("ib feedback list — hard-cap warning (fb#1439)", () => {
+  let cap2: StderrCapture;
+  beforeEach(() => {
+    cap2 = captureStderr();
+  });
+  afterEach(() => cap2.restore());
+
+  test("a page returned AT the cap says so, though nothing over-asked", async () => {
+    // 200 rows back on an explicit --limit 200: warnIfLimitCapped stays silent
+    // (nothing exceeded the cap), so before this fix the caller got nothing at all.
+    get.mockResolvedValueOnce(
+      Array.from({ length: 200 }, (_, i) => ({ feedbackId: 1000 - i, status: "open" }))
+    );
+    const out = await runFeedbackList(mockClient, { status: "open", limit: 200 });
+    expect(out.truncated).toBe(true);
+    const text = cap2.text();
+    expect(text).toMatch(/maximum of 200/);
+    expect(text).toMatch(/--offset 200/);
+  });
+
+  test("does not blame TEXT elision for missing rows", async () => {
+    // The envelope's `hint` is the head+tail text-elision note; it must not be
+    // presented as the reason rows are absent.
+    get.mockResolvedValueOnce(
+      Array.from({ length: 200 }, (_, i) => ({
+        feedbackId: 1000 - i,
+        status: "open",
+        description: "x".repeat(400),
+      }))
+    );
+    await runFeedbackList(mockClient, { status: "open", limit: 200 });
+    const text = cap2.text();
+    expect(text).toMatch(/--offset 200/);
+    expect(text).not.toMatch(/head\+tail/);
+  });
+
+  test("stays silent when the page is complete", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open" }]);
+    await runFeedbackList(mockClient, { status: "open", limit: 200 });
+    expect(cap2.text()).not.toMatch(/maximum of 200/);
+  });
+});

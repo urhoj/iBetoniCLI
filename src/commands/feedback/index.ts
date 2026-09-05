@@ -20,6 +20,7 @@ import {
   FEEDBACK_LIST_CAP,
   FEEDBACK_LIST_DEFAULT,
   warnIfLimitCapped,
+  warnIfCapReached,
 } from "../../api/listCaps.js";
 import { failWith, warnNote, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../../targets.js";
@@ -1071,6 +1072,16 @@ export async function runFeedbackList(
 
   const env = listEnvelope(items);
   if (truncated) env.truncated = true;
+  // Announce a page that hit the HARD cap (fb#1439). warnIfLimitCapped above
+  // fires only when the caller asked for MORE than the cap, so `--limit 200`
+  // against 234 rows — and the no-limit default at 50 — were both silent while
+  // being just as incomplete. Passed the envelope, not the hint: `hint` here
+  // describes TEXT elision, which is a different truncation entirely.
+  warnIfCapReached(env, {
+    effective: Math.min(Number(opts.limit) || FEEDBACK_LIST_DEFAULT, CAP),
+    cap: CAP,
+    command: "ib dev feedback list",
+  });
   const hints: string[] = [];
   if (cut) hints.push(TRUNCATE_HINT);
   // `--complexity none` SELECTS the unestimated rows, so the exclusion hint
