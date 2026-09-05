@@ -47,6 +47,22 @@ export const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
  * statement (fb#647). A closed row cannot be claimed, so it needs no warning.
  */
 export const ACTIVE_STATUSES = ["open", "reviewed"] as const;
+
+/**
+ * The ONE status word that isn't a status: "resolved" is the single most
+ * natural guess for this enum, precisely because the command that validates
+ * it is named `resolve` — but it means "fixed/shipped", which is `applied`,
+ * not `reviewed` (merely looked at). Raw edit distance gets this backwards:
+ * "resolved" and "reviewed" are both 8 characters with few substitutions, so
+ * `closestName` suggested `reviewed` — the wrong status, in the misleading
+ * direction, for a caller who just fixed something (fb#1364, hit twice in one
+ * session). Checked BEFORE the fuzzy matcher by `enumGuess`, same as
+ * SEVERITY_SYNONYMS below — a curated mapping wins over a same-length
+ * accident.
+ */
+const STATUS_SYNONYMS: Record<string, string> = {
+  resolved: "applied",
+};
 export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
@@ -757,7 +773,7 @@ function resolveStatuses(opts: {
           .filter(Boolean)
       ),
     ];
-    assertEnumCsv(list, STATUSES, "--status");
+    assertEnumCsv(list, STATUSES, "--status", STATUS_SYNONYMS);
     if (list.length) return list;
   }
   // Default (and --unresolved): the active bucket. Closed items need --all/--status.
@@ -1433,7 +1449,7 @@ export async function runFeedbackResolve(
   id: number,
   input: FeedbackResolveInput
 ): Promise<Record<string, unknown>> {
-  assertEnum(input.status, STATUSES, "--status");
+  assertEnum(input.status, STATUSES, "--status", STATUS_SYNONYMS);
   if (input.status === undefined && input.note === undefined) {
     failWith("Provide --status and/or --note", 4);
   }

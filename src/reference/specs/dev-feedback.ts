@@ -108,7 +108,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)", allowed: [...FEEDBACK_STATUSES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed). STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted", allowed: [...FEEDBACK_STATUSES] },
       { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
       { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
       { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
@@ -266,7 +266,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "note", type: "string", required: false, description: "The resolution note, positionally — the same field as --note, so `resolve 42 --status applied -- \"…\"` works exactly like `--note \"…\"`. Mirrors its sibling `ib dev feedback create <description>`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once." },
     ],
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed", allowed: [...FEEDBACK_STATUSES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364)", allowed: [...FEEDBACK_STATUSES] },
       { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
@@ -281,7 +281,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // Both client rows sit at exit 4, so EACH must carry `match` — an
       // unmatched row would win by exit alone and serve the wrong remedy
       // (the fb#305/#306 ambiguity).
-      { origin: "client", exit: 4, match: ["provide --status", "--status must be one of"], meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+      { origin: "client", exit: 4, match: ["provide --status", "--status must be one of"], meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value — 'resolved' means applied, the did-you-mean names it but does not accept it" },
       // Since fb#583 ONE excess positional is the note, so reaching this row
       // takes TWO or more — which on Windows PowerShell means the shell split
       // the note rather than the caller passing two notes on purpose.
@@ -514,7 +514,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     flags: [
       { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind", allowed: [...FEEDBACK_KINDS] },
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all", allowed: [...FEEDBACK_STATUSES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all. STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted", allowed: [...FEEDBACK_STATUSES] },
       { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed rows) — same as the default; mutually exclusive with --status/--all" },
       { name: "all", type: "boolean", description: "Count EVERY status (the whole table) — restores the pre-fb#1192 behaviour; mutually exclusive with --status/--unresolved" },
     ],

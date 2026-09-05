@@ -720,6 +720,13 @@ describe("ib feedback list", () => {
     ).rejects.toMatchObject({ exitCode: 4 });
     expect(get).not.toHaveBeenCalled();
   });
+
+  test("fb#1364: `--status resolved` is redirected to `applied` here too — same shared resolveStatuses() as resolve", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "resolved" })
+    ).rejects.toThrow(/did you mean applied/);
+    expect(get).not.toHaveBeenCalled();
+  });
 });
 
 // ─── get ───────────────────────────────────────────────────────────────────
@@ -838,6 +845,17 @@ describe("ib feedback resolve", () => {
     await expect(
       runFeedbackResolve(mockClient, 1, { status: "bogus" })
     ).rejects.toThrowError(CliError);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("fb#1364: `resolved` is redirected to `applied`, not the edit-distance-closer `reviewed`", async () => {
+    // "resolved" is the natural guess given this command's own name, but means
+    // fixed/shipped (applied), not merely looked at (reviewed) — raw edit
+    // distance picks reviewed (same length, few substitutions) without the
+    // synonym table. Hit twice in one real session (fb#1356/fb#1357).
+    await expect(
+      runFeedbackResolve(mockClient, 1, { status: "resolved" })
+    ).rejects.toThrow(/did you mean applied/);
     expect(put).not.toHaveBeenCalled();
   });
 

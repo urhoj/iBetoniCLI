@@ -2902,7 +2902,7 @@ DESCRIPTION
 FLAGS
   --kind STRING    improvement | bug | idea | legal — count only this kind
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope
-  --status STRING    open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all
+  --status STRING    open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all. STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted
   --unresolved    Shortcut for --status open,reviewed (un-closed rows) — same as the default; mutually exclusive with --status/--all
   --all    Count EVERY status (the whole table) — restores the pre-fb#1192 behaviour; mutually exclusive with --status/--unresolved
 
@@ -3217,7 +3217,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
-  --status STRING    open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)
+  --status STRING    open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed). STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted
   --unresolved    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
   --all    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
@@ -3340,7 +3340,7 @@ ARGUMENTS
   <note> STRING    The resolution note, positionally — the same field as --note, so \`resolve 42 --status applied -- "…"\` works exactly like \`--note "…"\`. Mirrors its sibling \`ib dev feedback create <description>\`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once. (optional)
 
 FLAGS
-  --status STRING    open | reviewed | applied | dismissed
+  --status STRING    open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364)
   --note STRING    Resolution note stored on the row (same field as the positional)
   --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
   --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
@@ -3357,7 +3357,7 @@ OUTPUT (JSON, stdout)
   A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --also: also: [{feedbackId, ok, status?, error?}], failed (count). With --dry-run: { dryRun:true, wouldSend:{ method, path, body }, alsoWouldSend? }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → provide --status and/or --note; status must be a known value
+  exit 4 (client-side)  Validation             → provide --status and/or --note; status must be a known value — 'resolved' means applied, the did-you-mean names it but does not accept it
   exit 4 (client-side)  The shell split the note on its inner double-quotes (typical on Windows PowerShell) — a single positional note is accepted → pass the note via --from-json <file|-> instead of argv
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
