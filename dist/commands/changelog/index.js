@@ -16,6 +16,8 @@ const AREAS = ["frontend", "backend", "cli", "database", "cicd", "workspace"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
+/** Shared by the `add` and `update` spec notes (fb#1294) — one string, two renders. */
+const SERVER_ENUM_NOTE = "--type/--area are SERVER-validated (fb#1294): a `must be one of` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check `ib version`.";
 // COORDINATED_REPOS / normalizeRepoCsv: see ./repos.ts (mirror of the backend
 // repo model). Step 0 bumps coordinated repos independently from the max
 // --bump-level across the unreleased entries naming them; a --repo whose CSV
@@ -1289,7 +1291,7 @@ export const CHANGELOG_SPECS = [
             'CROSS-LANE ENTRIES (fb#408): --repo is a CSV; a change spanning both lanes names both — --repo "puminet5api,betonicli" — each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.',
             "--feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880) — the response's `linkKeptBy` names the keeping resolver (nothing to restore). --take-resolve re-owns it (fb#366): only then the response carries `relinkedFrom` (restore: `ib dev changelog update <thatId> --feedback <id>`).",
             "DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog add`.",
-            "--type/--area are SERVER-validated (fb#1294): a `must be one of` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check `ib version`.",
+            SERVER_ENUM_NOTE,
             "Developer-gated.",
         ],
         seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
@@ -1591,7 +1593,7 @@ export const CHANGELOG_SPECS = [
             "--unlink is the UNDO for --feedback (fb#585). --feedback ADDS a link (the junction allows many), so it cannot correct a mistyped id on its own — `--unlink 541 --feedback 542` does, in one call, and the unlink is applied first. It never changes a status: a row closed by the removed link stays closed and is reported on stderr.",
             "A multi-id --feedback/--unlink set is one transaction PER id, not one across the set (fb#586). If one id fails, the others still run and each is reported separately — finish the set with another `changelog update`, and do NOT re-run `add`, which mints a duplicate entry.",
             "DEPLOY-GATED behaviours (fb#441/517/576/585 + field editability): --unlink, --no-resolve, CSV --feedback, the status-preserve rule, and --bump-level/--feedback/--sentry editability each need a recent puminet5api. The CLI detects and warns where it can (echo-compare on edits; missing `feedbackUnlinks`), but --no-resolve against an older backend is dropped SILENTLY and the row force-flips to applied. ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog update`.",
-            "--type/--area are SERVER-validated (fb#1294): a `must be one of` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check `ib version`.",
+            SERVER_ENUM_NOTE,
         ],
         seeAlso: ["ib dev changelog pending", "ib dev changelog get"],
         examples: [

@@ -50,30 +50,34 @@ export function cappedInt(cap, flag = "--limit") {
  */
 export function assertEnum(value, allowed, flag, synonyms) {
     if (value !== undefined && !allowed.includes(value)) {
-        const guess = synonyms?.[value.trim().toLowerCase()] ?? closestName(value, [...allowed]);
-        const hint = guess && allowed.includes(guess) ? ` — did you mean ${guess}?` : "";
+        const guess = enumGuess(value, allowed, synonyms);
+        const hint = guess ? ` — did you mean ${guess}?` : "";
         failWith(`${flag} must be one of: ${allowed.join(", ")}${hint}`, 4);
     }
+}
+/**
+ * The did-you-mean shared by {@link assertEnum} and {@link assertEnumCsv}: a
+ * `synonyms` entry first (the collisions edit distance cannot bridge — `high` →
+ * `major`, `confirmed` → `accepted`), then `closestName`. Only ever answers with
+ * a value that IS in `allowed`, so a stale synonym table cannot suggest a value
+ * the command would then reject. A hint, never a silent rewrite (fb#369).
+ */
+function enumGuess(value, allowed, synonyms) {
+    const g = synonyms?.[value.trim().toLowerCase()] ?? closestName(value, [...allowed]);
+    return g && allowed.includes(g) ? g : null;
 }
 /**
  * Guard a CSV-expanded list of enum values — the multi-valued sibling of
  * {@link assertEnum}. Reports ALL unknown values at once (failing on just the
  * first bad token invites a retry-per-token loop), exit 4, client-origin via
- * {@link failWith}. `undefined`/empty in → no-op.
- *
- * Carries the same did-you-mean as {@link assertEnum} (fb#1310): a `synonyms`
- * map first — for the vocabulary collisions edit distance cannot bridge
- * (`confirmed` → `accepted` on jerry request status, where `ib jerry offer
- * confirm` puts the wrong word in the caller's head) — then `closestName`.
- * A synonym is a HINT, never a silent rewrite (fb#369).
+ * {@link failWith}. `undefined`/empty in → no-op. Hints via {@link enumGuess}
+ * (fb#1310), one guess per unknown token.
  */
 export function assertEnumCsv(values, allowed, flag, synonyms) {
     const unknown = values?.filter((v) => !allowed.includes(v)) ?? [];
     if (unknown.length) {
-        const guesses = unknown
-            .map((v) => synonyms?.[v.trim().toLowerCase()] ?? closestName(v, [...allowed]))
-            .filter((g) => !!g && allowed.includes(g));
-        const hint = guesses.length ? ` — did you mean ${[...new Set(guesses)].join(", ")}?` : "";
+        const guesses = [...new Set(unknown.map((v) => enumGuess(v, allowed, synonyms)).filter(Boolean))];
+        const hint = guesses.length ? ` — did you mean ${guesses.join(", ")}?` : "";
         failWith(`${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}${hint}`, 4);
     }
 }
