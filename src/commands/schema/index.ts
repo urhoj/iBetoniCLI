@@ -197,39 +197,47 @@ export interface SchemaQueryResult {
  * routine-bearing catalogs come back nearly empty with no error at all. That
  * is the dangerous shape: a plausible answer, not a permission failure.
  *
- * Measured 2026-09-05 against production: sys.procedures 6 vs ~200 real,
- * INFORMATION_SCHEMA.ROUTINES 7, sys.parameters 18. The exact trap this hint
- * exists to stop: `SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'`
- * returns 27 rows of tables, keys, defaults and triggers and NO stored
- * procedure, so `keikkaPerson_add` reads as missing while two shipped modules
- * EXEC it by name.
+ * Measured 2026-09-05 against production: sys.procedures returns 6 rows against
+ * 512 dbo procs; INFORMATION_SCHEMA.ROUTINES 7; sys.parameters 18. (The 6 are
+ * individually-granted objects, not zero — db_datareader's SELECT is simply not
+ * a permission SQL Server counts for procedure metadata.) The exact trap this
+ * hint exists to stop: `SELECT name FROM sys.objects WHERE name LIKE
+ * '%eikkaPerson%'` returns 27 rows of tables, keys, defaults and triggers and no
+ * stored procedure, so `keikkaPerson_add` reads as missing while two shipped
+ * modules EXEC it by name.
  *
  * Deliberately NOT matched: sys.tables, sys.views, sys.columns, sys.triggers,
- * sys.indexes, sys.foreign_keys and INFORMATION_SCHEMA.TABLES/COLUMNS — those
- * were measured COMPLETE under this login (db_datareader implies metadata
- * visibility on the user tables it can read), and a warning that is false on a
- * correct query is one callers learn to ignore.
- *
- * Matching is a regex over raw SQL text, so a CTE aliased `sys` or the literal
- * string 'INFORMATION_SCHEMA' inside a WHERE will trip it. That is acceptable
- * and has precedent — the backend's own read-only guard is likewise documented
- * as not parsing T-SQL string literals — because this is advisory only and
- * never rejects a query.
+ * sys.indexes, sys.foreign_keys and INFORMATION_SCHEMA.TABLES/COLUMNS. Tables
+ * (248), views (45), triggers (33) and INFORMATION_SCHEMA.COLUMNS over dbo base
+ * tables (2737) measured EQUAL to their app-login counts; sys.columns,
+ * sys.indexes and sys.foreign_keys were spot-checked per table rather than
+ * whole-catalogue. A warning that is false on a correct query is one callers
+ * learn to ignore. Matching is a regex over raw SQL text, so a CTE aliased `sys`
+ * trips it; acceptable, because this only ever advises and never rejects.
  */
 const METADATA_FILTERED_CATALOGS =
   /\b(?:sys\.(?:procedures|objects|all_objects|sql_modules|parameters)|information_schema\.(?:routines|parameters))\b/i;
 
-export const CATALOG_FILTER_HINT =
-  "This query reads a catalog view that SQL Server filters by METADATA PERMISSION. " +
-  "`ib dev schema query` runs under the db_datareader-only `ib_readonly` login, which holds no " +
-  "permission on stored procedures — sys.procedures reports 6 of ~200, and sys.objects lists " +
-  "tables normally while omitting every proc. An empty or short result here is NOT evidence that " +
-  "an object is missing. Confirm existence with `ib dev schema procs|proc|table|view`, which run " +
-  "under the app login and see the real catalogue.";
-
-/** The hint earned by `sql`, or undefined when it reads no filtered catalog. */
-export function catalogFilterHint(sql: string): string | undefined {
-  return METADATA_FILTERED_CATALOGS.test(sql) ? CATALOG_FILTER_HINT : undefined;
+/**
+ * The hint `sql` earns, or undefined when it reads no filtered catalog.
+ *
+ * The text states the MECHANISM and not the measured ratio on purpose (fb#1440):
+ * the counts move as procs are added, and this shipped with "6 of ~200" — a
+ * figure taken from a `schema procs` page that was itself capped at its default
+ * 200 and flagged `truncated: true`. Stale precision in an advisory about
+ * incomplete reads is the very failure it warns about; the dated measurement
+ * belongs in the docblock above, where it cannot be mistaken for current.
+ */
+function catalogFilterHint(sql: string): string | undefined {
+  return METADATA_FILTERED_CATALOGS.test(sql)
+    ? "This query reads a catalog view that SQL Server filters by METADATA PERMISSION. " +
+        "`ib dev schema query` runs under the db_datareader-only `ib_readonly` login, and SELECT " +
+        "is not a permission SQL Server counts for procedure metadata — so sys.procedures returns " +
+        "only the handful of procs granted individually, and sys.objects lists tables normally " +
+        "while showing just those same few. An empty or short result here is NOT evidence that an " +
+        "object is missing. Confirm existence with `ib dev schema procs|proc|table|view`, which " +
+        "run under the app login."
+    : undefined;
 }
 
 /**

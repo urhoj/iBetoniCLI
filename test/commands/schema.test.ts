@@ -276,8 +276,8 @@ describe("ib schema", () => {
     /**
      * fb#1326 — this command runs on the db_datareader-only `ib_readonly`
      * login, so the routine-bearing catalogs come back near-empty with NO
-     * error: sys.procedures reports 6 of ~200. A caller reading that as "the
-     * proc does not exist" is the failure this hint prevents.
+     * error: sys.procedures returns 6 rows against 512 dbo procs. A caller
+     * reading that as "the proc does not exist" is the failure this prevents.
      */
     describe("metadata-filtered catalog hint (fb#1326)", () => {
       test("a sys.procedures read is flagged, naming the login and the command that can settle existence", async () => {
@@ -287,18 +287,16 @@ describe("ib schema", () => {
         expect(result.hint).toContain("ib dev schema procs|proc|table|view");
       });
 
-      test("sys.objects is flagged — the original trap listed tables but no procs", async () => {
+      test.each([
+        // The original fb#1326 trap: listed tables, keys and triggers, no procs.
+        ["sys.objects", "SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'"],
+        // Lower-cased on purpose — the matcher is case-insensitive.
+        ["INFORMATION_SCHEMA.ROUTINES", "select * from information_schema.routines"],
+        ["sys.parameters", "SELECT * FROM sys.parameters WHERE object_id = 1"],
+        ["sys.sql_modules", "SELECT definition FROM sys.sql_modules"],
+      ])("%s is flagged", async (_label, sql) => {
         post().mockResolvedValueOnce(complete);
-        const result = await runSchemaQuery(
-          mockClient,
-          "SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'"
-        );
-        expect(result.hint).toBeDefined();
-      });
-
-      test("INFORMATION_SCHEMA.ROUTINES is flagged case-insensitively", async () => {
-        post().mockResolvedValueOnce(complete);
-        const result = await runSchemaQuery(mockClient, "select * from information_schema.routines");
+        const result = await runSchemaQuery(mockClient, sql);
         expect(result.hint).toBeDefined();
       });
 

@@ -114,6 +114,23 @@ function looksLikeFlag(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("-") && value !== "-";
 }
 
+/**
+ * Yield every long `--flag` in `argv` with the value it carries, handling both
+ * spellings (`--body '<v>'` and `--body=<v>`). Only `--` tokens are matched, so
+ * the positional rows `spec.flags` also carries as a documentation convenience
+ * can never be mistaken for one. `value` is undefined when the flag ends argv.
+ */
+function* longFlags(argv: string[]): Generator<{ name: string; value: string | undefined }> {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (!token.startsWith("--")) continue;
+    const eq = token.indexOf("=");
+    yield eq === -1
+      ? { name: token.slice(2), value: argv[i + 1] }
+      : { name: token.slice(2, eq), value: token.slice(eq + 1) };
+  }
+}
+
 interface ParseResult {
   /** Full path of the command whose action fired, e.g. "ib keikka list". */
   invoked: string | null;
@@ -224,14 +241,8 @@ describe("every CommandSpec example is invocable as written", () => {
         const argv = ibArgv(example);
         if (!argv) continue;
 
-        for (let i = 0; i < argv.length; i++) {
-          const token = argv[i];
-          if (!token.startsWith("--")) continue;
-          const eq = token.indexOf("=");
-          const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
+        for (const { name, value } of longFlags(argv)) {
           if (!jsonFlags.has(name)) continue;
-
-          const value = eq === -1 ? argv[i + 1] : token.slice(eq + 1);
           // An absent or flag-shaped value is the swallowed-value check's
           // failure mode above, which reports it better — don't double-report.
           if (value === undefined || looksLikeFlag(value)) continue;
@@ -289,15 +300,9 @@ describe("every CommandSpec example is invocable as written", () => {
         const argv = ibArgv(example);
         if (!argv) continue;
 
-        for (let i = 0; i < argv.length; i++) {
-          const token = argv[i];
-          if (!token.startsWith("--")) continue;
-          const eq = token.indexOf("=");
-          const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
+        for (const { name, value } of longFlags(argv)) {
           const flag = byName.get(name);
           if (!flag || flag.type === "json") continue;
-
-          const value = eq === -1 ? argv[i + 1] : token.slice(eq + 1);
           if (typeof value !== "string" || !/^[[{]/.test(value.trim())) continue;
 
           offenders.push(

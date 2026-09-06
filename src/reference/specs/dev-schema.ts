@@ -207,7 +207,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       {
         command: "ib dev schema query",
         description:
-          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that `schema tables/table` cannot answer. Read-over-POST: works under --read-only. Developer-only.",
+          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists — its login sees only a fraction of the ROWS in the routine-bearing catalog views (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],
@@ -238,7 +238,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         notes: [
           "Runs under the db_datareader-only `ib_readonly` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.",
           "dbo scope like the rest of `ib dev schema`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).",
-          "NOT a source of truth for whether an object EXISTS. Catalog views are filtered by metadata permission and this login holds none on procedures: sys.procedures returns 6 of ~200, and sys.objects omits every proc while listing tables normally — silently, with no error. Use `ib dev schema procs|proc|table|view` to settle existence; a `hint` on the result flags an affected query (fb#1326).",
+          "NOT a source of truth for whether an OBJECT exists. Catalog views are filtered by metadata permission, and db_datareader's SELECT does not count for procedure metadata — so sys.procedures returns only the few procs granted individually and sys.objects lists tables normally while showing just those same few, silently and with no error. Use `ib dev schema procs|proc|table|view` to settle existence; a `hint` on the result flags an affected query (fb#1326).",
         ],
         examples: [
           "ib dev schema query \"SELECT COUNT(*) AS n FROM person\"",
