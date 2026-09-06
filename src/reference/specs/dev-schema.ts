@@ -211,7 +211,11 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],
-        flags: [{ name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" }],
+        flags: [
+          { name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" },
+          { name: "param", type: "string", required: false, description: "Bind one @parameter as name=value, REPEATABLE — run an application query with its @params intact instead of hand-editing them into literals. `8`/`true`/`false`/`null` are typed as number/bool/NULL; anything else is a string. The @ sigil is optional (`--param @ownerAsiakasId=8` works)." },
+          { name: "params", type: "json", required: false, description: "Bind every parameter from ONE JSON object — `{\"ownerAsiakasId\":null,\"documentTypeId\":3}`. Exact types, so use this when a literal's spelling and its intended type disagree (a string \"8\"). Mutually exclusive with --param (exit 4)." },
+        ],
         outputShape:
           "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. `hint` appears only when the SQL reads a metadata-filtered catalog view (see NOTES).",
         errors: [
@@ -230,6 +234,18 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           ),
           apiErr(
             400,
+            "SQL error: Must declare the scalar variable \"@x\"",
+            "the statement has an @parameter nothing bound — pass it with `--param x=<value>` (repeatable) or `--params '{\"x\":<value>}'`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check `ib version`",
+            "Must declare the scalar variable"
+          ),
+          apiErr(
+            400,
+            "Invalid param name / value",
+            "param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself",
+            ["invalid param name", "params must be", "too many params", "given twice", "must be a string, number, boolean or null", "must be a finite number"]
+          ),
+          apiErr(
+            400,
             "Guard rejection or SQL error",
             "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
           ),
@@ -243,6 +259,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         examples: [
           "ib dev schema query \"SELECT COUNT(*) AS n FROM person\"",
           "ib dev schema query --sql \"SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId\"",
+          "ib dev schema query \"SELECT TOP 5 keikkaId FROM keikka WHERE (@ownerAsiakasId IS NULL OR ownerAsiakasId = @ownerAsiakasId)\" --param ownerAsiakasId=null",
+          "ib dev schema query \"SELECT COUNT(*) AS n FROM documents WHERE ownerAsiakasId = @o AND documentTypeId = @t\" --params '{\"o\":8,\"t\":3}'",
         ],
       },
       {

@@ -16,6 +16,8 @@ import {
   runSchemaIndexes,
   resolveSqlInput,
   declaredObjectName,
+  parseParamLiteral,
+  resolveQueryParams,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -344,6 +346,108 @@ describe("ib schema", () => {
 
     test("treats whitespace-only as absent", () => {
       expect(() => resolveSqlInput("   ", undefined)).toThrow(/required/);
+    });
+  });
+
+  /**
+   * fb#1177 — without binding, an application query pasted verbatim failed with
+   * "Must declare the scalar variable" and every @param had to be hand-edited
+   * into a literal: the exact edit that can change the predicate being verified.
+   */
+  describe("query parameters (fb#1177)", () => {
+    const post = () => mockClient.post;
+    const complete = { columns: ["n"], rows: [{ n: 1 }], rowCount: 1, truncated: false, cap: 1000 };
+    beforeEach(() => post().mockReset());
+
+    describe("parseParamLiteral", () => {
+      test.each([
+        ["an integer", "8", 8],
+        ["zero", "0", 0],
+        ["a negative", "-3", -3],
+        ["a decimal", "60.25", 60.25],
+        ["true", "true", true],
+        ["false", "false", false],
+        // THE case the typing exists for: bound as the string "null" it would
+        // answer `@x IS NULL OR col = @x` with the wrong branch.
+        ["null", "null", null],
+        ["a plain word", "Kalle", "Kalle"],
+        ["a date (NOT a number)", "2026-09-06", "2026-09-06"],
+        ["an empty value", "", ""],
+        ["a leading-zero code (stays a string)", "007", "007"],
+        ["a number with spaces around it", " 8 ", " 8 "],
+      ])("%s", (_label, raw, expected) => {
+        expect(parseParamLiteral(raw)).toEqual(expected);
+      });
+    });
+
+    test("absent on both spellings → undefined, so the body is unchanged", () => {
+      expect(resolveQueryParams(undefined, undefined)).toBeUndefined();
+      expect(resolveQueryParams([], undefined)).toBeUndefined();
+    });
+
+    test("repeated --param builds the map", () => {
+      expect(resolveQueryParams(["ownerAsiakasId=null", "documentTypeId=3"], undefined)).toEqual({
+        ownerAsiakasId: null,
+        documentTypeId: 3,
+      });
+    });
+
+    test("the @ sigil is kept verbatim — the backend strips it", () => {
+      expect(resolveQueryParams(["@ownerAsiakasId=8"], undefined)).toEqual({ "@ownerAsiakasId": 8 });
+    });
+
+    test("only the FIRST = splits, so a value may contain one", () => {
+      expect(resolveQueryParams(["expr=a=b"], undefined)).toEqual({ expr: "a=b" });
+    });
+
+    test("--params takes a JSON object with exact types", () => {
+      expect(resolveQueryParams(undefined, '{"o":8,"name":"8","flag":false,"n":null}')).toEqual({
+        o: 8,
+        name: "8",
+        flag: false,
+        n: null,
+      });
+    });
+
+    test.each([
+      ["a malformed pair (no =)", ["ownerAsiakasId"], /name=value/],
+      ["an empty name", ["=8"], /name=value/],
+      ["invalid JSON", undefined, /valid JSON/],
+    ])("%s exits 4", (_label, pairs, pattern) => {
+      const json = pairs ? undefined : "{not json";
+      expect(() => resolveQueryParams(pairs as string[] | undefined, json)).toThrow(pattern);
+    });
+
+    test.each([
+      ["a JSON array", "[1,2]"],
+      ["a JSON scalar", "8"],
+      ["JSON null", "null"],
+    ])("--params with %s exits 4", (_label, json) => {
+      expect(() => resolveQueryParams(undefined, json)).toThrow(/JSON OBJECT/);
+    });
+
+    test("both spellings at once exits 4 rather than picking a silent winner", () => {
+      expect(() => resolveQueryParams(["a=1"], '{"a":2}')).toThrow(/not both/);
+    });
+
+    test("runSchemaQuery sends params in the body when bound", async () => {
+      post().mockResolvedValueOnce({ ...complete });
+      await runSchemaQuery(mockClient, "SELECT 1 WHERE @o IS NULL", { o: null });
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/api/cli/schema/query",
+        { sql: "SELECT 1 WHERE @o IS NULL", params: { o: null } },
+        { read: true }
+      );
+    });
+
+    test("and omits the key entirely when nothing is bound", async () => {
+      post().mockResolvedValueOnce({ ...complete });
+      await runSchemaQuery(mockClient, "SELECT 1");
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/api/cli/schema/query",
+        { sql: "SELECT 1" },
+        { read: true }
+      );
     });
   });
 

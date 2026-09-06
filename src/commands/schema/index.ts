@@ -246,6 +246,72 @@ function catalogFilterHint(sql: string): string | undefined {
  * `feedback create <description>`) reaches for the positional first and wasted
  * a round-trip against a live-DB tool when only `--sql` was accepted.
  */
+/** What one bound value may be — the JSON scalars the backend accepts. */
+export type QueryParamValue = string | number | boolean | null;
+
+/** A bare integer/decimal/exponent literal, i.e. what JSON would call a number. */
+const NUMERIC_LITERAL = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+
+/**
+ * Type a `--param name=value` value the way the caller means it (fb#1177).
+ *
+ * `8` is an int, `null` is a NULL and `true` is a bit — because that is what
+ * those tokens are in the application code the query was copied from, and a
+ * NULL bound as the four-character string "null" would answer the
+ * `@x IS NULL OR col = @x` question with exactly the wrong branch. Everything
+ * else is a string. `--params <json>` is the escape hatch when the literal
+ * spelling and the intended type disagree (a string "8", say).
+ */
+export function parseParamLiteral(raw: string): QueryParamValue {
+  if (raw === "null") return null;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  if (NUMERIC_LITERAL.test(raw)) return Number(raw);
+  return raw;
+}
+
+/**
+ * Resolve the two spellings into the map sent as the request body's `params`
+ * (fb#1177), or `undefined` when neither was given — the unparameterized body
+ * must stay byte-identical to what it was before this flag existed.
+ *
+ * The two are mutually exclusive rather than merged: one map with two sources
+ * means a silent winner on any key they share, and the caller cannot see which
+ * one won from the output.
+ */
+export function resolveQueryParams(
+  pairs?: string[],
+  json?: string
+): Record<string, QueryParamValue> | undefined {
+  if (pairs?.length && json) {
+    failWith("Provide params once — via repeated --param name=value OR --params <json>, not both", 4);
+  }
+  if (json) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      failWith("--params must be valid JSON (an object of name → value)", 4);
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      failWith("--params must be a JSON OBJECT of name → value", 4);
+    }
+    return parsed as Record<string, QueryParamValue>;
+  }
+  if (!pairs?.length) return undefined;
+  const out: Record<string, QueryParamValue> = {};
+  for (const pair of pairs) {
+    // First `=` only: a value may legitimately contain one (a date range, an
+    // expression), and splitting on all of them would silently truncate it.
+    const eq = pair.indexOf("=");
+    if (eq <= 0) {
+      failWith(`--param must be name=value (got \`${pair}\`)`, 4);
+    }
+    out[pair.slice(0, eq)] = parseParamLiteral(pair.slice(eq + 1));
+  }
+  return out;
+}
+
 export function resolveSqlInput(positional?: string, flag?: string): string {
   const sql = foldAliases(
     [positional, flag],
@@ -264,8 +330,18 @@ export function resolveSqlInput(positional?: string, flag?: string): string {
  * `truncated: true` when the cap bit — warn like every other capped list, so
  * a caller reading only `rows` cannot mistake a cut result for a complete one.
  */
-export async function runSchemaQuery(client: ApiClient, sql: string): Promise<SchemaQueryResult> {
-  const result = await client.post<SchemaQueryResult>("/api/cli/schema/query", { sql }, { read: true });
+export async function runSchemaQuery(
+  client: ApiClient,
+  sql: string,
+  params?: Record<string, QueryParamValue>
+): Promise<SchemaQueryResult> {
+  const result = await client.post<SchemaQueryResult>(
+    "/api/cli/schema/query",
+    // Omitted, not `params: undefined`, when nothing was bound — the body of an
+    // unparameterized query is unchanged by this feature (fb#1177).
+    params ? { sql, params } : { sql },
+    { read: true }
+  );
   if (result.truncated) {
     // Tailored hint: this route has no --limit/--offset — the way past the cap
     // is a narrower WHERE or an aggregate (which is what this command is for).
@@ -385,9 +461,18 @@ export function registerSchemaCommands(
       "Run one read-only SELECT (or WITH … SELECT) against the live DB — for data-SHAPE questions (COUNT, GROUP BY, histograms). Single statement, no semicolons, hard 1000-row cap; runs under a db_datareader-only login."
     )
     .option("--sql <select>", "The SELECT statement to run (alias for the positional)")
+    .option(
+      "--param <name=value>",
+      "Bind one @parameter, repeatable — so an application query runs with its @params intact. `8`/`true`/`null` are typed as such; anything else is a string",
+      (v: string, prev: string[]) => prev.concat([v]),
+      [] as string[]
+    )
+    .option("--params <json>", "Bind every parameter from one JSON object (exact types; alternative to --param)")
     .action(
-      jsonAction(getClient, (client, sql: string | undefined, opts: { sql?: string }) =>
-        runSchemaQuery(client, resolveSqlInput(sql, opts.sql))
+      jsonAction(
+        getClient,
+        (client, sql: string | undefined, opts: { sql?: string; param?: string[]; params?: string }) =>
+          runSchemaQuery(client, resolveSqlInput(sql, opts.sql), resolveQueryParams(opts.param, opts.params))
       )
     );
 

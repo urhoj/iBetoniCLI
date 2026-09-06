@@ -3902,6 +3902,8 @@ ARGUMENTS
 
 FLAGS
   --sql STRING    The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)
+  --param STRING    Bind one @parameter as name=value, REPEATABLE — run an application query with its @params intact instead of hand-editing them into literals. \`8\`/\`true\`/\`false\`/\`null\` are typed as number/bool/NULL; anything else is a string. The @ sigil is optional (\`--param @ownerAsiakasId=8\` works).
+  --params JSON    Bind every parameter from ONE JSON object — \`{"ownerAsiakasId":null,"documentTypeId":3}\`. Exact types, so use this when a literal's spelling and its intended type disagree (a string "8"). Mutually exclusive with --param (exit 4).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -3916,6 +3918,8 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  SQL error: permission denied → the \`ib_readonly\` principal lacks a permission the query needs — DMVs like sys.dm_db_index_usage_stats need VIEW DATABASE PERFORMANCE STATE. Ask an operator to GRANT it (or rewrite to avoid the DMV); this is NOT a guard rejection, so rephrasing the query will not help
   exit 4 (HTTP 400)  SQL error: aggregate over an aggregate/subquery → SQL Server rejects aggregating an expression that itself contains an aggregate or subquery (e.g. SUM(CASE WHEN EXISTS(...) THEN 1 ELSE 0 END)) — compute the per-row flag in a derived table and aggregate outside it: SELECT SUM(flag) FROM (SELECT CASE WHEN EXISTS(...) THEN 1 ELSE 0 END AS flag FROM t) x. Object/column names are not the problem here
+  exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
+  exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
   exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
   exit 6 (HTTP 503)  Read-only login not provisioned on this backend → the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool
 
@@ -3927,6 +3931,8 @@ NOTES
 EXAMPLES
   ib dev schema query "SELECT COUNT(*) AS n FROM person"
   ib dev schema query --sql "SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId"
+  ib dev schema query "SELECT TOP 5 keikkaId FROM keikka WHERE (@ownerAsiakasId IS NULL OR ownerAsiakasId = @ownerAsiakasId)" --param ownerAsiakasId=null
+  ib dev schema query "SELECT COUNT(*) AS n FROM documents WHERE ownerAsiakasId = @o AND documentTypeId = @t" --params '{"o":8,"t":3}'
 "
 `;
 
