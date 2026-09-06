@@ -628,12 +628,19 @@ function longFlag(flags) {
  * groomer only sees this log, and a bare `unknown command 'x'` reads as "no
  * pointer was given" (fb#275).
  */
-function emitUsageEnvelope(err, env) {
+function emitUsageEnvelope(err, env, resolvedUsage = false) {
     writeErrorEnvelope(env, 4);
-    // An envelope that named the next command is not friction (fb#1141) — the
-    // envelope is the structured witness, so the skip is decided here rather than
-    // re-derived from the rendered hint inside recordFriction.
-    recordFriction(err, 4, `${env.error} — ${env.hint}`, false, usageEnvelopeResolves(env));
+    // An envelope that named the next COMMAND is not friction (fb#1141). The
+    // caller decides, and only the unknown-command branches pass true (fb#1467):
+    // deriving it here from any envelope's `didYouMean` swept in the unknown-
+    // OPTION and excess-argument paths too, so a flag typo with a fuzzy hit
+    // (`--serach` → `--search`) silently stopped being captured — and that is the
+    // signal the fb#235/#236/#388 flag-vocabulary work was BUILT from, a
+    // different class than the command RESOLUTION fb#1020 is about. It was also
+    // inverted: `acceptedBy` ("that flag belongs to `ib jerry admin search`"),
+    // the strongest pointer the option path produces, sets no `didYouMean` and so
+    // stayed captured while the weakest one did not.
+    recordFriction(err, 4, `${env.error} — ${env.hint}`, false, resolvedUsage);
     setExit(4);
 }
 /**
@@ -679,7 +686,7 @@ export function handleParseRejection(err, hooks = {}) {
             // success for a leaf this build does not have.
             const unknownLeaf = erroringCommand ? unknownLeafHelpEnvelope(erroringCommand()) : null;
             if (unknownLeaf)
-                return emitUsageEnvelope(err, unknownLeaf);
+                return emitUsageEnvelope(err, unknownLeaf, usageEnvelopeResolves(unknownLeaf));
             if (text)
                 emitStderr(text);
             setExit(err.exitCode ?? 0);
@@ -692,7 +699,8 @@ export function handleParseRejection(err, hooks = {}) {
                 const token = (Array.isArray(cmd.args) && cmd.args[0]) ||
                     text.match(/unknown command '([^']+)'/)?.[1] ||
                     "";
-                return emitUsageEnvelope(err, buildUnknownCommandEnvelope(cmd, token, getCallerTier()));
+                const envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+                return emitUsageEnvelope(err, envelope, usageEnvelopeResolves(envelope));
             }
         }
         if (err.code === "commander.missingMandatoryOptionValue" && erroringCommand) {

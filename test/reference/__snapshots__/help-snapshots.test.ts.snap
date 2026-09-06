@@ -3839,7 +3839,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
+  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`renameNote\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3849,7 +3849,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib dev schema procs\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
 
 NOTES
-  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`renameNote\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema proc asiakas_find
@@ -3910,7 +3910,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. \`truncated: true\` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. \`hint\` appears only when the SQL reads a metadata-filtered catalog view (see NOTES).
+  { columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. \`truncated: true\` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. \`hint\` appears only when the SQL reads a metadata-filtered catalog view (see NOTES) — across the whole \`ib dev schema\` group \`hint\` means only that an answer may be INCOMPLETE.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3921,6 +3921,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
   exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
   exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
+  exit 4 (client-side)  Malformed --param / --params → \`--param\` takes \`name=value\` and must name each parameter once; \`--params\` takes ONE JSON object. The two are mutually exclusive — pick the JSON form when a value's literal spelling and its intended type disagree
+  exit 4 (client-side)  Numeric --param cannot be carried exactly → the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via \`--params '{"name":"<digits>"}'\` and let SQL Server do the conversion
   exit 6 (HTTP 503)  Read-only login not provisioned on this backend → the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool
 
 NOTES
@@ -4102,7 +4104,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
+  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`renameNote\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4112,7 +4114,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Trigger not found      → check the name via \`ib dev schema triggers\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it
 
 NOTES
-  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`renameNote\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema trigger keikka_after_ins_trig
@@ -4177,7 +4179,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
+  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`renameNote\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4187,7 +4189,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  View not found         → check the name via \`ib dev schema views\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
 
 NOTES
-  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`renameNote\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema view keikkaBetoniView

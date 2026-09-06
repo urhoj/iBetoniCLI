@@ -32,9 +32,9 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       " `truncated: true` (with a `hint` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.";
     const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
     /** Appended to every outputShape that carries a definition body (fb#1140). */
-    const renamedShape = " A renamed object also carries `renamedFrom` + `hint` (see NOTES).";
+    const renamedShape = " A renamed object also carries `renamedFrom` + `renameNote` (see NOTES).";
     const renamedNote =
-      "OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (`keikka_saveContactPerson` returns `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`). When it does, the payload carries `renamedFrom` and a `hint`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).";
+      "OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (`keikka_saveContactPerson` returns `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`). When it does, the payload carries `renamedFrom` and a `renameNote`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).";
     return [
       {
         command: "ib dev schema tables",
@@ -217,7 +217,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           { name: "params", type: "json", required: false, description: "Bind every parameter from ONE JSON object — `{\"ownerAsiakasId\":null,\"documentTypeId\":3}`. Exact types, so use this when a literal's spelling and its intended type disagree (a string \"8\"). Mutually exclusive with --param (exit 4)." },
         ],
         outputShape:
-          "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. `hint` appears only when the SQL reads a metadata-filtered catalog view (see NOTES).",
+          "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. `hint` appears only when the SQL reads a metadata-filtered catalog view (see NOTES) — across the whole `ib dev schema` group `hint` means only that an answer may be INCOMPLETE.",
         errors: [
           ...devErrors,
           apiErr(
@@ -249,6 +249,25 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
             "Guard rejection or SQL error",
             "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
           ),
+          // Client-side guards. This group had NO origin:"client" rows at all, so
+          // every local `failWith` here answered with the generic per-exit hint
+          // while the command's own remedy sat unreachable (fb#1471).
+          {
+            origin: "client",
+            exit: 4,
+            match: ["--param must be name=value", "given twice", "not both", "--params must be"],
+            meaning: "Malformed --param / --params",
+            remedy:
+              "`--param` takes `name=value` and must name each parameter once; `--params` takes ONE JSON object. The two are mutually exclusive — pick the JSON form when a value's literal spelling and its intended type disagree",
+          },
+          {
+            origin: "client",
+            exit: 4,
+            match: ["overflows to", "cannot be represented exactly"],
+            meaning: "Numeric --param cannot be carried exactly",
+            remedy:
+              "the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via `--params '{\"name\":\"<digits>\"}'` and let SQL Server do the conversion",
+          },
           apiErr(503, "Read-only login not provisioned on this backend", "the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool"),
         ],
         notes: [

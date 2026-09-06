@@ -349,9 +349,12 @@ describe("recordFriction", () => {
       const e = lastEntry();
       expect(e.exitCode).toBe(4);
       expect(String(e.message)).toContain('unknown command "zzqqxx" under `ib dev feedback`');
-      // The enriched half: Commander's own message names neither the group's
-      // real subcommands nor the way to list them.
-      expect(String(e.message)).toMatch(/available|--help/i);
+      // The enriched half, asserted on the content only enrichment produces:
+      // the group's REAL subcommand names. A `/available|--help/` match would
+      // survive an envelope that lost its sibling list entirely, since the
+      // generic --help pointer is emitted independently (fb#1471).
+      expect(String(e.message)).toContain("get");
+      expect(String(e.message)).toContain("list");
     } finally {
       stderrSpy.mockRestore();
       process.exitCode = prevExitCode;
@@ -516,6 +519,28 @@ describe("handleParseRejection → friction wiring (#1141)", () => {
   test("a dead-end unknown command IS still logged (the fb#1020 signal survives)", async () => {
     await parse(["dev", "feedback", "qqzzww"]);
     expect(read()).toContain("qqzzww");
+  });
+
+  /**
+   * fb#1467 — the skip is for unknown COMMANDS only. Deriving it inside the
+   * shared `emitUsageEnvelope` swept in the unknown-OPTION path, so a flag typo
+   * with a fuzzy hit stopped being captured — and that is the very signal the
+   * fb#235/#236/#388 flag-vocabulary work was built from. It was also inverted:
+   * `acceptedBy`, the strongest pointer that path produces, sets no
+   * `didYouMean` and so was never exempt while the weakest one was.
+   */
+  test("a flag typo WITH a did-you-mean is still captured (fb#1467)", async () => {
+    const before = read();
+    await parse(["dev", "schema", "procs", "--serach", "asiakas"]);
+    const after = read();
+    expect(after).not.toBe(before);
+    expect(after).toContain("--serach");
+  });
+
+  test("an excess-argument envelope with a date suggestion is still captured", async () => {
+    const before = read();
+    await parse(["vehicle", "driver", "board", "today", "2026-09-06"]);
+    expect(read()).not.toBe(before);
   });
 });
 

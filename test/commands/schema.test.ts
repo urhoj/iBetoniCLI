@@ -363,6 +363,8 @@ describe("ib schema", () => {
       test.each([
         ["an integer", "8", 8],
         ["zero", "0", 0],
+        ["a written-out zero decimal", "0.0", 0],
+        ["a small but representable decimal", "1e-300", 1e-300],
         ["a negative", "-3", -3],
         ["a decimal", "60.25", 60.25],
         ["true", "true", true],
@@ -377,6 +379,37 @@ describe("ib schema", () => {
         ["a number with spaces around it", " 8 ", " 8 "],
       ])("%s", (_label, raw, expected) => {
         expect(parseParamLiteral(raw)).toEqual(expected);
+      });
+    });
+
+    /**
+     * fb#1468 — the numeric guards. `1e400` became Infinity, which
+     * JSON.stringify writes as `null`, so the backend bound NULL and an
+     * `@x IS NULL OR col = @x` predicate silently answered across every tenant.
+     * The backend's own isFinite check cannot see it: the flattening happens
+     * here, before the request leaves.
+     */
+    describe("numbers that cannot be carried exactly are refused (fb#1468)", () => {
+      test.each([
+        ["positive overflow", "1e400", /overflows to Infinity/],
+        ["negative overflow", "-1e400", /overflows to -Infinity/],
+        ["beyond 2^53", "9007199254740993", /cannot be represented exactly/],
+        ["a 20-digit integer", "12345678901234567890", /cannot be represented exactly/],
+        ["underflow to zero", "1e-400", /underflows to 0/],
+        ["negative underflow", "-1e-400", /underflows to 0/],
+      ])("%s exits 4", (_label, raw, pattern) => {
+        expect(() => parseParamLiteral(raw)).toThrow(pattern);
+      });
+
+      test.each([
+        ["the largest exact integer", "9007199254740992", 9007199254740992],
+        ["an exponent form of a round number", "1e2", 100],
+        ["a plain integer", "8", 8],
+        ["a decimal", "60.25", 60.25],
+        ["zero", "0", 0],
+        ["a negative", "-3", -3],
+      ])("%s is accepted", (_label, raw, expected) => {
+        expect(parseParamLiteral(raw)).toBe(expected);
       });
     });
 
@@ -398,6 +431,41 @@ describe("ib schema", () => {
 
     test("only the FIRST = splits, so a value may contain one", () => {
       expect(resolveQueryParams(["expr=a=b"], undefined)).toEqual({ expr: "a=b" });
+    });
+
+    /**
+     * fb#1468 round 2 — the text guards only ever see `--param`, so the
+     * documented escape hatch was the hole: `--params '{"x":1e400}'` reproduced
+     * the whole wrong-branch bug on the very flag the overflow message
+     * recommends. And one character defeated the text guard: `…93` threw while
+     * `…93.0` bound `…92` in silence. Both are now caught by a VALUE-level rule
+     * applied to every entry of the final map, whichever spelling built it.
+     */
+    describe("the value rule covers both spellings (fb#1468)", () => {
+      test("--params rejects an overflowing number", () => {
+        expect(() => resolveQueryParams(undefined, '{"x":1e400}')).toThrow(/infinite/);
+      });
+
+      test("--params rejects an integer past the exact range", () => {
+        expect(() => resolveQueryParams(undefined, '{"x":9007199254740993}')).toThrow(
+          /exactly-representable/
+        );
+      });
+
+      test("--param catches the decimal spelling the text guard cannot", () => {
+        expect(() => resolveQueryParams(["x=9007199254740993.0"], undefined)).toThrow(
+          /exactly-representable/
+        );
+      });
+
+      test("ordinary values still pass both paths", () => {
+        expect(resolveQueryParams(["a=8", "b=60.25"], undefined)).toEqual({ a: 8, b: 60.25 });
+        expect(resolveQueryParams(undefined, '{"a":8,"b":null,"c":"x"}')).toEqual({
+          a: 8,
+          b: null,
+          c: "x",
+        });
+      });
     });
 
     test("--params takes a JSON object with exact types", () => {
@@ -428,6 +496,27 @@ describe("ib schema", () => {
 
     test("both spellings at once exits 4 rather than picking a silent winner", () => {
       expect(() => resolveQueryParams(["a=1"], '{"a":2}')).toThrow(/not both/);
+    });
+
+    // fb#1468: the same "no silent winner" rule, one level down. A stale
+    // `--param ownerAsiakasId=8` left ahead of a new `--param ownerAsiakasId=null`
+    // used to run green against the wrong tenant scope.
+    test("a repeated --param name exits 4 instead of last-winning", () => {
+      expect(() => resolveQueryParams(["x=1", "x=2"], undefined)).toThrow(/given twice/);
+    });
+
+    test("different names are of course fine", () => {
+      expect(resolveQueryParams(["x=1", "y=2"], undefined)).toEqual({ x: 1, y: 2 });
+    });
+
+    // fb#1468: `--params "$UNSET_VAR"` is a routine shell shape. Truthiness read
+    // it as absent, so it bound nothing AND slipped past the exclusivity guard.
+    test("--params '' is a parse error, not a silent no-op", () => {
+      expect(() => resolveQueryParams(undefined, "")).toThrow(/valid JSON/);
+    });
+
+    test("--params '' still conflicts with --param", () => {
+      expect(() => resolveQueryParams(["a=1"], "")).toThrow(/not both/);
     });
 
     test("runSchemaQuery sends params in the body when bound", async () => {
@@ -479,6 +568,42 @@ describe("ib schema", () => {
        * not be read as the declaration. A false rename note is worse than none
        * — it invents a rename that never happened.
        */
+      // fb#1470: `\w+` truncated a bracketed name to its first word, and the
+      // note then volunteered a WRONG old name plus grep advice pointing at a
+      // fragment that matches half the codebase. Brackets exist precisely to
+      // hold what \w cannot, and a renamed-from-bracketed object is exactly the
+      // legacy population this note serves.
+      test.each([
+        ["a space", "CREATE PROCEDURE dbo.[keikka save contact] AS", "keikka save contact"],
+        ["a bracketed function name", "CREATE FUNCTION dbo.[fn a](@x int)", "fn a"],
+        ["a non-ASCII letter", "CREATE PROCEDURE dbo.[keikka_määrä] AS", "keikka_määrä"],
+        ["a bracketed schema too", "CREATE PROCEDURE [dbo].[weird name] AS", "weird name"],
+        ["a reserved word (unchanged)", "CREATE PROCEDURE dbo.[Order] AS", "Order"],
+      ])("keeps a bracketed name containing %s", (_label, definition, expected) => {
+        expect(declaredObjectName(definition)).toBe(expected);
+      });
+
+      // fb#1470 round 2: a final segment this grammar cannot read used to let
+      // the optional qualifier backtrack, capturing the SCHEMA as the name — the
+      // note then asserted the object "was created as dbo" and sent the reader
+      // off to grep for "dbo". Failing to parse is the correct outcome here; a
+      // confident wrong answer is exactly what the parser's docblock forbids.
+      test.each([
+        ["a double-quoted identifier", 'CREATE PROCEDURE dbo."my proc" AS'],
+        ["a bare non-ASCII name", "CREATE PROC dbo.äöproc AS"],
+        ["a bracketed schema + unreadable name", "CREATE PROC [dbo].äöproc AS"],
+      ])("returns null rather than the schema for %s", (_label, definition) => {
+        expect(declaredObjectName(definition)).toBeNull();
+      });
+
+      test("a three-part name yields the OBJECT, not the schema", () => {
+        expect(declaredObjectName("CREATE PROCEDURE puminet.dbo.thing AS")).toBe("thing");
+      });
+
+      test("an escaped ]] inside brackets is unescaped, not truncated", () => {
+        expect(declaredObjectName("CREATE PROCEDURE [dbo].[weird]]name] AS")).toBe("weird]name");
+      });
+
       test("a CREATE named inside a leading comment does not win over the real one", () => {
         expect(
           declaredObjectName("-- replaces CREATE PROCEDURE dbo.old_thing\nCREATE PROCEDURE dbo.new_thing AS")
@@ -506,11 +631,11 @@ describe("ib schema", () => {
       });
       const result = (await run(mockClient, "keikka_saveContactPerson")) as {
         renamedFrom: string;
-        hint: string;
+        renameNote: string;
       };
       expect(result.renamedFrom).toBe("updateKeikkaPerson");
-      expect(result.hint).toContain("sp_renamed");
-      expect(result.hint).toContain("keikka_saveContactPerson");
+      expect(result.renameNote).toContain("sp_renamed");
+      expect(result.renameNote).toContain("keikka_saveContactPerson");
     });
 
     test("a matching name is left untouched, key ABSENT not null", async () => {
@@ -518,7 +643,7 @@ describe("ib schema", () => {
       get().mockResolvedValueOnce({ ...payload });
       const result = await runSchemaProc(mockClient, "asiakas_find");
       expect("renamedFrom" in result).toBe(false);
-      expect("hint" in result).toBe(false);
+      expect("renameNote" in result).toBe(false);
       expect(result).toEqual(payload);
     });
 
@@ -529,6 +654,36 @@ describe("ib schema", () => {
       });
       const result = await runSchemaProc(mockClient, "Asiakas_Find");
       expect("renamedFrom" in result).toBe(false);
+    });
+
+    // fb#1470: on a collision the CLI's value wins (it is the one derived from
+    // the definition actually returned) — what changed is the POSITION. A plain
+    // spread keeps an overwritten key in its ORIGINAL slot, so the note landed
+    // mid-object and the "appended" contract failed in exactly the collision
+    // case that motivated writing it down.
+    test("a backend-sent renamedFrom/renameNote is overridden and re-appended, not left in place", async () => {
+      get().mockResolvedValueOnce({
+        name: "keikka_saveContactPerson",
+        definition: "CREATE PROCEDURE [dbo].[updateKeikkaPerson] AS",
+        renamedFrom: "BACKEND",
+        renameNote: "BACKEND NOTE",
+      });
+      const result = await runSchemaProc(mockClient, "keikka_saveContactPerson");
+      expect(result.renamedFrom).toBe("updateKeikkaPerson");
+      // Appended, per the docblock's own contract — not left in the backend's slot.
+      expect(Object.keys(result).slice(-2)).toEqual(["renamedFrom", "renameNote"]);
+    });
+
+    // The group's `hint` means "this answer may be INCOMPLETE" everywhere else
+    // (fb#1326 catalog filter, fb#606/641 truncation); the rename note says the
+    // opposite, so it must not ride that key (fb#1470).
+    test("the note does NOT use the group's `hint` key", async () => {
+      get().mockResolvedValueOnce({
+        name: "keikka_saveContactPerson",
+        definition: "CREATE PROCEDURE [dbo].[updateKeikkaPerson] AS",
+      });
+      const result = await runSchemaProc(mockClient, "keikka_saveContactPerson");
+      expect("hint" in result).toBe(false);
     });
 
     test("a payload with no parseable definition is passed through", async () => {

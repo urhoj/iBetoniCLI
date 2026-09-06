@@ -84,8 +84,36 @@ export function declaredObjectName(definition) {
         if (s === before)
             break;
     }
-    const m = /^CREATE\s+(?:OR\s+ALTER\s+)?(?:PROC(?:EDURE)?|FUNCTION|VIEW|TRIGGER)\s+(?:\[?\w+\]?\s*\.\s*)?\[?(\w+)\]?/i.exec(s);
-    return m ? m[1] : null;
+    // A segment is a bracket-quoted string or a bare identifier — never
+    // `\[?(\w+)\]?`, since brackets exist precisely so a name may hold a space,
+    // `$`, `#` or a non-ASCII letter, and `\w+` truncated those to their first
+    // word (`[keikka save contact]` → `keikka`). Inside brackets, `]]` is T-SQL's
+    // escape for a literal `]`, so the segment body allows it and it is unescaped
+    // below.
+    //
+    // The whole dotted reference is matched, and `(?!\s*\.)` REQUIRES that it was
+    // matched to its end. Without that, a final segment this grammar cannot read
+    // (`dbo."my proc"`, `dbo.äöproc`, a 3-part `db.dbo.thing`) let the optional
+    // qualifier backtrack and the SCHEMA was captured as the name — so the note
+    // fired asserting the object "was created as `dbo`" and sent the reader off to
+    // grep for `dbo`. That is the same confidently-wrong-answer failure this
+    // parser's own docblock forbids, one character further along. Now the match
+    // simply fails and no note is written (fb#1470).
+    const SEGMENT = String.raw `(?:\[(?:[^\]]|\]\])+\]|\w+)`;
+    const m = new RegExp(
+    // `(?!\s*\.)` requires the reference to have been matched to its END, and
+    // `(?!\w)` stops a bare segment from simply SHRINKING to satisfy it —
+    // without the second, `dbo."my proc"` backtracked `\w+` from `dbo` to `db`
+    // and answered "db".
+    String.raw `^CREATE\s+(?:OR\s+ALTER\s+)?(?:PROC(?:EDURE)?|FUNCTION|VIEW|TRIGGER)\s+(${SEGMENT}(?:\s*\.\s*${SEGMENT})*)(?!\s*\.)(?!\w)`, "i").exec(s);
+    if (!m)
+        return null;
+    // Last segment of the reference = the object name; earlier ones are db/schema.
+    const segments = m[1].match(new RegExp(SEGMENT, "g"));
+    const last = segments?.[segments.length - 1];
+    if (!last)
+        return null;
+    return last.startsWith("[") ? last.slice(1, -1).replace(/\]\]/g, "]") : last;
 }
 /**
  * Say so when the body does not belong to the name that was asked for (fb#1140).
@@ -98,19 +126,42 @@ export function declaredObjectName(definition) {
  * Both strings are in hand here, so the mismatch can explain itself.
  *
  * Appended, never an always-present key — stdout JSON key order is part of the
- * observable contract, so an inapplicable note must be absent, not null. Same
- * rule as `runSchemaQuery`'s catalog `hint`, and the same `hint` key: one
- * vocabulary across the schema group.
+ * observable contract, so an inapplicable note must be absent, not null.
+ *
+ * The prose rides `renameNote`, NOT `hint`, and the distinction is the point
+ * (fb#1470). Within `ib dev schema`, `hint` has exactly one meaning: THIS ANSWER
+ * MAY BE INCOMPLETE — the fb#1326 catalog-filter warning ("an empty result here
+ * is NOT evidence an object is missing") and every fb#606/fb#641 truncation
+ * note. This note says the opposite — the answer IS correct despite appearances
+ * — so putting it under `hint` taught a consumer that has learned the group's
+ * vocabulary to distrust exactly the payload the note exists to vouch for.
+ *
+ * On a collision the CLI's value WINS — deliberately, since it is the one
+ * derived from the definition actually returned. What changed is only the
+ * POSITION: a plain `{...result, renamedFrom, renameNote}` keeps an overwritten
+ * key in its original slot, so the note landed mid-object and the "appended"
+ * contract above held exactly in the case nobody would test and failed in the
+ * collision case that motivated writing it down. Deleting the incoming keys
+ * first makes the two land last either way. Nothing sends either key today; the
+ * CLI ships ahead of the backend here, so "today" is not the guarantee that
+ * matters.
+ *
+ * The double assertion is load-bearing beyond the spread: `T` may declare these
+ * keys with other types, so this signature promises slightly more than it can
+ * prove. Every caller passes `Record_`, where it is exact.
  */
 export function withRenameNote(result) {
     const declared = declaredObjectName(result.definition);
     const name = typeof result.name === "string" ? result.name : "";
     if (!declared || !name || declared.toLowerCase() === name.toLowerCase())
         return result;
+    const rest = { ...result };
+    delete rest.renamedFrom;
+    delete rest.renameNote;
     return {
-        ...result,
+        ...rest,
         renamedFrom: declared,
-        hint: `this object was created as \`${declared}\` and later sp_renamed to \`${name}\` — OBJECT_DEFINITION returns the pre-rename CREATE text, so the body naming \`${declared}\` IS the object you asked for, not a wrong fetch. Grepping the codebase for \`${declared}\` may also find callers the current name misses.`,
+        renameNote: `this object was created as \`${declared}\` and later sp_renamed to \`${name}\` — OBJECT_DEFINITION returns the pre-rename CREATE text, so the body naming \`${declared}\` IS the object you asked for, not a wrong fetch. Grepping the codebase for \`${declared}\` may also find callers the current name misses.`,
     };
 }
 export async function runSchemaTable(client, name) {
@@ -201,6 +252,17 @@ const NUMERIC_LITERAL = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
  * `@x IS NULL OR col = @x` question with exactly the wrong branch. Everything
  * else is a string. `--params <json>` is the escape hatch when the literal
  * spelling and the intended type disagree (a string "8", say).
+ *
+ * A number that JavaScript cannot carry EXACTLY is refused rather than bound
+ * (fb#1470/fb#1468). `1e400` becomes `Infinity`, which `JSON.stringify` writes
+ * to the wire as `null` — so the backend bound NULL and an
+ * `@x IS NULL OR col = @x` predicate silently took the IS NULL branch and
+ * answered across every tenant, exit 0. That is the wrong-branch-under-test
+ * failure this whole feature exists to prevent, reached from the other side.
+ * `9007199254740993` was just as bad in a quieter way: it bound
+ * `...992`, a DIFFERENT number, with no error at all. The backend's own
+ * `Number.isFinite` guard cannot catch either, because the flattening happens
+ * client-side before the request leaves — so this is the layer that has to.
  */
 export function parseParamLiteral(raw) {
     if (raw === "null")
@@ -209,9 +271,59 @@ export function parseParamLiteral(raw) {
         return true;
     if (raw === "false")
         return false;
-    if (NUMERIC_LITERAL.test(raw))
-        return Number(raw);
+    if (NUMERIC_LITERAL.test(raw)) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) {
+            failWith(`--param value \`${raw}\` overflows to ${n > 0 ? "Infinity" : "-Infinity"}, which serializes as NULL and would silently change the predicate — pass a finite number, or the exact string via --params '{"…":"${raw}"}'`, 4);
+        }
+        // Underflow is the same failure as overflow, quieter: `1e-400` is not
+        // Infinity, it is 0 — a value the caller never wrote, bound with no error.
+        // Guarded separately because the round-trip test below deliberately does
+        // not cover exponent forms.
+        if (n === 0 && !/^-?0*(?:\.0*)?$/.test(raw)) {
+            failWith(`--param value \`${raw}\` underflows to 0, which is not the value you wrote — pass a representable number, or the exact string via --params '{"…":"${raw}"}'`, 4);
+        }
+        // A text-level round-trip, for PLAIN integer literals only: a decimal cannot
+        // round-trip its own text in binary floating point (0.1 never does) and an
+        // exponent form is a different spelling of the same value (`1e2` → "100"),
+        // so demanding one of either would reject correct input. This catches a
+        // digits-only literal whose value moved; `assertBindableNumber` below is
+        // what catches the same loss arriving in any OTHER spelling, including from
+        // `--params`. `n !== 0` because `-0` round-trips to "0" and is exactly
+        // representable — the underflow guard above already owns the real zero case.
+        if (n !== 0 && /^-?\d+$/.test(raw) && String(n) !== raw) {
+            failWith(`--param value \`${raw}\` cannot be represented exactly (it would bind as ${n}) — pass it as a string via --params '{"…":"${raw}"}' if the digits matter`, 4);
+        }
+        return n;
+    }
     return raw;
+}
+/**
+ * Refuse a number the wire cannot carry, whichever spelling produced it.
+ *
+ * `parseParamLiteral`'s guards are TEXT-level and so only ever see `--param`.
+ * That left the documented escape hatch as the hole: `--params '{"x":1e400}'`
+ * reproduced the whole fb#1468 bug — JSON.parse yields Infinity, JSON.stringify
+ * writes `null`, the backend binds NULL and an `@x IS NULL OR col = @x`
+ * predicate silently answers across every tenant — on the very flag the
+ * overflow message recommends. One character defeated the text guard too:
+ * `9007199254740993` threw, `9007199254740993.0` bound ...992 in silence.
+ *
+ * So the last word is a VALUE-level rule applied to every entry of the final
+ * map: nothing non-finite, and no integer outside the exactly-representable
+ * range. It cannot see a loss that JSON.parse already committed (`1e-400` → 0
+ * arrives indistinguishable from a written 0), which is why the text guards
+ * stay as the sharper instrument on the path that still has the text.
+ */
+function assertBindableNumber(name, value) {
+    if (typeof value !== "number")
+        return;
+    if (!Number.isFinite(value)) {
+        failWith(`param \`${name}\` is ${Number.isNaN(value) ? "NaN" : "infinite"}, which serializes as NULL and would silently change the predicate — pass a finite number, or the exact digits as a string`, 4);
+    }
+    if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+        failWith(`param \`${name}\` is outside the exactly-representable integer range (it would bind as ${value}) — pass the digits as a string and let SQL Server convert`, 4);
+    }
 }
 /**
  * Resolve the two spellings into the map sent as the request body's `params`
@@ -220,13 +332,21 @@ export function parseParamLiteral(raw) {
  *
  * The two are mutually exclusive rather than merged: one map with two sources
  * means a silent winner on any key they share, and the caller cannot see which
- * one won from the output.
+ * one won from the output. The SAME rule applies WITHIN `--param` — a repeated
+ * name used to last-win silently, which is the identical failure one level down
+ * (fb#1468): an agent editing a long command line leaves a stale
+ * `--param ownerAsiakasId=8` ahead of the new `--param ownerAsiakasId=null` and
+ * the query runs green against the wrong tenant scope.
+ *
+ * `json !== undefined`, not truthiness: `--params ""` (a routine unset-shell-var
+ * shape) read as ABSENT, so it bound nothing AND slipped past the exclusivity
+ * check above. An empty string is now a JSON parse error, which is what it is.
  */
 export function resolveQueryParams(pairs, json) {
-    if (pairs?.length && json) {
+    if (pairs?.length && json !== undefined) {
         failWith("Provide params once — via repeated --param name=value OR --params <json>, not both", 4);
     }
-    if (json) {
+    if (json !== undefined) {
         let parsed;
         try {
             parsed = JSON.parse(json);
@@ -237,7 +357,10 @@ export function resolveQueryParams(pairs, json) {
         if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
             failWith("--params must be a JSON OBJECT of name → value", 4);
         }
-        return parsed;
+        const fromJson = parsed;
+        for (const [name, value] of Object.entries(fromJson))
+            assertBindableNumber(name, value);
+        return fromJson;
     }
     if (!pairs?.length)
         return undefined;
@@ -249,10 +372,21 @@ export function resolveQueryParams(pairs, json) {
         if (eq <= 0) {
             failWith(`--param must be name=value (got \`${pair}\`)`, 4);
         }
-        out[pair.slice(0, eq)] = parseParamLiteral(pair.slice(eq + 1));
+        const name = pair.slice(0, eq);
+        if (Object.prototype.hasOwnProperty.call(out, name)) {
+            failWith(`--param ${name} given twice — pass each parameter once (the later value would silently win)`, 4);
+        }
+        out[name] = parseParamLiteral(pair.slice(eq + 1));
+        assertBindableNumber(name, out[name]);
     }
     return out;
 }
+/**
+ * Fold the `<sql>` positional and `--sql` flag alias into one value (fb#968) —
+ * an agent pattern-matching on sibling commands (`changelog add [description]`,
+ * `feedback create <description>`) reaches for the positional first and wasted
+ * a round-trip against a live-DB tool when only `--sql` was accepted.
+ */
 export function resolveSqlInput(positional, flag) {
     const sql = foldAliases([positional, flag], "Provide the SQL once — via the positional or --sql; if both are given they must match");
     if (!sql)
