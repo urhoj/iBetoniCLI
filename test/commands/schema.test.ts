@@ -15,6 +15,7 @@ import {
   runSchemaQuery,
   runSchemaIndexes,
   resolveSqlInput,
+  declaredObjectName,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -345,6 +346,103 @@ describe("ib schema", () => {
 
     test("treats whitespace-only as absent", () => {
       expect(() => resolveSqlInput("   ", undefined)).toThrow(/required/);
+    });
+  });
+
+  /**
+   * fb#1140 — OBJECT_DEFINITION keeps the pre-rename CREATE text, so a renamed
+   * object answers with a body naming something else entirely. The measured
+   * case is real: `keikka_saveContactPerson` returns
+   * `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`.
+   */
+  describe("sp_rename mismatch note (fb#1140)", () => {
+    describe("declaredObjectName", () => {
+      test.each([
+        ["bracketed schema-qualified proc", "CREATE PROCEDURE [dbo].[updateKeikkaPerson]\n AS BEGIN", "updateKeikkaPerson"],
+        ["bare PROC abbreviation", "CREATE PROC dbo.foo AS", "foo"],
+        ["unqualified name", "CREATE PROCEDURE foo AS", "foo"],
+        ["CREATE OR ALTER view", "CREATE OR ALTER VIEW [dbo].[v_keikka] AS SELECT 1", "v_keikka"],
+        ["function", "CREATE FUNCTION dbo.fn_calc(@a int) RETURNS int", "fn_calc"],
+        ["trigger", "CREATE TRIGGER [dbo].[keikka_ins] ON dbo.keikka", "keikka_ins"],
+        ["leading blank lines (the measured shape)", "\n\n\nCREATE PROCEDURE [dbo].[updateKeikkaPerson]", "updateKeikkaPerson"],
+        ["leading line comment", "-- legacy\nCREATE PROCEDURE dbo.real_name AS", "real_name"],
+        ["leading block comment", "/* banner\n   text */\nCREATE PROCEDURE dbo.real_name AS", "real_name"],
+        ["lowercase keywords", "create procedure dbo.real_name as", "real_name"],
+      ])("%s", (_label, definition, expected) => {
+        expect(declaredObjectName(definition)).toBe(expected);
+      });
+
+      /**
+       * The anti-cry-wolf case: a comment that TALKS about another CREATE must
+       * not be read as the declaration. A false rename note is worse than none
+       * — it invents a rename that never happened.
+       */
+      test("a CREATE named inside a leading comment does not win over the real one", () => {
+        expect(
+          declaredObjectName("-- replaces CREATE PROCEDURE dbo.old_thing\nCREATE PROCEDURE dbo.new_thing AS")
+        ).toBe("new_thing");
+      });
+
+      test.each([
+        ["a non-string", 42],
+        ["an unterminated block comment", "/* never closed\nCREATE PROCEDURE dbo.x AS"],
+        ["a body that does not start with CREATE", "SET ANSI_NULLS ON\nCREATE PROCEDURE dbo.x AS"],
+        ["an empty string", ""],
+      ])("%s parses to null", (_label, definition) => {
+        expect(declaredObjectName(definition)).toBeNull();
+      });
+    });
+
+    test.each([
+      ["proc", runSchemaProc],
+      ["view", runSchemaView],
+      ["trigger", runSchemaTrigger],
+    ])("%s: a renamed object explains itself", async (_label, run) => {
+      get().mockResolvedValueOnce({
+        name: "keikka_saveContactPerson",
+        definition: "\n\nCREATE PROCEDURE [dbo].[updateKeikkaPerson]\n AS BEGIN UPDATE dbo.keikka",
+      });
+      const result = (await run(mockClient, "keikka_saveContactPerson")) as {
+        renamedFrom: string;
+        hint: string;
+      };
+      expect(result.renamedFrom).toBe("updateKeikkaPerson");
+      expect(result.hint).toContain("sp_renamed");
+      expect(result.hint).toContain("keikka_saveContactPerson");
+    });
+
+    test("a matching name is left untouched, key ABSENT not null", async () => {
+      const payload = { name: "asiakas_find", definition: "CREATE PROCEDURE [dbo].[asiakas_find] AS" };
+      get().mockResolvedValueOnce({ ...payload });
+      const result = await runSchemaProc(mockClient, "asiakas_find");
+      expect("renamedFrom" in result).toBe(false);
+      expect("hint" in result).toBe(false);
+      expect(result).toEqual(payload);
+    });
+
+    test("names differing only in case are the SAME object (SQL Server collation)", async () => {
+      get().mockResolvedValueOnce({
+        name: "Asiakas_Find",
+        definition: "CREATE PROCEDURE [dbo].[asiakas_find] AS",
+      });
+      const result = await runSchemaProc(mockClient, "Asiakas_Find");
+      expect("renamedFrom" in result).toBe(false);
+    });
+
+    test("a payload with no parseable definition is passed through", async () => {
+      get().mockResolvedValueOnce({ name: "keikka", columns: [] });
+      const result = await runSchemaView(mockClient, "keikka");
+      expect("renamedFrom" in result).toBe(false);
+    });
+
+    test("the batch path annotates each renamed member (fb#109 fan-out)", async () => {
+      get()
+        .mockResolvedValueOnce({ name: "a_proc", definition: "CREATE PROCEDURE [dbo].[old_a] AS" })
+        .mockResolvedValueOnce({ name: "b_proc", definition: "CREATE PROCEDURE [dbo].[b_proc] AS" });
+      const res = await runSchemaBatch(mockClient, runSchemaProc, ["a_proc", "b_proc"]);
+      const byName = Object.fromEntries(res.items.map((i) => [i.name, i.object as Record<string, unknown>]));
+      expect(byName.a_proc.renamedFrom).toBe("old_a");
+      expect("renamedFrom" in byName.b_proc).toBe(false);
     });
   });
 });

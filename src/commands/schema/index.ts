@@ -83,17 +83,76 @@ export async function runSchemaTriggers(
 ): Promise<Envelope> {
   return getSchemaList(client, listQuery("/api/cli/schema/triggers", opts), "ib dev schema triggers");
 }
+/**
+ * The object name the definition text DECLARES, or null when none parses.
+ *
+ * Anchored at the first statement AFTER leading comments/whitespace, never a
+ * loose scan: a `CREATE PROCEDURE` mentioned inside a banner comment would
+ * otherwise be read as the declaration and produce a rename note on an object
+ * that was never renamed. Failing to parse costs nothing (no note, status quo);
+ * a wrong parse costs the caller's trust in the note.
+ */
+export function declaredObjectName(definition: unknown): string | null {
+  if (typeof definition !== "string") return null;
+  let s = definition;
+  for (;;) {
+    const before = s;
+    s = s.replace(/^\s+/, "");
+    if (s.startsWith("--")) {
+      const nl = s.indexOf("\n");
+      s = nl === -1 ? "" : s.slice(nl + 1);
+      continue;
+    }
+    if (s.startsWith("/*")) {
+      const end = s.indexOf("*/");
+      if (end === -1) return null; // unterminated — nothing safe to classify
+      s = s.slice(end + 2);
+      continue;
+    }
+    if (s === before) break;
+  }
+  const m =
+    /^CREATE\s+(?:OR\s+ALTER\s+)?(?:PROC(?:EDURE)?|FUNCTION|VIEW|TRIGGER)\s+(?:\[?\w+\]?\s*\.\s*)?\[?(\w+)\]?/i.exec(s);
+  return m ? m[1] : null;
+}
+
+/**
+ * Say so when the body does not belong to the name that was asked for (fb#1140).
+ *
+ * `OBJECT_DEFINITION` keeps the ORIGINAL `CREATE` text after `sp_rename`, so
+ * `ib dev schema proc keikka_saveContactPerson` answers with a body that says
+ * `CREATE PROCEDURE [dbo].[updateKeikkaPerson]` — the requested name appears
+ * nowhere in the payload. An agent auditing the object then concludes it
+ * fetched the wrong one, or (worse) attributes the body to the wrong name.
+ * Both strings are in hand here, so the mismatch can explain itself.
+ *
+ * Appended, never an always-present key — stdout JSON key order is part of the
+ * observable contract, so an inapplicable note must be absent, not null. Same
+ * rule as `runSchemaQuery`'s catalog `hint`, and the same `hint` key: one
+ * vocabulary across the schema group.
+ */
+export function withRenameNote<T extends Record_>(result: T): T {
+  const declared = declaredObjectName(result.definition);
+  const name = typeof result.name === "string" ? result.name : "";
+  if (!declared || !name || declared.toLowerCase() === name.toLowerCase()) return result;
+  return {
+    ...result,
+    renamedFrom: declared,
+    hint: `this object was created as \`${declared}\` and later sp_renamed to \`${name}\` — OBJECT_DEFINITION returns the pre-rename CREATE text, so the body naming \`${declared}\` IS the object you asked for, not a wrong fetch. Grepping the codebase for \`${declared}\` may also find callers the current name misses.`,
+  };
+}
+
 export async function runSchemaTable(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/table/${name}`);
 }
 export async function runSchemaView(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/view/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/view/${name}`));
 }
 export async function runSchemaProc(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/proc/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/proc/${name}`));
 }
 export async function runSchemaTrigger(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/trigger/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/trigger/${name}`));
 }
 export async function runSchemaRows(client: ApiClient, table: string, opts: SchemaListFilter): Promise<Envelope> {
   return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);

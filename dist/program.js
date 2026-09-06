@@ -31,7 +31,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName } from "./output/unknownCommand.js";
+import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -630,7 +630,10 @@ function longFlag(flags) {
  */
 function emitUsageEnvelope(err, env) {
     writeErrorEnvelope(env, 4);
-    recordFriction(err, 4, `${env.error} — ${env.hint}`);
+    // An envelope that named the next command is not friction (fb#1141) — the
+    // envelope is the structured witness, so the skip is decided here rather than
+    // re-derived from the rendered hint inside recordFriction.
+    recordFriction(err, 4, `${env.error} — ${env.hint}`, false, usageEnvelopeResolves(env));
     setExit(4);
 }
 /**

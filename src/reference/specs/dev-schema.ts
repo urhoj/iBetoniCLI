@@ -31,6 +31,10 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
     const truncNote =
       " `truncated: true` (with a `hint` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.";
     const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
+    /** Appended to every outputShape that carries a definition body (fb#1140). */
+    const renamedShape = " A renamed object also carries `renamedFrom` + `hint` (see NOTES).";
+    const renamedNote =
+      "OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (`keikka_saveContactPerson` returns `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`). When it does, the payload carries `renamedFrom` and a `hint`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).";
     return [
       {
         command: "ib dev schema tables",
@@ -83,7 +87,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema view keikkaBetoniView", "ib dev schema view keikkaBetoniView,asiakasView"],
       },
@@ -105,7 +110,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema proc asiakas_find", "ib dev schema proc sijainti_save,sijainti_add,asiakas_sijainnit_get"],
       },
@@ -134,7 +140,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "Trigger not found", "check the name via `ib dev schema triggers` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it")],
         examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,asiakasPerson_after_del_trig"],
       },

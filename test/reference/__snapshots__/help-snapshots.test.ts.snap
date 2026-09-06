@@ -3839,7 +3839,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3847,6 +3847,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib dev schema procs\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema proc asiakas_find
@@ -4093,7 +4096,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4101,6 +4104,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  Trigger not found      → check the name via \`ib dev schema triggers\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema trigger keikka_after_ins_trig
@@ -4165,7 +4171,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4173,6 +4179,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  View not found         → check the name via \`ib dev schema views\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema view keikkaBetoniView

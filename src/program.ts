@@ -32,7 +32,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
+import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -776,12 +776,14 @@ function longFlag(flags: string): string {
  * groomer only sees this log, and a bare `unknown command 'x'` reads as "no
  * pointer was given" (fb#275).
  */
-function emitUsageEnvelope<T extends { error: string; hint: string }>(
-  err: unknown,
-  env: T
-): void {
+function emitUsageEnvelope<
+  T extends { error: string; hint: string; didYouMean?: string | null; availableElsewhere?: string[] },
+>(err: unknown, env: T): void {
   writeErrorEnvelope(env, 4);
-  recordFriction(err, 4, `${env.error} — ${env.hint}`);
+  // An envelope that named the next command is not friction (fb#1141) — the
+  // envelope is the structured witness, so the skip is decided here rather than
+  // re-derived from the rendered hint inside recordFriction.
+  recordFriction(err, 4, `${env.error} — ${env.hint}`, false, usageEnvelopeResolves(env));
   setExit(4);
 }
 

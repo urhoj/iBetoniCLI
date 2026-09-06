@@ -397,6 +397,33 @@ export interface UnknownCommandEnvelope {
 }
 
 /**
+ * Did this usage envelope actually ANSWER the caller? (fb#1141)
+ *
+ * The discriminator for friction capture, one exit code over from the fb#579
+ * (anticipated not-found) and fb#720 (claim-conflict 409) skips: a usage error
+ * that names the exact command to run next is evidence the resolver works, not
+ * evidence the caller was stuck. `ib dev sql` answering "sql is an ARGUMENT of
+ * `ib dev schema query`, not a command" is the shape — and after fb#1020 taught
+ * the resolver to reach grandchild verbs and positional argument names, every
+ * capture in the session that filed fb#1141 was of exactly that kind, because
+ * probing the fix is what an agent does every time it ships an unknown-command
+ * improvement.
+ *
+ * Deliberately structural, never a pattern-match on the rendered hint: the
+ * prose drifts, and sniffing it would silently stop discriminating.
+ *
+ * A DEAD-END envelope (no did-you-mean, nothing elsewhere) is NOT resolving and
+ * stays captured — that is precisely the state fb#1020 reported, so the signal
+ * that produced this whole family of fixes keeps working.
+ */
+export function usageEnvelopeResolves(env: {
+  didYouMean?: string | null;
+  availableElsewhere?: string[];
+}): boolean {
+  return Boolean(env.didYouMean) || (env.availableElsewhere?.length ?? 0) > 0;
+}
+
+/**
  * Build the enriched envelope. `cmd` is the GROUP that threw
  * commander.unknownCommand; `unknownToken` is the bad token (cmd.args[0]).
  */
