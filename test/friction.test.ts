@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { recordFriction, frictionPath, truncateMessage } from "../src/friction.js";
 import { CliError } from "../src/api/errors.js";
 import { setActiveCommandErrors, writeError } from "../src/output/json.js";
+import { usageEnvelopeResolves } from "../src/output/unknownCommand.js";
 import {
   buildProgram,
   enableParserThrow,
@@ -331,21 +332,26 @@ describe("recordFriction", () => {
   // SAW — the enriched envelope with the did-you-mean — not Commander's bare
   // internal message. A groomer reading a bare `unknown command 'show'` filed
   // a request for a show→get hint that already existed (fb#229).
-  test("unknown-subcommand parse path records the displayed did-you-mean, not the bare parser message", async () => {
+  test("unknown-subcommand parse path records the displayed envelope, not the bare parser message", async () => {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const prevExitCode = process.exitCode;
     try {
       const program = await buildProgram();
       const hooks = enableParserThrow(program);
-      // `view`, not `show` — `show` became a real alias of `get` (fb#373), so it
-      // no longer errors; `view` still exercises the same verb-synonym hint.
+      // A DEAD-END token on purpose (fb#1141): a resolving envelope — the old
+      // `view` → `Did you mean ib dev feedback get?` case — is no longer
+      // captured at all, so asserting fidelity on one would only ever prove the
+      // exemption fired. Fidelity is about what a CAPTURED row carries, and the
+      // dead end is the row the groomer actually receives.
       await program
-        .parseAsync(["node", "ib", "dev", "feedback", "view", "273"])
+        .parseAsync(["node", "ib", "dev", "feedback", "zzqqxx", "273"])
         .catch((err) => handleParseRejection(err, hooks));
       const e = lastEntry();
       expect(e.exitCode).toBe(4);
-      expect(String(e.message)).toContain('unknown command "view" under `ib dev feedback`');
-      expect(String(e.message)).toContain("Did you mean `ib dev feedback get`?");
+      expect(String(e.message)).toContain('unknown command "zzqqxx" under `ib dev feedback`');
+      // The enriched half: Commander's own message names neither the group's
+      // real subcommands nor the way to list them.
+      expect(String(e.message)).toMatch(/available|--help/i);
     } finally {
       stderrSpy.mockRestore();
       process.exitCode = prevExitCode;
@@ -418,6 +424,98 @@ describe("claim conflict (409) is not friction (#720)", () => {
   test("a curated 409 on a DIFFERENT command (business-state conflict) still captures", () => {
     recordFriction(new CliError("Offer not in draft / not owned", 409, null, 4), undefined, "not a draft", true);
     expect(lastEntry().message).toBe("not a draft");
+  });
+});
+
+// fb#1141: the fb#579 shape one exit code over. A USAGE error that NAMED the
+// next command resolved the caller, and capturing it files a false positive
+// every time an agent probes an unknown-command fix — a routine act, so the
+// class recurs by construction. The discriminator is whether the envelope
+// pointed anywhere, never "exit 4 is not friction": the same invocations were
+// genuine friction before fb#1020 taught the resolver to reach them.
+describe("a resolving USAGE envelope is not friction (#1141)", () => {
+  test("usageEnvelopeResolves: a did-you-mean alone resolves", () => {
+    expect(usageEnvelopeResolves({ didYouMean: "get", availableElsewhere: [] })).toBe(true);
+  });
+
+  test("usageEnvelopeResolves: an elsewhere-owner alone resolves", () => {
+    expect(
+      usageEnvelopeResolves({ didYouMean: null, availableElsewhere: ["ib dev schema query"] })
+    ).toBe(true);
+  });
+
+  test("usageEnvelopeResolves: both empty is a DEAD END (the fb#1020 state)", () => {
+    expect(usageEnvelopeResolves({ didYouMean: null, availableElsewhere: [] })).toBe(false);
+  });
+
+  test("usageEnvelopeResolves: an envelope carrying neither key (validation) is a dead end", () => {
+    expect(usageEnvelopeResolves({})).toBe(false);
+  });
+
+  test("exit 4 flagged as resolving is not captured", () => {
+    const before = read();
+    recordFriction(
+      new Error("unknown command 'sql'"),
+      4,
+      "unknown command \"sql\" under `ib dev` — sql is an ARGUMENT of `ib dev schema query`, not a command: run `ib dev schema query <sql>`",
+      false,
+      true
+    );
+    expect(read()).toBe(before);
+  });
+
+  test("exit 4 NOT flagged (a dead-end envelope) is still captured", () => {
+    recordFriction(new Error("unknown command 'zzqqxx'"), 4, "dead-end usage", false, false);
+    expect(lastEntry().message).toBe("dead-end usage");
+  });
+
+  test("the skip is exit-4 ONLY — the flag cannot silence another exit code", () => {
+    recordFriction(new CliError("boom", 500, null, 6), undefined, "resolving exit 6", false, true);
+    expect(lastEntry().message).toBe("resolving exit 6");
+  });
+});
+
+// The unit above proves recordFriction obeys the flag; this proves the CALLER
+// passes it — through the real parser, on the reported invocation. A correct
+// helper wired to nothing would leave the bug fully live.
+describe("handleParseRejection → friction wiring (#1141)", () => {
+  async function parse(argv: string[]): Promise<void> {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prevExitCode = process.exitCode;
+    try {
+      const program = await buildProgram();
+      const hooks = enableParserThrow(program);
+      await program
+        .parseAsync(["node", "ib", ...argv])
+        .catch((err) => handleParseRejection(err, hooks));
+    } finally {
+      stderrSpy.mockRestore();
+      process.exitCode = prevExitCode;
+    }
+  }
+
+  // THE REPORTED CASE, in its real shape: `ib dev sql` resolves to
+  // `ib dev schema query <sql>` via descendantsOwningPositional (fb#1020).
+  test("`ib dev sql` — the envelope names the exact command — is not logged", async () => {
+    const before = read();
+    await parse(["dev", "sql", "SELECT 1"]);
+    expect(read()).toBe(before);
+  });
+
+  // The second false positive from the same session, a different resolver layer
+  // (descendantsOwningCompoundVerb): `ib jerry company-search` → `ib jerry admin search`.
+  test("`ib jerry company-search` — resolved via the compound-verb layer — is not logged", async () => {
+    const before = read();
+    await parse(["jerry", "company-search", "kalle"]);
+    expect(read()).toBe(before);
+  });
+
+  // A token distinct from the fidelity test's above: identical messages collapse
+  // into a repeat COUNT rather than a new row (fb#313), so reusing one would
+  // assert against that test's entry and pass no matter what this one did.
+  test("a dead-end unknown command IS still logged (the fb#1020 signal survives)", async () => {
+    await parse(["dev", "feedback", "qqzzww"]);
+    expect(read()).toContain("qqzzww");
   });
 });
 

@@ -31,6 +31,10 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
     const truncNote =
       " `truncated: true` (with a `hint` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.";
     const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
+    /** Appended to every outputShape that carries a definition body (fb#1140). */
+    const renamedShape = " A renamed object also carries `renamedFrom` + `hint` (see NOTES).";
+    const renamedNote =
+      "OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (`keikka_saveContactPerson` returns `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`). When it does, the payload carries `renamedFrom` and a `hint`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).";
     return [
       {
         command: "ib dev schema tables",
@@ -83,7 +87,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema view keikkaBetoniView", "ib dev schema view keikkaBetoniView,asiakasView"],
       },
@@ -105,7 +110,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema proc asiakas_find", "ib dev schema proc sijainti_save,sijainti_add,asiakas_sijainnit_get"],
       },
@@ -134,7 +140,8 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
+        notes: [renamedNote],
         errors: [...devErrors, invalidNameErr, apiErr(404, "Trigger not found", "check the name via `ib dev schema triggers` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it")],
         examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,asiakasPerson_after_del_trig"],
       },
@@ -200,13 +207,17 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       {
         command: "ib dev schema query",
         description:
-          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that `schema tables/table` cannot answer. Read-over-POST: works under --read-only. Developer-only.",
+          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists — its login sees only a fraction of the ROWS in the routine-bearing catalog views (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],
-        flags: [{ name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" }],
+        flags: [
+          { name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" },
+          { name: "param", type: "string", required: false, description: "Bind one @parameter as name=value, REPEATABLE — run an application query with its @params intact instead of hand-editing them into literals. `8`/`true`/`false`/`null` are typed as number/bool/NULL; anything else is a string. The @ sigil is optional (`--param @ownerAsiakasId=8` works)." },
+          { name: "params", type: "json", required: false, description: "Bind every parameter from ONE JSON object — `{\"ownerAsiakasId\":null,\"documentTypeId\":3}`. Exact types, so use this when a literal's spelling and its intended type disagree (a string \"8\"). Mutually exclusive with --param (exit 4)." },
+        ],
         outputShape:
-          "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000 }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows.",
+          "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. `hint` appears only when the SQL reads a metadata-filtered catalog view (see NOTES).",
         errors: [
           ...devErrors,
           apiErr(
@@ -223,6 +234,18 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           ),
           apiErr(
             400,
+            "SQL error: Must declare the scalar variable \"@x\"",
+            "the statement has an @parameter nothing bound — pass it with `--param x=<value>` (repeatable) or `--params '{\"x\":<value>}'`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check `ib version`",
+            "Must declare the scalar variable"
+          ),
+          apiErr(
+            400,
+            "Invalid param name / value",
+            "param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself",
+            ["invalid param name", "params must be", "too many params", "given twice", "must be a string, number, boolean or null", "must be a finite number"]
+          ),
+          apiErr(
+            400,
             "Guard rejection or SQL error",
             "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
           ),
@@ -231,10 +254,13 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         notes: [
           "Runs under the db_datareader-only `ib_readonly` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.",
           "dbo scope like the rest of `ib dev schema`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).",
+          "NOT a source of truth for whether an OBJECT exists. Catalog views are filtered by metadata permission, and db_datareader's SELECT does not count for procedure metadata — so sys.procedures returns only the few procs granted individually and sys.objects lists tables normally while showing just those same few, silently and with no error. Use `ib dev schema procs|proc|table|view` to settle existence; a `hint` on the result flags an affected query (fb#1326).",
         ],
         examples: [
           "ib dev schema query \"SELECT COUNT(*) AS n FROM person\"",
           "ib dev schema query --sql \"SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId\"",
+          "ib dev schema query \"SELECT TOP 5 keikkaId FROM keikka WHERE (@ownerAsiakasId IS NULL OR ownerAsiakasId = @ownerAsiakasId)\" --param ownerAsiakasId=null",
+          "ib dev schema query \"SELECT COUNT(*) AS n FROM documents WHERE ownerAsiakasId = @o AND documentTypeId = @t\" --params '{\"o\":8,\"t\":3}'",
         ],
       },
       {

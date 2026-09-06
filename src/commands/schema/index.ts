@@ -83,17 +83,76 @@ export async function runSchemaTriggers(
 ): Promise<Envelope> {
   return getSchemaList(client, listQuery("/api/cli/schema/triggers", opts), "ib dev schema triggers");
 }
+/**
+ * The object name the definition text DECLARES, or null when none parses.
+ *
+ * Anchored at the first statement AFTER leading comments/whitespace, never a
+ * loose scan: a `CREATE PROCEDURE` mentioned inside a banner comment would
+ * otherwise be read as the declaration and produce a rename note on an object
+ * that was never renamed. Failing to parse costs nothing (no note, status quo);
+ * a wrong parse costs the caller's trust in the note.
+ */
+export function declaredObjectName(definition: unknown): string | null {
+  if (typeof definition !== "string") return null;
+  let s = definition;
+  for (;;) {
+    const before = s;
+    s = s.replace(/^\s+/, "");
+    if (s.startsWith("--")) {
+      const nl = s.indexOf("\n");
+      s = nl === -1 ? "" : s.slice(nl + 1);
+      continue;
+    }
+    if (s.startsWith("/*")) {
+      const end = s.indexOf("*/");
+      if (end === -1) return null; // unterminated — nothing safe to classify
+      s = s.slice(end + 2);
+      continue;
+    }
+    if (s === before) break;
+  }
+  const m =
+    /^CREATE\s+(?:OR\s+ALTER\s+)?(?:PROC(?:EDURE)?|FUNCTION|VIEW|TRIGGER)\s+(?:\[?\w+\]?\s*\.\s*)?\[?(\w+)\]?/i.exec(s);
+  return m ? m[1] : null;
+}
+
+/**
+ * Say so when the body does not belong to the name that was asked for (fb#1140).
+ *
+ * `OBJECT_DEFINITION` keeps the ORIGINAL `CREATE` text after `sp_rename`, so
+ * `ib dev schema proc keikka_saveContactPerson` answers with a body that says
+ * `CREATE PROCEDURE [dbo].[updateKeikkaPerson]` — the requested name appears
+ * nowhere in the payload. An agent auditing the object then concludes it
+ * fetched the wrong one, or (worse) attributes the body to the wrong name.
+ * Both strings are in hand here, so the mismatch can explain itself.
+ *
+ * Appended, never an always-present key — stdout JSON key order is part of the
+ * observable contract, so an inapplicable note must be absent, not null. Same
+ * rule as `runSchemaQuery`'s catalog `hint`, and the same `hint` key: one
+ * vocabulary across the schema group.
+ */
+export function withRenameNote<T extends Record_>(result: T): T {
+  const declared = declaredObjectName(result.definition);
+  const name = typeof result.name === "string" ? result.name : "";
+  if (!declared || !name || declared.toLowerCase() === name.toLowerCase()) return result;
+  return {
+    ...result,
+    renamedFrom: declared,
+    hint: `this object was created as \`${declared}\` and later sp_renamed to \`${name}\` — OBJECT_DEFINITION returns the pre-rename CREATE text, so the body naming \`${declared}\` IS the object you asked for, not a wrong fetch. Grepping the codebase for \`${declared}\` may also find callers the current name misses.`,
+  };
+}
+
 export async function runSchemaTable(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/table/${name}`);
 }
 export async function runSchemaView(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/view/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/view/${name}`));
 }
 export async function runSchemaProc(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/proc/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/proc/${name}`));
 }
 export async function runSchemaTrigger(client: ApiClient, name: string): Promise<Record_> {
-  return client.get<Record_>(`/api/cli/schema/trigger/${name}`);
+  return withRenameNote(await client.get<Record_>(`/api/cli/schema/trigger/${name}`));
 }
 export async function runSchemaRows(client: ApiClient, table: string, opts: SchemaListFilter): Promise<Envelope> {
   return getSchemaList(client, listQuery(`/api/cli/schema/rows/${table}`, opts), `ib dev schema rows ${table}`);
@@ -124,6 +183,61 @@ export interface SchemaQueryResult {
   rowCount: number;
   truncated: boolean;
   cap: number;
+  /** Present only when the SQL reads a metadata-filtered catalog view (fb#1326). */
+  hint?: string;
+}
+
+/**
+ * Catalog views that UNDER-REPORT under this command's login (fb#1326).
+ *
+ * `ib dev schema query` runs on the `ib_readonly` principal, which holds
+ * db_datareader and nothing else, while every OTHER `ib dev schema *` command
+ * runs as the app login. SQL Server filters catalog views by metadata
+ * permission, and db_datareader confers no permission on procedures — so the
+ * routine-bearing catalogs come back nearly empty with no error at all. That
+ * is the dangerous shape: a plausible answer, not a permission failure.
+ *
+ * Measured 2026-09-05 against production: sys.procedures returns 6 rows against
+ * 512 dbo procs; INFORMATION_SCHEMA.ROUTINES 7; sys.parameters 18. (The 6 are
+ * individually-granted objects, not zero — db_datareader's SELECT is simply not
+ * a permission SQL Server counts for procedure metadata.) The exact trap this
+ * hint exists to stop: `SELECT name FROM sys.objects WHERE name LIKE
+ * '%eikkaPerson%'` returns 27 rows of tables, keys, defaults and triggers and no
+ * stored procedure, so `keikkaPerson_add` reads as missing while two shipped
+ * modules EXEC it by name.
+ *
+ * Deliberately NOT matched: sys.tables, sys.views, sys.columns, sys.triggers,
+ * sys.indexes, sys.foreign_keys and INFORMATION_SCHEMA.TABLES/COLUMNS. Tables
+ * (248), views (45), triggers (33) and INFORMATION_SCHEMA.COLUMNS over dbo base
+ * tables (2737) measured EQUAL to their app-login counts; sys.columns,
+ * sys.indexes and sys.foreign_keys were spot-checked per table rather than
+ * whole-catalogue. A warning that is false on a correct query is one callers
+ * learn to ignore. Matching is a regex over raw SQL text, so a CTE aliased `sys`
+ * trips it; acceptable, because this only ever advises and never rejects.
+ */
+const METADATA_FILTERED_CATALOGS =
+  /\b(?:sys\.(?:procedures|objects|all_objects|sql_modules|parameters)|information_schema\.(?:routines|parameters))\b/i;
+
+/**
+ * The hint `sql` earns, or undefined when it reads no filtered catalog.
+ *
+ * The text states the MECHANISM and not the measured ratio on purpose (fb#1440):
+ * the counts move as procs are added, and this shipped with "6 of ~200" — a
+ * figure taken from a `schema procs` page that was itself capped at its default
+ * 200 and flagged `truncated: true`. Stale precision in an advisory about
+ * incomplete reads is the very failure it warns about; the dated measurement
+ * belongs in the docblock above, where it cannot be mistaken for current.
+ */
+function catalogFilterHint(sql: string): string | undefined {
+  return METADATA_FILTERED_CATALOGS.test(sql)
+    ? "This query reads a catalog view that SQL Server filters by METADATA PERMISSION. " +
+        "`ib dev schema query` runs under the db_datareader-only `ib_readonly` login, and SELECT " +
+        "is not a permission SQL Server counts for procedure metadata — so sys.procedures returns " +
+        "only the handful of procs granted individually, and sys.objects lists tables normally " +
+        "while showing just those same few. An empty or short result here is NOT evidence that an " +
+        "object is missing. Confirm existence with `ib dev schema procs|proc|table|view`, which " +
+        "run under the app login."
+    : undefined;
 }
 
 /**
@@ -132,6 +246,72 @@ export interface SchemaQueryResult {
  * `feedback create <description>`) reaches for the positional first and wasted
  * a round-trip against a live-DB tool when only `--sql` was accepted.
  */
+/** What one bound value may be — the JSON scalars the backend accepts. */
+export type QueryParamValue = string | number | boolean | null;
+
+/** A bare integer/decimal/exponent literal, i.e. what JSON would call a number. */
+const NUMERIC_LITERAL = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+
+/**
+ * Type a `--param name=value` value the way the caller means it (fb#1177).
+ *
+ * `8` is an int, `null` is a NULL and `true` is a bit — because that is what
+ * those tokens are in the application code the query was copied from, and a
+ * NULL bound as the four-character string "null" would answer the
+ * `@x IS NULL OR col = @x` question with exactly the wrong branch. Everything
+ * else is a string. `--params <json>` is the escape hatch when the literal
+ * spelling and the intended type disagree (a string "8", say).
+ */
+export function parseParamLiteral(raw: string): QueryParamValue {
+  if (raw === "null") return null;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  if (NUMERIC_LITERAL.test(raw)) return Number(raw);
+  return raw;
+}
+
+/**
+ * Resolve the two spellings into the map sent as the request body's `params`
+ * (fb#1177), or `undefined` when neither was given — the unparameterized body
+ * must stay byte-identical to what it was before this flag existed.
+ *
+ * The two are mutually exclusive rather than merged: one map with two sources
+ * means a silent winner on any key they share, and the caller cannot see which
+ * one won from the output.
+ */
+export function resolveQueryParams(
+  pairs?: string[],
+  json?: string
+): Record<string, QueryParamValue> | undefined {
+  if (pairs?.length && json) {
+    failWith("Provide params once — via repeated --param name=value OR --params <json>, not both", 4);
+  }
+  if (json) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      failWith("--params must be valid JSON (an object of name → value)", 4);
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      failWith("--params must be a JSON OBJECT of name → value", 4);
+    }
+    return parsed as Record<string, QueryParamValue>;
+  }
+  if (!pairs?.length) return undefined;
+  const out: Record<string, QueryParamValue> = {};
+  for (const pair of pairs) {
+    // First `=` only: a value may legitimately contain one (a date range, an
+    // expression), and splitting on all of them would silently truncate it.
+    const eq = pair.indexOf("=");
+    if (eq <= 0) {
+      failWith(`--param must be name=value (got \`${pair}\`)`, 4);
+    }
+    out[pair.slice(0, eq)] = parseParamLiteral(pair.slice(eq + 1));
+  }
+  return out;
+}
+
 export function resolveSqlInput(positional?: string, flag?: string): string {
   const sql = foldAliases(
     [positional, flag],
@@ -150,8 +330,18 @@ export function resolveSqlInput(positional?: string, flag?: string): string {
  * `truncated: true` when the cap bit — warn like every other capped list, so
  * a caller reading only `rows` cannot mistake a cut result for a complete one.
  */
-export async function runSchemaQuery(client: ApiClient, sql: string): Promise<SchemaQueryResult> {
-  const result = await client.post<SchemaQueryResult>("/api/cli/schema/query", { sql }, { read: true });
+export async function runSchemaQuery(
+  client: ApiClient,
+  sql: string,
+  params?: Record<string, QueryParamValue>
+): Promise<SchemaQueryResult> {
+  const result = await client.post<SchemaQueryResult>(
+    "/api/cli/schema/query",
+    // Omitted, not `params: undefined`, when nothing was bound — the body of an
+    // unparameterized query is unchanged by this feature (fb#1177).
+    params ? { sql, params } : { sql },
+    { read: true }
+  );
   if (result.truncated) {
     // Tailored hint: this route has no --limit/--offset — the way past the cap
     // is a narrower WHERE or an aggregate (which is what this command is for).
@@ -164,7 +354,10 @@ export async function runSchemaQuery(client: ApiClient, sql: string): Promise<Sc
       "ib dev schema query"
     );
   }
-  return result;
+  // Appended, never an always-present key: stdout JSON key order is part of the
+  // observable contract, so an inapplicable hint must be absent, not undefined.
+  const hint = catalogFilterHint(sql);
+  return hint ? { ...result, hint } : result;
 }
 /**
  * Migration snapshot tables + their retention state (fb#440). No `search` —
@@ -268,9 +461,18 @@ export function registerSchemaCommands(
       "Run one read-only SELECT (or WITH … SELECT) against the live DB — for data-SHAPE questions (COUNT, GROUP BY, histograms). Single statement, no semicolons, hard 1000-row cap; runs under a db_datareader-only login."
     )
     .option("--sql <select>", "The SELECT statement to run (alias for the positional)")
+    .option(
+      "--param <name=value>",
+      "Bind one @parameter, repeatable — so an application query runs with its @params intact. `8`/`true`/`null` are typed as such; anything else is a string",
+      (v: string, prev: string[]) => prev.concat([v]),
+      [] as string[]
+    )
+    .option("--params <json>", "Bind every parameter from one JSON object (exact types; alternative to --param)")
     .action(
-      jsonAction(getClient, (client, sql: string | undefined, opts: { sql?: string }) =>
-        runSchemaQuery(client, resolveSqlInput(sql, opts.sql))
+      jsonAction(
+        getClient,
+        (client, sql: string | undefined, opts: { sql?: string; param?: string[]; params?: string }) =>
+          runSchemaQuery(client, resolveSqlInput(sql, opts.sql), resolveQueryParams(opts.param, opts.params))
       )
     );
 

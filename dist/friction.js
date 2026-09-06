@@ -112,8 +112,11 @@ export function truncateMessage(message) {
  *   matching spec ERRORS row, or one attached at the throw site (see
  *   `hintDetailForError`'s `source`). Meaningful for exit 5 (the not-found
  *   skip below) and for the 409 claim-conflict skip further down.
+ * @param resolvedUsage the exit-4 USAGE envelope RESOLVED the caller — it named
+ *   the command to run instead (`usageEnvelopeResolves`, decided at the
+ *   `emitUsageEnvelope` call site where the structured envelope exists).
  */
-export function recordFriction(err, exitCodeOverride, displayed, curatedHint = false) {
+export function recordFriction(err, exitCodeOverride, displayed, curatedHint = false, resolvedUsage = false) {
     try {
         if (getEmbeddedCtx())
             return; // real local CLI only
@@ -153,6 +156,20 @@ export function recordFriction(err, exitCodeOverride, displayed, curatedHint = f
         // skipped — see the backend message in modules/feedback/feedback.js.
         const statusCode = err instanceof CliError ? err.statusCode : 0;
         if (statusCode === 409 && curatedHint && /is claimed by/.test(errorMessage(err)))
+            return;
+        // A USAGE error that NAMED the next command is the fb#579 shape at exit 4
+        // (feedback #1141): `ib dev sql` answering "sql is an ARGUMENT of
+        // `ib dev schema query`" resolved the caller, and capturing it files a
+        // false positive every time an agent probes an unknown-command fix — which
+        // is a routine act, so the class recurs by construction. All four captures
+        // in the session that filed this were of exactly that kind.
+        //
+        // NOT "exit 4 is never friction", and not "unknown-command is never
+        // friction": the SAME two invocations WERE genuine friction before fb#1020
+        // taught the resolver to reach them, and are what produced that row. The
+        // discriminator is whether this envelope pointed anywhere — a dead end
+        // (no did-you-mean, nothing elsewhere) is still captured.
+        if (exitCode === 4 && resolvedUsage)
             return;
         const argv = process.argv.slice(2).join(" ").slice(0, 400);
         // `displayed` is what the caller actually SAW (enriched envelope error +

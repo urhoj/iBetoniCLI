@@ -7,7 +7,7 @@
     "A listed spec that drops to/below 800 B (or is renamed away) FAILS the liveness guard until its entry is deleted, so the baseline stays honest."
   ],
   "ceilings": {
-    "ib dev feedback list": 3296,
+    "ib dev feedback list": 3531,
     "ib sijainti list": 3095,
     "ib dev changelog update": 2766,
     "ib dev feedback resolve": 2504,

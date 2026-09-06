@@ -2418,7 +2418,7 @@ FLAGS
   --has-sentry    Only entries linked to a Sentry issue (deploy-gated)
   --unreleased    List only UNRELEASED/pending entries (versionTag IS NULL) + the max bump level — routes to \`changelog pending\`
   --pending    Alias for --unreleased
-  --limit NUMBER    Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured — you get 500 rows and a stderr warning; \`truncated: true\` in the envelope says the page was capped (fb#605). Page the rest with --offset. (default: 100)
+  --limit NUMBER    Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets \`truncated: true\` — not only an over-ask: hitting the cap at \`--limit 500\`, or the 100 default, is just as incomplete and was silent until fb#1439 (fb#605). Page the rest with --offset. (default: 100)
   --offset NUMBER    Skip N rows — the ONLY way to reach entries beyond the 500-row cap (the backend has always supported it; the flag was missing until fb#605). Combine with --limit to page: \`--limit 500\`, then \`--limit 500 --offset 500\`. (default: 0)
 
 GLOBAL FLAGS
@@ -3230,7 +3230,7 @@ FLAGS
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use \`--complexity none\` to find those.
   --severity STRING    Only items with this exact severity, or \`none\` for the rows with NO grade at all — the severity twin of \`--complexity none\` (deploy-gated). Before this existed severity was ORDERABLE but not selectable, so 'which rows still need a grade?' cost a full unresolved page filtered client-side, against a 200-row cap. Unlike --complexity, an unknown value is REJECTED (exit 4), never answered with the whole table.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
-  --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; \`truncated: true\` says the page was capped (fb#605). Page the rest with --offset. (default: 50)
+  --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets \`truncated: true\` — the 50 default counts, not just an over-ask (fb#605, fb#1439). (default: 50)
   --offset NUMBER    Skip N rows — how you reach anything beyond the 200-row cap. \`--limit 200\`, then \`--limit 200 --offset 200\`, and so on. (default: 0)
   --full    Return untruncated description/resolution (default: each capped at 200 chars)
   --unclaimed    Only items no agent currently holds — the set you should pick from. Includes rows whose claim EXPIRED (the 24h reclamation), not just never-claimed ones. Mutually exclusive with --mine/--claimed-by/--held.
@@ -3239,6 +3239,7 @@ FLAGS
   --held    Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes).
   --gated STRING    Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated owner-action), or \`owner-any\` for the whole human-blocked family (owner + owner-decision + owner-action). Use owner-any whenever you mean 'waiting on a person': bare \`owner\` is the LEGACY value only, so naming it answers 0 on a queue whose rows have been reclassified, which reads as 'nothing is blocked'. Filtered SERVER-SIDE since fb#1198 — it previously filtered client-side over one 200-row page, so \`--gated --all\` answered 1 when the table held 18, and because the page is newest-first the rows it dropped were the OLDEST, i.e. the longest-blocked. Deploy-gated but CHECKED like --severity: an older backend ignores the param and answers unfiltered, which under a gate lens reads as 'every row is blocked', so a mismatch raises a loud stderr warning plus an envelope hint.
   --ungated    Only rows carrying NO gate (gateKind IS NULL) — the complement of bare --gated, and the 'workable right now' half of a fix-session slice (pair it with --unclaimed --max-complexity N). Filtered CLIENT-SIDE — the backend's gated param has no negation value — and therefore routed over the complete per-status walk, so no row is dropped to the 200-row cap: a lone --status walks that status, --all fans out over all four. Mutually exclusive with --gated (exit 4) (fb#1209).
+  --min-age STRING    Exclude rows filed within this duration — <n>m|<n>h|<n>d; a bare number exits 4 rather than being guessed at. Drops rows their filer still owns: a just-filed row carries NO claim yet, so --unclaimed cannot tell it from an abandoned one, and newest-first puts exactly those on top. Client-side over the complete walk like --ungated. A row with no parseable createdAt is KEPT (fb#1421).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -3250,6 +3251,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation (status-selector conflict) → pass only ONE of --all / --unresolved / --status — no flag is already --unresolved
   exit 4 (client-side)  Validation (--gated/--ungated conflict) → pass only one of --gated [kind] or --ungated — complements, cannot both apply
+  exit 4 (client-side)  --min-age has no unit or is unparseable (client-side, before any request) → pass <n>m, <n>h or <n>d, e.g. --min-age 12h — a bare number is refused, not guessed: minutes vs hours is a silent 60x
   exit 4 (client-side)  Validation (claim-filter conflict) → pass only one of --unclaimed / --mine / --claimed-by <label> / --held
   exit 4 (client-side)  Validation (enum value rejected) → --status: open|reviewed|applied|dismissed; --kind: improvement|bug|idea|legal; --scope: cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --severity: critical|major|minor|cosmetic|none; --gated value: deploy|soak|legal|owner|owner-decision|owner-action|backlog|owner-any — STRICT server filters, unknown value -> empty list, not an error
   exit 4 (client-side)  --max-complexity is not an integer >= 1, rejected locally before any request → pass an integer 1-5
@@ -3267,6 +3269,7 @@ NOTES
   - --oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. \`--kind bug --oldest\`) to keep breakages ahead of age.
   - Each row carries claimState (free|held|mine). An expired claim reads as \`free\` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically. A row that would read \`mine\` instead reads \`held\` (+ a stderr warning) when the caller's identity is the derived user@host fallback (no $IB_CLAIM_ID/--by/ctx set) — that label is shared by every such session on the host, so \`mine\` cannot be proven (fb#901).
   - --held (fb#886) is deploy-gated with the same CHECKED contract as --severity, because its silent-ignore also points the wrong way: an older backend ignores the param and answers unfiltered, which reads as 'everything is claimed'. On a mismatch (a returned row with no live lease) the CLI emits a loud stderr warning plus an envelope \`hint\`; filter client-side on claimState there instead.
+  - FRESHNESS NOTE (fb#1421): a stderr note names ACTIVE rows filed in the last 12h; nothing is hidden, and it is suppressed under --min-age. \`--unclaimed --ungated --max-complexity 2 --min-age 12h\` = the fully-workable batch-fix slice.
   - --ungated (fb#1209) has NO server-side param — the backend's gated filter has no negation value — so it runs CLIENT-SIDE over the complete per-status walk (a lone --status walks that status, --all fans out over all four). That routing is what keeps it exact against the 200-row cap; filtering one capped page is the fb#536/fb#1198 under-report class.
   - PARTLY-SHIPPED ROWS (fb#647): a row can carry \`changelogLinks\` and still be open — that is a fix recorded with \`ib dev changelog add --feedback <id> --no-resolve\`, which links the shipped half WITHOUT closing the row. Any linked row that is still OPEN or REVIEWED is also named in a one-line stderr note (a closed row always has a \`resolves\` link, so those are not worth saying). Read the entry (\`ib dev changelog get <id>\`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.
 
@@ -3285,6 +3288,7 @@ EXAMPLES
   ib dev feedback list --gated owner-action --all
   ib dev feedback list --gated owner-any --unresolved
   ib dev feedback list --ungated --unclaimed --max-complexity 2
+  ib dev feedback list --unclaimed --ungated --max-complexity 2 --min-age 12h
   ib dev feedback list --severity critical --unresolved
   ib dev feedback list --held
 "
@@ -3835,7 +3839,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3843,6 +3847,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib dev schema procs\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema proc asiakas_find
@@ -3887,7 +3894,7 @@ exports[`Help snapshots — contract stability > help for ib dev schema query ma
   ib dev schema query [<sql>] [flags]
 
 DESCRIPTION
-  Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, existence probes) that \`schema tables/table\` cannot answer. Read-over-POST: works under --read-only. Developer-only.
+  Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that \`schema tables/table\` cannot answer. NOT authoritative for whether an OBJECT exists — its login sees only a fraction of the ROWS in the routine-bearing catalog views (see NOTES). Read-over-POST: works under --read-only. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
@@ -3895,13 +3902,15 @@ ARGUMENTS
 
 FLAGS
   --sql STRING    The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)
+  --param STRING    Bind one @parameter as name=value, REPEATABLE — run an application query with its @params intact instead of hand-editing them into literals. \`8\`/\`true\`/\`false\`/\`null\` are typed as number/bool/NULL; anything else is a string. The @ sigil is optional (\`--param @ownerAsiakasId=8\` works).
+  --params JSON    Bind every parameter from ONE JSON object — \`{"ownerAsiakasId":null,"documentTypeId":3}\`. Exact types, so use this when a literal's spelling and its intended type disagree (a string "8"). Mutually exclusive with --param (exit 4).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000 }. \`truncated: true\` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows.
+  { columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. \`truncated: true\` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. \`hint\` appears only when the SQL reads a metadata-filtered catalog view (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3909,16 +3918,21 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  SQL error: permission denied → the \`ib_readonly\` principal lacks a permission the query needs — DMVs like sys.dm_db_index_usage_stats need VIEW DATABASE PERFORMANCE STATE. Ask an operator to GRANT it (or rewrite to avoid the DMV); this is NOT a guard rejection, so rephrasing the query will not help
   exit 4 (HTTP 400)  SQL error: aggregate over an aggregate/subquery → SQL Server rejects aggregating an expression that itself contains an aggregate or subquery (e.g. SUM(CASE WHEN EXISTS(...) THEN 1 ELSE 0 END)) — compute the per-row flag in a derived table and aggregate outside it: SELECT SUM(flag) FROM (SELECT CASE WHEN EXISTS(...) THEN 1 ELSE 0 END AS flag FROM t) x. Object/column names are not the problem here
+  exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
+  exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
   exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
   exit 6 (HTTP 503)  Read-only login not provisioned on this backend → the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool
 
 NOTES
   - Runs under the db_datareader-only \`ib_readonly\` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.
   - dbo scope like the rest of \`ib dev schema\`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).
+  - NOT a source of truth for whether an OBJECT exists. Catalog views are filtered by metadata permission, and db_datareader's SELECT does not count for procedure metadata — so sys.procedures returns only the few procs granted individually and sys.objects lists tables normally while showing just those same few, silently and with no error. Use \`ib dev schema procs|proc|table|view\` to settle existence; a \`hint\` on the result flags an affected query (fb#1326).
 
 EXAMPLES
   ib dev schema query "SELECT COUNT(*) AS n FROM person"
   ib dev schema query --sql "SELECT personContactTypeId, COUNT(*) AS n FROM personContact GROUP BY personContactTypeId"
+  ib dev schema query "SELECT TOP 5 keikkaId FROM keikka WHERE (@ownerAsiakasId IS NULL OR ownerAsiakasId = @ownerAsiakasId)" --param ownerAsiakasId=null
+  ib dev schema query "SELECT COUNT(*) AS n FROM documents WHERE ownerAsiakasId = @o AND documentTypeId = @t" --params '{"o":8,"t":3}'
 "
 `;
 
@@ -4088,7 +4102,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4096,6 +4110,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  Trigger not found      → check the name via \`ib dev schema triggers\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema trigger keikka_after_ins_trig
@@ -4160,7 +4177,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false) A renamed object also carries \`renamedFrom\` + \`hint\` (see NOTES).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -4168,6 +4185,9 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   exit 5 (HTTP 404)  View not found         → check the name via \`ib dev schema views\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+
+NOTES
+  - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`hint\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
 
 EXAMPLES
   ib dev schema view keikkaBetoniView
@@ -4640,7 +4660,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).
+  { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId,canRespond,reason}]} }. canRespond answers the question adminCount never could (fb#1265): can the person the mail ACTUALLY reaches open the request and bid? reason is null when they can, "no-person-behind-address" for the offerNotificationEmail/billingEmail branches (a bare address — nobody can sign in as an inbox, the strongest possible no), or "missing-jerry-role" for a configured contact holding none of {1,2,5,6,11,22}. Note adminCount is IRRELEVANT to delivery: admins are step 3 of the recipient chain, reached only when steps 0-2 are empty. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
@@ -4762,14 +4782,14 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  --with-notification    Add the RESOLVED tarjouspyyntö recipient to every row (notificationSource / notificationEmail / notificationRecipientCount) — the whole fleet's real notification addresses in ONE call. Opt-in: costs the backend 1-4 extra queries per company.
+  --with-notification    Add the RESOLVED tarjouspyyntö recipient to every row (notificationSource / notificationEmail / notificationRecipientCount / notificationRecipientsCanRespond) — the whole fleet's real notification addresses in ONE call. Opt-in: costs the backend 1-4 extra queries per company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime?, notificationSource?, notificationEmail?, notificationRecipientCount? }>. The three notification* fields appear only with --with-notification. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).
+  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime?, notificationSource?, notificationEmail?, notificationRecipientCount?, notificationRecipientsCanRespond? }>. The four notification* fields appear only with --with-notification. notificationRecipientsCanRespond is how many of those recipients hold a role that actually reaches the Jerry UI: 0 alongside a notificationRecipientCount > 0 is the silent revenue leak (fb#1265) — mail lands reliably, nobody behind it can bid, and the company reads as merely uninterested on every other column. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -5198,7 +5218,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, customerPersonId, customerEmail, customerPhone, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, viewSource, viewedByPersonId, viewedByName, declinedAt, declineReason, declinedByPersonId, declinedByName, hasOffer }] }. viewSource: null = never opened · "authenticated" = a signed-in person opened it (viewedByPersonId/viewedByName name them) · "link" = opened through the tokenized preview link, nobody authenticated. customerPersonId/customerEmail/customerPhone are the placing operator's contact info, unmasked (isSystemAdmin-only route, fb#982) — use to confirm which address the customer-side notification email went to.
+  { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, customerPersonId, customerEmail, customerPhone, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, viewSource, viewedByPersonId, viewedByName, declinedAt, declineReason, declinedByPersonId, declinedByName, declineSource, hasOffer }] }. viewSource: null = never opened · "authenticated" = a signed-in person opened it (viewedByPersonId/viewedByName name them) · "link" = opened through the tokenized preview link, nobody authenticated. declineSource is its twin over declinedAt/declinedByPersonId, and answers the fb#1268 success question directly: a "link" decline came in over the emailed token with no login, which before fb#1268 was impossible (declining was login-gated, and there had never been a single decline). customerPersonId/customerEmail/customerPhone are the placing operator's contact info, unmasked (isSystemAdmin-only route, fb#982) — use to confirm which address the customer-side notification email went to.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid id             → pass a numeric requestId

@@ -114,6 +114,23 @@ function looksLikeFlag(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("-") && value !== "-";
 }
 
+/**
+ * Yield every long `--flag` in `argv` with the value it carries, handling both
+ * spellings (`--body '<v>'` and `--body=<v>`). Only `--` tokens are matched, so
+ * the positional rows `spec.flags` also carries as a documentation convenience
+ * can never be mistaken for one. `value` is undefined when the flag ends argv.
+ */
+function* longFlags(argv: string[]): Generator<{ name: string; value: string | undefined }> {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (!token.startsWith("--")) continue;
+    const eq = token.indexOf("=");
+    yield eq === -1
+      ? { name: token.slice(2), value: argv[i + 1] }
+      : { name: token.slice(2, eq), value: token.slice(eq + 1) };
+  }
+}
+
 interface ParseResult {
   /** Full path of the command whose action fired, e.g. "ib keikka list". */
   invoked: string | null;
@@ -190,6 +207,115 @@ describe("every CommandSpec example is invocable as written", () => {
   test("the suite actually checked the whole example corpus", () => {
     // Guards against a vacuous pass if examples stop being enumerated.
     expect(totalExamples).toBeGreaterThan(600);
+  });
+
+  /**
+   * fb#1325 — the checks above exercise COMMANDER only, and Commander treats
+   * `--body '<json>'` as an opaque string it never looks inside. So an example
+   * could carry syntactically invalid JSON and pass lint, type-check, this
+   * suite and the help snapshot. Two real instances shipped: `ib keikka
+   * create`'s payload named fields the route never reads (fb#1311), and two
+   * `ib keikka intake commit` examples used a literal `{"order":{...}}`
+   * ellipsis, which throws on JSON.parse. For a command whose body is
+   * forwarded verbatim to a route, the example is the ONLY guidance an
+   * autonomous AI caller gets — an unparseable one is a trap, not weak docs.
+   *
+   * Keyed on the flag's DECLARED type, never its name: `--body` is overloaded
+   * (13 JSON payloads vs 15 prose strings like `ib message chat send --body
+   * 'Kiitos tarjouksesta'`), and `--from-json` always takes a FILE PATH and is
+   * declared `type: "string"`, so type-driven matching excludes it for free.
+   */
+  test("every JSON-typed flag value in an example is parseable, non-empty JSON", () => {
+    const offenders: string[] = [];
+    let checked = 0;
+
+    for (const spec of COMMAND_SPECS) {
+      // Only long `--flag` tokens are matched, so the positional rows that
+      // spec.flags also carries as a documentation convenience never apply.
+      const jsonFlags = new Set(
+        spec.flags.filter((f) => f.type === "json").map((f) => f.name)
+      );
+      if (jsonFlags.size === 0) continue;
+
+      for (const example of spec.examples) {
+        const argv = ibArgv(example);
+        if (!argv) continue;
+
+        for (const { name, value } of longFlags(argv)) {
+          if (!jsonFlags.has(name)) continue;
+          // An absent or flag-shaped value is the swallowed-value check's
+          // failure mode above, which reports it better — don't double-report.
+          if (value === undefined || looksLikeFlag(value)) continue;
+          checked++;
+
+          let payload: unknown;
+          try {
+            payload = JSON.parse(value);
+          } catch (err) {
+            // The raw example is printed alongside the extracted value because
+            // tokenize() does not handle backslash escapes: a PowerShell-quoted
+            // example would be mangled here and read as "invalid JSON" when the
+            // real fault is the tokenizer.
+            offenders.push(
+              `${spec.command} --${name}: ${(err as Error).message}\n    example:      ${example}\n    as tokenized: ${value}`
+            );
+            continue;
+          }
+
+          if (payload === null || typeof payload !== "object" || Object.keys(payload).length === 0) {
+            offenders.push(
+              `${spec.command} --${name}: parses but carries no fields (${value})\n    example:      ${example}`
+            );
+          }
+        }
+      }
+    }
+
+    // Without a floor this gate empties itself silently: CommandFlag.type is a
+    // bare string, not a union, and nothing else pins the "json" vocabulary.
+    expect(
+      checked,
+      'no JSON-typed flag value was checked at all — has the "json" type label been renamed or moved to a shared flag row?'
+    ).toBeGreaterThanOrEqual(13);
+
+    expect(
+      offenders,
+      "these example payloads are not runnable JSON — an AI caller copying them gets a parse error instead of a result"
+    ).toEqual([]);
+  });
+
+  /**
+   * Guards the guard: the check above is only as good as the `type: "json"`
+   * label. A `--body` row typed "string" by accident drops out of it with
+   * nothing failing, so assert the converse — a JSON-shaped example value
+   * means its flag must be declared json.
+   */
+  test("an example value that looks like JSON is declared `type: \"json\"`", () => {
+    const offenders: string[] = [];
+
+    for (const spec of COMMAND_SPECS) {
+      const byName = new Map(spec.flags.map((f) => [f.name, f]));
+
+      for (const example of spec.examples) {
+        const argv = ibArgv(example);
+        if (!argv) continue;
+
+        for (const { name, value } of longFlags(argv)) {
+          const flag = byName.get(name);
+          if (!flag || flag.type === "json") continue;
+          if (typeof value !== "string" || !/^[[{]/.test(value.trim())) continue;
+
+          offenders.push(
+            `${spec.command} --${name} is declared type "${flag.type}" but its example passes a JSON payload:\n    ${example}`
+          );
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      'these flags carry a JSON example value but are not declared `type: "json"`, so the payload gate above skips them'
+    ).toEqual([]);
   });
 });
 

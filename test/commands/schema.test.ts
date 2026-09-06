@@ -15,6 +15,9 @@ import {
   runSchemaQuery,
   runSchemaIndexes,
   resolveSqlInput,
+  declaredObjectName,
+  parseParamLiteral,
+  resolveQueryParams,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -271,6 +274,53 @@ describe("ib schema", () => {
       expect(msg).toContain("ib dev schema query");
       expect(msg).toContain("GROUP BY");
     });
+
+    /**
+     * fb#1326 — this command runs on the db_datareader-only `ib_readonly`
+     * login, so the routine-bearing catalogs come back near-empty with NO
+     * error: sys.procedures returns 6 rows against 512 dbo procs. A caller
+     * reading that as "the proc does not exist" is the failure this prevents.
+     */
+    describe("metadata-filtered catalog hint (fb#1326)", () => {
+      test("a sys.procedures read is flagged, naming the login and the command that can settle existence", async () => {
+        post().mockResolvedValueOnce({ ...complete, rows: [{ n: 6 }] });
+        const result = await runSchemaQuery(mockClient, "SELECT COUNT(*) AS n FROM sys.procedures");
+        expect(result.hint).toContain("ib_readonly");
+        expect(result.hint).toContain("ib dev schema procs|proc|table|view");
+      });
+
+      test.each([
+        // The original fb#1326 trap: listed tables, keys and triggers, no procs.
+        ["sys.objects", "SELECT name FROM sys.objects WHERE name LIKE '%eikkaPerson%'"],
+        // Lower-cased on purpose — the matcher is case-insensitive.
+        ["INFORMATION_SCHEMA.ROUTINES", "select * from information_schema.routines"],
+        ["sys.parameters", "SELECT * FROM sys.parameters WHERE object_id = 1"],
+        ["sys.sql_modules", "SELECT definition FROM sys.sql_modules"],
+      ])("%s is flagged", async (_label, sql) => {
+        post().mockResolvedValueOnce(complete);
+        const result = await runSchemaQuery(mockClient, sql);
+        expect(result.hint).toBeDefined();
+      });
+
+      /**
+       * The cry-wolf guard. These catalogs were MEASURED complete under this
+       * login (db_datareader implies metadata visibility on the tables it can
+       * read), so warning on them would be substantively false — and a warning
+       * that is false on correct queries is one callers learn to ignore.
+       */
+      test.each([
+        ["sys.tables", "SELECT COUNT(*) AS n FROM sys.tables"],
+        ["sys.columns", "SELECT name FROM sys.columns WHERE object_id = 1"],
+        ["INFORMATION_SCHEMA.TABLES", "SELECT * FROM INFORMATION_SCHEMA.TABLES"],
+        ["a plain user table", "SELECT COUNT(*) AS n FROM keikka"],
+      ])("%s is NOT flagged", async (_label, sql) => {
+        post().mockResolvedValueOnce(complete);
+        const result = await runSchemaQuery(mockClient, sql);
+        // Absent, not undefined: stdout key order is part of the contract.
+        expect("hint" in result).toBe(false);
+        expect(result).toEqual(complete);
+      });
+    });
   });
 
   describe("resolveSqlInput (fb#968)", () => {
@@ -296,6 +346,205 @@ describe("ib schema", () => {
 
     test("treats whitespace-only as absent", () => {
       expect(() => resolveSqlInput("   ", undefined)).toThrow(/required/);
+    });
+  });
+
+  /**
+   * fb#1177 — without binding, an application query pasted verbatim failed with
+   * "Must declare the scalar variable" and every @param had to be hand-edited
+   * into a literal: the exact edit that can change the predicate being verified.
+   */
+  describe("query parameters (fb#1177)", () => {
+    const post = () => mockClient.post;
+    const complete = { columns: ["n"], rows: [{ n: 1 }], rowCount: 1, truncated: false, cap: 1000 };
+    beforeEach(() => post().mockReset());
+
+    describe("parseParamLiteral", () => {
+      test.each([
+        ["an integer", "8", 8],
+        ["zero", "0", 0],
+        ["a negative", "-3", -3],
+        ["a decimal", "60.25", 60.25],
+        ["true", "true", true],
+        ["false", "false", false],
+        // THE case the typing exists for: bound as the string "null" it would
+        // answer `@x IS NULL OR col = @x` with the wrong branch.
+        ["null", "null", null],
+        ["a plain word", "Kalle", "Kalle"],
+        ["a date (NOT a number)", "2026-09-06", "2026-09-06"],
+        ["an empty value", "", ""],
+        ["a leading-zero code (stays a string)", "007", "007"],
+        ["a number with spaces around it", " 8 ", " 8 "],
+      ])("%s", (_label, raw, expected) => {
+        expect(parseParamLiteral(raw)).toEqual(expected);
+      });
+    });
+
+    test("absent on both spellings → undefined, so the body is unchanged", () => {
+      expect(resolveQueryParams(undefined, undefined)).toBeUndefined();
+      expect(resolveQueryParams([], undefined)).toBeUndefined();
+    });
+
+    test("repeated --param builds the map", () => {
+      expect(resolveQueryParams(["ownerAsiakasId=null", "documentTypeId=3"], undefined)).toEqual({
+        ownerAsiakasId: null,
+        documentTypeId: 3,
+      });
+    });
+
+    test("the @ sigil is kept verbatim — the backend strips it", () => {
+      expect(resolveQueryParams(["@ownerAsiakasId=8"], undefined)).toEqual({ "@ownerAsiakasId": 8 });
+    });
+
+    test("only the FIRST = splits, so a value may contain one", () => {
+      expect(resolveQueryParams(["expr=a=b"], undefined)).toEqual({ expr: "a=b" });
+    });
+
+    test("--params takes a JSON object with exact types", () => {
+      expect(resolveQueryParams(undefined, '{"o":8,"name":"8","flag":false,"n":null}')).toEqual({
+        o: 8,
+        name: "8",
+        flag: false,
+        n: null,
+      });
+    });
+
+    test.each([
+      ["a malformed pair (no =)", ["ownerAsiakasId"], /name=value/],
+      ["an empty name", ["=8"], /name=value/],
+      ["invalid JSON", undefined, /valid JSON/],
+    ])("%s exits 4", (_label, pairs, pattern) => {
+      const json = pairs ? undefined : "{not json";
+      expect(() => resolveQueryParams(pairs as string[] | undefined, json)).toThrow(pattern);
+    });
+
+    test.each([
+      ["a JSON array", "[1,2]"],
+      ["a JSON scalar", "8"],
+      ["JSON null", "null"],
+    ])("--params with %s exits 4", (_label, json) => {
+      expect(() => resolveQueryParams(undefined, json)).toThrow(/JSON OBJECT/);
+    });
+
+    test("both spellings at once exits 4 rather than picking a silent winner", () => {
+      expect(() => resolveQueryParams(["a=1"], '{"a":2}')).toThrow(/not both/);
+    });
+
+    test("runSchemaQuery sends params in the body when bound", async () => {
+      post().mockResolvedValueOnce({ ...complete });
+      await runSchemaQuery(mockClient, "SELECT 1 WHERE @o IS NULL", { o: null });
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/api/cli/schema/query",
+        { sql: "SELECT 1 WHERE @o IS NULL", params: { o: null } },
+        { read: true }
+      );
+    });
+
+    test("and omits the key entirely when nothing is bound", async () => {
+      post().mockResolvedValueOnce({ ...complete });
+      await runSchemaQuery(mockClient, "SELECT 1");
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/api/cli/schema/query",
+        { sql: "SELECT 1" },
+        { read: true }
+      );
+    });
+  });
+
+  /**
+   * fb#1140 — OBJECT_DEFINITION keeps the pre-rename CREATE text, so a renamed
+   * object answers with a body naming something else entirely. The measured
+   * case is real: `keikka_saveContactPerson` returns
+   * `CREATE PROCEDURE [dbo].[updateKeikkaPerson]`.
+   */
+  describe("sp_rename mismatch note (fb#1140)", () => {
+    describe("declaredObjectName", () => {
+      test.each([
+        ["bracketed schema-qualified proc", "CREATE PROCEDURE [dbo].[updateKeikkaPerson]\n AS BEGIN", "updateKeikkaPerson"],
+        ["bare PROC abbreviation", "CREATE PROC dbo.foo AS", "foo"],
+        ["unqualified name", "CREATE PROCEDURE foo AS", "foo"],
+        ["CREATE OR ALTER view", "CREATE OR ALTER VIEW [dbo].[v_keikka] AS SELECT 1", "v_keikka"],
+        ["function", "CREATE FUNCTION dbo.fn_calc(@a int) RETURNS int", "fn_calc"],
+        ["trigger", "CREATE TRIGGER [dbo].[keikka_ins] ON dbo.keikka", "keikka_ins"],
+        ["leading blank lines (the measured shape)", "\n\n\nCREATE PROCEDURE [dbo].[updateKeikkaPerson]", "updateKeikkaPerson"],
+        ["leading line comment", "-- legacy\nCREATE PROCEDURE dbo.real_name AS", "real_name"],
+        ["leading block comment", "/* banner\n   text */\nCREATE PROCEDURE dbo.real_name AS", "real_name"],
+        ["lowercase keywords", "create procedure dbo.real_name as", "real_name"],
+      ])("%s", (_label, definition, expected) => {
+        expect(declaredObjectName(definition)).toBe(expected);
+      });
+
+      /**
+       * The anti-cry-wolf case: a comment that TALKS about another CREATE must
+       * not be read as the declaration. A false rename note is worse than none
+       * — it invents a rename that never happened.
+       */
+      test("a CREATE named inside a leading comment does not win over the real one", () => {
+        expect(
+          declaredObjectName("-- replaces CREATE PROCEDURE dbo.old_thing\nCREATE PROCEDURE dbo.new_thing AS")
+        ).toBe("new_thing");
+      });
+
+      test.each([
+        ["a non-string", 42],
+        ["an unterminated block comment", "/* never closed\nCREATE PROCEDURE dbo.x AS"],
+        ["a body that does not start with CREATE", "SET ANSI_NULLS ON\nCREATE PROCEDURE dbo.x AS"],
+        ["an empty string", ""],
+      ])("%s parses to null", (_label, definition) => {
+        expect(declaredObjectName(definition)).toBeNull();
+      });
+    });
+
+    test.each([
+      ["proc", runSchemaProc],
+      ["view", runSchemaView],
+      ["trigger", runSchemaTrigger],
+    ])("%s: a renamed object explains itself", async (_label, run) => {
+      get().mockResolvedValueOnce({
+        name: "keikka_saveContactPerson",
+        definition: "\n\nCREATE PROCEDURE [dbo].[updateKeikkaPerson]\n AS BEGIN UPDATE dbo.keikka",
+      });
+      const result = (await run(mockClient, "keikka_saveContactPerson")) as {
+        renamedFrom: string;
+        hint: string;
+      };
+      expect(result.renamedFrom).toBe("updateKeikkaPerson");
+      expect(result.hint).toContain("sp_renamed");
+      expect(result.hint).toContain("keikka_saveContactPerson");
+    });
+
+    test("a matching name is left untouched, key ABSENT not null", async () => {
+      const payload = { name: "asiakas_find", definition: "CREATE PROCEDURE [dbo].[asiakas_find] AS" };
+      get().mockResolvedValueOnce({ ...payload });
+      const result = await runSchemaProc(mockClient, "asiakas_find");
+      expect("renamedFrom" in result).toBe(false);
+      expect("hint" in result).toBe(false);
+      expect(result).toEqual(payload);
+    });
+
+    test("names differing only in case are the SAME object (SQL Server collation)", async () => {
+      get().mockResolvedValueOnce({
+        name: "Asiakas_Find",
+        definition: "CREATE PROCEDURE [dbo].[asiakas_find] AS",
+      });
+      const result = await runSchemaProc(mockClient, "Asiakas_Find");
+      expect("renamedFrom" in result).toBe(false);
+    });
+
+    test("a payload with no parseable definition is passed through", async () => {
+      get().mockResolvedValueOnce({ name: "keikka", columns: [] });
+      const result = await runSchemaView(mockClient, "keikka");
+      expect("renamedFrom" in result).toBe(false);
+    });
+
+    test("the batch path annotates each renamed member (fb#109 fan-out)", async () => {
+      get()
+        .mockResolvedValueOnce({ name: "a_proc", definition: "CREATE PROCEDURE [dbo].[old_a] AS" })
+        .mockResolvedValueOnce({ name: "b_proc", definition: "CREATE PROCEDURE [dbo].[b_proc] AS" });
+      const res = await runSchemaBatch(mockClient, runSchemaProc, ["a_proc", "b_proc"]);
+      const byName = Object.fromEntries(res.items.map((i) => [i.name, i.object as Record<string, unknown>]));
+      expect(byName.a_proc.renamedFrom).toBe("old_a");
+      expect("renamedFrom" in byName.b_proc).toBe(false);
     });
   });
 });
