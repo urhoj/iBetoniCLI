@@ -191,12 +191,18 @@ describe("warnIfCapReached (fb#1439)", () => {
     // TEXT-truncation hint in env.hint while env.truncated means ROWS, so a
     // caller who checks `truncated` and reads `hint` is told about elided prose.
     const warn = vi.fn();
+    // Hoisted out of the call ON PURPOSE: warnIfCapReached's parameter deliberately
+    // narrows to "truncated" | "count" to state in the type that it does NOT consume
+    // `hint` (see its docblock). Passing the literal inline trips excess-property
+    // checking (TS2353); binding it first drops literal freshness, so the test can
+    // still hand it a real envelope carrying a hint — which is the whole point here.
+    const envWithTextElisionHint = {
+      count: 200,
+      truncated: true,
+      hint: "description/resolution/errorText over 200 chars show head+tail (middle elided)",
+    };
     warnIfCapReached(
-      {
-        count: 200,
-        truncated: true,
-        hint: "description/resolution/errorText over 200 chars show head+tail (middle elided)",
-      },
+      envWithTextElisionHint,
       { effective: 200, cap: FEEDBACK_LIST_CAP, command: "ib dev feedback list" },
       warn
     );
