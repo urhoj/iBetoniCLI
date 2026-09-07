@@ -22,6 +22,15 @@ export interface PrhCompany {
   companyForm: { type?: string; name?: string } | null;
   status: string | null;
   companySituations: Array<{ type?: string; [k: string]: unknown }>;
+  /**
+   * Which registry answered. "vies" means PRH had nothing and the backend fell
+   * back to the EU VAT register — the only way a SOLE TRADER (toiminimi)
+   * resolves, since PRH open data excludes them as personal data. Such a record
+   * carries no companyForm/status and an EMPTY companySituations, so a
+   * bankruptcy check reads "clear" for the wrong reason; and its `name` is the
+   * owner's personal name ("Owner Name / TRADENAME").
+   */
+  source?: "prh" | "vies";
 }
 
 /**

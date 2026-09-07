@@ -1213,6 +1213,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - --from-prh resolves a SOLE TRADER (toiminimi) too, but via the EU VAT register, because PRH open data excludes them as personal data. The name it prefills is then the owner's PERSONAL name in the form 'Owner Name / TRADENAME' — that is the legal invoicing name of a toiminimi, so it is usually what you want on the invoice, but check it before saving. \`ib opendata prh <ytunnus>\` shows which registry answered (source:'prh'|'vies').
+
 EXAMPLES
   ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
   ib customer create --name 'Example Oy' --ytunnus 1234567-8
@@ -9542,14 +9545,19 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>
+  by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status, source:'prh'|'vies' } | search: ListEnvelope<{ businessId, name, city }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --page is not an integer >= 1, rejected locally before any request → pass a positive integer page number
-  exit 5 (HTTP 404)  Business ID not found  → verify the Y-tunnus
+  exit 5 (HTTP 404)  Business ID not found — or a sole trader whose VAT registration VIES could not confirm either → verify the Y-tunnus; a toiminimi under the VAT threshold is in NO free registry
   exit 4 (HTTP 400)  Invalid Y-tunnus format → use XXXXXXXX-X
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - source:'vies' → PRH had no row and the answer came from the EU VAT register instead. PRH open data EXCLUDES sole traders (yksityiset elinkeinonharjoittajat) as personal data, so that is the only way a toiminimi resolves — a totalResults:0 from PRH is not a wrong Y-tunnus.
+  - A source:'vies' record is thinner: companyForm/status are null and companySituations is EMPTY, so a bankruptcy/KONK check on it reads 'clear' because there is no data, not because the business is healthy. Its \`name\` is the owner's PERSONAL name in the form 'Owner Name / TRADENAME' (the legal invoicing name of a toiminimi); the trade name alone is in tradeNames[0].
+  - --search has NO VIES fallback (VIES answers exact VAT numbers only), so name search cannot find sole traders at all. Look them up by Y-tunnus.
 
 SEE ALSO
   ib customer create, ib opendata building

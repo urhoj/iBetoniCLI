@@ -132,6 +132,9 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       apiErr(400, "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
+    notes: [
+      "--from-prh resolves a SOLE TRADER (toiminimi) too, but via the EU VAT register, because PRH open data excludes them as personal data. The name it prefills is then the owner's PERSONAL name in the form 'Owner Name / TRADENAME' — that is the legal invoicing name of a toiminimi, so it is usually what you want on the invoice, but check it before saving. `ib opendata prh <ytunnus>` shows which registry answered (source:'prh'|'vies').",
+    ],
     examples: [
       "ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard",
       "ib customer create --name 'Example Oy' --ytunnus 1234567-8",
