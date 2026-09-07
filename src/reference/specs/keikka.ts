@@ -308,6 +308,34 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka drivers assign 9001 --dry-run",
     ],
   },
+  {
+    command: "ib keikka copy",
+    description:
+      "Duplicate a keikka — customer, worksite, vehicle, concrete lines — into a new row in the source's tenant (POST /api/keikka/copy). --date moves it to a new day, keeping the source's time-of-day; auto-assigns the day-driver and schedules the weather timer.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    args: [{ name: "keikkaId", type: "number", description: "Source keikkaId to copy" }],
+    flags: [
+      { name: "date", type: "date", description: "Copy onto this date instead of the source's (YYYY-MM-DD or today/yesterday/tomorrow) — time-of-day is kept" },
+    ],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape:
+      "real: raw mssql result — new keikkaId in `returnValue` (like `keikka create`) | --dry-run: { dryRun: true, wouldCopy: { keikkaId, creatorPersonId, newDate? } }",
+    errors: [
+      { origin: "client", exit: 4, meaning: "No personId claim on the token", remedy: "log in again (`ib auth login`)" },
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    notes: [
+      "`--dry-run` is CLIENT-SIDE: this route ignores `X-Dry-Run`, so a real request always persists.",
+      "creatorPersonId is the caller's own personId (no override flag); the copy starts driverless, then gets the target day's day-driver auto-assigned.",
+    ],
+    seeAlso: ["ib keikka get", "ib keikka create"],
+    examples: [
+      "ib keikka copy 9001",
+      "ib keikka copy 9001 --date tomorrow --reason \"repeat order\"",
+    ],
+  },
 
   {
     command: "ib keikka search",

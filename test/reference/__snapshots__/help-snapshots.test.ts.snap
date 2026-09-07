@@ -6305,6 +6305,53 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka copy matches snapshot 1`] = `
+"USAGE
+  ib keikka copy <keikkaId> [flags]
+
+DESCRIPTION
+  Duplicate a keikka — customer, worksite, vehicle, concrete lines — into a new row in the source's tenant (POST /api/keikka/copy). --date moves it to a new day, keeping the source's time-of-day; auto-assigns the day-driver and schedules the weather timer.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <keikkaId> NUMBER    Source keikkaId to copy (required)
+
+FLAGS
+  --date DATE    Copy onto this date instead of the source's (YYYY-MM-DD or today/yesterday/tomorrow) — time-of-day is kept
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  real: raw mssql result — new keikkaId in \`returnValue\` (like \`keikka create\`) | --dry-run: { dryRun: true, wouldCopy: { keikkaId, creatorPersonId, newDate? } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId claim on the token → log in again (\`ib auth login\`)
+  exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--dry-run\` is CLIENT-SIDE: this route ignores \`X-Dry-Run\`, so a real request always persists.
+  - creatorPersonId is the caller's own personId (no override flag); the copy starts driverless, then gets the target day's day-driver auto-assigned.
+
+SEE ALSO
+  ib keikka get, ib keikka create
+
+EXAMPLES
+  ib keikka copy 9001
+  ib keikka copy 9001 --date tomorrow --reason "repeat order"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka create matches snapshot 1`] = `
 "USAGE
   ib keikka create --body <body> [flags]

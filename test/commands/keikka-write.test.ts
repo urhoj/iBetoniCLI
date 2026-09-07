@@ -4,6 +4,7 @@ import {
   runKeikkaCreate,
   runKeikkaUpdate,
   runKeikkaDriversAssign,
+  runKeikkaCopy,
 } from "../../src/commands/keikka/index.js";
 
 const mockClient = mockApiClient();
@@ -73,5 +74,67 @@ describe("ib keikka create/update/drivers", () => {
       {},
       { headers: { "Idempotency-Key": "assign-9001" } }
     );
+  });
+});
+
+describe("runKeikkaCopy", () => {
+  const c = mockApiClient();
+  const JWT =
+    "e30." +
+    Buffer.from(JSON.stringify({ personId: 42 })).toString("base64url") +
+    ".sig";
+  beforeEach(() => {
+    c.post.mockReset();
+    c.getCurrentToken.mockReturnValue(JWT);
+  });
+
+  test("--dry-run resolves client-side: no POST, echoes wouldCopy with the token's personId", async () => {
+    const result = await runKeikkaCopy(
+      c,
+      9001,
+      { date: "2026-09-10" },
+      { dryRun: true }
+    );
+    expect(c.post).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      dryRun: true,
+      wouldCopy: { keikkaId: 9001, creatorPersonId: 42, newDate: "2026-09-10" },
+    });
+  });
+
+  test("real call posts keikkaId + creatorPersonId + newDate and the write-flag headers", async () => {
+    c.post.mockResolvedValueOnce({ returnValue: 9555 });
+    const result = await runKeikkaCopy(
+      c,
+      9001,
+      { date: "2026-09-10" },
+      { reason: "repeat order" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/keikka/copy",
+      { keikkaId: 9001, creatorPersonId: 42, newDate: "2026-09-10" },
+      { headers: { "X-Action-Reason": "repeat order" } }
+    );
+    expect(result).toEqual({ returnValue: 9555 });
+  });
+
+  test("omits newDate entirely when no --date is given", async () => {
+    c.post.mockResolvedValueOnce({ returnValue: 9556 });
+    await runKeikkaCopy(c, 9001, {}, {});
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/keikka/copy",
+      { keikkaId: 9001, creatorPersonId: 42 },
+      { headers: {} }
+    );
+  });
+
+  test("no personId claim on the token → exit-4 failure, no POST", async () => {
+    c.getCurrentToken.mockReturnValue(
+      "e30." + Buffer.from(JSON.stringify({})).toString("base64url") + ".sig"
+    );
+    await expect(runKeikkaCopy(c, 9001, {}, {})).rejects.toThrow(
+      /could not resolve personId/
+    );
+    expect(c.post).not.toHaveBeenCalled();
   });
 });

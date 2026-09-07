@@ -3,7 +3,8 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
-import { ownerAsiakasIdFromToken } from "../../owner.js";
+import { ownerAsiakasIdFromToken, personIdFromClaims } from "../../owner.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -231,6 +232,29 @@ export async function runKeikkaDriversAssign(client, keikkaId, flags) {
     return client.post(`/api/keikka/defaultDriver/assign/${keikkaId}`, {}, { headers: writeFlagsToHeaders(flags) });
 }
 /**
+ * POST /api/keikka/copy — duplicates a keikka (customer/worksite/vehicle/concrete
+ * lines) into a new row in the SOURCE keikka's own tenant. `newDate`, if given,
+ * is a plain date: the backend proc keeps the source's original time-of-day and
+ * only swaps the calendar day.
+ *
+ * `--dry-run` resolves CLIENT-SIDE: this route never checks `req.dryRun` (unlike
+ * `POST /newKeikka`), so an `X-Dry-Run` header sent to it would be silently
+ * ignored and the copy would persist anyway. Never send the real request when
+ * `flags.dryRun` is set.
+ */
+export async function runKeikkaCopy(client, keikkaId, opts, flags) {
+    const creatorPersonId = personIdFromClaims(decodeJwtPayload(client.getCurrentToken()), "needed as the copy's creatorPersonId");
+    const body = { keikkaId, creatorPersonId };
+    if (opts.date)
+        body.newDate = opts.date;
+    if (flags.dryRun) {
+        return { dryRun: true, wouldCopy: body };
+    }
+    return client.post("/api/keikka/copy", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
  * GET /api/cli/keikka/validate/:keikkaId (single) or
  * GET /api/cli/keikka/validate?date=YYYY-MM-DD (day).
  */
@@ -362,6 +386,7 @@ export async function runKeikkaPersonList(client, keikkaId, opts = {}) {
  *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
  *   - get      single keikka by id
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
+ *   - copy     POST /api/keikka/copy — duplicate onto an optional --date (client-side dry-run)
  *   - update   POST /api/keikka/setStatus (v1.0: --status only)
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
  *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
@@ -481,6 +506,14 @@ export function registerKeikkaCommands(parent, getClient) {
     const assignCmd = drivers
         .command("assign <keikkaId>");
     addWriteFlagsToCommand(assignCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), opts)));
+    const copyCmd = k
+        .command("copy <keikkaId>")
+        .option("--date <date>", "Copy onto this date instead of the source's (keeps the source's time-of-day)");
+    addWriteFlagsToCommand(copyCmd).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        const result = await runKeikkaCopy(client, parseId(idStr, "keikkaId"), { date: opts.date ? resolveDate(opts.date) : undefined }, opts);
+        writeJson(result);
+    }));
     const keikkaPerson = k
         .command("person")
         .description("Persons attached to a keikka (keikkaPerson links)");
