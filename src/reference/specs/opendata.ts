@@ -303,7 +303,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       { name: "page", type: "number", default: "1", description: "Result page for --search" },
     ],
     outputShape:
-      "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status, source:'prh'|'vies' } | search: ListEnvelope<{ businessId, name, city }>",
+      "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, businessLine, companyForm, registrationDate, lastModified, status, registeredEntries[], companySituations[], source:'prh'|'vies' } | search: ListEnvelope<{ businessId, name, city }>",
     errors: [
       intParseErr("--page", "pass a positive integer page number"),
       apiErr(404, "Business ID not found — or a sole trader whose VAT registration VIES could not confirm either", "verify the Y-tunnus; a toiminimi under the VAT threshold is in NO free registry"),
@@ -311,9 +311,8 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "source:'vies' → PRH had no row and the answer came from the EU VAT register instead. PRH open data EXCLUDES sole traders (yksityiset elinkeinonharjoittajat) as personal data, so that is the only way a toiminimi resolves — a totalResults:0 from PRH is not a wrong Y-tunnus.",
-      "A source:'vies' record is thinner: companyForm/status are null and companySituations is EMPTY, so a bankruptcy/KONK check on it reads 'clear' because there is no data, not because the business is healthy. Its `name` is the owner's PERSONAL name in the form 'Owner Name / TRADENAME' (the legal invoicing name of a toiminimi); the trade name alone is in tradeNames[0].",
-      "--search has NO VIES fallback (VIES answers exact VAT numbers only), so name search cannot find sole traders at all. Look them up by Y-tunnus.",
+      "source:'vies' → PRH had no row and the EU VAT register answered instead; that is the only way a sole trader (toiminimi) resolves, since PRH open data excludes them. Thinner record: companyForm/status null, companySituations EMPTY — a KONK check on it reads clear for lack of data. Full contract: `ib reference detail get \"ib opendata prh\"`.",
+      "--search has NO VIES fallback (exact VAT numbers only), so name search cannot find sole traders. Look them up by Y-tunnus.",
     ],
     seeAlso: ["ib customer create", "ib opendata building"],
     examples: ["ib opendata prh 0145937-9", "ib opendata prh --search Betoni"],

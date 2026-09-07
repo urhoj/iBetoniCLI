@@ -133,7 +133,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.asiakas.edit"),
     ],
     notes: [
-      "--from-prh resolves a SOLE TRADER (toiminimi) too, but via the EU VAT register, because PRH open data excludes them as personal data. The name it prefills is then the owner's PERSONAL name in the form 'Owner Name / TRADENAME' — that is the legal invoicing name of a toiminimi, so it is usually what you want on the invoice, but check it before saving. `ib opendata prh <ytunnus>` shows which registry answered (source:'prh'|'vies').",
+      "--from-prh resolves a SOLE TRADER (toiminimi) too, via the EU VAT register (PRH excludes them). The name it prefills is then the owner's PERSONAL name, 'Owner Name / TRADENAME' — the legal invoicing name of a toiminimi, so usually right, but check before saving. Same for `ib customer update`/`create-or-update`. `ib opendata prh <ytunnus>` shows which registry answered.",
     ],
     examples: [
       "ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard",
@@ -158,7 +158,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
-      { name: "from-prh", type: "string", description: "Refresh name + yTunnus + billing address from PRH (explicit flags still win)" },
+      { name: "from-prh", type: "string", description: "Refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       FROM_JSON_BODY_FLAG,
     ],
@@ -184,7 +184,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "ytunnus", type: "string", description: "Business ID key (yTunnus) — required unless --from-prh/--body supplies it" },
-      { name: "from-prh", type: "string", description: "Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create" },
+      { name: "from-prh", type: "string", description: "Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)" },
       { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
       { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
       { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },

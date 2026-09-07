@@ -1214,7 +1214,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - --from-prh resolves a SOLE TRADER (toiminimi) too, but via the EU VAT register, because PRH open data excludes them as personal data. The name it prefills is then the owner's PERSONAL name in the form 'Owner Name / TRADENAME' — that is the legal invoicing name of a toiminimi, so it is usually what you want on the invoice, but check it before saving. \`ib opendata prh <ytunnus>\` shows which registry answered (source:'prh'|'vies').
+  - --from-prh resolves a SOLE TRADER (toiminimi) too, via the EU VAT register (PRH excludes them). The name it prefills is then the owner's PERSONAL name, 'Owner Name / TRADENAME' — the legal invoicing name of a toiminimi, so usually right, but check before saving. Same for \`ib customer update\`/\`create-or-update\`. \`ib opendata prh <ytunnus>\` shows which registry answered.
 
 EXAMPLES
   ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
@@ -1234,7 +1234,7 @@ DESCRIPTION
 
 FLAGS
   --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
-  --from-prh STRING    Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create
+  --from-prh STRING    Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)
   --name STRING    Customer name (asiakasNimi)
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
@@ -1880,7 +1880,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
-  --from-prh STRING    Refresh name + yTunnus + billing address from PRH (explicit flags still win)
+  --from-prh STRING    Refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
@@ -9545,7 +9545,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status, source:'prh'|'vies' } | search: ListEnvelope<{ businessId, name, city }>
+  by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, businessLine, companyForm, registrationDate, lastModified, status, registeredEntries[], companySituations[], source:'prh'|'vies' } | search: ListEnvelope<{ businessId, name, city }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --page is not an integer >= 1, rejected locally before any request → pass a positive integer page number
@@ -9555,9 +9555,8 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - source:'vies' → PRH had no row and the answer came from the EU VAT register instead. PRH open data EXCLUDES sole traders (yksityiset elinkeinonharjoittajat) as personal data, so that is the only way a toiminimi resolves — a totalResults:0 from PRH is not a wrong Y-tunnus.
-  - A source:'vies' record is thinner: companyForm/status are null and companySituations is EMPTY, so a bankruptcy/KONK check on it reads 'clear' because there is no data, not because the business is healthy. Its \`name\` is the owner's PERSONAL name in the form 'Owner Name / TRADENAME' (the legal invoicing name of a toiminimi); the trade name alone is in tradeNames[0].
-  - --search has NO VIES fallback (VIES answers exact VAT numbers only), so name search cannot find sole traders at all. Look them up by Y-tunnus.
+  - source:'vies' → PRH had no row and the EU VAT register answered instead; that is the only way a sole trader (toiminimi) resolves, since PRH open data excludes them. Thinner record: companyForm/status null, companySituations EMPTY — a KONK check on it reads clear for lack of data. Full contract: \`ib reference detail get "ib opendata prh"\`.
+  - --search has NO VIES fallback (exact VAT numbers only), so name search cannot find sole traders. Look them up by Y-tunnus.
 
 SEE ALSO
   ib customer create, ib opendata building
