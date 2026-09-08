@@ -9438,7 +9438,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }
+  { source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, propertyId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No source, multiple sources, or invalid city/coords → pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti
@@ -9455,6 +9455,7 @@ NOTES
   - national:true → the building came from the national Ryhti dataset (used when the metro WFS providers miss or the point is outside the metro area). Its street/postal address is joined by proximity from the Ryhti open_address dataset (so streetNameFi/streetNumber/postalCode/postalArea are populated), but it has no utility fields, and SYKE warns its data quality varies — treat it as enrichment, not authoritative.
   - outOfArea:true → the point is outside the Helsinki metropolitan area; with the Ryhti fallback a building may still be found (found:true, national:true). found:false with outOfArea:true means even Ryhti had no match.
   - found:false with outOfArea:false → no building within ~50 m of the point.
+  - found:true means a polygon was hit at that point, NOT that it is the building you meant — an address can land on a shed, and a parcel centre point on the neighbour. Cross-check propertyId against the parcel you intended.
   - For building data already stored on a worksite, \`ib worksite get <id> --include-building\` is cheaper.
 
 SEE ALSO

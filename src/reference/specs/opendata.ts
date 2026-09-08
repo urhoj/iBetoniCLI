@@ -23,7 +23,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       { name: "city", type: "string", description: "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)" },
     ],
     outputShape:
-      "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
+      "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, propertyId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
     errors: [
       { origin: "client", exit: 4, match: ["provide exactly one", "must be provided together", "disagree; pass only one"], meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
       intParseErr("--sijainti", "pass a positive sijaintiId"),
@@ -38,6 +38,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       "national:true → the building came from the national Ryhti dataset (used when the metro WFS providers miss or the point is outside the metro area). Its street/postal address is joined by proximity from the Ryhti open_address dataset (so streetNameFi/streetNumber/postalCode/postalArea are populated), but it has no utility fields, and SYKE warns its data quality varies — treat it as enrichment, not authoritative.",
       "outOfArea:true → the point is outside the Helsinki metropolitan area; with the Ryhti fallback a building may still be found (found:true, national:true). found:false with outOfArea:true means even Ryhti had no match.",
       "found:false with outOfArea:false → no building within ~50 m of the point.",
+      "found:true means a polygon was hit at that point, NOT that it is the building you meant — an address can land on a shed, and a parcel centre point on the neighbour. Cross-check propertyId against the parcel you intended.",
       "For building data already stored on a worksite, `ib worksite get <id> --include-building` is cheaper.",
     ],
     seeAlso: ["ib worksite get", "ib opendata weather worksite", "ib sijainti list"],
