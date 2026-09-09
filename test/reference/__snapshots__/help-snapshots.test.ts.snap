@@ -2152,7 +2152,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { totalKeys, pattern, groups: [{ prefix, count }] }; on a ZERO match \`groups\` lists the WHOLE keyspace instead and \`totalKeysScanned\` + \`hint\` are added, so 0 can be told from a clean family
+  { totalKeys, pattern, groups: [{ prefix, count, sample }] }; a ZERO match adds \`totalKeysScanned\` + \`hint\` and replaces \`groups\` with a grouping of the WHOLE keyspace, so 0 can be told from a clean family — except when Redis is unavailable, where \`groups\` is [] and \`totalKeysScanned\` null (the hint says so; 0 means UNKNOWN, not clean)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

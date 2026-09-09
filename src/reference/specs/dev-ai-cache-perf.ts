@@ -114,7 +114,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
         tier: "developer",
         flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *). Prefix with `*` to reach namespaced cache entries" }],
         outputShape:
-          "{ totalKeys, pattern, groups: [{ prefix, count }] }; on a ZERO match `groups` lists the WHOLE keyspace instead and `totalKeysScanned` + `hint` are added, so 0 can be told from a clean family",
+          "{ totalKeys, pattern, groups: [{ prefix, count, sample }] }; a ZERO match adds `totalKeysScanned` + `hint` and replaces `groups` with a grouping of the WHOLE keyspace, so 0 can be told from a clean family — except when Redis is unavailable, where `groups` is [] and `totalKeysScanned` null (the hint says so; 0 means UNKNOWN, not clean)",
         errors: devErrors,
         examples: ["ib dev cache keys", "ib dev cache keys --pattern '*keikka:*'"],
       },
