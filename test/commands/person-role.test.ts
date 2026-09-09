@@ -74,33 +74,43 @@ describe("runPersonRoleRevoke", () => {
     mockClient.delete.mockReset();
   });
 
-  test("looks up the setting id then DELETEs it; returns { removed: 1 }", async () => {
-    mockClient.get.mockResolvedValueOnce([
-      { asiakasPersonSettingId: 501, asiakasPersonSettingTypeId: 11 },
-    ]);
-    mockClient.delete.mockResolvedValueOnce({ success: true });
+  test("DELETEs the by-role path in one request; returns the backend envelope", async () => {
+    mockClient.delete.mockResolvedValueOnce({ removed: 1, asiakasPersonSettingId: 501 });
     const result = await runPersonRoleRevoke(mockClient, 5351, 26, 11, { reason: "rotation" });
-    expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/26/5351");
     expect(mockClient.delete).toHaveBeenCalledWith(
-      "/api/asiakasPersonSettings/delete/501",
+      "/api/asiakasPersonSettings/byRole/26/5351/11",
       { headers: { "X-Action-Reason": "rotation" } }
     );
-    expect(result).toEqual({ removed: 1 });
+    expect(result).toMatchObject({ removed: 1 });
   });
 
-  test("is idempotent: returns { removed: 0 } and skips DELETE when role absent", async () => {
-    mockClient.get.mockResolvedValueOnce([
-      { asiakasPersonSettingId: 502, asiakasPersonSettingTypeId: 8 },
-    ]);
+  /**
+   * fb#1537 — the regression that motivated the rewrite. The old implementation
+   * GET the role list first and returned { removed: 0 } when it saw no match.
+   * That GET is a CACHED route, so a stale cache reported a revocation that
+   * never happened, with exit 0. Asserting that NO read precedes the delete is
+   * the whole contract: the client must not decide "absent" from a cached read,
+   * because it cannot tell a missing role from a missing cache entry.
+   */
+  test("never reads before deleting — a cached list must not be able to veto a revoke", async () => {
+    mockClient.delete.mockResolvedValueOnce({ removed: 1, asiakasPersonSettingId: 501 });
+    await runPersonRoleRevoke(mockClient, 5351, 26, 11, { reason: "rotation" });
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+
+  test("idempotent { removed: 0 } now comes from the SERVER, not a client-side skip", async () => {
+    mockClient.delete.mockResolvedValueOnce({ removed: 0 });
     const result = await runPersonRoleRevoke(mockClient, 5351, 26, 11, { reason: "rotation" });
-    expect(mockClient.delete).not.toHaveBeenCalled();
+    // The request is still made — that is the point. The server resolves the row
+    // uncached and answers authoritatively.
+    expect(mockClient.delete).toHaveBeenCalledWith(
+      "/api/asiakasPersonSettings/byRole/26/5351/11",
+      { headers: { "X-Action-Reason": "rotation" } }
+    );
     expect(result).toEqual({ removed: 0 });
   });
 
   test("under --dry-run returns the backend wouldDelete envelope", async () => {
-    mockClient.get.mockResolvedValueOnce([
-      { asiakasPersonSettingId: 501, asiakasPersonSettingTypeId: 11 },
-    ]);
     mockClient.delete.mockResolvedValueOnce({
       dryRun: true, wouldDelete: { asiakasPersonSettingId: 501 }, validation: { ok: true },
     });

@@ -115,6 +115,29 @@ function readRawInput(pathOrDash) {
     return raw.replace(/^\uFEFF/, "");
 }
 /**
+ * Read RAW TEXT from a file (or stdin when the path is `-`), for inputs that are
+ * not JSON — currently `ib dev schema query --sql-file`. Same shell-safety
+ * rationale as {@link readJsonObjectInput}: PowerShell splits a quoted argument
+ * on its inner double-quotes, and SQL is worse than JSON for this because it is
+ * multi-line by nature and any string literal or quoted identifier trips it
+ * (fb#1540). Failures carry `statusCode: 0` — the client-origin marker — so
+ * `hintForError` serves the client-row remedy rather than an HTTP row's
+ * (fb#305/307), and the friction store is not told the backend rejected a
+ * request that was never sent.
+ */
+export function readTextInput(pathOrDash) {
+    try {
+        return readRawInput(pathOrDash);
+    }
+    catch (e) {
+        const detail = errorMessage(e);
+        const hint = pathOrDash === "-"
+            ? "Nothing readable arrived on stdin. Pipe the SQL in (`… | ib dev schema query --sql-file -`) or pass a file path instead of `-`."
+            : "Could not open that path. Check it exists and is readable; the argument is a file path, or `-` to read stdin.";
+        throw new CliError(`Could not read --sql-file ${pathOrDash}: ${detail}`, 0, null, 4, hint);
+    }
+}
+/**
  * Read and JSON-parse a file (or stdin when the path is `-`), returning whatever
  * shape the document holds — object OR array. The raw fs / `SyntaxError` is left
  * to escape: every caller wraps this in its own catch with a command-specific

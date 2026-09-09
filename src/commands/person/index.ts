@@ -418,14 +418,19 @@ export async function runPersonRoleRevoke(
   roleTypeId: number,
   flags: WriteFlags
 ): Promise<unknown> {
-  const current = await runPersonRoleList(client, personId, asiakasId);
-  const match = current.items.find((i) => i.roleTypeId === roleTypeId);
-  if (!match) return { removed: 0 };
-  const res = await client.delete(
-    `/api/asiakasPersonSettings/delete/${match.asiakasPersonSettingId}`,
+  // Resolve-and-delete in ONE server-side request. This used to read the role
+  // list first and return { removed: 0 } when it saw no match — but that read is
+  // /api/asiakasPersonSettings/get, a CACHED route, so a stale cache turned a
+  // revocation into a silent no-op that still exited 0: the caller is told the
+  // role is gone while it is still live (fb#1537, hit for real after
+  // `ib jerry admin enable` granted 11 roles through a path that did not
+  // invalidate). No client-side lookup can be trusted here — only the server can
+  // resolve the row uncached in the same request that deletes it, so
+  // { removed: 0 } now means the role is genuinely absent.
+  return await client.delete(
+    `/api/asiakasPersonSettings/byRole/${asiakasId}/${personId}/${roleTypeId}`,
     { headers: writeFlagsToHeaders(flags) }
   );
-  return flags.dryRun ? res : { removed: 1 };
 }
 
 /** Caller's own profile + roles (aggregated across all their companies) + actable companies. */

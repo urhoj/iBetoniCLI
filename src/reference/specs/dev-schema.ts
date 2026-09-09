@@ -215,6 +215,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           { name: "sql", type: "string", required: false, description: "The SELECT statement (alias for the positional; single statement, one trailing ';' tolerated)" },
           { name: "param", type: "string", required: false, description: "Bind one @parameter as name=value, REPEATABLE — run an application query with its @params intact instead of hand-editing them into literals. `8`/`true`/`false`/`null` are typed as number/bool/NULL; anything else is a string. The @ sigil is optional (`--param @ownerAsiakasId=8` works)." },
           { name: "params", type: "json", required: false, description: "Bind every parameter from ONE JSON object — `{\"ownerAsiakasId\":null,\"documentTypeId\":3}`. Exact types, so use this when a literal's spelling and its intended type disagree (a string \"8\"). Mutually exclusive with --param (exit 4)." },
+          { name: "sql-file", type: "string", required: false, description: "Read the SQL from a file, or `-` for stdin, instead of argv — the shell-safe form for a multi-line statement or one containing quoted identifiers/string literals, which PowerShell splits on (the same hazard `--from-json` exists for elsewhere). Mutually exclusive with the positional and --sql (exit 4)." },
         ],
         outputShape:
           "{ columns: [name…], rows: [{col: value}…], rowCount, truncated, cap: 1000, hint? }. `truncated: true` = the hard 1000-row cap bit (also warned on stderr) — there is no --limit/--offset; narrow with WHERE or aggregate instead of selecting raw rows. `hint` appears only when the SQL reads a metadata-filtered catalog view (see NOTES) — across the whole `ib dev schema` group `hint` means only that an answer may be INCOMPLETE.",
@@ -267,6 +268,22 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
             meaning: "Numeric --param cannot be carried exactly",
             remedy:
               "the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via `--params '{\"name\":\"<digits>\"}'` and let SQL Server do the conversion",
+          },
+          {
+            origin: "client",
+            exit: 4,
+            match: ["Could not read --sql-file", "No SQL arrived on stdin", "No SQL in"],
+            meaning: "--sql-file could not be read, or held no SQL",
+            remedy:
+              "the argument is a file path, or `-` to read stdin. Check the path exists and is readable; when piping, make sure something actually reaches stdin (`Get-Content q.sql | ib dev schema query --sql-file -`). An empty file is rejected rather than sent as a blank statement",
+          },
+          {
+            origin: "client",
+            exit: 4,
+            match: ["Provide the SQL once", "--sql, --sql-file, or a positional"],
+            meaning: "SQL given twice, or not at all",
+            remedy:
+              "pass the statement exactly once: inline (positional or --sql, which may agree with each other) OR from a file with --sql-file. Reach for --sql-file when the SQL is multi-line or contains quoted identifiers/string literals — PowerShell splits an inline argument on its inner double-quotes",
           },
           apiErr(503, "Read-only login not provisioned on this backend", "the ib_readonly user is missing — see puminet5api/scripts/database/provision-readonly-sql-user.js; the query NEVER falls back to the read-write pool"),
         ],

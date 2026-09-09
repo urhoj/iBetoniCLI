@@ -1,4 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSchemaTables,
@@ -342,6 +345,51 @@ describe("ib schema", () => {
 
     test("neither given exits 4", () => {
       expect(() => resolveSqlInput(undefined, undefined)).toThrow(/--sql.*required/);
+    });
+
+    // fb#1540 — SQL is multi-line by nature and PowerShell splits an inline
+    // argument on its inner double-quotes, the same hazard --from-json exists
+    // for on the JSON-bodied commands.
+    test("--sql-file reads the statement from a file", () => {
+      const f = join(tmpdir(), `ib-sqlfile-${Date.now()}.sql`);
+      const multiline = ["SELECT TOP 1 personId", "FROM dbo.person", ""].join("\n");
+      writeFileSync(f, multiline, "utf8");
+      try {
+        expect(resolveSqlInput(undefined, undefined, f)).toBe(
+          ["SELECT TOP 1 personId", "FROM dbo.person"].join("\n")
+        );
+      } finally {
+        rmSync(f, { force: true });
+      }
+    });
+
+    test("--sql-file combined with an inline form exits 4", () => {
+      const f = join(tmpdir(), `ib-sqlfile-${Date.now()}-2.sql`);
+      writeFileSync(f, "SELECT 1", "utf8");
+      try {
+        expect(() => resolveSqlInput("SELECT 1", undefined, f)).toThrow(/Provide the SQL once/);
+        expect(() => resolveSqlInput(undefined, "SELECT 1", f)).toThrow(/Provide the SQL once/);
+      } finally {
+        rmSync(f, { force: true });
+      }
+    });
+
+    // An empty file is a distinct cause from a missing one — commonly a stale
+    // 0-byte file from an earlier attempt. Sending it as a blank statement would
+    // surface as an opaque backend guard rejection instead.
+    test("an empty --sql-file exits 4 rather than sending a blank statement", () => {
+      const f = join(tmpdir(), `ib-sqlfile-${Date.now()}-3.sql`);
+      writeFileSync(f, "   \n", "utf8");
+      try {
+        expect(() => resolveSqlInput(undefined, undefined, f)).toThrow(/No SQL in/);
+      } finally {
+        rmSync(f, { force: true });
+      }
+    });
+
+    test("an unreadable --sql-file exits 4 naming the flag", () => {
+      expect(() => resolveSqlInput(undefined, undefined, join(tmpdir(), "ib-nope-does-not-exist.sql")))
+        .toThrow(/Could not read --sql-file/);
     });
 
     test("treats whitespace-only as absent", () => {

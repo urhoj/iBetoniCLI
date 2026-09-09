@@ -8,6 +8,7 @@ import { qs } from "../../api/query.js";
 import { warnIfTruncated } from "../../api/listCaps.js";
 import { cappedInt } from "../../targets.js";
 import { foldAliases } from "../_shared/flags.js";
+import { readTextInput } from "../../api/parseBody.js";
 import { failWith } from "../../output/json.js";
 
 export interface SchemaListFilter {
@@ -454,12 +455,30 @@ export function resolveQueryParams(
  * `feedback create <description>`) reaches for the positional first and wasted
  * a round-trip against a live-DB tool when only `--sql` was accepted.
  */
-export function resolveSqlInput(positional?: string, flag?: string): string {
+export function resolveSqlInput(positional?: string, flag?: string, file?: string): string {
+  // --sql-file is the shell-safe form (fb#1540): a multi-line statement, or one
+  // containing quoted identifiers/literals, cannot survive PowerShell's
+  // argument splitting — the same hazard `--from-json` already exists for on the
+  // JSON-bodied commands. It is an alternative to, not a companion of, the
+  // inline forms, so passing both is a usage error rather than a silent winner.
+  if (file !== undefined) {
+    if (positional !== undefined || flag !== undefined) {
+      failWith("Provide the SQL once — use --sql-file, or the inline positional/--sql", 4);
+    }
+    const fromFile = readTextInput(file).trim();
+    if (!fromFile) {
+      failWith(
+        file === "-" ? "No SQL arrived on stdin" : `No SQL in ${file} — the file is empty`,
+        4
+      );
+    }
+    return fromFile;
+  }
   const sql = foldAliases(
     [positional, flag],
     "Provide the SQL once — via the positional or --sql; if both are given they must match"
   );
-  if (!sql) failWith("--sql (or a positional SQL statement) is required", 4);
+  if (!sql) failWith("--sql, --sql-file, or a positional SQL statement is required", 4);
   return sql;
 }
 
@@ -610,11 +629,19 @@ export function registerSchemaCommands(
       [] as string[]
     )
     .option("--params <json>", "Bind every parameter from one JSON object (exact types; alternative to --param)")
+    .option(
+      "--sql-file <file|->",
+      "Read the SQL from a file (or - for stdin) instead of argv — shell-safe for multi-line statements and for SQL containing quoted identifiers or string literals, which PowerShell splits on"
+    )
     .action(
       jsonAction(
         getClient,
-        (client, sql: string | undefined, opts: { sql?: string; param?: string[]; params?: string }) =>
-          runSchemaQuery(client, resolveSqlInput(sql, opts.sql), resolveQueryParams(opts.param, opts.params))
+        (client, sql: string | undefined, opts: { sql?: string; sqlFile?: string; param?: string[]; params?: string }) =>
+          runSchemaQuery(
+            client,
+            resolveSqlInput(sql, opts.sql, opts.sqlFile),
+            resolveQueryParams(opts.param, opts.params)
+          )
       )
     );
 
