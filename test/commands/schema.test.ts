@@ -374,6 +374,21 @@ describe("ib schema", () => {
       }
     });
 
+    // A whitespace-only positional is ABSENT everywhere else (the test below
+    // asserts it for the inline path), so it must not read as "SQL given twice"
+    // here. PowerShell producing a blank positional alongside --sql-file is the
+    // realistic way in — and the old conflict check tested `!== undefined`, which
+    // called it given.
+    test("a whitespace-only positional does not conflict with --sql-file", () => {
+      const f = join(tmpdir(), `ib-sqlfile-${Date.now()}-3.sql`);
+      writeFileSync(f, "SELECT 1", "utf8");
+      try {
+        expect(resolveSqlInput("   ", undefined, f)).toBe("SELECT 1");
+      } finally {
+        rmSync(f, { force: true });
+      }
+    });
+
     // An empty file is a distinct cause from a missing one — commonly a stale
     // 0-byte file from an earlier attempt. Sending it as a blank statement would
     // surface as an opaque backend guard rejection instead.

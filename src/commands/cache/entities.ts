@@ -1,9 +1,21 @@
 /**
  * Offline entity vocabulary for `ib dev cache entities` and `ib dev cache invalidate`.
- * Mirrors the backend VALID_ENTITIES allowlist (UniversalCacheManager BASE_TTL).
- * The backend is authoritative — unknown entities return 400. `cascade: true`
- * marks entities that support related-family fan-out via --cascade.
- * `developerOnly: true` marks cross-tenant entities whose invalidate requires developer access.
+ *
+ * A CURATED SUBSET of the backend's VALID_ENTITIES allowlist (derived there from
+ * UniversalCacheManager's BASE_TTL keys, 60+ of them) — the commonly-targeted
+ * ones, not a mirror. The backend stays authoritative: an entity missing here is
+ * still accepted, and an unknown one returns 400.
+ *
+ * ⚠ Keep it in step anyway when an entity becomes newly targetable. The backend's
+ * rejection message is `Unknown entityType '<x>'. See \`ib cache entities\`.`, so
+ * this list is where a stuck operator is sent — an omission reads to them as
+ * "that entity does not exist". fb#1545: asiakasPersonSetting was made
+ * invalidatable by fb#1538 but left off here, which reproduced the very failure
+ * fb#1538 fixed, one layer up.
+ *
+ * `cascade: true` marks entities supporting related-family fan-out via --cascade.
+ * `developerOnly: true` marks cross-tenant entities whose invalidate requires
+ * developer access (the backend forces everyone else to their own tenant).
  */
 export interface CacheEntity {
   entityType: string;
@@ -20,6 +32,9 @@ export const CACHE_ENTITIES: CacheEntity[] = [
   { entityType: "asiakas", params: ["asiakasId"], example: "ib dev cache invalidate asiakas --asiakas 8 --confirm" },
   { entityType: "vehicle", params: ["asiakasId"], example: "ib dev cache invalidate vehicle --asiakas 8 --confirm" },
   { entityType: "person", params: ["asiakasId"], example: "ib dev cache invalidate person --asiakas 8 --confirm" },
+  // Per-company role grants (fb#1538/fb#1545). Clear this after granting or
+  // revoking a role out-of-band, when `ib person role list` still disagrees with SQL.
+  { entityType: "asiakasPersonSetting", params: ["asiakasId"], example: "ib dev cache invalidate asiakasPersonSetting --asiakas 27 --confirm" },
   { entityType: "tyomaa", params: ["asiakasId"], example: "ib dev cache invalidate tyomaa --asiakas 8 --confirm" },
   { entityType: "sijainti", params: ["asiakasId"], example: "ib dev cache invalidate sijainti --asiakas 8 --confirm" },
   { entityType: "grid", params: [], developerOnly: true, example: "ib dev cache invalidate grid --confirm" },

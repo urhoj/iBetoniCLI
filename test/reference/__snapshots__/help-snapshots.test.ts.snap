@@ -2141,18 +2141,18 @@ exports[`Help snapshots — contract stability > help for ib dev cache keys matc
   ib dev cache keys [flags]
 
 DESCRIPTION
-  Key counts grouped by prefix pattern (SCAN). Developer-only.
+  Key counts grouped by prefix pattern (SCAN). Scans the PHYSICAL keyspace (so it sees the unnamespaced session/lock keys a logical scan hides), where cache entries are stored as \`r:<build>:<key>\` — a glob not starting with \`*\` or \`r:\` cannot match one and returns a misleading 0. Use \`*keikka:*\`, not \`keikka:*\` (fb#1539). Developer-only.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
-  --pattern STRING    SCAN match glob (default: *) (default: *)
+  --pattern STRING    SCAN match glob (default: *). Prefix with \`*\` to reach namespaced cache entries (default: *)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { totalKeys, groups: [{ prefix, count }] }
+  { totalKeys, pattern, groups: [{ prefix, count }] }; on a ZERO match \`groups\` lists the WHOLE keyspace instead and \`totalKeysScanned\` + \`hint\` are added, so 0 can be told from a clean family
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2161,7 +2161,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev cache keys
-  ib dev cache keys --pattern 'keikka:*'
+  ib dev cache keys --pattern '*keikka:*'
 "
 `;
 
@@ -2170,7 +2170,7 @@ exports[`Help snapshots — contract stability > help for ib dev cache pattern m
   ib dev cache pattern [<glob>] [flags]
 
 DESCRIPTION
-  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer \`ib dev cache invalidate\` (domain entity); use \`ib dev cache keys\` to find the right glob.
+  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer \`ib dev cache invalidate\` (domain entity); use \`ib dev cache keys\` to find the right glob, but drop its leading \`*\` here — that route scans raw, this one prepends \`r:*:\` for you.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
@@ -10863,7 +10863,7 @@ exports[`Help snapshots — contract stability > help for ib person role revoke 
   ib person role revoke <personId> [flags]
 
 DESCRIPTION
-  Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).
+  Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Resolves the grant and deletes it in ONE server-side request (DELETE /api/asiakasPersonSettings/byRole/...), reading the row straight from SQL rather than the cached role list — so { removed:0 } means genuinely absent, never a stale read reporting a revocation that did not happen (fb#1537). --dry-run previews via the backend and is the only place the resolved asiakasPersonSettingId is visible before the write.
   Permissions: requires company admin on the target tenant (tier per role).
 
 ARGUMENTS
@@ -10884,12 +10884,12 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }
+  { removed: 1, asiakasPersonSettingId } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId }, validation }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
-  exit 4 (HTTP 400)  Unknown role           → use a name from ROLE_TYPEID_BY_NAME
+  exit 4 (HTTP 400)  Unknown role, or an id that is not a positive integer → use a name from ROLE_TYPEID_BY_NAME; the byRole route also validates asiakasId/personId/personSettingTypeId server-side, so pass a positive personId and --asiakas
   exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

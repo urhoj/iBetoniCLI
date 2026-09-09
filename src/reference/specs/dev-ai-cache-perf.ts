@@ -108,13 +108,15 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev cache keys",
-        description: "Key counts grouped by prefix pattern (SCAN). Developer-only.",
+        description:
+          "Key counts grouped by prefix pattern (SCAN). Scans the PHYSICAL keyspace (so it sees the unnamespaced session/lock keys a logical scan hides), where cache entries are stored as `r:<build>:<key>` — a glob not starting with `*` or `r:` cannot match one and returns a misleading 0. Use `*keikka:*`, not `keikka:*` (fb#1539). Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
-        flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *)" }],
-        outputShape: "{ totalKeys, groups: [{ prefix, count }] }",
+        flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *). Prefix with `*` to reach namespaced cache entries" }],
+        outputShape:
+          "{ totalKeys, pattern, groups: [{ prefix, count }] }; on a ZERO match `groups` lists the WHOLE keyspace instead and `totalKeysScanned` + `hint` are added, so 0 can be told from a clean family",
         errors: devErrors,
-        examples: ["ib dev cache keys", "ib dev cache keys --pattern 'keikka:*'"],
+        examples: ["ib dev cache keys", "ib dev cache keys --pattern '*keikka:*'"],
       },
       {
         command: "ib dev cache invalidate",
@@ -164,7 +166,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev cache pattern",
-        description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer `ib dev cache invalidate` (domain entity); use `ib dev cache keys` to find the right glob.",
+        description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer `ib dev cache invalidate` (domain entity); use `ib dev cache keys` to find the right glob, but drop its leading `*` here — that route scans raw, this one prepends `r:*:` for you.",
         permissions: DEV_PERMS,
         tier: "developer",
         mutates: true,

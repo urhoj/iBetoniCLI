@@ -3,6 +3,9 @@ export const CACHE_ENTITIES = [
     { entityType: "asiakas", params: ["asiakasId"], example: "ib dev cache invalidate asiakas --asiakas 8 --confirm" },
     { entityType: "vehicle", params: ["asiakasId"], example: "ib dev cache invalidate vehicle --asiakas 8 --confirm" },
     { entityType: "person", params: ["asiakasId"], example: "ib dev cache invalidate person --asiakas 8 --confirm" },
+    // Per-company role grants (fb#1538/fb#1545). Clear this after granting or
+    // revoking a role out-of-band, when `ib person role list` still disagrees with SQL.
+    { entityType: "asiakasPersonSetting", params: ["asiakasId"], example: "ib dev cache invalidate asiakasPersonSetting --asiakas 27 --confirm" },
     { entityType: "tyomaa", params: ["asiakasId"], example: "ib dev cache invalidate tyomaa --asiakas 8 --confirm" },
     { entityType: "sijainti", params: ["asiakasId"], example: "ib dev cache invalidate sijainti --asiakas 8 --confirm" },
     { entityType: "grid", params: [], developerOnly: true, example: "ib dev cache invalidate grid --confirm" },

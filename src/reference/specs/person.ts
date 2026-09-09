@@ -212,7 +212,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   {
     command: "ib person role revoke",
     description:
-      "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).",
+      "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Resolves the grant and deletes it in ONE server-side request (DELETE /api/asiakasPersonSettings/byRole/...), reading the row straight from SQL rather than the cached role list — so { removed:0 } means genuinely absent, never a stale read reporting a revocation that did not happen (fb#1537). --dry-run previews via the backend and is the only place the resolved asiakasPersonSettingId is visible before the write.",
     permissions: ["company admin on the target tenant (tier per role)"],
     args: [{ name: "personId", type: "number", description: "personId" }],
     flags: [
@@ -222,11 +222,18 @@ export const PERSON_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
-    outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
+    outputShape:
+      "{ removed: 1, asiakasPersonSettingId } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId }, validation }",
     errors: [
       ROLE_NAME_CLIENT_ERROR,
       ASIAKAS_FLAG_ERR,
-      apiErr(400, "Unknown role", "use a name from ROLE_TYPEID_BY_NAME"),
+      // ONE row per HTTP status — hintForError matches server errors by `http`,
+      // so a second 400 row here would be dead and its remedy unreachable (fb#668).
+      apiErr(
+        400,
+        "Unknown role, or an id that is not a positive integer",
+        "use a name from ROLE_TYPEID_BY_NAME; the byRole route also validates asiakasId/personId/personSettingTypeId server-side, so pass a positive personId and --asiakas"
+      ),
       apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
     ],

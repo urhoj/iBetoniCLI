@@ -461,8 +461,17 @@ export function resolveSqlInput(positional?: string, flag?: string, file?: strin
   // argument splitting — the same hazard `--from-json` already exists for on the
   // JSON-bodied commands. It is an alternative to, not a companion of, the
   // inline forms, so passing both is a usage error rather than a silent winner.
+  // Fold the inline pair FIRST so both branches below judge "was inline SQL
+  // given?" by the same rule. Testing `positional !== undefined || flag !==
+  // undefined` here instead made a whitespace-only positional count as "given"
+  // for the conflict check while foldAliases treats it as absent — so
+  // resolveSqlInput("   ", undefined, f) was rejected as SQL given twice.
+  const inline = foldAliases(
+    [positional, flag],
+    "Provide the SQL once — via the positional or --sql; if both are given they must match"
+  );
   if (file !== undefined) {
-    if (positional !== undefined || flag !== undefined) {
+    if (inline) {
       failWith("Provide the SQL once — use --sql-file, or the inline positional/--sql", 4);
     }
     const fromFile = readTextInput(file).trim();
@@ -474,12 +483,8 @@ export function resolveSqlInput(positional?: string, flag?: string, file?: strin
     }
     return fromFile;
   }
-  const sql = foldAliases(
-    [positional, flag],
-    "Provide the SQL once — via the positional or --sql; if both are given they must match"
-  );
-  if (!sql) failWith("--sql, --sql-file, or a positional SQL statement is required", 4);
-  return sql;
+  if (!inline) failWith("--sql, --sql-file, or a positional SQL statement is required", 4);
+  return inline;
 }
 
 /**
