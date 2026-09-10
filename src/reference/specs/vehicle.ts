@@ -166,7 +166,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle create",
     description:
-      "Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting.",
+      "Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting. --reg refuses a duplicate active plate unless --force (fb#1560).",
     permissions: ["auth.page.vehicle.edit"],
     flags: [
       { name: "reg", type: "string", description: "Registration number (vehicleRegNo)" },
@@ -178,6 +178,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       { name: "capacity", type: "number", description: "Concrete capacity in m3 (vehicleM3)" },
       { name: "puomi", type: "number", description: "Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)" },
       { name: "asiakas", type: "number", description: "Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)" },
+      { name: "force", type: "boolean", description: "Skip the duplicate-plate check" },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -189,6 +190,13 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       intParseErr("--default-driver", "pass a personId — `ib person search` finds them"),
       numParseErr("--capacity", "pass the capacity in m3 as a number (e.g. 7.5)"),
       numParseErr("--puomi", "pass the boom length in metres as a number"),
+      {
+        origin: "client",
+        exit: 4,
+        match: "already exists under asiakasId",
+        meaning: "--reg matches an active vehicle under the target tenant",
+        remedy: "pass --force",
+      },
       apiErr(400, "Validation failed", "fix the field flags"),
       // Matched on the backend's Finnish denyMessage (vehicleRoutes.js
       // `vehicleEdit` → requireCompanyRole denyMessage).

@@ -424,14 +424,43 @@ const VEHICLE_DIFF_FIELDS = [
  * `/new` endpoint (with `X-Dry-Run`) and return the backend's preview — no save
  * is attempted. The `--reason` audit string is sent on both calls; the
  * `--idempotency-key` only applies to the populating save.
+ *
+ * Neither `/new` nor `/save` checks for an existing vehicle with the same
+ * plate — two independent create calls for the same `--reg` always produce
+ * two rows (this bit the Betomik fleet sync twice, 2026-09-09/10: two
+ * unrelated create passes for the same 18 plates, nothing to do with
+ * dry-run — `req.dryRun` on `/new` has correctly short-circuited before any
+ * insert since 2026-06-02). So when `--reg` is given, search the target
+ * tenant for an already-ACTIVE vehicle (no `lastDate`, not soft-deleted) with
+ * the same plate first and refuse before either backend call, unless
+ * `--force` is passed. Client-side only — a retired/soft-deleted duplicate
+ * plate never blocks a legitimate re-create.
  */
 export async function runVehicleCreate(
   client: ApiClient,
   fields: VehicleWriteFields,
-  flags: WriteFlags
+  flags: WriteFlags,
+  opts: { force?: boolean } = {}
 ): Promise<unknown> {
   const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const targetAsiakasId = fields.asiakasId ?? ownerAsiakasId;
+  if (fields.vehicleRegNo && !opts.force) {
+    const existing = await runVehicleSearch(client, fields.vehicleRegNo, undefined, targetAsiakasId);
+    const plate = fields.vehicleRegNo.toUpperCase();
+    const conflict = existing.items.find(
+      (v) =>
+        typeof v.plate === "string" &&
+        v.plate.toUpperCase() === plate &&
+        v.lastDate == null &&
+        v.deletedTime == null
+    );
+    if (conflict) {
+      failWith(
+        `An active vehicle with plate ${fields.vehicleRegNo} already exists under asiakasId ${targetAsiakasId} (vehicleId ${conflict.vehicleId}) — pass --force to create a duplicate anyway.`,
+        4
+      );
+    }
+  }
   if (flags.dryRun) {
     return client.post(
       `/api/vehicle/new/${targetAsiakasId}`,
@@ -654,13 +683,17 @@ export function registerVehicleCommands(
       )
     );
 
-  const createCmd = addVehicleFieldFlags(v.command("create"), "create");
+  const createCmd = addVehicleFieldFlags(v.command("create"), "create").option(
+    "--force",
+    "Create even if an active vehicle with the same --reg plate already exists under the target tenant"
+  );
   addWriteFlagsToCommand(createCmd).action(
-    guarded(async (opts: WriteFlags & VehicleFieldOpts) => {
+    guarded(async (opts: WriteFlags & VehicleFieldOpts & { force?: boolean }) => {
       const result = await runVehicleCreate(
         await getClient(),
         vehicleFieldsFromOpts(opts),
-        opts
+        opts,
+        { force: opts.force }
       );
       writeJson(result);
     })

@@ -77,6 +77,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("non-dry-run: new then save with merged body", async () => {
+    c.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
     c.post
       .mockResolvedValueOnce({ vehicleId: 88 })
       .mockResolvedValueOnce({ vehicleId: 88 });
@@ -102,6 +103,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("dry-run: only /new with X-Dry-Run, no save", async () => {
+    c.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
     c.post.mockResolvedValueOnce({
       dryRun: true,
       wouldCreate: { vehicleId: null },
@@ -114,6 +116,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("--asiakas rides the /new path param so the stub is owned by the target tenant (fb#94)", async () => {
+    c.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
     c.post
       .mockResolvedValueOnce({ vehicleId: 91 })
       .mockResolvedValueOnce({ vehicleId: 91 });
@@ -146,6 +149,60 @@ describe("runVehicleCreate", () => {
     expect(c.post).toHaveBeenCalledWith("/api/vehicle/new/1380", {}, {
       headers: { "X-Dry-Run": "1" },
     });
+  });
+
+  test("no --reg: skips the duplicate-plate search entirely", async () => {
+    c.post
+      .mockResolvedValueOnce({ vehicleId: 92 })
+      .mockResolvedValueOnce({ vehicleId: 92 });
+    await runVehicleCreate(c, { vehicleM3: 8 }, { reason: "new truck" });
+    expect(c.get).not.toHaveBeenCalled();
+  });
+
+  test("refuses (exit 4) when an active vehicle with the same plate already exists (fb#1560 follow-up)", async () => {
+    c.get.mockResolvedValueOnce({
+      items: [
+        { vehicleId: 1171, plate: "NLR-210", lastDate: null, deletedTime: null },
+      ],
+      nextCursor: null,
+      count: 1,
+    });
+    await expect(
+      runVehicleCreate(c, { vehicleRegNo: "nlr-210" }, { reason: "fleet add" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/list?search=nlr-210&asiakas=1349"
+    );
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
+  test("a RETIRED duplicate plate (lastDate set) does not block a re-create", async () => {
+    c.get.mockResolvedValueOnce({
+      items: [
+        { vehicleId: 1189, plate: "NLR-210", lastDate: "2026-09-09", deletedTime: null },
+      ],
+      nextCursor: null,
+      count: 1,
+    });
+    c.post
+      .mockResolvedValueOnce({ vehicleId: 1300 })
+      .mockResolvedValueOnce({ vehicleId: 1300 });
+    await runVehicleCreate(c, { vehicleRegNo: "NLR-210" }, { reason: "re-create" });
+    expect(c.post).toHaveBeenCalledTimes(2);
+  });
+
+  test("--force skips the duplicate-plate search entirely", async () => {
+    c.post
+      .mockResolvedValueOnce({ vehicleId: 93 })
+      .mockResolvedValueOnce({ vehicleId: 93 });
+    await runVehicleCreate(
+      c,
+      { vehicleRegNo: "NLR-210" },
+      { reason: "intentional duplicate" },
+      { force: true }
+    );
+    expect(c.get).not.toHaveBeenCalled();
+    expect(c.post).toHaveBeenCalledTimes(2);
   });
 });
 

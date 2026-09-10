@@ -12580,7 +12580,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle create matc
   ib vehicle create [flags]
 
 DESCRIPTION
-  Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting.
+  Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting. --reg refuses a duplicate active plate unless --force (fb#1560).
   Permissions: requires auth.page.vehicle.edit.
 
 FLAGS
@@ -12593,6 +12593,7 @@ FLAGS
   --capacity NUMBER    Concrete capacity in m3 (vehicleM3)
   --puomi NUMBER    Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)
   --asiakas NUMBER    Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)
+  --force    Skip the duplicate-plate check
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -12614,6 +12615,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --default-driver is not an integer >= 1, rejected locally before any request → pass a personId — \`ib person search\` finds them
   exit 4 (client-side)  --capacity is not a number, rejected locally before any request → pass the capacity in m3 as a number (e.g. 7.5)
   exit 4 (client-side)  --puomi is not a number, rejected locally before any request → pass the boom length in metres as a number
+  exit 4 (client-side)  --reg matches an active vehicle under the target tenant → pass --force
   exit 4 (HTTP 400)  Validation failed      → fix the field flags
   exit 3 (HTTP 403)  No vehicle-edit access on the target tenant (--asiakas if given, otherwise your active company) → you need an admin/owner/vehicleHandler role on that tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
