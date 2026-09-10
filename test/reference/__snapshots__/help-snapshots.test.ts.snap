@@ -13665,7 +13665,7 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
   ib worksite create [flags]
 
 DESCRIPTION
-  Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.
+  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0), asiakasId (linked customer, not ownerAsiakasId).
   Permissions: requires auth.page.tyomaa.edit.
 
 FLAGS
@@ -13687,12 +13687,13 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 3 (HTTP 403)  ownerAsiakasId missing or you lack edit on it → resolves from --body.ownerAsiakasId before validation, so a missing field 403s not 400s
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib worksite create --body '{"name":"Site A","address":"Main St 1","asiakasId":1349}'
+  ib worksite create --body '{"tyomaaNimi":"Site A","tyomaaOsoite1":"Main St 1","ownerAsiakasId":8}' --reason 'new site'
 "
 `;
 

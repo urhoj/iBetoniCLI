@@ -14,7 +14,7 @@ import { buildReference } from "../../src/reference/dump.js";
  * extend the shared-row hoist). Never bump casually: every byte here is paid
  * by every AI that ingests the dump.
  */
-const DUMP_LIMIT_BYTES = 702_000; // measured 700,691 B on 2026-09-09 after the fb#1540 rows. Deliberate growth (+691 B, one command): `ib dev schema query` gained --sql-file plus its two client-origin ERROR rows. The rows are the point, not padding — hintForError matches on them, so an unreadable/empty file and a doubly-given statement each answer with their own remedy instead of the generic exit-4 hint. Headroom is deliberately thin (~1.3 KB): the previous +5% cushion is what let this land as a trip rather than a decision.
+const DUMP_LIMIT_BYTES = 702_600; // 702,000 -> 702,600 on 2026-09-10 (fb#1562): `ib worksite create`'s description and example used field names (name/address/asiakasId) that don't exist on POST /api/tyomaa/new, and omitting the real required field (ownerAsiakasId) 403s at the tenant gate before validation ever runs — a stale example that reads as a permission bug. Fixed the description, example, and added the same explicit 403-vs-400 ERROR row `ib keikka create` already carries for the identical gotcha (fb#1311); 702,407 B measured after trimming prose twice first.
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

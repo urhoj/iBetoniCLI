@@ -100,7 +100,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   {
     command: "ib worksite create",
     description:
-      "Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.",
+      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0), asiakasId (linked customer, not ownerAsiakasId).",
     permissions: ["auth.page.tyomaa.edit"],
     flags: [
       {
@@ -115,10 +115,11 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     outputShape: "{ tyomaaId, ... } (raw backend response)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(403, "ownerAsiakasId missing or you lack edit on it", "resolves from --body.ownerAsiakasId before validation, so a missing field 403s not 400s", "ei oikeuksia"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: [
-      "ib worksite create --body '{\"name\":\"Site A\",\"address\":\"Main St 1\",\"asiakasId\":1349}'",
+      "ib worksite create --body '{\"tyomaaNimi\":\"Site A\",\"tyomaaOsoite1\":\"Main St 1\",\"ownerAsiakasId\":8}' --reason 'new site'",
     ],
   },
   {
