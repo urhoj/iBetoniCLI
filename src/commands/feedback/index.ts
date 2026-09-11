@@ -64,6 +64,15 @@ export const ACTIVE_STATUSES = ["open", "reviewed"] as const;
 const STATUS_SYNONYMS: Record<string, string> = {
   resolved: "applied",
 };
+
+/**
+ * `--status` values that name the sibling FLAG instead of a status (fb#1444).
+ * Most CLIs spell "every status" as a filter VALUE, so `--status all` is the
+ * predictable first guess rather than a slip — and STATUS_SYNONYMS cannot answer
+ * it, because `enumGuess` may only reply with a value that IS in `allowed`. The
+ * redirect to `--all` needs its own check. A hint, never a silent rewrite.
+ */
+const STATUS_ALL_SENTINELS = ["all", "any", "*"];
 export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
@@ -829,6 +838,16 @@ function resolveStatuses(opts: {
           .filter(Boolean)
       ),
     ];
+    const wantedAll = list.filter((s) => STATUS_ALL_SENTINELS.includes(s.toLowerCase()));
+    if (wantedAll.length) {
+      // Same message shape as assertEnumCsv, so the spec's existing "must be one
+      // of" errors row resolves it and no new row is needed — with the flag
+      // redirect appended, which enumGuess structurally cannot supply.
+      failWith(
+        `--status: unknown value(s) ${wantedAll.join(", ")} — must be one of: ${STATUSES.join(", ")}. For EVERY status pass the --all flag; ${STATUS_ALL_SENTINELS.join("/")} are not status values`,
+        4
+      );
+    }
     assertEnumCsv(list, STATUSES, "--status", STATUS_SYNONYMS);
     if (list.length) return list;
   }
@@ -2237,13 +2256,20 @@ export function registerFeedbackCommands(
       })
     );
 
-  f.command("cluster <id>").action(
-    guarded(async (idStr: string) => {
-      const id = parseRefId(idStr, "feedback", "cluster");
-      const client = await getClient();
-      writeJson(await runFeedbackCluster(client, id));
-    })
-  );
+  // `relations`/`related` — the write side is link/unlink and every doc around it
+  // says "relations", so that is the read verb a caller reaches for; the real one
+  // is `cluster`, a word none of that documentation uses. Edit distance cannot
+  // bridge it, and `related` scored closer to the WRITE command `create` (fb#1420,
+  // fb#1436). Same discovery-alias idiom as `count`/`stats` above.
+  f.command("cluster <id>")
+    .aliases(["relations", "related"])
+    .action(
+      guarded(async (idStr: string) => {
+        const id = parseRefId(idStr, "feedback", "cluster");
+        const client = await getClient();
+        writeJson(await runFeedbackCluster(client, id));
+      })
+    );
 
   // `[note]` is positional so this command AGREES with its sibling
   // `feedback create <description>` (fb#583). Both take one id-ish thing plus

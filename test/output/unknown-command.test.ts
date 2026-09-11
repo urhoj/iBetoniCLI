@@ -778,6 +778,25 @@ describe("verb aliases (#229)", () => {
     // exit 4 and point at `ib stats`, an unrelated delivery-statistics domain.
     expect(leafOf("feedback", "count").aliases()).toContain("stats");
   });
+  test("`feedback cluster` answers to `relations`/`related` (fb#1420, fb#1436)", () => {
+    // The write side is link/unlink and every doc around it says "relations", so
+    // that is the read verb a caller reaches for. Edit distance cannot bridge it:
+    // `relations` dead-ended with didYouMean:null and `related` resolved to the
+    // WRITE command `create`.
+    const aliases = leafOf("feedback", "cluster").aliases();
+    expect(aliases).toContain("relations");
+    expect(aliases).toContain("related");
+  });
+  test("the cluster aliases stay out of `available` (fb#1420)", () => {
+    // An alias is another NAME for one command, not an extra child. If it leaked
+    // into visibleSubcommands the did-you-mean list would grow two entries here
+    // (and two per future alias), burying the verbs that are really there.
+    const feedback = program.commands.find((c) => c.name() === "feedback")!;
+    const visible = visibleSubcommands(feedback, "developer");
+    expect(visible).toContain("cluster");
+    expect(visible).not.toContain("relations");
+    expect(visible).not.toContain("related");
+  });
 });
 
 describe("visibleSubcommands (#1)", () => {
@@ -1061,6 +1080,57 @@ describe("fb#1020 envelope wiring", () => {
     const env = buildUnknownCommandEnvelope(jerry, "zzzznope", "developer");
     expect(env.availableElsewhere).toEqual([]);
     expect(env.hint).not.toContain("ARGUMENT");
+  });
+
+  test("the ARGUMENT remedy keeps trailing flags but drops leftover positionals (fb#1397)", () => {
+    // `ib dev sql query --help` used to suggest `ib dev schema query <sql> query
+    // --help` — the leftover argv appended verbatim after the placeholder, so the
+    // remedy failed again with a guard/SQL error. The placeholder already stands
+    // in for the caller's positionals; only the flags are still unaccounted for.
+    const dev = program.commands.find((c) => c.name() === "dev")!;
+    dev.args = ["sql", "query", "--help"];
+    const env = buildUnknownCommandEnvelope(dev, "sql", "developer");
+    expect(env.hint).toContain("ib dev schema query <sql> --help");
+    expect(env.hint).not.toContain("<sql> query");
+  });
+
+  test("a VERB redirect still carries the caller's remaining args (fb#1397 guard)", () => {
+    // The flag-only filter belongs to the ARGUMENT branch alone: there a verb was
+    // swapped for a verb, so the trailing tokens really are the caller's arguments
+    // and dropping them would make the remedy un-runnable.
+    const jerry = program.commands.find((c) => c.name() === "jerry")!;
+    jerry.args = ["company-search", "acme"];
+    const env = buildUnknownCommandEnvelope(jerry, "company-search", "developer");
+    expect(env.hint).toContain("ib jerry admin search acme");
+  });
+});
+
+// fb#1522: an unattended agent FOLLOWS a did-you-mean, so pointing a read
+// intent at a mutating command is the wrong default. `ib dev feedback related`
+// used to answer `create` — the group's write — while `cluster` sat unmentioned
+// in `available`. That exact token is now an alias (fb#1420/1436); this covers
+// the ranking rule that produced it, which serves every group.
+describe("did-you-mean prefers a read over an equally near write (fb#1522)", () => {
+  const feedbackGroup = () => leafByPath("dev", "feedback");
+
+  test("a tie between a write and a read resolves to the read, not registration order", () => {
+    // `cret` is 2 edits from both `create` (write, registered first) and `get`
+    // (read). Registration order alone used to hand it to the write.
+    const env = buildUnknownCommandEnvelope(feedbackGroup(), "cret", "developer");
+    expect(env.didYouMean).toBe("get");
+    expect(env.hint).toContain("Did you mean `ib dev feedback get`?");
+  });
+
+  test("a clearly nearer write still wins, but the hint names it as a WRITE", () => {
+    const env = buildUnknownCommandEnvelope(feedbackGroup(), "creat", "developer");
+    expect(env.didYouMean).toBe("create");
+    expect(env.hint).toContain("Did you mean `ib dev feedback create` (a WRITE command)?");
+  });
+
+  test("a read suggestion carries no WRITE tag", () => {
+    const env = buildUnknownCommandEnvelope(feedbackGroup(), "lis", "developer");
+    expect(env.didYouMean).toBe("list");
+    expect(env.hint).not.toContain("WRITE");
   });
 });
 

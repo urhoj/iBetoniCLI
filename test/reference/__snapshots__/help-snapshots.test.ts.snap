@@ -930,6 +930,7 @@ FLAGS
   --search STRING    Client-side substring filter over laatuNimike / laatuLyhenne / laatuSelite
   --shared-only    Only the shared (asiakasId 0) grades
   --own-only    Only the supplier's own grades (excludes the shared ones)
+  --limit NUMBER    Client-side cap on the rows returned (max 500); a cut page sets \`truncated: true\`. Without it the list is COMPLETE — the backend never paginates this catalogue (fb#1521)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -948,6 +949,7 @@ NOTES
   - asiakasId 0 is the SHARED (yhteinen) grade pool visible to every tenant; anything else is that supplier's own. The backend returns both in one list with no marker — \`shared\` is derived client-side.
   - Deliberately NOT restricted to your own tenant: a customer legitimately reads its SUPPLIER's catalogue, which is why the backend scopes the cache key by supplier rather than by caller.
   - The rows come from betoniLaatuView. laatuAllowedRae/laatuAllowedS/laatuAllowedC are expressed in the vocabularies \`ib betoni reference\` returns.
+  - Never paginated: without --limit the envelope is the supplier's WHOLE catalogue (no \`truncated\`, no cursor), so a laatuId absent from it does not exist for that supplier (fb#1521).
 
 SEE ALSO
   ib betoni laatu get, ib betoni reference
@@ -2502,8 +2504,8 @@ FLAGS
   --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. \`--repo "puminet5api,betonicli"\`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via \`npm run final\`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none. (max 200 chars)
-  --sha STRING    Commit SHAs (CSV) (max 500 chars)
-  --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
+  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\`, not \`sha\` (fb#1431) (max 500 chars)
+  --commit STRING    Alias for --sha — Commit SHAs (CSV), read back as \`commitShas\`; if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback STRING    cliFeedback id(s) to link — a single id or CSV (\`541,542\`), \`fb#\` anchors accepted. Role \`resolves\` (default) advances an \`open\` row to applied; a deliberately-set status (e.g. \`reviewed\`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve re-owns it (fb#366). resolveFeedback is per-REQUEST: one already-resolved id demotes the WHOLE call.
@@ -2621,14 +2623,14 @@ ARGUMENTS
   <changelogId> NUMBER    Entry id — accepts an optional \`cl#\` anchor (e.g. \`cl#858\`); a \`fb#\` id is rejected (exit 4) with the feedback command to use (feedback #230) (required)
 
 FLAGS
-  (none)
+  --full    No-op, accepted for symmetry with \`ib dev feedback get\` which REQUIRES it — nothing here is ever truncated (fb#1381)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  entry
+  The full entry, never truncated. SIX fields are NOT named after the flag that writes them, so probing the flag name reads as a silently-dropped write (fb#1431): --sha/--commit→commitShas, --vtag→versionTag, --feedback→feedbackLinks:[{feedbackId,role}] (+ the legacy scalar feedbackId), --sentry→sentryIssue, --date→entryDate, --bump-level→bumpLevel. Every other field is plain-named.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
@@ -2826,8 +2828,8 @@ FLAGS
   --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one (max 200 chars)
-  --sha STRING    Commit SHAs (CSV) (max 500 chars)
-  --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
+  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\`, not \`sha\` (fb#1431) (max 500 chars)
+  --commit STRING    Alias for --sha — Commit SHAs (CSV), read back as \`commitShas\`; if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
   --feedback STRING    cliFeedback id(s) to link — a single id or CSV, \`fb#\` anchors accepted. \`update\` is the CORRECTION path: it records/repairs the link and NEVER changes the row's status (fb#578) — close a row with \`ib dev feedback resolve <id> --status applied\`; \`changelog add\` is what advances rows. Linking an ALREADY-resolved row TAKES it (stderr names the displaced entry); hand-written and \`Shipped:\` notes are preserved (fb#366/576).
@@ -3100,6 +3102,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev feedback cluster matches snapshot 1`] = `
 "USAGE
   ib dev feedback cluster <id> [flags]
+  (also: ib dev feedback relations · ib dev feedback related)
 
 DESCRIPTION
   Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only). Deploy-gated on puminet5api.
@@ -3125,7 +3128,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set — see \`get\`'s \`related\`.
+  - cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set. Aliases \`relations\`/\`related\` (fb#1420/1436) carry that same narrowing — for ALL FOUR edge types on one row read \`related[]\` off \`get <id> --full\`.
   - \`truncated: true\` means a walk bound cut the component — treat the result as suspect data, not a complete (bigger) fix.
 
 SEE ALSO

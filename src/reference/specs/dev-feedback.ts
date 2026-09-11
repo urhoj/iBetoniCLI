@@ -249,6 +249,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   },
   {
     command: "ib dev feedback cluster",
+    aliases: ["ib dev feedback relations", "ib dev feedback related"],
     description:
       "Fetch the fix-together component for a feedback row: every row reachable through duplicate + same-root-cause edges (developer-only, read-only). Deploy-gated on puminet5api.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -263,7 +264,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set — see `get`'s `related`.",
+      "cluster = duplicate + same-root-cause edges only; related/blocks edges are context, not part of the fix-together set. Aliases `relations`/`related` (fb#1420/1436) carry that same narrowing — for ALL FOUR edge types on one row read `related[]` off `get <id> --full`.",
       "`truncated: true` means a walk bound cut the component — treat the result as suspect data, not a complete (bigger) fix.",
     ],
     seeAlso: ["ib dev feedback link", "ib dev feedback get"],

@@ -68,6 +68,22 @@ describe("ib betoni laatu list", () => {
     expect(own.items.map((r) => r.laatuId)).toEqual([2, 3]);
   });
 
+  // fb#1521: every sibling list takes --limit and flags a cut page, so an agent
+  // has learned that silence means complete. Without a cap of its own this list
+  // was silent for a DIFFERENT reason, and the two were indistinguishable.
+  test("--limit caps client-side and says so; the unlimited list stays uncapped and unflagged", async () => {
+    client.get.mockResolvedValue(LAATU_ROWS);
+    const capped = await runLaatuList(client, { limit: 2 });
+    expect(capped.items.map((r) => r.laatuId)).toEqual([1, 2]);
+    expect(capped.truncated).toBe(true);
+    client.get.mockResolvedValue(LAATU_ROWS);
+    const whole = await runLaatuList(client, { limit: 10 });
+    expect(whole.count).toBe(3);
+    expect(whole).not.toHaveProperty("truncated");
+    client.get.mockResolvedValue(LAATU_ROWS);
+    expect(await runLaatuList(client)).not.toHaveProperty("truncated");
+  });
+
   test("--shared-only with --own-only exits 4 — they are disjoint sets, not a filter pair", async () => {
     client.get.mockResolvedValue(LAATU_ROWS);
     await expect(runLaatuList(client, { sharedOnly: true, ownOnly: true })).rejects.toMatchObject({

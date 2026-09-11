@@ -728,6 +728,24 @@ describe("ib feedback list", () => {
     ).rejects.toThrow(/did you mean applied/);
     expect(get).not.toHaveBeenCalled();
   });
+
+  test("fb#1444: `--status all` names the --all flag instead of only listing statuses", async () => {
+    // The enum did-you-mean cannot carry this one: `enumGuess` may only answer
+    // with a value that IS in `allowed`, and the thing the caller wanted is a
+    // FLAG. So the redirect rides on the message, keeping assertEnumCsv's shape
+    // so the spec's existing "must be one of" row still resolves it.
+    await expect(
+      runFeedbackList(mockClient, { status: "all" })
+    ).rejects.toThrow(/For EVERY status pass the --all flag/);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("fb#1444: an `all` sentinel inside a CSV is caught too, and is case-insensitive", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open,ALL" })
+    ).rejects.toThrow(/pass the --all flag/);
+    expect(get).not.toHaveBeenCalled();
+  });
 });
 
 /**

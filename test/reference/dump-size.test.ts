@@ -31,7 +31,12 @@ import { buildReference } from "../../src/reference/dump.js";
 // route never returned — it is a raw array). `ib keikka list` gained --asiakas (the
 // did-you-mean used to point it at --customer, a DIFFERENT dimension) plus its 403
 // row. Prose trimmed twice first; 714,246 B measured. Headroom ~350 B, deliberately thin.
-const DUMP_LIMIT_BYTES = 714_600;
+// 714,600 -> 716,200 on 2026-09-11 (fb#1381/1431/1521, +#1420/1436): `ib dev changelog
+// get` gained --full (no-op, sibling symmetry) and an outputShape naming the SIX fields
+// not spelled like their flags; `ib betoni laatu list` gained --limit plus the
+// never-paginated note; `feedback cluster` lists its relations/related aliases. All of
+// it answers filed discoverability misses. 715,861 B measured. Headroom ~340 B.
+const DUMP_LIMIT_BYTES = 716_200;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

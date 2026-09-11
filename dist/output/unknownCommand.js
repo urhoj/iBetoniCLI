@@ -339,9 +339,17 @@ export function usageEnvelopeResolves(env) {
 export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     const group = commandPath(cmd);
     const available = visibleSubcommands(cmd, tier);
-    const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, available);
+    // Reads before writes (fb#1522): an unattended agent FOLLOWS the suggestion,
+    // so a read intent must not be sent at a mutating command by accident.
+    // closestName keeps the FIRST candidate on a tie, so ordering the reads first
+    // is the whole tie-break — a clearly nearer write still wins, and is then
+    // labelled as one so the caller can notice before running it.
+    const isWrite = (name) => Boolean(specForPath(`${group} ${name}`)?.mutates);
+    const candidates = [...available.filter((n) => !isWrite(n)), ...available.filter(isWrite)];
+    const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, candidates);
     const discover = discoverHint(group);
-    const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
+    const writeTag = didYouMean && isWrite(didYouMean) ? " (a WRITE command)" : "";
+    const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`${writeTag}? ` : "";
     const availableStr = available.length > 0
         ? `Available ${cmd.name()} subcommands: ${available.join(", ")}. `
         : "";
@@ -369,6 +377,13 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
         ? null
         : descendantsOwningPositional(group, unknownToken, tier);
     const rest = (cmd.args ?? []).slice(1).map(String);
+    // Only the POSITIONAL branch may drop bare leftovers (fb#1397): it substitutes
+    // an argument placeholder for the bad token, so the caller's remaining
+    // positionals are already accounted for and appending them verbatim suggested
+    // `ib dev schema query <sql> query --help` — a command that fails again. The
+    // verb branches keep `rest` whole, because there a verb was swapped for a verb
+    // and the remaining tokens really are the caller's arguments.
+    const restFlags = rest.filter((t) => t.startsWith("-"));
     // "this group" is the group the caller typed — at the root there is none, so
     // the same two sentences name the owning DOMAIN instead (fb#383).
     const livesIn = group === "ib" ? "the verb lives in that domain group" : "the verb lives in a subgroup of this command";
@@ -380,7 +395,7 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
             : descendants.length > 1
                 ? `\`${group} ${unknownToken}\` does not exist, but ${livesDeeper}: ${descendants.map((d) => `\`${d}\``).join(", ")}. `
                 : positional
-                    ? `\`${group} ${unknownToken}\` does not exist — \`${unknownToken}\` is an ARGUMENT of \`${positional.path}\`, not a command: run \`${[positional.path, `<${positional.arg}>`, ...rest].join(" ")}\`. `
+                    ? `\`${group} ${unknownToken}\` does not exist — \`${unknownToken}\` is an ARGUMENT of \`${positional.path}\`, not a command: run \`${[positional.path, `<${positional.arg}>`, ...restFlags].join(" ")}\`. `
                     : "";
     return {
         success: false,

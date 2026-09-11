@@ -1191,6 +1191,11 @@ export function registerChangelogCommands(
   c.command("get <changelogId>")
     // `show` — the reflex spelling for read-one-row (feedback #373).
     .alias("show")
+    // Accepted and ignored: this command's description is NEVER capped, so there
+    // is nothing for it to unlock. Its sibling `ib dev feedback get` REQUIRES
+    // --full for the same thing, and callers who just used that reach for it here
+    // by analogy — a no-op beats an exit-4 round trip (fb#1381).
+    .option("--full")
     .action(
       guarded(async (idStr: string) => {
         const id = parseRefId(idStr, "changelog", "get");
@@ -1428,8 +1433,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: REPO_FLAG_DESC },
-      { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
-      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
+      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`, not `sha` (fb#1431)" },
+      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV), read back as `commitShas`; if both are given, they must match" },
       { name: "vtag", type: "string", description: "Version tag" },
       { name: "bump-level", type: "string", default: "patch", allowed: BUMP_LEVELS, description: "App version bump this implies: none|patch|minor|major" },
       {
@@ -1676,8 +1681,11 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)",
       },
     ],
-    flags: [],
-    outputShape: "entry",
+    flags: [
+      { name: "full", type: "boolean", description: "No-op, accepted for symmetry with `ib dev feedback get` which REQUIRES it — nothing here is ever truncated (fb#1381)" },
+    ],
+    outputShape:
+      "The full entry, never truncated. SIX fields are NOT named after the flag that writes them, so probing the flag name reads as a silently-dropped write (fb#1431): --sha/--commit→commitShas, --vtag→versionTag, --feedback→feedbackLinks:[{feedbackId,role}] (+ the legacy scalar feedbackId), --sentry→sentryIssue, --date→entryDate, --bump-level→bumpLevel. Every other field is plain-named.",
     errors: [
       {
         http: 403,
@@ -1744,8 +1752,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "severity", type: "string", description: SEVERITY_FLAG_DESC, allowed: [...SEVERITIES], synonyms: SEVERITY_SYNONYMS },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: "Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one" },
-      { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
-      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
+      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`, not `sha` (fb#1431)" },
+      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV), read back as `commitShas`; if both are given, they must match" },
       { name: "vtag", type: "string", description: "Version tag" },
       {
         name: "bump-level",

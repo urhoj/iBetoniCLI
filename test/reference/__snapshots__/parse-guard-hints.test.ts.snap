@@ -289,6 +289,10 @@ ib betoni laatu list --asiakas <id>
   ! --asiakas must be an integer >= 1
   > (no hint)
 
+ib betoni laatu list --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
 ib cache invalidate --asiakas <n>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId

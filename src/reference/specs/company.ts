@@ -146,6 +146,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
       { name: "search", type: "string", description: "Client-side substring filter over laatuNimike / laatuLyhenne / laatuSelite" },
       { name: "shared-only", type: "boolean", description: "Only the shared (asiakasId 0) grades" },
       { name: "own-only", type: "boolean", description: "Only the supplier's own grades (excludes the shared ones)" },
+      { name: "limit", type: "number", description: "Client-side cap on the rows returned (max 500); a cut page sets `truncated: true`. Without it the list is COMPLETE — the backend never paginates this catalogue (fb#1521)" },
     ],
     outputShape:
       "ListEnvelope<{ laatuId, laatuNimike, laatuLyhenne, laatuLaji, laatuSelite, sortNum, asiakasId, shared, isEnabled, showInDropDown, laatuAllowedS, laatuAllowedRae, laatuAllowedC, laatuShortCuts, laatuHelpId }>",
@@ -160,6 +161,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "asiakasId 0 is the SHARED (yhteinen) grade pool visible to every tenant; anything else is that supplier's own. The backend returns both in one list with no marker — `shared` is derived client-side.",
       "Deliberately NOT restricted to your own tenant: a customer legitimately reads its SUPPLIER's catalogue, which is why the backend scopes the cache key by supplier rather than by caller.",
       "The rows come from betoniLaatuView. laatuAllowedRae/laatuAllowedS/laatuAllowedC are expressed in the vocabularies `ib betoni reference` returns.",
+      "Never paginated: without --limit the envelope is the supplier's WHOLE catalogue (no `truncated`, no cursor), so a laatuId absent from it does not exist for that supplier (fb#1521).",
     ],
     seeAlso: ["ib betoni laatu get", "ib betoni reference"],
     examples: [

@@ -2,7 +2,7 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { failUsage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { jsonAction } from "../_shared/action.js";
-import { intFlag, assertEnum } from "../../targets.js";
+import { intFlag, cappedInt, assertEnum } from "../../targets.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 /** The shared-grade / shared-attribute sentinel used by both betoni entities. */
 const SHARED_ASIAKAS_ID = 0;
@@ -50,7 +50,13 @@ export async function runLaatuList(client, opts = {}) {
         const needle = opts.search.toLowerCase();
         items = items.filter((r) => [r.laatuNimike, r.laatuLyhenne, r.laatuSelite].some((v) => typeof v === "string" && v.toLowerCase().includes(needle)));
     }
-    return listEnvelope(items);
+    // Client-side cap (fb#1521): the backend never paginates this list, so the
+    // cap exists for vocabulary parity with every sibling `list` — and a cut page
+    // is flagged the way theirs are, so silence keeps meaning "complete".
+    const cut = opts.limit !== undefined && items.length > opts.limit;
+    if (cut)
+        items = items.slice(0, opts.limit);
+    return listEnvelope(items, cut ? { truncated: true, hint: "raise --limit or drop it — the uncapped list is the whole catalogue" } : undefined);
 }
 /**
  * One grade by id.
@@ -142,6 +148,7 @@ export function registerBetoniCommands(parent, getClient) {
         .option("--search <s>")
         .option("--shared-only")
         .option("--own-only")
+        .option("--limit <n>", "", cappedInt(500))
         .action(jsonAction(getClient, (client, opts) => runLaatuList(client, opts)));
     laatu
         .command("get <laatuId>")
