@@ -2022,6 +2022,203 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev apikey list matches snapshot 1`] = `
+"USAGE
+  ib dev apikey list --asiakas <asiakas> [flags]
+
+DESCRIPTION
+  Every credential configured for one tenant, across all sources — for support/diagnosis. NEVER returns the value itself, only its length. Read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --asiakas NUMBER    Target tenant ownerAsiakasId (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires are honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries and /api/apiKeys/check (fb#1564, fb#1592); valueLength is LEN(apiKey), never the value.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas was not passed → pass the target tenant's ownerAsiakasId — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev apikey verify, ib dev apikey sources
+
+EXAMPLES
+  ib dev apikey list --asiakas 8
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev apikey revoke matches snapshot 1`] = `
+"USAGE
+  ib dev apikey revoke --asiakas <asiakas> --source <source> --name <name> [flags]
+
+DESCRIPTION
+  Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.
+  Permissions: requires isSystemAdmin.
+
+FLAGS
+  --asiakas NUMBER    Target tenant ownerAsiakasId (required)
+  --source NUMBER    apiKeySourceId (see \`ib dev apikey sources\`) (required)
+  --name STRING    apiKeyName to revoke (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { revoked:true } or { revoked:true, alreadyRevoked:true }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Missing required flag  → pass --asiakas, --source, and --name
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive apiKeySourceId
+  exit 3 (HTTP 403)  System-admin only (server-enforced) → this write requires isSystemAdmin, not merely isDeveloper
+  exit 5 (HTTP 404)  No apiKey found for that tenant+source+name → check spelling with \`ib dev apikey list --asiakas <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev apikey set, ib dev apikey list
+
+EXAMPLES
+  ib dev apikey revoke --asiakas 8 --source 18 --name MAPON_APIKEY --reason "credential rotated"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev apikey set matches snapshot 1`] = `
+"USAGE
+  ib dev apikey set --asiakas <asiakas> --source <source> --name <name> [flags]
+
+DESCRIPTION
+  Create or replace a credential for tenant+source+name — the write path that has never existed for dbo.apiKeys; onboarding an integration previously required a developer to hand-write a prod SQL INSERT. Replacing an existing key REACTIVATES it (apiKeyActive=1), the same way rotating a credential anywhere else brings it back live. The value is NEVER echoed back in the response, even here — the caller already has it, so the response confirms only what changed (apiKeyId, entryTime, wasCreated).
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakas NUMBER    Target tenant ownerAsiakasId (required)
+  --source NUMBER    apiKeySourceId (see \`ib dev apikey sources\`) (required)
+  --name STRING    apiKeyName, e.g. MAPON_APIKEY (required)
+  --value STRING    The credential value (prefer --value-stdin on a shared shell) (required: one value)
+  --value-stdin    Read the credential value from stdin instead of argv (required: one value)
+  --description STRING    Optional human-readable note
+  --expires DATE    Optional expiry date (today|yesterday|tomorrow or YYYY-MM-DD)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { apiKeyId, entryTime, wasCreated:boolean } — never the value.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Missing/conflicting required flags → pass --asiakas, --source, --name, and exactly one of --value / --value-stdin
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive apiKeySourceId
+  exit 3 (HTTP 403)  System-admin only (server-enforced) → this write requires isSystemAdmin, not merely isDeveloper — the ticket is explicit that admin-tier access is not enough
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The 12h-ish config cache (both the /api/apiKeys/check cache and puminet7-functions-app's fleet-tracking cron cache) is invalidated on write — a set/revoke takes effect quickly, not after the cache TTL.
+  - A later \`revoke\` on this same row takes effect in the readers that honour apiKeyActive/expires: getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592).
+
+SEE ALSO
+  ib dev apikey revoke, ib dev apikey verify, ib dev apikey sources
+
+EXAMPLES
+  ib dev apikey set --asiakas 8 --source 18 --name MAPON_APIKEY --value-stdin --reason "Mapon onboarding"
+  ib dev apikey set --asiakas 8 --source 18 --name MAPON_APIURL --value https://mapon.com/api/v1 --reason "Mapon onboarding"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev apikey sources matches snapshot 1`] = `
+"USAGE
+  ib dev apikey sources [flags]
+
+DESCRIPTION
+  The full dbo.apiKeySources reference list (id, name, description) — how to find a valid apiKeySourceId before calling \`set\`. Read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items:[{ apiKeySourceId, apiKeySourceName, apiKeySourceDescription }], nextCursor, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev apikey list, ib dev apikey set
+
+EXAMPLES
+  ib dev apikey sources
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev apikey verify matches snapshot 1`] = `
+"USAGE
+  ib dev apikey verify --asiakas <asiakas> --source <source> [flags]
+
+DESCRIPTION
+  Does tenant X have a credential configured for source Y — the diagnostic the existing tenant-self-scoped POST /api/apiKeys/check cannot answer for an ARBITRARY tenant. Omit --name to see every key configured for that source. NEVER returns the value itself. Read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --asiakas NUMBER    Target tenant ownerAsiakasId (required)
+  --source NUMBER    apiKeySourceId (see \`ib dev apikey sources\`) (required)
+  --name STRING    apiKeyName — omit to see every key configured for that source
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { found:boolean, entries:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --asiakas was not passed → pass the target tenant's ownerAsiakasId
+  exit 4 (client-side)  --source was not passed → pass an apiKeySourceId — see \`ib dev apikey sources\`
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive apiKeySourceId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev apikey list, ib dev apikey sources
+
+EXAMPLES
+  ib dev apikey verify --asiakas 8 --source 18
+  ib dev apikey verify --asiakas 8 --source 18 --name MAPON_APIKEY
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook import matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook import --body <body> [flags]

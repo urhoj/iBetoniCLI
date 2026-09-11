@@ -18,7 +18,13 @@ import { buildReference } from "../../src/reference/dump.js";
 // 702,600 -> 702,800 on 2026-09-11 (fb#1560 follow-up), measured 702,715 B after rebasing onto the fb#1562 bump above: `ib vehicle create` gained --force plus its client-origin duplicate-plate ERROR row (a real vehicle-create call had no check for an already-active same-plate vehicle at all — two independent create passes for the Betomik pilot's fleet produced duplicate rows twice in a row). The row is the point, not padding — hintForError matches on it, so the refusal answers with its own remedy (--force) instead of the generic exit-4 hint. Prose was trimmed twice before this bump; headroom kept deliberately thin (~85 B).
 // 702,800 -> 704,300 on 2026-09-11 (Betomik order-book validator, task 6): new CommandSpec `ib dev betomik-orderbook import` (developer-tier, --body/--from-json + the write-safety trio, 3 ERROR rows for the 403/400/client-side-no-payload cases), measured 704,205 B. Headroom kept deliberately thin (~95 B).
 // 704,300 -> 704,600 on 2026-09-11 (fb#1500/fb#1483/fb#1532, fb#1525): split `ib dev schema query`'s single "Guard rejection or SQL error" ERROR row into a shape-guard row and a genuine-SQL-error row — the old combined remedy always opened with the guard-rejection framing ("rephrase to a single read statement") even for a real SQL Server error, where the statement's shape was never the problem; plus corrected `ib worksite create`'s PERMISSIONS/403 remedy from the FE-only `auth.page.tyomaa.edit` (never evaluated server-side, fb#1525) to the real `keikkaEdit` company-role tier gate on --body.ownerAsiakasId (fb#1434). Measured 704,465 B. Headroom kept deliberately thin (~135 B).
-const DUMP_LIMIT_BYTES = 704_600;
+// 704,600 -> 713,000 on 2026-09-11 (fb#1563/fb#1564): five new `ib dev apikey`
+// leaves (sources/list/verify/set/revoke) — the first write path ever added
+// for dbo.apiKeys, which previously required a developer to hand-write a prod
+// SQL INSERT. 712,703 B measured (headroom ~300 B, deliberately thin); the five specs are real new capability
+// (write-safety trio + reasonPolicy on two, plus the "never returns the
+// value" contract worth stating explicitly), not padding.
+const DUMP_LIMIT_BYTES = 713_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

@@ -142,6 +142,8 @@ export const DOMAIN_REGISTRARS: ReadonlyMap<string, DomainRegistrar> = new Map<
       (await import("./commands/dev/email-health/index.js")).registerEmailHealthCommand(dev, d.getClient);
       (await import("./commands/dev/email-delivery/index.js")).registerEmailDeliveryCommand(dev, d.getClient);
       (await import("./commands/betomikOrderbook/index.js")).registerBetomikOrderbookCommands(dev, d.getClient);
+      // Same shape again: canonical only under `ib dev`, no top-level alias.
+      (await import("./commands/dev/apikey/index.js")).registerApikeyCommands(dev, d.getClient);
     },
   ],
   // Hidden back-compat aliases at the old top-level paths (still executable).

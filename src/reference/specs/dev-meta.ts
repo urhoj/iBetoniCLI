@@ -253,4 +253,127 @@ export const DEV_META_SPECS: CommandSpec[] = [
       "ib dev email-delivery --message 142d9f3f351.7618.254f56",
     ],
   },
+  // ─── apikey (5) ──────────────────────────────────────────────────────────
+  // Sysadmin credential admin for dbo.apiKeys (fb#1563). Gating is split by
+  // verb, deliberately stricter than the rest of `ib dev`: writes require
+  // isSystemAdmin ONLY, reads use the usual isSystemAdminOrDeveloper gate
+  // since they never reveal the value — see each command's `permissions`.
+  {
+    command: "ib dev apikey sources",
+    description:
+      "The full dbo.apiKeySources reference list (id, name, description) — how to find a valid apiKeySourceId before calling `set`. Read-only.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [],
+    outputShape: "{ items:[{ apiKeySourceId, apiKeySourceName, apiKeySourceDescription }], nextCursor, count }",
+    errors: [...permErrors("isSystemAdmin or isDeveloper")],
+    seeAlso: ["ib dev apikey list", "ib dev apikey set"],
+    examples: ["ib dev apikey sources"],
+  },
+  {
+    command: "ib dev apikey list",
+    description:
+      "Every credential configured for one tenant, across all sources — for support/diagnosis. NEVER returns the value itself, only its length. Read-only.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [{ name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" }],
+    outputShape:
+      "{ items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires are honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries and /api/apiKeys/check (fb#1564, fb#1592); valueLength is LEN(apiKey), never the value.",
+    errors: [
+      { origin: "client", exit: 4, match: "--asiakas is required", meaning: "--asiakas was not passed", remedy: "pass the target tenant's ownerAsiakasId — `ib company list` shows the ones you can reach" },
+      intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
+      ...permErrors("isSystemAdmin or isDeveloper"),
+    ],
+    seeAlso: ["ib dev apikey verify", "ib dev apikey sources"],
+    examples: ["ib dev apikey list --asiakas 8"],
+  },
+  {
+    command: "ib dev apikey verify",
+    description:
+      "Does tenant X have a credential configured for source Y — the diagnostic the existing tenant-self-scoped POST /api/apiKeys/check cannot answer for an ARBITRARY tenant. Omit --name to see every key configured for that source. NEVER returns the value itself. Read-only.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [
+      { name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" },
+      { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
+      { name: "name", type: "string", description: "apiKeyName — omit to see every key configured for that source" },
+    ],
+    outputShape: "{ found:boolean, entries:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }] }",
+    errors: [
+      { origin: "client", exit: 4, match: "--asiakas is required", meaning: "--asiakas was not passed", remedy: "pass the target tenant's ownerAsiakasId" },
+      { origin: "client", exit: 4, match: "--source is required", meaning: "--source was not passed", remedy: "pass an apiKeySourceId — see `ib dev apikey sources`" },
+      intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
+      intParseErr("--source", "pass a positive apiKeySourceId"),
+      ...permErrors("isSystemAdmin or isDeveloper"),
+    ],
+    seeAlso: ["ib dev apikey list", "ib dev apikey sources"],
+    examples: [
+      "ib dev apikey verify --asiakas 8 --source 18",
+      "ib dev apikey verify --asiakas 8 --source 18 --name MAPON_APIKEY",
+    ],
+  },
+  {
+    command: "ib dev apikey set",
+    description:
+      "Create or replace a credential for tenant+source+name — the write path that has never existed for dbo.apiKeys; onboarding an integration previously required a developer to hand-write a prod SQL INSERT. Replacing an existing key REACTIVATES it (apiKeyActive=1), the same way rotating a credential anywhere else brings it back live. The value is NEVER echoed back in the response, even here — the caller already has it, so the response confirms only what changed (apiKeyId, entryTime, wasCreated).",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    mutates: true,
+    writeFlags: true,
+    dryRunKind: "server",
+    reasonPolicy: "always",
+    flags: [
+      { name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" },
+      { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
+      { name: "name", type: "string", required: true, description: "apiKeyName, e.g. MAPON_APIKEY" },
+      { name: "value", type: "string", description: "The credential value (prefer --value-stdin on a shared shell)", requiredGroup: "value" },
+      { name: "value-stdin", type: "boolean", description: "Read the credential value from stdin instead of argv", requiredGroup: "value" },
+      { name: "description", type: "string", description: "Optional human-readable note" },
+      { name: "expires", type: "date", description: "Optional expiry date (today|yesterday|tomorrow or YYYY-MM-DD)" },
+    ],
+    outputShape: "{ apiKeyId, entryTime, wasCreated:boolean } — never the value.",
+    errors: [
+      { origin: "client", exit: 4, match: ["is required", "mutually exclusive", "Provide the credential"], meaning: "Missing/conflicting required flags", remedy: "pass --asiakas, --source, --name, and exactly one of --value / --value-stdin" },
+      intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
+      intParseErr("--source", "pass a positive apiKeySourceId"),
+      apiErr(403, "System-admin only (server-enforced)", "this write requires isSystemAdmin, not merely isDeveloper — the ticket is explicit that admin-tier access is not enough"),
+      ...authErrors(),
+    ],
+    notes: [
+      "The 12h-ish config cache (both the /api/apiKeys/check cache and puminet7-functions-app's fleet-tracking cron cache) is invalidated on write — a set/revoke takes effect quickly, not after the cache TTL.",
+      "A later `revoke` on this same row takes effect in the readers that honour apiKeyActive/expires: getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592).",
+    ],
+    seeAlso: ["ib dev apikey revoke", "ib dev apikey verify", "ib dev apikey sources"],
+    examples: [
+      "ib dev apikey set --asiakas 8 --source 18 --name MAPON_APIKEY --value-stdin --reason \"Mapon onboarding\"",
+      "ib dev apikey set --asiakas 8 --source 18 --name MAPON_APIURL --value https://mapon.com/api/v1 --reason \"Mapon onboarding\"",
+    ],
+  },
+  {
+    command: "ib dev apikey revoke",
+    description:
+      "Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    mutates: true,
+    writeFlags: true,
+    dryRunKind: "server",
+    reasonPolicy: "always",
+    flags: [
+      { name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" },
+      { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
+      { name: "name", type: "string", required: true, description: "apiKeyName to revoke" },
+    ],
+    outputShape: "{ revoked:true } or { revoked:true, alreadyRevoked:true }.",
+    errors: [
+      { origin: "client", exit: 4, match: "is required", meaning: "Missing required flag", remedy: "pass --asiakas, --source, and --name" },
+      intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
+      intParseErr("--source", "pass a positive apiKeySourceId"),
+      apiErr(403, "System-admin only (server-enforced)", "this write requires isSystemAdmin, not merely isDeveloper"),
+      apiErr(404, "No apiKey found for that tenant+source+name", "check spelling with `ib dev apikey list --asiakas <id>`"),
+      ...authErrors(),
+    ],
+    seeAlso: ["ib dev apikey set", "ib dev apikey list"],
+    examples: ["ib dev apikey revoke --asiakas 8 --source 18 --name MAPON_APIKEY --reason \"credential rotated\""],
+  },
 ];
