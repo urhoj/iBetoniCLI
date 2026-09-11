@@ -443,7 +443,10 @@ async function nearestObjectNameSuggestion(client, badName) {
     const names = [...tables.items, ...views.items]
         .map((r) => r.name)
         .filter((n) => typeof n === "string");
-    const match = closestName(bare, names);
+    // {} not the default VERB_SYNONYMS table (add/create/show/get…) — meaningless
+    // for a SQL object name and only ever a copy-paste artifact from the
+    // command-name did-you-mean use case (bug-review finding on fb#1483).
+    const match = closestName(bare, names, {});
     return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
 }
 /**

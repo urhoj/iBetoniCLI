@@ -517,7 +517,10 @@ async function nearestObjectNameSuggestion(client: ApiClient, badName: string): 
   const names = [...tables.items, ...views.items]
     .map((r) => (r as Record_).name)
     .filter((n): n is string => typeof n === "string");
-  const match = closestName(bare, names);
+  // {} not the default VERB_SYNONYMS table (add/create/show/get…) — meaningless
+  // for a SQL object name and only ever a copy-paste artifact from the
+  // command-name did-you-mean use case (bug-review finding on fb#1483).
+  const match = closestName(bare, names, {});
   return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
 }
 
