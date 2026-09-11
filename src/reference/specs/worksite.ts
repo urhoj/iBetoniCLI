@@ -100,7 +100,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   {
     command: "ib worksite create",
     description:
-      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0), asiakasId (linked customer, not ownerAsiakasId).",
+      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on `ib worksite update` instead.",
     permissions: ["auth.page.tyomaa.edit"],
     flags: [
       {
