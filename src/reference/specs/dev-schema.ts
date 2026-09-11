@@ -245,10 +245,28 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
             "param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself",
             ["invalid param name", "params must be", "too many params", "given twice", "must be a string, number, boolean or null", "must be a finite number"]
           ),
+          // Split from one combined "Guard rejection or SQL error" row (fb#1500):
+          // that single remedy always opened with the guard-rejection framing
+          // ("rephrase to a single read statement") even for a genuine SQL
+          // Server error, where the statement's SHAPE was never the problem —
+          // rephrasing a shape that already validated does not help. Matched on
+          // the LITERAL reasons `validateReadOnlySql` (puminet5api
+          // modules/schema/readOnlyQuery.js) throws — its "sql must be a
+          // string" branch is omitted from `match` as unreachable via this
+          // client (the `sql` param is always a string). Anything else at this
+          // status (always `SQL error: …`, fb#1177's scalar-variable/
+          // invalid-param cases excepted — those match earlier, narrower rows)
+          // falls through to the catch-all below.
           apiErr(
             400,
-            "Guard rejection or SQL error",
-            "the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a `SQL error:` prefix means the statement reached the DB and failed there (check names via `ib dev schema table`)"
+            "Guard rejection (shape)",
+            "rephrase to one SELECT (or WITH … SELECT); ';'/INTO also rejects inside a string literal (false positive)",
+            ["semicolons are not allowed", "select (or", "into is not allowed", "empty query", "unterminated block comment"]
+          ),
+          apiErr(
+            400,
+            "SQL error (reached DB)",
+            "shape was fine; check names via `ib dev schema table <name>` (an Invalid object name gets an automatic did-you-mean)"
           ),
           // Client-side guards. This group had NO origin:"client" rows at all, so
           // every local `failWith` here answered with the generic per-exit hint

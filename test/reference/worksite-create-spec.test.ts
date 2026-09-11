@@ -14,6 +14,9 @@ describe("ib worksite create spec truthfulness", () => {
     // the fb#1562 bug used them where `tyomaaNimi`/`tyomaaOsoite1` belong.
     expect(examples).not.toContain('"name"');
     expect(examples).not.toContain('"address"');
+    // `asiakasId` is never bound by tyomaaSql.newTyomaa's tyomaa_create call —
+    // a create-body example using it would silently no-op (fb#1562 follow-up).
+    expect(examples).not.toContain('"asiakasId"');
   });
 
   it("its first example carries the required field", () => {

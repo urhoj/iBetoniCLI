@@ -54,6 +54,36 @@ export interface GlossarySetFields {
 }
 
 /**
+ * Keys `set --from-json` actually reads (via {@link mergeSetInput}), including
+ * the read-shape aliases (`relatedCommands`/`relatedEntity`).
+ */
+const GLOSSARY_SET_JSON_KEYS = [
+  "definition", "synonyms", "related", "relatedCommands", "entity", "relatedEntity",
+  "domain", "aiConfidence", "needsHumanReview",
+] as const;
+
+/**
+ * Reject an unknown key in a `set --from-json` object instead of silently
+ * dropping it (fb#1533) — mirroring `ib dev changelog add --from-json`'s
+ * contract ("an unknown or wrong-typed key exits 4, never silently dropped").
+ * `set` is a PARTIAL update where an omitted field KEEPS its current value, so
+ * a typo'd key was previously indistinguishable from "leave this field alone"
+ * — the write still succeeded, just without the change the caller intended.
+ * That matters most for the machine writer (`groom-ib-glossary`, which uses
+ * --from-json to stay argv-safe with Finnish ä/ö): a typo there produced a
+ * green run that groomed nothing.
+ */
+function assertKnownGlossarySetKeys(json: Record<string, unknown>): void {
+  const unknown = Object.keys(json).filter((k) => !(GLOSSARY_SET_JSON_KEYS as readonly string[]).includes(k));
+  if (unknown.length) {
+    failWith(
+      `--from-json: unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${GLOSSARY_SET_JSON_KEYS.join(", ")}`,
+      4
+    );
+  }
+}
+
+/**
  * Merge fields from a parsed JSON object with explicit CLI flags.
  * Flags take precedence over the JSON values — an explicitly-passed flag always
  * wins regardless of what the JSON file contains. Fields absent from both json
@@ -381,6 +411,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
         let json: Record<string, unknown>;
         try { json = readJsonInput(opts.fromJson) as Record<string, unknown>; }
         catch { failWith("--from-json: not valid JSON", 4); }
+        assertKnownGlossarySetKeys(json);
         merged = mergeSetInput(json, flagFields);
       }
       // Validate the MERGED score, not just the flag — a --from-json object can

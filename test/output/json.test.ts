@@ -177,6 +177,53 @@ describe("JSON output", () => {
       });
     });
 
+    // fb#1568: `ib keikka latest --columns keikkaId,asiakasId` wraps its real
+    // payload in a single-object `item` envelope (`{ item, searched }`), so
+    // real field names one level down used to be unreachable and the exit-4
+    // "Available" list named only the wrapper's own keys (item, searched).
+    test("projects into a single-object `item` envelope, keeping sibling metadata (fb#1568)", () => {
+      setProjectionColumns(["keikkaId", "asiakasId"]);
+      writeJson({
+        item: { keikkaId: 42, asiakasId: 8, tyomaaId: 5 },
+        searched: { from: "2026-01-01", to: "2026-09-11" },
+      });
+      expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({
+        item: { keikkaId: 42, asiakasId: 8 },
+        searched: { from: "2026-01-01", to: "2026-09-11" },
+      });
+    });
+
+    test("a null `item` (nothing found) passes through unchanged (fb#1568)", () => {
+      setProjectionColumns(["keikkaId"]);
+      writeJson({ item: null, searched: { from: "2025-09-12", to: "2026-09-11" } });
+      expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({
+        item: null,
+        searched: { from: "2025-09-12", to: "2026-09-11" },
+      });
+    });
+
+    test("an unmatched column against an `item` envelope names the ITEM's own fields, not the wrapper's (fb#1568)", () => {
+      setProjectionColumns(["tyomaaNimi"]);
+      let err: unknown;
+      try {
+        writeJson({ item: { keikkaId: 42, asiakasId: 8 }, searched: { from: "a", to: "b" } });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).message).toContain("Available: keikkaId, asiakasId");
+      expect((err as CliError).message).not.toContain("Available: item, searched");
+    });
+
+    // A record whose OWN field happens to be literally named "item" but is not
+    // itself an object (e.g. a string/number) is an ordinary flat record — the
+    // item-envelope heuristic must not misfire on it.
+    test("a non-object `item` field does not trigger envelope descent", () => {
+      setProjectionColumns(["item"]);
+      writeJson({ item: "puomisto", other: 1 });
+      expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({ item: "puomisto" });
+    });
+
     // fb#596: `ib dev schema table X --columns name` matches the record's OWN
     // `name` (the TABLE name), so the no-match exit-4 guard cannot fire, and the
     // 27-row `columns[]` the caller actually meant is dropped in silence —

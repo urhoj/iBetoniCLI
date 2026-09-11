@@ -326,6 +326,81 @@ describe("ib schema", () => {
     });
   });
 
+  describe("runSchemaQuery near-miss object-name suggestion (fb#1483/fb#1500/fb#1532)", () => {
+    const post = () => mockClient.post;
+
+    beforeEach(() => {
+      post().mockReset();
+      get().mockReset();
+    });
+
+    test("an Invalid object name failure is enriched with a did-you-mean hint from the live table/view list", async () => {
+      post().mockRejectedValueOnce(
+        new CliError("SQL error: Invalid object name 'dbo.laskupohjaRivi'.", 400, null, 4)
+      );
+      get()
+        .mockResolvedValueOnce({ items: [{ name: "laskupohjaRivit" }], nextCursor: null, count: 1 })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(runSchemaQuery(mockClient, "SELECT COUNT(*) FROM dbo.laskupohjaRivi")).rejects.toMatchObject({
+        message: "SQL error: Invalid object name 'dbo.laskupohjaRivi'.",
+        hint: expect.stringContaining("dbo.laskupohjaRivit"),
+      });
+    });
+
+    // dbo holds ~250 tables against a 200-row default page (fb#1483 follow-up,
+    // caught live: the suggestion still "worked" by luck on a name inside the
+    // first page, but fired a nonsensical TRUNCATED stderr warning and would
+    // silently miss any typo landing past row 200). The lookup must ask for
+    // the max page, not the default.
+    test("the near-miss lookup requests the full 1000-row page, not the 200-row default", async () => {
+      post().mockRejectedValueOnce(
+        new CliError("SQL error: Invalid object name 'dbo.foo'.", 400, null, 4)
+      );
+      get()
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.foo")).rejects.toBeDefined();
+      expect(get()).toHaveBeenNthCalledWith(1, "/api/cli/schema/tables?limit=1000");
+      expect(get()).toHaveBeenNthCalledWith(2, "/api/cli/schema/views?limit=1000");
+    });
+
+    test("no hint is added when nothing in the live list is close — the original error is unchanged", async () => {
+      const original = new CliError("SQL error: Invalid object name 'dbo.totallyUnrelated'.", 400, null, 4);
+      post().mockRejectedValueOnce(original);
+      get()
+        .mockResolvedValueOnce({ items: [{ name: "keikka" }], nextCursor: null, count: 1 })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.totallyUnrelated")).rejects.toBe(original);
+    });
+
+    test("a non-object-name 400 (e.g. Invalid column name) is left untouched and never triggers a lookup", async () => {
+      const original = new CliError("SQL error: Invalid column name 'foo'.", 400, null, 4);
+      post().mockRejectedValueOnce(original);
+
+      await expect(runSchemaQuery(mockClient, "SELECT foo FROM keikka")).rejects.toBe(original);
+      expect(get()).not.toHaveBeenCalled();
+    });
+
+    test("a failed near-miss lookup never masks the original error", async () => {
+      const original = new CliError("SQL error: Invalid object name 'dbo.oops'.", 400, null, 4);
+      post().mockRejectedValueOnce(original);
+      get().mockRejectedValue(new Error("network down"));
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.oops")).rejects.toBe(original);
+    });
+
+    test("a non-400 failure is never enriched", async () => {
+      const original = new CliError("Not a developer", 403, null, 3);
+      post().mockRejectedValueOnce(original);
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM keikka")).rejects.toBe(original);
+      expect(get()).not.toHaveBeenCalled();
+    });
+  });
+
   describe("resolveSqlInput (fb#968)", () => {
     test("accepts the positional alone", () => {
       expect(resolveSqlInput("SELECT 1", undefined)).toBe("SELECT 1");

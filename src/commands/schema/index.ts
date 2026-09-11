@@ -10,6 +10,7 @@ import { cappedInt } from "../../targets.js";
 import { foldAliases } from "../_shared/flags.js";
 import { readTextInput } from "../../api/parseBody.js";
 import { failWith } from "../../output/json.js";
+import { closestName } from "../../output/nearest.js";
 
 export interface SchemaListFilter {
   search?: string;
@@ -487,6 +488,42 @@ export function resolveSqlInput(positional?: string, flag?: string, file?: strin
   return inline;
 }
 
+/** Matches the SQL Server 208 message text, verbatim from `readOnlyQuery.js`'s
+ *  `SQL error: ${err.message}` forwarding — captures the quoted object name. */
+const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
+
+/**
+ * "Did you mean …?" for an `Invalid object name` failure (fb#1483/fb#1532):
+ * `ib dev schema query` runs on a login with no catalogue metadata visibility
+ * (see the command's NOTES), so a bad name otherwise reaches the caller as a
+ * bare SQL Server message with none of the near-miss help `schema table`'s own
+ * 404 gives. Column-name errors (SQL 207) are deliberately NOT handled the same
+ * way: the message carries no table context to search against, and guessing
+ * one would be worse than the honest "check `ib dev schema table`" remedy.
+ *
+ * Best-effort: any failure fetching the live table/view list is swallowed by
+ * the caller (a failed near-miss lookup must never mask the original error).
+ */
+async function nearestObjectNameSuggestion(client: ApiClient, badName: string): Promise<string | null> {
+  const bare = badName.includes(".") ? badName.slice(badName.lastIndexOf(".") + 1) : badName;
+  // { limit: 1000 } — the default 200-row page is a PARTIAL catalogue (dbo
+  // holds ~250 tables), so an unlimited fetch here would silently miss a
+  // near-miss for any typo landing past row 200 and additionally fire a
+  // TRUNCATED stderr warning that makes no sense for an internal lookup.
+  const [tables, views] = await Promise.all([
+    runSchemaTables(client, { limit: 1000 }),
+    runSchemaViews(client, { limit: 1000 }),
+  ]);
+  const names = [...tables.items, ...views.items]
+    .map((r) => (r as Record_).name)
+    .filter((n): n is string => typeof n === "string");
+  // {} not the default VERB_SYNONYMS table (add/create/show/get…) — meaningless
+  // for a SQL object name and only ever a copy-paste artifact from the
+  // command-name did-you-mean use case (bug-review finding on fb#1483).
+  const match = closestName(bare, names, {});
+  return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
+}
+
 /**
  * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
  * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
@@ -501,13 +538,25 @@ export async function runSchemaQuery(
   sql: string,
   params?: Record<string, QueryParamValue>
 ): Promise<SchemaQueryResult> {
-  const result = await client.post<SchemaQueryResult>(
-    "/api/cli/schema/query",
-    // Omitted, not `params: undefined`, when nothing was bound — the body of an
-    // unparameterized query is unchanged by this feature (fb#1177).
-    params ? { sql, params } : { sql },
-    { read: true }
-  );
+  let result: SchemaQueryResult;
+  try {
+    result = await client.post<SchemaQueryResult>(
+      "/api/cli/schema/query",
+      // Omitted, not `params: undefined`, when nothing was bound — the body of an
+      // unparameterized query is unchanged by this feature (fb#1177).
+      params ? { sql, params } : { sql },
+      { read: true }
+    );
+  } catch (e) {
+    if (e instanceof CliError && e.statusCode === 400) {
+      const objectMatch = e.message.match(INVALID_OBJECT_NAME_RE);
+      if (objectMatch) {
+        const suggestion = await nearestObjectNameSuggestion(client, objectMatch[1]).catch(() => null);
+        if (suggestion) throw new CliError(e.message, e.statusCode, e.body, e.exitCode, suggestion);
+      }
+    }
+    throw e;
+  }
   if (result.truncated) {
     // Tailored hint: this route has no --limit/--offset — the way past the cap
     // is a narrower WHERE or an aggregate (which is what this command is for).

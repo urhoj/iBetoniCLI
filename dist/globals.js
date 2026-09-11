@@ -24,7 +24,7 @@ const GLOBAL_OPTIONS = [
     ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
     [
         "--columns <csv>",
-        "Only output these TOP-LEVEL fields (projects list rows and single records; never reaches into a nested list; loud on no match)",
+        "Only output these TOP-LEVEL fields (projects list rows, single records, and an item envelope's item; never reaches into a nested list; loud on no match)",
     ],
     [
         "--print-payload",

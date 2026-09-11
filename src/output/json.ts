@@ -75,6 +75,22 @@ const isRow = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 
 /**
+ * The single-object counterpart to {@link isListEnvelope} (fb#1568): a
+ * `ListEnvelope` wraps its payload in an `items` ARRAY alongside metadata
+ * (`nextCursor`/`count`); a handful of commands (currently only
+ * `ib keikka latest`) wrap a single-record payload in an `item` OBJECT
+ * alongside metadata the same way (`{ item, searched }`). Recognizing the
+ * literal `item` key — present and either a row or `null` — is what tells
+ * this apart from an ordinary flat record that happens to have OTHER nested
+ * object fields (`ib keikka get`'s `customer`/`worksite`/… are real sibling
+ * fields, not a wrapper, and must keep projecting at their own top level).
+ */
+const isItemEnvelope = (
+  v: unknown
+): v is Record<string, unknown> & { item: Record<string, unknown> | null } =>
+  isRow(v) && "item" in v && (v.item === null || isRow(v.item));
+
+/**
  * A single record's real payload usually lives in a NESTED list — `ib dev schema
  * table X` returns `{name, columns[], indexes[], triggers[], …}` — which a
  * TOP-LEVEL projection drops in silence. `--columns name` there READS as "the
@@ -133,16 +149,19 @@ function describeUnknownColumn(col: string, available: string[]): string {
 /**
  * Apply the global `--columns` projection to a command's success output
  * (fb#451). A `ListEnvelope` / raw array projects each object row (envelope
- * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); a single
- * record projects its top-level keys. LOUD by contract — the old silent no-op
+ * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); an `item`
+ * envelope (fb#1568 — see {@link isItemEnvelope}) projects the nested `item`
+ * the same way (its own metadata, e.g. `searched`, is kept); a plain record
+ * projects its top-level keys. LOUD by contract — the old silent no-op
  * was the bug: a requested column matching nothing warns on stderr; when NO
  * requested column matches, or the output is a scalar that cannot be
  * projected at all, the command exits 4 naming what IS available instead of
  * returning the unprojected payload as if the flag had been applied.
  *
- * TOP-LEVEL ONLY — it never reaches into a nested list. A record whose payload
- * lives in one warns instead (fb#596); see {@link warnDroppedNestedLists} for
- * why that case cannot use the exit-4 guard above.
+ * TOP-LEVEL ONLY beyond that one `item` exception — it never reaches into a
+ * nested LIST. A record whose payload lives in one warns instead (fb#596);
+ * see {@link warnDroppedNestedLists} for why that case cannot use the exit-4
+ * guard above.
  */
 export function applyColumnsProjection(
   value: unknown,
@@ -152,6 +171,9 @@ export function applyColumnsProjection(
   if (isListEnvelope(value)) {
     if (value.items.length === 0) return value; // empty list: nothing to project
     rows = value.items.filter(isRow);
+  } else if (isItemEnvelope(value)) {
+    if (value.item === null) return value; // nothing found: nothing to project
+    rows = [value.item];
   } else if (Array.isArray(value)) {
     if (value.length === 0) return value;
     rows = value.filter(isRow);
@@ -189,6 +211,12 @@ export function applyColumnsProjection(
   };
   if (isListEnvelope(value)) {
     return { ...value, items: value.items.map((it) => (isRow(it) ? pick(it) : it)) };
+  }
+  if (isItemEnvelope(value)) {
+    const item = value.item as Record<string, unknown>; // narrowed above: non-null here
+    const projectedItem = pick(item);
+    warnDroppedNestedLists(item, projectedItem);
+    return { ...value, item: projectedItem };
   }
   if (Array.isArray(value)) return value.map((it) => (isRow(it) ? pick(it) : it));
   const record = value as Record<string, unknown>;

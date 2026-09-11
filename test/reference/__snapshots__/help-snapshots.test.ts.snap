@@ -2038,7 +2038,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires reflect fb#1564 (both are now honoured by every reader); valueLength is LEN(apiKey), never the value.
+  { items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires are honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries and /api/apiKeys/check (fb#1564, fb#1592); valueLength is LEN(apiKey), never the value.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas was not passed → pass the target tenant's ownerAsiakasId — \`ib company list\` shows the ones you can reach
@@ -2060,7 +2060,7 @@ exports[`Help snapshots — contract stability > help for ib dev apikey revoke m
   ib dev apikey revoke --asiakas <asiakas> --source <source> --name <name> [flags]
 
 DESCRIPTION
-  Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is exactly what fb#1564 makes meaningful (every reader now actually honours the flag). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.
+  Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.
   Permissions: requires isSystemAdmin.
 
 FLAGS
@@ -2139,7 +2139,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - The 12h-ish config cache (both the /api/apiKeys/check cache and puminet7-functions-app's fleet-tracking cron cache) is invalidated on write — a set/revoke takes effect quickly, not after the cache TTL.
-  - fb#1564 (apiKeyActive/expires now honoured by every reader) is what makes a later \`revoke\` on this same row actually take effect.
+  - A later \`revoke\` on this same row takes effect in the readers that honour apiKeyActive/expires: getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592).
 
 SEE ALSO
   ib dev apikey revoke, ib dev apikey verify, ib dev apikey sources
@@ -2216,6 +2216,45 @@ SEE ALSO
 EXAMPLES
   ib dev apikey verify --asiakas 8 --source 18
   ib dev apikey verify --asiakas 8 --source 18 --name MAPON_APIKEY
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook import matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook import --body <body> [flags]
+
+DESCRIPTION
+  Bulk-load a parsed Betomik order-book run into the staging table for review before any real sync (developer only).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --body JSON    { sheetLabel, isoYear, isoWeek, rows } — the parser's --json-out payload, forwarded verbatim (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { importRunId, rowCount }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can trigger an import
+  exit 4 (HTTP 400)  Missing sheetLabel/isoYear/isoWeek/rows → Pass a complete {sheetLabel, isoYear, isoWeek, rows} body
+  exit 4 (client-side)  No --body or --from-json payload given → Pass --from-json <file|-> (the parser's json-out file) or --body '<json>'
+
+NOTES
+  - The request body is read via --body/--from-json, NOT typed flags — it must be exactly {sheetLabel, isoYear, isoWeek, rows}, the shape parse-betomik-orderbook.py's --json-out writes.
+  - Each entry in rows is one job record from the parser's own output (source_type, plant_or_note, driver_name, etc.) — nothing here re-validates the parser's classification, it is stored as-is plus a server-side driver-name match.
+
+EXAMPLES
+  ib dev betomik-orderbook import --from-json week40.json --reason "manual weekly import"
 "
 `;
 
@@ -4121,7 +4160,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  SQL error: aggregate over an aggregate/subquery → SQL Server rejects aggregating an expression that itself contains an aggregate or subquery (e.g. SUM(CASE WHEN EXISTS(...) THEN 1 ELSE 0 END)) — compute the per-row flag in a derived table and aggregate outside it: SELECT SUM(flag) FROM (SELECT CASE WHEN EXISTS(...) THEN 1 ELSE 0 END AS flag FROM t) x. Object/column names are not the problem here
   exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
   exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
-  exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
+  exit 4 (HTTP 400)  Guard rejection (shape) → rephrase to one SELECT (or WITH … SELECT); ';'/INTO also rejects inside a string literal (false positive)
+  exit 4 (HTTP 400)  SQL error (reached DB) → shape was fine; check names via \`ib dev schema table <name>\` (an Invalid object name gets an automatic did-you-mean)
   exit 4 (client-side)  Malformed --param / --params → \`--param\` takes \`name=value\` and must name each parameter once; \`--params\` takes ONE JSON object. The two are mutually exclusive — pick the JSON form when a value's literal spelling and its intended type disagree
   exit 4 (client-side)  Numeric --param cannot be carried exactly → the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via \`--params '{"name":"<digits>"}'\` and let SQL Server do the conversion
   exit 4 (client-side)  --sql-file could not be read, or held no SQL → the argument is a file path, or \`-\` to read stdin. Check the path exists and is readable; when piping, make sure something actually reaches stdin (\`Get-Content q.sql | ib dev schema query --sql-file -\`). An empty file is rejected rather than sent as a blank statement
@@ -13864,8 +13904,8 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
   ib worksite create [flags]
 
 DESCRIPTION
-  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0), asiakasId (linked customer, not ownerAsiakasId).
-  Permissions: requires auth.page.tyomaa.edit.
+  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on \`ib worksite update\` instead.
+  Permissions: requires keikkaEdit company-role tier on --body.ownerAsiakasId.
 
 FLAGS
   --body JSON    JSON object with the new tyomaa fields
@@ -13888,7 +13928,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 3 (HTTP 403)  ownerAsiakasId missing or you lack edit on it → resolves from --body.ownerAsiakasId before validation, so a missing field 403s not 400s
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check keikkaEdit tier on --body.ownerAsiakasId
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
