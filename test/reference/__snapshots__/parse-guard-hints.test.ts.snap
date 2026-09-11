@@ -409,6 +409,34 @@ ib customer update --type <id>
   ! --type must be an integer >= 1
   > pass a valid asiakasTypeId
 
+ib dev apikey list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib dev apikey revoke --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib dev apikey revoke --source <id>
+  ! --source must be an integer >= 1
+  > pass a positive apiKeySourceId
+
+ib dev apikey set --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib dev apikey set --source <id>
+  ! --source must be an integer >= 1
+  > pass a positive apiKeySourceId
+
+ib dev apikey verify --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive ownerAsiakasId
+
+ib dev apikey verify --source <id>
+  ! --source must be an integer >= 1
+  > pass a positive apiKeySourceId
+
 ib dev cache invalidate --asiakas <n>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId
