@@ -42,4 +42,11 @@ export const CACHE_ENTITIES: CacheEntity[] = [
   { entityType: "weather", params: ["asiakasId"], example: "ib dev cache invalidate weather --asiakas 8 --confirm" },
   { entityType: "lasku", params: ["asiakasId"], example: "ib dev cache invalidate lasku --asiakas 8 --confirm" },
   { entityType: "stat", params: [], developerOnly: true, example: "ib dev cache invalidate stat --confirm" },
+  // fb#1542: cached by the API for years but unregistered in BASE_TTL, so the
+  // backend answered "Unknown entityType" — targetable since @ibetoni/cache 2026-09-11.
+  { entityType: "holidays", params: ["asiakasId"], example: "ib dev cache invalidate holidays --asiakas 8 --confirm" },
+  { entityType: "ilmoitustaulu", params: ["asiakasId"], example: "ib dev cache invalidate ilmoitustaulu --asiakas 8 --confirm" },
+  { entityType: "subscription", params: ["asiakasId"], example: "ib dev cache invalidate subscription --asiakas 8 --confirm" },
+  { entityType: "subscriptionItems", params: ["asiakasId"], example: "ib dev cache invalidate subscriptionItems --asiakas 8 --confirm" },
+  { entityType: "inventory", params: ["asiakasId"], example: "ib dev cache invalidate inventory --asiakas 8 --confirm" },
 ];
