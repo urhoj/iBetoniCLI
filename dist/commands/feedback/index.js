@@ -1163,29 +1163,35 @@ function warnPartlyShipped(items) {
     const linked = active.filter((r) => readChangelogLinks(r).length > 0);
     if (!linked.length)
         return;
-    // An ACTIVE row with a `resolves` link is the opposite shape (fb#1553): the
+    // An OPEN row with a `resolves` link is the opposite shape (fb#1553): the
     // backend derives it as "deliberately reopened" (changelogSql @reopened —
     // someone closed the row and reopened it on purpose) and refuses to
     // auto-advance it. Calling that "shipped without closing" points the reader
-    // toward closing a row that is held open by design. Same exclusion as the
-    // backend: a 'Related: changelog #…' resolution is a plain link, not a reopen.
-    const reopened = linked.filter((r) => readChangelogLinks(r).some((l) => l.role === "resolves") &&
-        !String(r.resolution ?? "").startsWith("Related: changelog #"));
-    const partly = linked.filter((r) => !reopened.includes(r));
-    const name = (rows) => {
+    // toward closing a row that is held open by design. The predicate mirrors
+    // the backend's exactly (fb#1625): status must be `open` — the backend never
+    // derives a REVIEWED row as reopened, whether its resolves link came from the
+    // fb#517 shape (status preserved when the fix entry linked it) or from a
+    // hand-set applied→reviewed — and a 'Related: changelog #…' resolution is a
+    // plain link, not a reopen.
+    const isReopened = (r) => r.status === "open" &&
+        readChangelogLinks(r).some((l) => l.role === "resolves") &&
+        !String(r.resolution ?? "").startsWith("Related: changelog #");
+    const reopened = linked.filter(isReopened);
+    const partly = linked.filter((r) => !isReopened(r));
+    const nameRows = (rows) => {
         const named = rows
             .slice(0, LINKED_ROWS_NAMED)
             .map((r) => `fb#${r.feedbackId} → ${readChangelogLinks(r).map((l) => `cl#${l.changelogId}`).join("+")}`)
             .join(", ");
-        const rest = rows.length - Math.min(rows.length, LINKED_ROWS_NAMED);
+        const rest = Math.max(0, rows.length - LINKED_ROWS_NAMED);
         return `${named}${rest > 0 ? `, +${rest} more` : ""}`;
     };
     if (partly.length) {
-        warnNote(`[ib] note: ${partly.length} of ${active.length} un-closed rows already carry changelog links (${name(partly)}) — ` +
+        warnNote(`[ib] note: ${partly.length} of ${active.length} un-closed rows already carry changelog links (${nameRows(partly)}) — ` +
             `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`);
     }
     if (reopened.length) {
-        warnNote(`[ib] note: ${reopened.length} un-closed row${reopened.length === 1 ? "" : "s"} carry a resolves link — closed once and reopened deliberately (${name(reopened)}). ` +
+        warnNote(`[ib] note: ${reopened.length} open row${reopened.length === 1 ? "" : "s"} carry a resolves link — closed once and reopened deliberately (${nameRows(reopened)}). ` +
             `The resolution note says what residue is held open; read it (ib dev feedback get <id>) and do not close the row on the strength of this note.`);
     }
 }

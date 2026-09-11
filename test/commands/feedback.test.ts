@@ -2017,8 +2017,21 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
     ]);
     await runFeedbackList(mockClient, { all: true });
     expect(note()).toMatch(/1 of 2 un-closed rows already carry changelog links \(fb#418 → cl#1189\)/);
-    expect(note()).toMatch(/1 un-closed row.*closed once and reopened deliberately \(fb#1354 → cl#2004\)/);
+    expect(note()).toMatch(/1 open row.*closed once and reopened deliberately \(fb#1354 → cl#2004\)/);
     expect(note()).not.toMatch(/fb#1354 → cl#2004\).*part of that work has shipped/);
+  });
+
+  // fb#1625: the backend derives @reopened only for status='open'. A REVIEWED row
+  // with a resolves link is never derived as reopened — the fb#517 shape (status
+  // preserved when the fix entry linked it) or a hand-set applied→reviewed — so
+  // the CLI reports it as partly shipped, not reopened.
+  test("a REVIEWED row with a resolves link is partly shipped, not reopened", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 517, status: "reviewed", changelogLinks: [{ changelogId: 1300, role: "resolves" }] },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/1 of 1 un-closed rows already carry changelog links \(fb#517 → cl#1300\)/);
+    expect(note()).not.toMatch(/reopened/);
   });
 
   test("a 'Related: changelog #' resolves link is not a reopen — mirrors the backend's exclusion", async () => {
