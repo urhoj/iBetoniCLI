@@ -1418,15 +1418,38 @@ function warnPartlyShipped(items: Record<string, unknown>[]): void {
   const active = items.filter((r) => ACTIVE_STATUSES.includes(r.status as never));
   const linked = active.filter((r) => readChangelogLinks(r).length > 0);
   if (!linked.length) return;
-  const named = linked
-    .slice(0, LINKED_ROWS_NAMED)
-    .map((r) => `fb#${r.feedbackId} → ${readChangelogLinks(r).map((l) => `cl#${l.changelogId}`).join("+")}`)
-    .join(", ");
-  const rest = linked.length - Math.min(linked.length, LINKED_ROWS_NAMED);
-  warnNote(
-    `[ib] note: ${linked.length} of ${active.length} un-closed rows already carry changelog links (${named}${rest > 0 ? `, +${rest} more` : ""}) — ` +
-      `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`
+  // An ACTIVE row with a `resolves` link is the opposite shape (fb#1553): the
+  // backend derives it as "deliberately reopened" (changelogSql @reopened —
+  // someone closed the row and reopened it on purpose) and refuses to
+  // auto-advance it. Calling that "shipped without closing" points the reader
+  // toward closing a row that is held open by design. Same exclusion as the
+  // backend: a 'Related: changelog #…' resolution is a plain link, not a reopen.
+  const reopened = linked.filter(
+    (r) =>
+      readChangelogLinks(r).some((l) => l.role === "resolves") &&
+      !String(r.resolution ?? "").startsWith("Related: changelog #")
   );
+  const partly = linked.filter((r) => !reopened.includes(r));
+  const name = (rows: Record<string, unknown>[]) => {
+    const named = rows
+      .slice(0, LINKED_ROWS_NAMED)
+      .map((r) => `fb#${r.feedbackId} → ${readChangelogLinks(r).map((l) => `cl#${l.changelogId}`).join("+")}`)
+      .join(", ");
+    const rest = rows.length - Math.min(rows.length, LINKED_ROWS_NAMED);
+    return `${named}${rest > 0 ? `, +${rest} more` : ""}`;
+  };
+  if (partly.length) {
+    warnNote(
+      `[ib] note: ${partly.length} of ${active.length} un-closed rows already carry changelog links (${name(partly)}) — ` +
+        `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`
+    );
+  }
+  if (reopened.length) {
+    warnNote(
+      `[ib] note: ${reopened.length} un-closed row${reopened.length === 1 ? "" : "s"} carry a resolves link — closed once and reopened deliberately (${name(reopened)}). ` +
+        `The resolution note says what residue is held open; read it (ib dev feedback get <id>) and do not close the row on the strength of this note.`
+    );
+  }
 }
 
 /**

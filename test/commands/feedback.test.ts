@@ -2006,6 +2006,30 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
     expect(note()).not.toMatch(/fb#647/);
   });
 
+  // fb#1553: an ACTIVE row with a `resolves` link is the backend's derived
+  // "deliberately reopened" shape (changelogSql @reopened) — someone closed it and
+  // reopened it on purpose. The note used to call that "shipped without closing",
+  // pointing the next agent toward closing a row that is held open by design.
+  test("an open row with a RESOLVES link reads as reopened, not as partly shipped", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1354, status: "open", resolution: "Reopened deliberately. cl#2004 auto-resolved this on link…", changelogLinks: [{ changelogId: 2004, role: "resolves" }] },
+      { feedbackId: 418, status: "open", changelogLinks: [{ changelogId: 1189, role: "references" }] },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/1 of 2 un-closed rows already carry changelog links \(fb#418 → cl#1189\)/);
+    expect(note()).toMatch(/1 un-closed row.*closed once and reopened deliberately \(fb#1354 → cl#2004\)/);
+    expect(note()).not.toMatch(/fb#1354 → cl#2004\).*part of that work has shipped/);
+  });
+
+  test("a 'Related: changelog #' resolves link is not a reopen — mirrors the backend's exclusion", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 900, status: "open", resolution: "Related: changelog #1500", changelogLinks: [{ changelogId: 1500, role: "resolves" }] },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/1 of 1 un-closed rows already carry changelog links/);
+    expect(note()).not.toMatch(/reopened/);
+  });
+
   test("names at most five rows, then counts the rest", async () => {
     get.mockResolvedValueOnce(
       Array.from({ length: 7 }, (_, i) => ({
