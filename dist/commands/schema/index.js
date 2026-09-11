@@ -432,7 +432,14 @@ const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
  */
 async function nearestObjectNameSuggestion(client, badName) {
     const bare = badName.includes(".") ? badName.slice(badName.lastIndexOf(".") + 1) : badName;
-    const [tables, views] = await Promise.all([runSchemaTables(client, {}), runSchemaViews(client, {})]);
+    // { limit: 1000 } — the default 200-row page is a PARTIAL catalogue (dbo
+    // holds ~250 tables), so an unlimited fetch here would silently miss a
+    // near-miss for any typo landing past row 200 and additionally fire a
+    // TRUNCATED stderr warning that makes no sense for an internal lookup.
+    const [tables, views] = await Promise.all([
+        runSchemaTables(client, { limit: 1000 }),
+        runSchemaViews(client, { limit: 1000 }),
+    ]);
     const names = [...tables.items, ...views.items]
         .map((r) => r.name)
         .filter((n) => typeof n === "string");

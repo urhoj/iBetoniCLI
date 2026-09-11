@@ -348,6 +348,24 @@ describe("ib schema", () => {
       });
     });
 
+    // dbo holds ~250 tables against a 200-row default page (fb#1483 follow-up,
+    // caught live: the suggestion still "worked" by luck on a name inside the
+    // first page, but fired a nonsensical TRUNCATED stderr warning and would
+    // silently miss any typo landing past row 200). The lookup must ask for
+    // the max page, not the default.
+    test("the near-miss lookup requests the full 1000-row page, not the 200-row default", async () => {
+      post().mockRejectedValueOnce(
+        new CliError("SQL error: Invalid object name 'dbo.foo'.", 400, null, 4)
+      );
+      get()
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.foo")).rejects.toBeDefined();
+      expect(get()).toHaveBeenNthCalledWith(1, "/api/cli/schema/tables?limit=1000");
+      expect(get()).toHaveBeenNthCalledWith(2, "/api/cli/schema/views?limit=1000");
+    });
+
     test("no hint is added when nothing in the live list is close — the original error is unchanged", async () => {
       const original = new CliError("SQL error: Invalid object name 'dbo.totallyUnrelated'.", 400, null, 4);
       post().mockRejectedValueOnce(original);
