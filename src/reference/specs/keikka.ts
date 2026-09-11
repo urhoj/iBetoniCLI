@@ -7,13 +7,13 @@ import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOT
 
 // ─── keikka cross-tenant (--asiakas) fragments (fb#1512) ─────────────────────
 // Mirrors VEHICLE_ASIAKAS_PERMISSION/_403 but the keikka read gate is narrower:
-// sysadmin/developer (or global viewer) only — no per-tenant role opens it.
+// sysadmin/developer or global viewer — no per-tenant role opens it.
 // Substring is the backend's own text (keikkaCliRoutes.js resolveKeikkaListOwner).
-const KEIKKA_ASIAKAS_PERMISSION = "--asiakas: sysadmin/developer only (server-enforced)";
+const KEIKKA_ASIAKAS_PERMISSION = "--asiakas: sysadmin/developer or global viewer (server-enforced)";
 const KEIKKA_ASIAKAS_403 = apiErr(
   403,
   "No read access to the requested --asiakas company",
-  "omit --asiakas for the active company, or use a developer token",
+  "omit --asiakas for the active company, or use a sysadmin/developer or global-viewer token",
   "no read access to asiakas"
 );
 
@@ -23,7 +23,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka list",
     description:
-      "List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; sysadmin/developer lever) instead of the active company.",
+      "List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; see PERMISSIONS).",
     permissions: ["auth.page.grid.tilaus.read", KEIKKA_ASIAKAS_PERMISSION],
     flags: [
       {
@@ -54,7 +54,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         name: "asiakas",
         type: "number",
         description:
-          "List another company's orders (cross-tenant tenant override). Requires sysadmin/developer; default = active company.",
+          "List another company's orders (cross-tenant). Sysadmin/developer or global viewer; default = active company.",
       },
       {
         name: "vehicle",

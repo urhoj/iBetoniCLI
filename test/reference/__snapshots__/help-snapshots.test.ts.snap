@@ -1792,7 +1792,7 @@ ARGUMENTS
 FLAGS
   --search STRING    Search query (alias for the <query> positional)
   --limit NUMBER    Max results (default: 50)
-  --my-companies    Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under)
+  --my-companies    Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under). No fan-out for sysadmin/developer tokens
   --own-only    Drop hits owned by another tenant (ownerAsiakasId ≠ the company searched under). Use before binding a hit onto an order's customer.
 
 GLOBAL FLAGS
@@ -6787,8 +6787,8 @@ exports[`Help snapshots — contract stability > help for ib keikka list matches
   ib keikka list [flags]
 
 DESCRIPTION
-  List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; sysadmin/developer lever) instead of the active company.
-  Permissions: requires auth.page.grid.tilaus.read, --asiakas: sysadmin/developer only (server-enforced).
+  List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; see PERMISSIONS).
+  Permissions: requires auth.page.grid.tilaus.read, --asiakas: sysadmin/developer or global viewer (server-enforced).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
@@ -6796,7 +6796,7 @@ FLAGS
   --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
   --date DATE    Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.
   --customer NUMBER    Filter by the ORDER's customer (keikka.asiakasId) inside the tenant being listed — NOT the tenant itself; use --asiakas for that
-  --asiakas NUMBER    List another company's orders (cross-tenant tenant override). Requires sysadmin/developer; default = active company.
+  --asiakas NUMBER    List another company's orders (cross-tenant). Sysadmin/developer or global viewer; default = active company.
   --vehicle NUMBER    Filter by vehicleId
   --worksite NUMBER    Filter by worksite (tyomaaId)
   --status STRING    Filter by tila/status
@@ -6816,7 +6816,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a tenant), or omit it for the active company
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
-  exit 3 (HTTP 403)  No read access to the requested --asiakas company → omit --asiakas for the active company, or use a developer token
+  exit 3 (HTTP 403)  No read access to the requested --asiakas company → omit --asiakas for the active company, or use a sysadmin/developer or global-viewer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

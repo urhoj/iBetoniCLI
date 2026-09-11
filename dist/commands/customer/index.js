@@ -407,7 +407,8 @@ export async function runCustomerWorksites(client, asiakasId) {
  *
  * When `myCompanies` is true, adds `myCompanies=1` to the query so the backend
  * fans out across all companies the caller belongs to (rows tagged with
- * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner).
+ * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner). Sysadmin/developer
+ * tokens get no fan-out — the backend answers single-target, untagged.
  *
  * `ownOnly` filters client-side to rows whose `ownerAsiakasId` equals the scope
  * they matched under (the active company, or `scopeAsiakasId` with
@@ -417,8 +418,12 @@ export async function runCustomerSearch(client, query, limit, myCompanies = fals
     const rows = await client.get(`/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`);
     if (!ownOnly || !Array.isArray(rows))
         return rows;
-    const owner = await resolveCurrentOwnerAsiakasId(client);
-    return rows.filter((r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner));
+    const hits = rows;
+    // Fan-out rows carry their scope; the active company is resolved only for rows
+    // without one (a plain search, or --my-companies from a sysadmin/developer token,
+    // which the backend answers single-target and untagged).
+    const owner = hits.some((r) => r.scopeAsiakasId == null) ? await resolveCurrentOwnerAsiakasId(client) : undefined;
+    return hits.filter((r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner));
 }
 /**
  * POST /api/asiakas/createY with a free-form body forwarded to the existing

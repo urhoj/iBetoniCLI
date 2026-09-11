@@ -651,20 +651,9 @@ export async function runCustomerWorksites(
 }
 
 /** One `ib customer search` hit — the raw asiakas_search_usingLikes/usingFullText row. */
-export interface CustomerSearchHit {
+interface CustomerSearchHit {
   asiakasId: number;
-  asiakasNimi: string | null;
-  ytunnus: string | null;
-  kommentti: string | null;
-  lastActiveTime: string | null;
-  /**
-   * The row's REAL tenant (fb#1321). The search deliberately admits SELF-OWNED
-   * company rows (other suppliers, `ownerAsiakasId === asiakasId`) next to the
-   * caller's own customers, and nothing else in the row tells them apart — bind
-   * a foreign hit onto `keikka.asiakasId` and the order silently gets another
-   * tenant's company as its customer. Absent (undefined) only from a backend
-   * that predates the projection migration.
-   */
+  /** The row's REAL tenant (fb#1321) — the search admits other tenants' self-owned rows; see the spec note. */
   ownerAsiakasId?: number | null;
   /** `--my-companies` only: the company the row matched under. */
   scopeAsiakasId?: number;
@@ -678,7 +667,8 @@ export interface CustomerSearchHit {
  *
  * When `myCompanies` is true, adds `myCompanies=1` to the query so the backend
  * fans out across all companies the caller belongs to (rows tagged with
- * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner).
+ * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner). Sysadmin/developer
+ * tokens get no fan-out — the backend answers single-target, untagged.
  *
  * `ownOnly` filters client-side to rows whose `ownerAsiakasId` equals the scope
  * they matched under (the active company, or `scopeAsiakasId` with
@@ -695,10 +685,12 @@ export async function runCustomerSearch(
     `/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`
   );
   if (!ownOnly || !Array.isArray(rows)) return rows;
-  const owner = await resolveCurrentOwnerAsiakasId(client);
-  return (rows as CustomerSearchHit[]).filter(
-    (r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner)
-  );
+  const hits = rows as CustomerSearchHit[];
+  // Fan-out rows carry their scope; the active company is resolved only for rows
+  // without one (a plain search, or --my-companies from a sysadmin/developer token,
+  // which the backend answers single-target and untagged).
+  const owner = hits.some((r) => r.scopeAsiakasId == null) ? await resolveCurrentOwnerAsiakasId(client) : undefined;
+  return hits.filter((r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner));
 }
 
 /**

@@ -24,7 +24,13 @@ import { buildReference } from "../../src/reference/dump.js";
 // SQL INSERT. 712,703 B measured (headroom ~300 B, deliberately thin); the five specs are real new capability
 // (write-safety trio + reasonPolicy on two, plus the "never returns the
 // value" contract worth stating explicitly), not padding.
-// 713,000 -> 714,600 on 2026-09-11 (fb#1321, fb#1512), measured after rebasing onto the apikey bump above: `ib customer search` gained --own-only, a NOTE naming the cross-tenant hit class (the search admits self-owned foreign company rows and nothing in the row told them apart until the backend projected ownerAsiakasId — binding one onto keikka.asiakasId silently attaches another tenant's company as the customer), and a CORRECTED outputShape (the old `ListEnvelope<{…, score}>` described a payload the route never returned — it is a raw array). `ib keikka list` gained --asiakas (tenant override; the did-you-mean used to point --asiakas at --customer, a DIFFERENT dimension) plus its 403 row and a --customer description saying which dimension it is. Prose trimmed twice first (the keikka note was dropped entirely, the flag descriptions carry the distinction); measured 706,008 B. Measured 714,246 B; headroom kept deliberately thin (~350 B).
+// 713,000 -> 714,600 on 2026-09-11 (fb#1321, fb#1512): `ib customer search` gained
+// --own-only, a note naming the cross-tenant hit class (the search admits self-owned
+// foreign company rows; ownerAsiakasId is now projected so a caller can tell), and a
+// CORRECTED outputShape (the old ListEnvelope<{…, score}> described a payload the
+// route never returned — it is a raw array). `ib keikka list` gained --asiakas (the
+// did-you-mean used to point it at --customer, a DIFFERENT dimension) plus its 403
+// row. Prose trimmed twice first; 714,246 B measured. Headroom ~350 B, deliberately thin.
 const DUMP_LIMIT_BYTES = 714_600;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag

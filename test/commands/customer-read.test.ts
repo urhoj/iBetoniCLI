@@ -151,8 +151,10 @@ describe("ib customer list/get/search", () => {
       expect(rows.map((r) => r.asiakasId)).toEqual([252]);
     });
 
-    test("with --my-companies, 'own' means owned by the company the row matched under", async () => {
-      mockClient.getCurrentToken.mockReturnValue(jwtFor(8));
+    test("with --my-companies, 'own' means owned by the company the row matched under — and the active company is never resolved", async () => {
+      // fb#1618: every fan-out row carries scopeAsiakasId, so a token that cannot
+      // name an active company must not fail a search that never needed it.
+      mockClient.getCurrentToken.mockImplementation(() => { throw new Error("no token"); });
       mockClient.get.mockResolvedValueOnce([
         { asiakasId: 1000, ownerAsiakasId: 10, scopeAsiakasId: 10 },
         { asiakasId: 66, ownerAsiakasId: 66, scopeAsiakasId: 10 },
@@ -160,6 +162,19 @@ describe("ib customer list/get/search", () => {
       ]);
       const rows = (await runCustomerSearch(mockClient, "a", undefined, true, true)) as Array<{ asiakasId: number }>;
       expect(rows.map((r) => r.asiakasId)).toEqual([1000, 2200]);
+      expect(mockClient.get).toHaveBeenCalledTimes(1); // no /company-selection/available fallback either
+    });
+
+    test("--my-companies from a sysadmin/developer token (no fan-out, no scopeAsiakasId) falls back to the active company", async () => {
+      // asiakas.js skips the fan-out for isSystemAdminOrDeveloper, so rows come back
+      // single-target and untagged; 'own' must then mean the active company, not 'nothing'.
+      mockClient.getCurrentToken.mockReturnValue(jwtFor(8));
+      mockClient.get.mockResolvedValueOnce([
+        { asiakasId: 252, ownerAsiakasId: 8 },
+        { asiakasId: 66, ownerAsiakasId: 66 },
+      ]);
+      const rows = (await runCustomerSearch(mockClient, "a", undefined, true, true)) as Array<{ asiakasId: number }>;
+      expect(rows.map((r) => r.asiakasId)).toEqual([252]);
     });
 
     test("without --own-only every hit passes through unchanged", async () => {

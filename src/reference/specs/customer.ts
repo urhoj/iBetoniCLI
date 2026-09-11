@@ -228,7 +228,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       {
         name: "my-companies",
         type: "boolean",
-        description: "Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under)",
+        description: "Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under). No fan-out for sysadmin/developer tokens",
       },
       {
         name: "own-only",
