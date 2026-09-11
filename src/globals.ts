@@ -38,18 +38,21 @@ export interface GlobalOptions {
   /**
    * Output projection (`--columns a,b,c`): the success output keeps only the
    * named top-level fields — each row of a list (`ListEnvelope` items / raw
-   * arrays, envelope metadata kept) or the single record. Applied at the
-   * `writeJson` chokepoint in BOTH JSON and `--pretty` modes; under `--pretty`
-   * it also overrides the spec's `prettyColumns` table pick. LOUD by contract
-   * (fb#451 — it used to be a pretty-table-only pick, silently a no-op in JSON
-   * mode): unknown columns warn on stderr; no matching column, or output that
-   * cannot be projected (a scalar), exits 4 naming what IS available.
-   * `null` = not set.
+   * arrays, envelope metadata kept), the nested record of an `item` envelope
+   * (fb#1568 — `{ item, ...metadata }`, currently only `ib keikka latest`;
+   * sibling metadata like `searched` is kept, `item: null` is a no-op), or a
+   * plain record's top-level keys. Applied at the `writeJson` chokepoint in
+   * BOTH JSON and `--pretty` modes; under `--pretty` it also overrides the
+   * spec's `prettyColumns` table pick. LOUD by contract (fb#451 — it used to
+   * be a pretty-table-only pick, silently a no-op in JSON mode): unknown
+   * columns warn on stderr; no matching column, or output that cannot be
+   * projected (a scalar), exits 4 naming what IS available. `null` = not set.
    *
-   * TOP-LEVEL ONLY — it never reaches into a nested list, and a record whose
-   * payload lives in one (`ib dev schema table X` → `columns[]`) warns on stderr
-   * rather than failing, because a top-level key DID match and the exit-4 guard
-   * is therefore unreachable (fb#596).
+   * TOP-LEVEL ONLY beyond that one `item` exception — it never reaches into a
+   * nested LIST, and a record whose payload lives in one (`ib dev schema
+   * table X` → `columns[]`) warns on stderr rather than failing, because a
+   * top-level key DID match and the exit-4 guard is therefore unreachable
+   * (fb#596).
    *
    * Named `--columns`, NOT `--fields`: a root option is recognized anywhere in
    * argv and would SHADOW the per-command `--fields <csv>` that
@@ -101,7 +104,7 @@ const GLOBAL_OPTIONS: ReadonlyArray<readonly [flags: string, description: string
   ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
   [
     "--columns <csv>",
-    "Only output these TOP-LEVEL fields (projects list rows and single records; never reaches into a nested list; loud on no match)",
+    "Only output these TOP-LEVEL fields (projects list rows, single records, and an item envelope's item; never reaches into a nested list; loud on no match)",
   ],
   [
     "--print-payload",
