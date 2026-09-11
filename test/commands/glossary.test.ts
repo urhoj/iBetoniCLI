@@ -309,6 +309,53 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  test("an unknown key in --from-json exits 4 (no PUT), naming the accepted keys (fb#1533)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ definition: "d", bogusKeyThatDoesNotExist: "x" }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      const prevExit = process.exitCode;
+      process.exitCode = undefined;
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+        expect(process.exitCode).toBe(4);
+        const written = stderr.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("unknown key bogusKeyThatDoesNotExist");
+        expect(written).toContain("accepted:");
+        expect(written).toContain("definition");
+      } finally {
+        stderr.mockRestore();
+        process.exitCode = prevExit;
+      }
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  // The reporter's own repro (fb#1533): the required `term` positional put
+  // inside the JSON body instead — previously silently dropped, then failed
+  // downstream with a confusing "missing required argument term". It must now
+  // be rejected up front, by name, same as any other unknown key.
+  test("`term` inside the JSON is rejected as an unknown key, not silently dropped", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ term: "pumppumatka", definition: "d" }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      const prevExit = process.exitCode;
+      process.exitCode = undefined;
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+        expect(process.exitCode).toBe(4);
+        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("unknown key term");
+      } finally {
+        stderr.mockRestore();
+        process.exitCode = prevExit;
+      }
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
   test("import forwards a per-entry aiConfidence — a bulk groom no longer wipes every score", async () => {
     // `_body` declared so `put.mock.calls[0][1]` is in bounds — a one-param
     // vi.fn() types calls as a 1-tuple and every body assertion below is then
