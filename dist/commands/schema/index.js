@@ -8,6 +8,7 @@ import { cappedInt } from "../../targets.js";
 import { foldAliases } from "../_shared/flags.js";
 import { readTextInput } from "../../api/parseBody.js";
 import { failWith } from "../../output/json.js";
+import { closestName } from "../../output/nearest.js";
 /**
  * One query-string builder for all six list leaves. `table` is only ever set by
  * `triggers`/`indexes` and `unused` only by `indexes`; `qs` drops undefined, so
@@ -414,6 +415,30 @@ export function resolveSqlInput(positional, flag, file) {
         failWith("--sql, --sql-file, or a positional SQL statement is required", 4);
     return inline;
 }
+/** Matches the SQL Server 208 message text, verbatim from `readOnlyQuery.js`'s
+ *  `SQL error: ${err.message}` forwarding — captures the quoted object name. */
+const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
+/**
+ * "Did you mean …?" for an `Invalid object name` failure (fb#1483/fb#1532):
+ * `ib dev schema query` runs on a login with no catalogue metadata visibility
+ * (see the command's NOTES), so a bad name otherwise reaches the caller as a
+ * bare SQL Server message with none of the near-miss help `schema table`'s own
+ * 404 gives. Column-name errors (SQL 207) are deliberately NOT handled the same
+ * way: the message carries no table context to search against, and guessing
+ * one would be worse than the honest "check `ib dev schema table`" remedy.
+ *
+ * Best-effort: any failure fetching the live table/view list is swallowed by
+ * the caller (a failed near-miss lookup must never mask the original error).
+ */
+async function nearestObjectNameSuggestion(client, badName) {
+    const bare = badName.includes(".") ? badName.slice(badName.lastIndexOf(".") + 1) : badName;
+    const [tables, views] = await Promise.all([runSchemaTables(client, {}), runSchemaViews(client, {})]);
+    const names = [...tables.items, ...views.items]
+        .map((r) => r.name)
+        .filter((n) => typeof n === "string");
+    const match = closestName(bare, names);
+    return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
+}
 /**
  * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
  * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
@@ -424,10 +449,24 @@ export function resolveSqlInput(positional, flag, file) {
  * a caller reading only `rows` cannot mistake a cut result for a complete one.
  */
 export async function runSchemaQuery(client, sql, params) {
-    const result = await client.post("/api/cli/schema/query", 
-    // Omitted, not `params: undefined`, when nothing was bound — the body of an
-    // unparameterized query is unchanged by this feature (fb#1177).
-    params ? { sql, params } : { sql }, { read: true });
+    let result;
+    try {
+        result = await client.post("/api/cli/schema/query", 
+        // Omitted, not `params: undefined`, when nothing was bound — the body of an
+        // unparameterized query is unchanged by this feature (fb#1177).
+        params ? { sql, params } : { sql }, { read: true });
+    }
+    catch (e) {
+        if (e instanceof CliError && e.statusCode === 400) {
+            const objectMatch = e.message.match(INVALID_OBJECT_NAME_RE);
+            if (objectMatch) {
+                const suggestion = await nearestObjectNameSuggestion(client, objectMatch[1]).catch(() => null);
+                if (suggestion)
+                    throw new CliError(e.message, e.statusCode, e.body, e.exitCode, suggestion);
+            }
+        }
+        throw e;
+    }
     if (result.truncated) {
         // Tailored hint: this route has no --limit/--offset — the way past the cap
         // is a narrower WHERE or an aggregate (which is what this command is for).

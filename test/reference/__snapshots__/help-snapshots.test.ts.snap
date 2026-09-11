@@ -3963,7 +3963,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  SQL error: aggregate over an aggregate/subquery → SQL Server rejects aggregating an expression that itself contains an aggregate or subquery (e.g. SUM(CASE WHEN EXISTS(...) THEN 1 ELSE 0 END)) — compute the per-row flag in a derived table and aggregate outside it: SELECT SUM(flag) FROM (SELECT CASE WHEN EXISTS(...) THEN 1 ELSE 0 END AS flag FROM t) x. Object/column names are not the problem here
   exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
   exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
-  exit 4 (HTTP 400)  Guard rejection or SQL error → the message IS the answer: guard rejections (not SELECT/WITH first, a non-trailing ';', INTO) mean rephrase to a single read statement — ';'/INTO inside a string LITERAL are documented false positives, rephrase rather than escape; a \`SQL error:\` prefix means the statement reached the DB and failed there (check names via \`ib dev schema table\`)
+  exit 4 (HTTP 400)  Guard rejection (shape) → rephrase to one SELECT (or WITH … SELECT); ';'/INTO also rejects inside a string literal (false positive)
+  exit 4 (HTTP 400)  SQL error (reached DB) → shape was fine; check names via \`ib dev schema table <name>\` (an Invalid object name gets an automatic did-you-mean)
   exit 4 (client-side)  Malformed --param / --params → \`--param\` takes \`name=value\` and must name each parameter once; \`--params\` takes ONE JSON object. The two are mutually exclusive — pick the JSON form when a value's literal spelling and its intended type disagree
   exit 4 (client-side)  Numeric --param cannot be carried exactly → the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via \`--params '{"name":"<digits>"}'\` and let SQL Server do the conversion
   exit 4 (client-side)  --sql-file could not be read, or held no SQL → the argument is a file path, or \`-\` to read stdin. Check the path exists and is readable; when piping, make sure something actually reaches stdin (\`Get-Content q.sql | ib dev schema query --sql-file -\`). An empty file is rejected rather than sent as a blank statement
@@ -13707,7 +13708,7 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
 
 DESCRIPTION
   Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on \`ib worksite update\` instead.
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires keikkaEdit company-role tier on --body.ownerAsiakasId.
 
 FLAGS
   --body JSON    JSON object with the new tyomaa fields
@@ -13730,7 +13731,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 3 (HTTP 403)  ownerAsiakasId missing or you lack edit on it → resolves from --body.ownerAsiakasId before validation, so a missing field 403s not 400s
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check keikkaEdit tier on --body.ownerAsiakasId
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES

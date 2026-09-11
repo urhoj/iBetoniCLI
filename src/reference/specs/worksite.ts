@@ -101,7 +101,13 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     command: "ib worksite create",
     description:
       "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on `ib worksite update` instead.",
-    permissions: ["auth.page.tyomaa.edit"],
+    // `auth.page.tyomaa.edit` is a FRONTEND-only shape and is never evaluated
+    // here — POST /api/tyomaa/new is gated by `requireCompanyRole({ tier:
+    // "keikkaEdit", resolveTenant: body.ownerAsiakasId })` (fb#1434), satisfied
+    // by isKeikkaHandler OR the edit tier (asiakasAdmin/Owner/Editor/
+    // laskuAdmin/laskupohjaAdmin) on --body.ownerAsiakasId — a DIFFERENT gate
+    // than the one this spec used to claim (fb#1525).
+    permissions: ["keikkaEdit company-role tier on --body.ownerAsiakasId"],
     flags: [
       {
         name: "body",
@@ -116,7 +122,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(403, "ownerAsiakasId missing or you lack edit on it", "resolves from --body.ownerAsiakasId before validation, so a missing field 403s not 400s", "ei oikeuksia"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("keikkaEdit tier on --body.ownerAsiakasId"),
     ],
     examples: [
       "ib worksite create --body '{\"tyomaaNimi\":\"Site A\",\"tyomaaOsoite1\":\"Main St 1\",\"ownerAsiakasId\":8}' --reason 'new site'",
