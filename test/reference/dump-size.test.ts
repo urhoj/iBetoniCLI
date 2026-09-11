@@ -16,7 +16,8 @@ import { buildReference } from "../../src/reference/dump.js";
  */
 // 702,000 -> 702,600 on 2026-09-10 (fb#1562): `ib worksite create`'s description and example used field names (name/address/asiakasId) that don't exist on POST /api/tyomaa/new, and omitting the real required field (ownerAsiakasId) 403s at the tenant gate before validation ever runs — a stale example that reads as a permission bug. Fixed the description, example, and added the same explicit 403-vs-400 ERROR row `ib keikka create` already carries for the identical gotcha (fb#1311); 702,407 B measured after trimming prose twice first.
 // 702,600 -> 702,800 on 2026-09-11 (fb#1560 follow-up), measured 702,715 B after rebasing onto the fb#1562 bump above: `ib vehicle create` gained --force plus its client-origin duplicate-plate ERROR row (a real vehicle-create call had no check for an already-active same-plate vehicle at all — two independent create passes for the Betomik pilot's fleet produced duplicate rows twice in a row). The row is the point, not padding — hintForError matches on it, so the refusal answers with its own remedy (--force) instead of the generic exit-4 hint. Prose was trimmed twice before this bump; headroom kept deliberately thin (~85 B).
-const DUMP_LIMIT_BYTES = 702_800;
+// 702,800 -> 704,300 on 2026-09-11 (Betomik order-book validator, task 6): new CommandSpec `ib dev betomik-orderbook import` (developer-tier, --body/--from-json + the write-safety trio, 3 ERROR rows for the 403/400/client-side-no-payload cases), measured 704,205 B. Headroom kept deliberately thin (~95 B).
+const DUMP_LIMIT_BYTES = 704_300;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

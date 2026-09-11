@@ -46,6 +46,7 @@ import { REFERENCE_SPECS } from "./specs/reference.js";
 import { DEV_META_SPECS } from "./specs/dev-meta.js";
 import { DEV_FEEDBACK_SPECS } from "./specs/dev-feedback.js";
 import { DEV_AI_CACHE_PERF_SPECS } from "./specs/dev-ai-cache-perf.js";
+import { BETOMIK_ORDERBOOK_SPECS } from "./specs/betomik-orderbook.js";
 import { LOG_SPECS } from "./specs/log.js";
 import { HELP_SEARCH_SPECS } from "./specs/help-search.js";
 import { MESSAGE_SPECS } from "./specs/message.js";
@@ -82,6 +83,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...DEV_META_SPECS,
   ...DEV_FEEDBACK_SPECS,
   ...DEV_AI_CACHE_PERF_SPECS,
+  ...BETOMIK_ORDERBOOK_SPECS,
   ...LOG_SPECS,
   ...HELP_SEARCH_SPECS,
   ...MESSAGE_SPECS,

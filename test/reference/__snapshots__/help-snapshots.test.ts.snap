@@ -2022,6 +2022,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook import matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook import --body <body> [flags]
+
+DESCRIPTION
+  Bulk-load a parsed Betomik order-book run into the staging table for review before any real sync (developer only).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --body JSON    { sheetLabel, isoYear, isoWeek, rows } — the parser's --json-out payload, forwarded verbatim (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { importRunId, rowCount }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can trigger an import
+  exit 4 (HTTP 400)  Missing sheetLabel/isoYear/isoWeek/rows → Pass a complete {sheetLabel, isoYear, isoWeek, rows} body
+  exit 4 (client-side)  No --body or --from-json payload given → Pass --from-json <file|-> (the parser's json-out file) or --body '<json>'
+
+NOTES
+  - The request body is read via --body/--from-json, NOT typed flags — it must be exactly {sheetLabel, isoYear, isoWeek, rows}, the shape parse-betomik-orderbook.py's --json-out writes.
+  - Each entry in rows is one job record from the parser's own output (source_type, plant_or_note, driver_name, etc.) — nothing here re-validates the parser's classification, it is stored as-is plus a server-side driver-name match.
+
+EXAMPLES
+  ib dev betomik-orderbook import --from-json week40.json --reason "manual weekly import"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
 "USAGE
   ib dev cache clear [flags]
