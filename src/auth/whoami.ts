@@ -25,6 +25,10 @@ export interface WhoamiOutput {
    */
   companies: Array<{ asiakasId: number; roles: string[] }>;
   endpoint: string;
+  /** Present only when `--endpoint` named a deployment slot that has no session
+   * of its own and is acting with its sibling's (fb#1609): the endpoint the
+   * session was actually minted for. */
+  sessionEndpoint?: string;
   /** `file` = refreshable creds store; `env` = IB_TOKEN (non-refreshable). */
   source: "file" | "env";
   /** True when the session write-lock (--read-only / IB_READ_ONLY) is active. */

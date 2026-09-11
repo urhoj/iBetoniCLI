@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -207,30 +207,19 @@ describe("resolveAuth — per-endpoint sessions (fb#855)", () => {
     await createStore(file).save(session("https://api.example.com", "prod_jwt"), undefined, { activate: true });
     expect(await resolveAuth({ credentialsPath: file, defaultEndpoint: "http://127.0.0.1:8080" })).toBeNull();
   });
-});
 
-describe("resolveAuth — staging slot reuses the prod session (fb#1609)", () => {
-  let dir: string;
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ib-resolve-1609-")); delete process.env.IB_TOKEN; });
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
-
-  test("--endpoint api-staging resolves the api.ibetoni.fi session and says so on stderr", async () => {
+  test("--endpoint api-staging resolves the api.ibetoni.fi session and says so on stderr (fb#1609)", async () => {
     const { createStore } = await import("../../src/auth/store.js");
     const file = join(dir, "credentials.json");
-    await createStore(file).save({
-      jwt: "prod_jwt", refreshToken: "rt", issuedAt: "", expiresAt: "",
-      personId: 1, ownerAsiakasId: 1, ownerAsiakasName: "X", endpoint: "https://api.ibetoni.fi",
-    }, undefined, { activate: true });
-    const lines: string[] = [];
-    const orig = process.stderr.write;
-    process.stderr.write = ((chunk: string) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    await createStore(file).save(session("https://api.ibetoni.fi", "prod_jwt"), undefined, { activate: true });
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
       const auth = await resolveAuth({ credentialsPath: file, defaultEndpoint: "https://api-staging.ibetoni.fi" });
       expect(auth?.token).toBe("prod_jwt");
       expect(auth?.refreshable).toBe(true);
+      expect(spy.mock.calls.flat().join("")).toMatch(/api-staging\.ibetoni\.fi.*api\.ibetoni\.fi/);
     } finally {
-      process.stderr.write = orig;
+      spy.mockRestore();
     }
-    expect(lines.join("")).toMatch(/api-staging\.ibetoni\.fi.*api\.ibetoni\.fi/);
   });
 });

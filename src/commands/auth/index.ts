@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { getGlobalOptions, DEFAULT_ENDPOINT } from "../../globals.js";
 import { createStore, defaultCredentialsPath, endpointKey } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
-import { performLogout } from "../../auth/logout.js";
+import { performLogout, borrowedSessionNote } from "../../auth/logout.js";
 import { renderWhoami } from "../../auth/whoami.js";
 import {
   assertPersistedSwitchAllowed,
@@ -22,7 +22,7 @@ import {
   buildImpersonationProfile,
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
-import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage, warnNote } from "../../output/json.js";
 import { intFlag, parseId } from "../../targets.js";
 
 /**
@@ -81,6 +81,11 @@ export function registerAuthCommands(
           const creds = override ? await store.loadFor(override) : await store.load();
           if (!creds) {
             // Not logged in — no-op success.
+            return;
+          }
+          const borrowed = override ? borrowedSessionNote(creds, override) : null;
+          if (borrowed) {
+            warnNote(borrowed);
             return;
           }
           await performLogout({
@@ -170,12 +175,16 @@ export function registerAuthCommands(
         const tier = resolveCallerTier(token);
         const out = renderWhoami({
           claims,
-          endpoint: resolved.endpoint,
+          endpoint: endpointOverride ?? resolved.endpoint,
           source: resolved.source,
           readOnly: isReadOnly(),
           tier,
           impersonation: profile?.impersonation,
         });
+        // fb#1624: stdout must say when the session is a slot sibling's (fb#1609),
+        // not only the stderr note — a parser of the JSON contract sees nothing else.
+        if (endpointOverride && endpointKey(endpointOverride) !== endpointKey(resolved.endpoint))
+          out.sessionEndpoint = resolved.endpoint;
         if (refreshed) out.refreshed = true;
         if (resolved.source === "file") {
           out.sessions = (await store.sessions()).map(

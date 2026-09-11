@@ -1,7 +1,7 @@
 import { getGlobalOptions, DEFAULT_ENDPOINT } from "../../globals.js";
 import { createStore, defaultCredentialsPath, endpointKey } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
-import { performLogout } from "../../auth/logout.js";
+import { performLogout, borrowedSessionNote } from "../../auth/logout.js";
 import { renderWhoami } from "../../auth/whoami.js";
 import { assertPersistedSwitchAllowed, runPersistedSwitch, } from "../../auth/switch.js";
 import { refreshAndPersistSession } from "../../auth/refresh.js";
@@ -12,7 +12,7 @@ import { resolveCallerTier } from "../../tier.js";
 import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
-import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage, warnNote } from "../../output/json.js";
 import { intFlag, parseId } from "../../targets.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -63,6 +63,11 @@ export function registerAuthCommands(parent, isReadOnly) {
             const creds = override ? await store.loadFor(override) : await store.load();
             if (!creds) {
                 // Not logged in — no-op success.
+                return;
+            }
+            const borrowed = override ? borrowedSessionNote(creds, override) : null;
+            if (borrowed) {
+                warnNote(borrowed);
                 return;
             }
             await performLogout({
@@ -133,12 +138,16 @@ export function registerAuthCommands(parent, isReadOnly) {
         const tier = resolveCallerTier(token);
         const out = renderWhoami({
             claims,
-            endpoint: resolved.endpoint,
+            endpoint: endpointOverride ?? resolved.endpoint,
             source: resolved.source,
             readOnly: isReadOnly(),
             tier,
             impersonation: profile?.impersonation,
         });
+        // fb#1624: stdout must say when the session is a slot sibling's (fb#1609),
+        // not only the stderr note — a parser of the JSON contract sees nothing else.
+        if (endpointOverride && endpointKey(endpointOverride) !== endpointKey(resolved.endpoint))
+            out.sessionEndpoint = resolved.endpoint;
         if (refreshed)
             out.refreshed = true;
         if (resolved.source === "file") {

@@ -10,7 +10,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth login",
     description:
-      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so) — a post-deploy staging check needs no login.",
+      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so).",
     auth: "none",
     flags: [
       {
@@ -69,7 +69,7 @@ export const AUTH_SPECS: CommandSpec[] = [
     auth: "any",
     flags: [],
     outputShape:
-      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating?, sessions?: { endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }[] } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting; `sessions` (file sessions only) lists every stored per-endpoint session, active first — the `--endpoint`s that need no login (fb#855).",
+      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, sessionEndpoint?, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating?, sessions?: { endpoint, personId, ownerAsiakasId, ownerAsiakasName, expiresAt, active }[] } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting; `sessions` (file sessions only) lists every stored per-endpoint session, active first — the `--endpoint`s that need no login (fb#855); `sessionEndpoint`: set when --endpoint is a slot acting with its sibling's session (fb#1609).",
     errors: [
       { origin: "client", exit: 2, match: "not logged in", meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN); under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1040) and lists the sessions you already hold" },
       {
@@ -156,7 +156,7 @@ export const AUTH_SPECS: CommandSpec[] = [
         origin: "client",
         exit: 2,
         match: "not logged in",
-        meaning: "Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855; api.ibetoni.fi and api-staging.ibetoni.fi share one, fb#1609)",
+        meaning: "Not logged in (no session for the endpoint — per-endpoint lookup, fb#855; the api/api-staging slots share one, fb#1609)",
         remedy: "ib auth login first; under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1040)",
       },
       {

@@ -62,11 +62,6 @@ const SLOT_SIBLINGS: Record<string, string> = {
   "api-staging.ibetoni.fi": "api.ibetoni.fi",
 };
 
-/** The sibling slot's key for `key`, or null when the host has none. */
-export function slotSibling(key: string): string | null {
-  return SLOT_SIBLINGS[key] ?? null;
-}
-
 export interface StoredSession extends CredentialsProfile {
   active: boolean;
 }
@@ -79,7 +74,7 @@ export interface CredentialsStore {
    * rotated the credentials since this invocation first loaded them.
    */
   reload(profile?: string): Promise<CredentialsProfile | null>;
-  /** The session minted for `endpoint` — active or parked — or null when there is none. */
+  /** The session minted for `endpoint` — active or parked — else its slot sibling's (SLOT_SIBLINGS, fb#1609), else null. */
   loadFor(endpoint: string): Promise<CredentialsProfile | null>;
   /** {@link loadFor}, fresh from disk — the refresh path's read. */
   reloadFor(endpoint: string): Promise<CredentialsProfile | null>;
@@ -151,14 +146,13 @@ export function createStore(path: string): CredentialsStore {
   };
   const loadFor = async (endpoint: string): Promise<CredentialsProfile | null> => {
     const file = await readCredentialsFile(path);
-    const slot = (key: string) =>
-      (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
+    const slot = (key?: string): CredentialsProfile | null =>
+      key ? ((activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null) : null;
     const key = endpointKey(endpoint);
-    const sibling = slotSibling(key);
     // The endpoint's own session first; its slot sibling's only as a fallback.
     // The profile keeps ITS endpoint, so a refresh persists back into the slot
     // it came from instead of cloning the session under the sibling's key.
-    return slot(key) ?? (sibling ? slot(sibling) : null);
+    return slot(key) ?? slot(SLOT_SIBLINGS[key]);
   };
   const clear = async (): Promise<void> => {
     if (existsSync(path)) await unlink(path);

@@ -233,48 +233,36 @@ describe("credentials store — per-endpoint sessions (fb#855)", () => {
     await s.save(prod, "_impersonator");
     expect(await s.sessions()).toHaveLength(1);
   });
-});
 
-/**
- * fb#1609: api-staging.ibetoni.fi is the SAME backend as api.ibetoni.fi on
- * another deployment slot — same signing keys, same DB — so the prod session
- * is a valid credential there. Without this, every post-deploy check against
- * staging needed an interactive `ib auth login --endpoint <staging>`.
- */
-describe("store — slot-sibling sessions (fb#1609)", () => {
-  let dir: string;
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ib-store-1609-")); });
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  // fb#1609: api-staging.ibetoni.fi is the SAME backend on another deployment
+  // slot (same keys, same DB), so the prod session is a valid credential there.
+  // Without this, every post-deploy check against staging needed an interactive
+  // `ib auth login --endpoint <staging>`.
+  const staging: CredentialsProfile = { ...prod, jwt: "eyJstg", endpoint: "https://api-staging.ibetoni.fi" };
 
-  const session = (endpoint: string, jwt: string): CredentialsProfile => ({
-    jwt, refreshToken: "rt", issuedAt: "", expiresAt: "",
-    personId: 1, ownerAsiakasId: 1, ownerAsiakasName: "X", endpoint,
+  test("loadFor(staging) falls back to the prod session, keeping the profile's own endpoint (fb#1609)", async () => {
+    const s = createStore(path);
+    await s.save(prod, undefined, { activate: true });
+    const got = await s.loadFor(staging.endpoint);
+    expect(got?.jwt).toBe(prod.jwt);
+    expect(got?.endpoint).toBe(prod.endpoint);
+    // both directions, and through reloadFor
+    await s.clear();
+    await s.save(staging, undefined, { activate: true });
+    expect((await s.reloadFor(prod.endpoint))?.jwt).toBe(staging.jwt);
   });
 
-  test("loadFor(staging) falls back to the prod session, keeping the profile's own endpoint", async () => {
-    const store = createStore(join(dir, "c.json"));
-    await store.save(session("https://api.ibetoni.fi", "prod_jwt"), undefined, { activate: true });
-    const got = await store.loadFor("https://api-staging.ibetoni.fi");
-    expect(got?.jwt).toBe("prod_jwt");
-    expect(got?.endpoint).toBe("https://api.ibetoni.fi");
+  test("a session minted for the endpoint itself wins over the sibling; a non-sibling still gets nothing", async () => {
+    const s = createStore(path);
+    await s.save(prod, undefined, { activate: true });
+    await s.save(staging);
+    expect((await s.loadFor(staging.endpoint))?.jwt).toBe(staging.jwt);
+    expect(await s.loadFor("http://127.0.0.1:3000")).toBeNull();
   });
 
-  test("the sibling works in both directions and through reloadFor", async () => {
-    const store = createStore(join(dir, "c.json"));
-    await store.save(session("https://api-staging.ibetoni.fi", "stg_jwt"), undefined, { activate: true });
-    expect((await store.reloadFor("https://api.ibetoni.fi"))?.jwt).toBe("stg_jwt");
-  });
-
-  test("a session minted for the endpoint itself wins over the sibling", async () => {
-    const store = createStore(join(dir, "c.json"));
-    await store.save(session("https://api.ibetoni.fi", "prod_jwt"), undefined, { activate: true });
-    await store.save(session("https://api-staging.ibetoni.fi", "stg_jwt"));
-    expect((await store.loadFor("https://api-staging.ibetoni.fi"))?.jwt).toBe("stg_jwt");
-  });
-
-  test("a non-sibling endpoint still gets nothing (fb#855 stands)", async () => {
-    const store = createStore(join(dir, "c.json"));
-    await store.save(session("https://api.ibetoni.fi", "prod_jwt"), undefined, { activate: true });
-    expect(await store.loadFor("http://127.0.0.1:3000")).toBeNull();
+  test("logout under a slot sibling names the borrowed session instead of logging it out (fb#1624)", async () => {
+    const { borrowedSessionNote } = await import("../../src/auth/logout.js");
+    expect(borrowedSessionNote(prod, staging.endpoint)).toMatch(/api-staging\.ibetoni\.fi.*borrows the api\.ibetoni\.fi one/);
+    expect(borrowedSessionNote(prod, prod.endpoint)).toBeNull();
   });
 });

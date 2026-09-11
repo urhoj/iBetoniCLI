@@ -26,10 +26,6 @@ const SLOT_SIBLINGS = {
     "api.ibetoni.fi": "api-staging.ibetoni.fi",
     "api-staging.ibetoni.fi": "api.ibetoni.fi",
 };
-/** The sibling slot's key for `key`, or null when the host has none. */
-export function slotSibling(key) {
-    return SLOT_SIBLINGS[key] ?? null;
-}
 // Same-process read cache: one CLI invocation loads the credentials file from
 // several places (tier resolution in bin/ib.ts, then every CLI context), and an
 // invocation almost never races an external writer — so the parsed file is
@@ -71,13 +67,12 @@ export function createStore(path) {
     };
     const loadFor = async (endpoint) => {
         const file = await readCredentialsFile(path);
-        const slot = (key) => (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
+        const slot = (key) => key ? ((activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null) : null;
         const key = endpointKey(endpoint);
-        const sibling = slotSibling(key);
         // The endpoint's own session first; its slot sibling's only as a fallback.
         // The profile keeps ITS endpoint, so a refresh persists back into the slot
         // it came from instead of cloning the session under the sibling's key.
-        return slot(key) ?? (sibling ? slot(sibling) : null);
+        return slot(key) ?? slot(SLOT_SIBLINGS[key]);
     };
     const clear = async () => {
         if (existsSync(path))

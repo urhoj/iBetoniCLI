@@ -47,6 +47,9 @@ export const CACHE_ENTITIES: CacheEntity[] = [
   { entityType: "holidays", params: ["asiakasId"], example: "ib dev cache invalidate holidays --asiakas 8 --confirm" },
   { entityType: "ilmoitustaulu", params: ["asiakasId"], example: "ib dev cache invalidate ilmoitustaulu --asiakas 8 --confirm" },
   { entityType: "subscription", params: ["asiakasId"], example: "ib dev cache invalidate subscription --asiakas 8 --confirm" },
+  // --asiakas reaches the customer:/pricing: families; the tier-keyed
+  // subscriptionItems:available:<tierId> family has no tenant slot and needs a
+  // developer sweep with no --asiakas.
   { entityType: "subscriptionItems", params: ["asiakasId"], example: "ib dev cache invalidate subscriptionItems --asiakas 8 --confirm" },
   { entityType: "inventory", params: ["asiakasId"], example: "ib dev cache invalidate inventory --asiakas 8 --confirm" },
 ];

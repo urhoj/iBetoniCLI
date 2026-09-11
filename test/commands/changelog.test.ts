@@ -1299,6 +1299,29 @@ describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  test("a cross-reference on an entry that resolves another row is APPLIED even though the scalar stays put (fb#1621)", () => {
+    // Since fb#1556 the backend derives the scalar from the junction (resolves
+    // link first), so `update 1654 --feedback 882 --no-resolve` on the entry
+    // resolving fb#750 echoes feedbackId 750 — and feedbackLinks names 882.
+    // Comparing the scalar alone called that the fb#303 silent drop.
+    const warn = vi.fn();
+    warnIfPatchIgnored(
+      { feedbackId: [882] },
+      { changelogId: 1654, feedbackId: 750, feedbackLinks: [{ feedbackId: 882, role: "references" }] },
+      warn
+    );
+    // An id the backend REJECTED (no such row, fb#543) was still processed — not a deploy gate.
+    warnIfPatchIgnored(
+      { feedbackId: [999999] },
+      { changelogId: 1654, feedbackId: 750, feedbackLinks: [{ feedbackId: 999999, feedbackLinked: false, error: "no such row" }] },
+      warn
+    );
+    expect(warn).not.toHaveBeenCalled();
+    // A pre-junction backend echoes no feedbackLinks at all — the scalar is still the only evidence there.
+    warnIfPatchIgnored({ feedbackId: [882] }, { changelogId: 1654, feedbackId: 750 }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
   test("still catches a genuinely ignored --feedback now that the shapes match", () => {
     const warn = vi.fn();
     warnIfPatchIgnored({ feedbackId: [541] }, { changelogId: 1281, feedbackId: null }, warn);

@@ -613,12 +613,19 @@ export function warnIfPatchIgnored(patch, result, warn = warnNote) {
         const sent = patch[f];
         if (sent === undefined || !(f in row))
             return false;
-        // fb#576: --feedback is a LIST on the wire, but the row echoes the SCALAR
-        // projection column (devChangelog.feedbackId = the first id given). `541 !==
-        // [541]` is always true, so this fired on every SUCCESSFUL --feedback update
-        // — and worse, it made the detector permanently USELESS for that flag: a
-        // genuinely deploy-gated ignore became indistinguishable from the normal
-        // case. Compare like with like.
+        // --feedback is a LIST on the wire and the row's scalar feedbackId is a
+        // PROJECTION of the junction — the resolves link first (fb#1556) — so the
+        // scalar can legitimately name a different id than the one just sent (a
+        // cross-reference on an entry that resolves another row). A backend that
+        // processed the flag echoes one feedbackLinks entry per sent id, rejected
+        // ids included (fb#543); that is the evidence, not the scalar. Only a
+        // pre-junction backend echoes no feedbackLinks — there the scalar is all
+        // there is (fb#576: compare like with like, `541 !== [541]` cried wolf).
+        if (f === "feedbackId" && Array.isArray(row.feedbackLinks)) {
+            const sentIds = Array.isArray(sent) ? sent : [sent];
+            const echoed = row.feedbackLinks.map((l) => l?.feedbackId);
+            return !sentIds.some((id) => echoed.includes(id));
+        }
         return row[f] !== (Array.isArray(sent) ? sent[0] : sent);
     });
     if (ignored.length)

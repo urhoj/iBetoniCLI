@@ -1,4 +1,18 @@
-import { createStore } from "./store.js";
+import { createStore, endpointKey } from "./store.js";
+/**
+ * fb#1624: under `--endpoint <slot sibling>` the store hands back the OTHER
+ * slot's session (fb#1609), so a logout named for api-staging.ibetoni.fi would
+ * revoke and delete the api.ibetoni.fi login it merely borrows. Returns the
+ * stderr note to print INSTEAD of logging out, or null when the session really
+ * is the requested endpoint's own.
+ */
+export function borrowedSessionNote(creds, endpoint) {
+    const asked = endpointKey(endpoint);
+    const own = endpointKey(creds.endpoint);
+    return asked === own
+        ? null
+        : `[ib] note: no session of its own for ${asked} — it borrows the ${own} one, which stays; log that out with --endpoint ${creds.endpoint}`;
+}
 /**
  * Tear down ONE CLI session: best-effort revoke the refresh token at
  * `POST /oauth/revoke`, then unconditionally forget that endpoint's local
