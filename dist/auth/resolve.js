@@ -1,7 +1,7 @@
-import { createStore } from "./store.js";
+import { createStore, endpointKey } from "./store.js";
 import { DEFAULT_ENDPOINT } from "../globals.js";
 import { decodeJwtPayload, jwtShapeProblem } from "./jwt.js";
-import { failWith } from "../output/json.js";
+import { failWith, warnNote } from "../output/json.js";
 /**
  * Fold a bare access token into a `ResolvedAuth`. No refresh path, so nothing
  * derived from it is ever persisted. The JWT is decoded best-effort to surface
@@ -67,11 +67,17 @@ export async function resolveAuth(opts) {
         return bareTokenAuth(process.env.IB_TOKEN, opts.defaultEndpoint, true);
     // Sessions are per endpoint (fb#855): an explicit --endpoint selects the
     // session minted FOR it, never the active one — a prod token presented to a
-    // local backend is a 401 with a misleading remedy, not a session.
+    // local backend is a 401 with a misleading remedy, not a session. The one
+    // exception is a deployment slot of the same backend (store.ts SLOT_SIBLINGS,
+    // fb#1609); the store handles that, this just says so, since the caller may
+    // not expect a request to staging to act with the prod session.
     const store = createStore(opts.credentialsPath);
     const creds = opts.defaultEndpoint ? await store.loadFor(opts.defaultEndpoint) : await store.load();
     if (!creds)
         return null;
+    if (opts.defaultEndpoint && endpointKey(opts.defaultEndpoint) !== endpointKey(creds.endpoint)) {
+        warnNote(`[ib] note: no session for ${endpointKey(opts.defaultEndpoint)} — using the ${endpointKey(creds.endpoint)} one (same backend, different deployment slot)`);
+    }
     return {
         token: creds.jwt,
         endpoint: creds.endpoint,

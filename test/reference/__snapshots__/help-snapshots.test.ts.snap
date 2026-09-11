@@ -652,7 +652,7 @@ exports[`Help snapshots — contract stability > help for ib auth login matches 
   ib auth login [flags]
 
 DESCRIPTION
-  Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching.
+  Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so) — a post-deploy staging check needs no login.
   Auth: none (public).
 
 FLAGS
@@ -726,7 +726,7 @@ OUTPUT (JSON, stdout)
   { ok: true }
 
 ERRORS (stderr, exit non-zero)
-  exit 2 (client-side)  Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855) → ib auth login first; under --endpoint the message names the exact \`ib auth login --endpoint <url>\` (fb#1040)
+  exit 2 (client-side)  Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855; api.ibetoni.fi and api-staging.ibetoni.fi share one, fb#1609) → ib auth login first; under --endpoint the message names the exact \`ib auth login --endpoint <url>\` (fb#1040)
   exit 2 (client-side)  Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant) → ib auth login to re-authenticate
   exit 4 (client-side)  Refresh refused while impersonating (it would escalate to a permanent login as the target) → ib auth impersonate --extend (10 more minutes) or --end (restore your own login)
 

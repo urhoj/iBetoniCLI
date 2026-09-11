@@ -12,6 +12,24 @@ export function endpointKey(endpoint) {
         return endpoint.trim().toLowerCase();
     }
 }
+/**
+ * Deployment slots of ONE backend (fb#1609). The staging slot serves the same
+ * code base against the same database with the same JWT keys, so a session
+ * minted by either verifies on both — and `npm run deploy -- backend` puts a
+ * fix on staging first, which is exactly when an unattended session needs to
+ * run `ib --endpoint <staging>` without a browser login. The pair is the one
+ * scripts/deploy-staging-all.ps1 and swap-production-all.ps1 already hard-code.
+ * A local backend is NOT a sibling: fb#855's "never present a token elsewhere"
+ * still holds for every host not listed here.
+ */
+const SLOT_SIBLINGS = {
+    "api.ibetoni.fi": "api-staging.ibetoni.fi",
+    "api-staging.ibetoni.fi": "api.ibetoni.fi",
+};
+/** The sibling slot's key for `key`, or null when the host has none. */
+export function slotSibling(key) {
+    return SLOT_SIBLINGS[key] ?? null;
+}
 // Same-process read cache: one CLI invocation loads the credentials file from
 // several places (tier resolution in bin/ib.ts, then every CLI context), and an
 // invocation almost never races an external writer — so the parsed file is
@@ -53,8 +71,13 @@ export function createStore(path) {
     };
     const loadFor = async (endpoint) => {
         const file = await readCredentialsFile(path);
+        const slot = (key) => (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
         const key = endpointKey(endpoint);
-        return (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
+        const sibling = slotSibling(key);
+        // The endpoint's own session first; its slot sibling's only as a fallback.
+        // The profile keeps ITS endpoint, so a refresh persists back into the slot
+        // it came from instead of cloning the session under the sibling's key.
+        return slot(key) ?? (sibling ? slot(sibling) : null);
     };
     const clear = async () => {
         if (existsSync(path))

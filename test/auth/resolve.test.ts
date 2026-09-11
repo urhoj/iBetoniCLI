@@ -208,3 +208,29 @@ describe("resolveAuth — per-endpoint sessions (fb#855)", () => {
     expect(await resolveAuth({ credentialsPath: file, defaultEndpoint: "http://127.0.0.1:8080" })).toBeNull();
   });
 });
+
+describe("resolveAuth — staging slot reuses the prod session (fb#1609)", () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ib-resolve-1609-")); delete process.env.IB_TOKEN; });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  test("--endpoint api-staging resolves the api.ibetoni.fi session and says so on stderr", async () => {
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "prod_jwt", refreshToken: "rt", issuedAt: "", expiresAt: "",
+      personId: 1, ownerAsiakasId: 1, ownerAsiakasName: "X", endpoint: "https://api.ibetoni.fi",
+    }, undefined, { activate: true });
+    const lines: string[] = [];
+    const orig = process.stderr.write;
+    process.stderr.write = ((chunk: string) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    try {
+      const auth = await resolveAuth({ credentialsPath: file, defaultEndpoint: "https://api-staging.ibetoni.fi" });
+      expect(auth?.token).toBe("prod_jwt");
+      expect(auth?.refreshable).toBe(true);
+    } finally {
+      process.stderr.write = orig;
+    }
+    expect(lines.join("")).toMatch(/api-staging\.ibetoni\.fi.*api\.ibetoni\.fi/);
+  });
+});

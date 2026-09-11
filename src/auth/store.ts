@@ -23,7 +23,10 @@ export interface CredentialsProfile {
  * local-dev login coexist and `--endpoint` selects between them (fb#855: a
  * token is endpoint-specific, and one slot meant every switch was a re-login
  * and every mismatch a 401 with a wall of remediation text). Each endpoint's
- * session lives in exactly ONE slot. Underscore-prefixed profiles
+ * session lives in exactly ONE slot — with one read-side exception: a
+ * deployment SLOT of the same backend (`SLOT_SIBLINGS`, fb#1609) may read its
+ * sibling's session, since that token was minted by the same keys against the
+ * same database. Underscore-prefixed profiles
  * (`_impersonator`) are internal stashes, not sessions. `activeProfile` is a
  * legacy field nothing reads; it stays "default".
  */
@@ -42,6 +45,26 @@ export function endpointKey(endpoint: string): string {
   } catch {
     return endpoint.trim().toLowerCase();
   }
+}
+
+/**
+ * Deployment slots of ONE backend (fb#1609). The staging slot serves the same
+ * code base against the same database with the same JWT keys, so a session
+ * minted by either verifies on both — and `npm run deploy -- backend` puts a
+ * fix on staging first, which is exactly when an unattended session needs to
+ * run `ib --endpoint <staging>` without a browser login. The pair is the one
+ * scripts/deploy-staging-all.ps1 and swap-production-all.ps1 already hard-code.
+ * A local backend is NOT a sibling: fb#855's "never present a token elsewhere"
+ * still holds for every host not listed here.
+ */
+const SLOT_SIBLINGS: Record<string, string> = {
+  "api.ibetoni.fi": "api-staging.ibetoni.fi",
+  "api-staging.ibetoni.fi": "api.ibetoni.fi",
+};
+
+/** The sibling slot's key for `key`, or null when the host has none. */
+export function slotSibling(key: string): string | null {
+  return SLOT_SIBLINGS[key] ?? null;
 }
 
 export interface StoredSession extends CredentialsProfile {
@@ -128,8 +151,14 @@ export function createStore(path: string): CredentialsStore {
   };
   const loadFor = async (endpoint: string): Promise<CredentialsProfile | null> => {
     const file = await readCredentialsFile(path);
+    const slot = (key: string) =>
+      (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
     const key = endpointKey(endpoint);
-    return (activeIsFor(file, key) ? file?.profiles[ACTIVE_PROFILE] : file?.profiles?.[key]) ?? null;
+    const sibling = slotSibling(key);
+    // The endpoint's own session first; its slot sibling's only as a fallback.
+    // The profile keeps ITS endpoint, so a refresh persists back into the slot
+    // it came from instead of cloning the session under the sibling's key.
+    return slot(key) ?? (sibling ? slot(sibling) : null);
   };
   const clear = async (): Promise<void> => {
     if (existsSync(path)) await unlink(path);

@@ -10,7 +10,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth login",
     description:
-      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching.",
+      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so) — a post-deploy staging check needs no login.",
     auth: "none",
     flags: [
       {
@@ -156,7 +156,7 @@ export const AUTH_SPECS: CommandSpec[] = [
         origin: "client",
         exit: 2,
         match: "not logged in",
-        meaning: "Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855)",
+        meaning: "Not logged in (no session for the endpoint — under --endpoint the lookup is per-endpoint, fb#855; api.ibetoni.fi and api-staging.ibetoni.fi share one, fb#1609)",
         remedy: "ib auth login first; under --endpoint the message names the exact `ib auth login --endpoint <url>` (fb#1040)",
       },
       {
