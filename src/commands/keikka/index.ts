@@ -18,7 +18,10 @@ import { qs } from "../../api/query.js";
 export interface KeikkaListFilter {
   from?: string;
   to?: string;
+  /** The ORDER's customer (keikka.asiakasId) inside the tenant — NOT the tenant. */
   customer?: number;
+  /** Tenant override (fb#1512): list ANOTHER company's orders; sysadmin/developer-gated server-side. */
+  asiakas?: number;
   vehicle?: number;
   status?: string;
   worksite?: number;
@@ -84,6 +87,7 @@ export async function runKeikkaList(
       status: opts.status || undefined,
       limit: opts.limit,
       cursor: opts.cursor || undefined,
+      asiakas: opts.asiakas,
     })}`
   );
   // Echo the interpreted date window so a count:0 result is self-evidently
@@ -590,6 +594,7 @@ export function registerKeikkaCommands(
       "--date <date>"
     )
     .option("--customer <id>", "", intFlag("--customer", 1))
+    .option("--asiakas <id>", "", intFlag("--asiakas", 1))
     .option("--vehicle <id>", "", intFlag("--vehicle", 1))
     .option("--worksite <id>", "", intFlag("--worksite", 1))
     .option("--status <s>")

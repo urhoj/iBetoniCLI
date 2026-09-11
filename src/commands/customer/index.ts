@@ -650,25 +650,54 @@ export async function runCustomerWorksites(
   return listEnvelope(items);
 }
 
+/** One `ib customer search` hit — the raw asiakas_search_usingLikes/usingFullText row. */
+export interface CustomerSearchHit {
+  asiakasId: number;
+  asiakasNimi: string | null;
+  ytunnus: string | null;
+  kommentti: string | null;
+  lastActiveTime: string | null;
+  /**
+   * The row's REAL tenant (fb#1321). The search deliberately admits SELF-OWNED
+   * company rows (other suppliers, `ownerAsiakasId === asiakasId`) next to the
+   * caller's own customers, and nothing else in the row tells them apart — bind
+   * a foreign hit onto `keikka.asiakasId` and the order silently gets another
+   * tenant's company as its customer. Absent (undefined) only from a backend
+   * that predates the projection migration.
+   */
+  ownerAsiakasId?: number | null;
+  /** `--my-companies` only: the company the row matched under. */
+  scopeAsiakasId?: number;
+}
+
 /**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
- * so the CLI sends only searchString. Result shape is whatever the backend
- * returns (typically an array of asiakas records).
+ * so the CLI sends only searchString. Returns the backend's array as-is.
  *
  * When `myCompanies` is true, adds `myCompanies=1` to the query so the backend
  * fans out across all companies the caller belongs to (rows tagged with
- * `ownerAsiakasId`).
+ * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner).
+ *
+ * `ownOnly` filters client-side to rows whose `ownerAsiakasId` equals the scope
+ * they matched under (the active company, or `scopeAsiakasId` with
+ * `myCompanies`). A hit with no owner column is dropped, never assumed own.
  */
 export async function runCustomerSearch(
   client: ApiClient,
   query: string,
   limit?: number,
-  myCompanies = false
+  myCompanies = false,
+  ownOnly = false
 ): Promise<unknown> {
-  return client.get<unknown>(
+  const rows = await client.get<unknown>(
     `/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`
+  );
+  if (!ownOnly || !Array.isArray(rows)) return rows;
+  const owner = await resolveCurrentOwnerAsiakasId(client);
+  return (rows as CustomerSearchHit[]).filter(
+    (r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner)
   );
 }
 
@@ -1201,9 +1230,10 @@ export function registerCustomerCommands(
     .addOption(queryAliasOption())
     .option("--limit <n>", "", cappedInt(500))
     .option("--my-companies")
+    .option("--own-only")
     .action(
-      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; myCompanies?: boolean }) =>
-        runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies)
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; query?: string; limit?: number; myCompanies?: boolean; ownOnly?: boolean }) =>
+        runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies, !!opts.ownOnly)
       )
     );
 

@@ -49,6 +49,7 @@ export async function runKeikkaList(client, opts) {
         status: opts.status || undefined,
         limit: opts.limit,
         cursor: opts.cursor || undefined,
+        asiakas: opts.asiakas,
     })}`);
     // Echo the interpreted date window so a count:0 result is self-evidently
     // scoped — without it an empty list is indistinguishable from a mis-aimed query.
@@ -378,6 +379,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--to <date>", "", "today")
         .option("--date <date>")
         .option("--customer <id>", "", intFlag("--customer", 1))
+        .option("--asiakas <id>", "", intFlag("--asiakas", 1))
         .option("--vehicle <id>", "", intFlag("--vehicle", 1))
         .option("--worksite <id>", "", intFlag("--worksite", 1))
         .option("--status <s>")

@@ -5,14 +5,26 @@
 import type { CommandSpec } from "../../output/help.js";
 import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, authErrors, intParseErr, limitErr, permErrors } from "./shared.js";
 
+// ─── keikka cross-tenant (--asiakas) fragments (fb#1512) ─────────────────────
+// Mirrors VEHICLE_ASIAKAS_PERMISSION/_403 but the keikka read gate is narrower:
+// sysadmin/developer (or global viewer) only — no per-tenant role opens it.
+// Substring is the backend's own text (keikkaCliRoutes.js resolveKeikkaListOwner).
+const KEIKKA_ASIAKAS_PERMISSION = "--asiakas: sysadmin/developer only (server-enforced)";
+const KEIKKA_ASIAKAS_403 = apiErr(
+  403,
+  "No read access to the requested --asiakas company",
+  "omit --asiakas for the active company, or use a developer token",
+  "no read access to asiakas"
+);
+
 export const KEIKKA_SPECS: CommandSpec[] = [
 
   // ─── keikka (6) ──────────────────────────────────────────────────────────
   {
     command: "ib keikka list",
     description:
-      "List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption.",
-    permissions: ["auth.page.grid.tilaus.read"],
+      "List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; sysadmin/developer lever) instead of the active company.",
+    permissions: ["auth.page.grid.tilaus.read", KEIKKA_ASIAKAS_PERMISSION],
     flags: [
       {
         name: "from",
@@ -35,7 +47,14 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       {
         name: "customer",
         type: "number",
-        description: "Filter by asiakasId",
+        description:
+          "Filter by the ORDER's customer (keikka.asiakasId) inside the tenant being listed — NOT the tenant itself; use --asiakas for that",
+      },
+      {
+        name: "asiakas",
+        type: "number",
+        description:
+          "List another company's orders (cross-tenant tenant override). Requires sysadmin/developer; default = active company.",
       },
       {
         name: "vehicle",
@@ -58,8 +77,10 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     errors: [
       limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`, or narrow with `--from` / `--to`"),
       intParseErr("--customer", "pass a positive asiakasId"),
+      intParseErr("--asiakas", "pass a positive asiakasId (a tenant), or omit it for the active company"),
       intParseErr("--vehicle", "pass a positive vehicleId"),
       intParseErr("--worksite", "pass a positive tyomaaId"),
+      KEIKKA_ASIAKAS_403,
       ...permErrors("auth.page.grid.tilaus.read"),
     ],
     notes: [
@@ -74,6 +95,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka list --date today",
       "ib keikka list --from 2026-05-01 --to 2026-05-31 --customer 1349 --status 9 --limit 50",
       "ib keikka list --from today --to tomorrow --pretty",
+      "ib keikka list --asiakas 27 --from 2026-01-01 --to 2026-12-31",
     ],
   },
   {

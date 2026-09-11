@@ -403,15 +403,22 @@ export async function runCustomerWorksites(client, asiakasId) {
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
- * so the CLI sends only searchString. Result shape is whatever the backend
- * returns (typically an array of asiakas records).
+ * so the CLI sends only searchString. Returns the backend's array as-is.
  *
  * When `myCompanies` is true, adds `myCompanies=1` to the query so the backend
  * fans out across all companies the caller belongs to (rows tagged with
- * `ownerAsiakasId`).
+ * `scopeAsiakasId`; `ownerAsiakasId` stays the real owner).
+ *
+ * `ownOnly` filters client-side to rows whose `ownerAsiakasId` equals the scope
+ * they matched under (the active company, or `scopeAsiakasId` with
+ * `myCompanies`). A hit with no owner column is dropped, never assumed own.
  */
-export async function runCustomerSearch(client, query, limit, myCompanies = false) {
-    return client.get(`/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`);
+export async function runCustomerSearch(client, query, limit, myCompanies = false, ownOnly = false) {
+    const rows = await client.get(`/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`);
+    if (!ownOnly || !Array.isArray(rows))
+        return rows;
+    const owner = await resolveCurrentOwnerAsiakasId(client);
+    return rows.filter((r) => r.ownerAsiakasId != null && r.ownerAsiakasId === (r.scopeAsiakasId ?? owner));
 }
 /**
  * POST /api/asiakas/createY with a free-form body forwarded to the existing
@@ -802,7 +809,8 @@ export function registerCustomerCommands(parent, getClient) {
         .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(500))
         .option("--my-companies")
-        .action(jsonAction(getClient, (client, query, opts) => runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies)));
+        .option("--own-only")
+        .action(jsonAction(getClient, (client, query, opts) => runCustomerSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.myCompanies, !!opts.ownOnly)));
     // Hidden back-compat alias — canonical command is now `ib opendata prh`.
     c.command("prh [ytunnus]", { hidden: true })
         .description("Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>.")

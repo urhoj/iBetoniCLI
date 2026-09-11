@@ -31,6 +31,16 @@ describe("ib keikka list/get", () => {
     expect(result.range).toEqual({ from: "2026-06-01", to: "2026-06-30" });
   });
 
+  // fb#1512: --asiakas is the TENANT override (sysadmin/developer-gated on the
+  // backend); --customer is the order's customer inside that tenant.
+  test("runKeikkaList: forwards --asiakas as the tenant override", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+    await runKeikkaList(mockClient, { from: "2026-01-01", to: "2026-12-31", asiakas: 27 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/keikka/list?from=2026-01-01&to=2026-12-31&asiakas=27"
+    );
+  });
+
   test("runKeikkaList: range echoes null when no dates were sent", async () => {
     mockClient.get.mockResolvedValueOnce({
       items: [],

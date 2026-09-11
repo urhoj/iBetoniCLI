@@ -721,6 +721,10 @@ ib keikka latest --worksite <id>
   ! --worksite must be an integer >= 1
   > pass a positive tyomaaId
 
+ib keikka list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a tenant), or omit it for the active company
+
 ib keikka list --customer <id>
   ! --customer must be an integer >= 1
   > pass a positive asiakasId

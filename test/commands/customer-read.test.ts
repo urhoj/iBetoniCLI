@@ -134,6 +134,40 @@ describe("ib customer list/get/search", () => {
     );
   });
 
+  // fb#1321: the search admits self-owned foreign company rows; the backend now
+  // projects each hit's real ownerAsiakasId so a caller can drop them.
+  describe("runCustomerSearch --own-only", () => {
+    const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const jwtFor = (ownerAsiakasId: number) => `${b64({ alg: "none" })}.${b64({ ownerAsiakasId })}.sig`;
+
+    test("drops hits owned by another tenant, keeps own and never a null-owner hit", async () => {
+      mockClient.getCurrentToken.mockReturnValue(jwtFor(8));
+      mockClient.get.mockResolvedValueOnce([
+        { asiakasId: 252, asiakasNimi: "Aapa Ky", ownerAsiakasId: 8 },
+        { asiakasId: 66, asiakasNimi: "Lujabetoni Oy", ownerAsiakasId: 66 },
+        { asiakasId: 5, asiakasNimi: "Pre-migration row" },
+      ]);
+      const rows = (await runCustomerSearch(mockClient, "a", undefined, false, true)) as Array<{ asiakasId: number }>;
+      expect(rows.map((r) => r.asiakasId)).toEqual([252]);
+    });
+
+    test("with --my-companies, 'own' means owned by the company the row matched under", async () => {
+      mockClient.getCurrentToken.mockReturnValue(jwtFor(8));
+      mockClient.get.mockResolvedValueOnce([
+        { asiakasId: 1000, ownerAsiakasId: 10, scopeAsiakasId: 10 },
+        { asiakasId: 66, ownerAsiakasId: 66, scopeAsiakasId: 10 },
+        { asiakasId: 2200, ownerAsiakasId: 22, scopeAsiakasId: 22 },
+      ]);
+      const rows = (await runCustomerSearch(mockClient, "a", undefined, true, true)) as Array<{ asiakasId: number }>;
+      expect(rows.map((r) => r.asiakasId)).toEqual([1000, 2200]);
+    });
+
+    test("without --own-only every hit passes through unchanged", async () => {
+      mockClient.get.mockResolvedValueOnce([{ asiakasId: 66, ownerAsiakasId: 66 }]);
+      expect(await runCustomerSearch(mockClient, "a")).toEqual([{ asiakasId: 66, ownerAsiakasId: 66 }]);
+    });
+  });
+
   test("runCustomerWorksites: GET asiakasTyomaaList, wraps array into envelope", async () => {
     mockClient.get.mockResolvedValueOnce([
       { tyomaaId: 7, tyomaaNimi: "Site A", tyomaaOsoite1: "Main 1", tyomaaOsoite4: "Helsinki" },

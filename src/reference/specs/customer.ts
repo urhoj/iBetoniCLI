@@ -228,13 +228,22 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       {
         name: "my-companies",
         type: "boolean",
-        description: "Search across every company you belong to (customer/worksite/person)",
+        description: "Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under)",
+      },
+      {
+        name: "own-only",
+        type: "boolean",
+        description:
+          "Drop hits owned by another tenant (ownerAsiakasId ≠ the company searched under). Use before binding a hit onto an order's customer.",
       },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, score }>",
+      "Array<{ asiakasId, asiakasNimi, ytunnus, kommentti, lastActiveTime, ownerAsiakasId, scopeAsiakasId? }> (a raw array, NOT a ListEnvelope)",
     errors: [limitErr("pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it"), ...permErrors("auth.page.asiakas.read")],
-    examples: ["ib customer search Example", "ib customer search 1234567"],
+    notes: [
+      "Hits include SELF-OWNED company rows of OTHER tenants (suppliers, ownerAsiakasId = asiakasId) next to your own customers. Check ownerAsiakasId (fb#1321) or pass --own-only before binding a hit to an order — keikka_create validates nothing.",
+    ],
+    examples: ["ib customer search Example", "ib customer search 1234567", "ib customer search Lujabetoni --own-only"],
   },
   {
     command: "ib customer modules",

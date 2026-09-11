@@ -1792,14 +1792,15 @@ ARGUMENTS
 FLAGS
   --search STRING    Search query (alias for the <query> positional)
   --limit NUMBER    Max results (default: 50)
-  --my-companies    Search across every company you belong to (customer/worksite/person)
+  --my-companies    Search across every company you belong to; each hit adds scopeAsiakasId (the company it matched under)
+  --own-only    Drop hits owned by another tenant (ownerAsiakasId ≠ the company searched under). Use before binding a hit onto an order's customer.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, name, yTunnus, score }>
+  Array<{ asiakasId, asiakasNimi, ytunnus, kommentti, lastActiveTime, ownerAsiakasId, scopeAsiakasId? }> (a raw array, NOT a ListEnvelope)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this is a search cap (default 50), so narrow the search term rather than raising it
@@ -1807,9 +1808,13 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Hits include SELF-OWNED company rows of OTHER tenants (suppliers, ownerAsiakasId = asiakasId) next to your own customers. Check ownerAsiakasId (fb#1321) or pass --own-only before binding a hit to an order — keikka_create validates nothing.
+
 EXAMPLES
   ib customer search Example
   ib customer search 1234567
+  ib customer search Lujabetoni --own-only
 "
 `;
 
@@ -6782,15 +6787,16 @@ exports[`Help snapshots — contract stability > help for ib keikka list matches
   ib keikka list [flags]
 
 DESCRIPTION
-  List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption.
-  Permissions: requires auth.page.grid.tilaus.read.
+  List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption. --asiakas lists ANOTHER company's orders (cross-tenant; sysadmin/developer lever) instead of the active company.
+  Permissions: requires auth.page.grid.tilaus.read, --asiakas: sysadmin/developer only (server-enforced).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
   --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
   --date DATE    Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.
-  --customer NUMBER    Filter by asiakasId
+  --customer NUMBER    Filter by the ORDER's customer (keikka.asiakasId) inside the tenant being listed — NOT the tenant itself; use --asiakas for that
+  --asiakas NUMBER    List another company's orders (cross-tenant tenant override). Requires sysadmin/developer; default = active company.
   --vehicle NUMBER    Filter by vehicleId
   --worksite NUMBER    Filter by worksite (tyomaaId)
   --status STRING    Filter by tila/status
@@ -6807,8 +6813,10 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
   exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a tenant), or omit it for the active company
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 3 (HTTP 403)  No read access to the requested --asiakas company → omit --asiakas for the active company, or use a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6827,6 +6835,7 @@ EXAMPLES
   ib keikka list --date today
   ib keikka list --from 2026-05-01 --to 2026-05-31 --customer 1349 --status 9 --limit 50
   ib keikka list --from today --to tomorrow --pretty
+  ib keikka list --asiakas 27 --from 2026-01-01 --to 2026-12-31
 "
 `;
 
