@@ -284,7 +284,7 @@ If verification fails with `invalid signature`: `puminet5api/app.js` loads `.env
 
 ## CI
 
-`.github/workflows/ci.yml` runs lint + type-check + tests + `check:dist`. Run `npm run lint && npm run type-check && npm test` locally before pushing.
+`.github/workflows/ci.yml` runs `check:dist` (an emitting tsc over src — the src type-check) + `type-check:test` (the noEmit lane for `test/`, fb#1461) + lint + tests. Run `npm run lint && npm run type-check && npm test` locally before pushing.
 
 **There is deliberately no npm publish lane, and no committed `package-lock.json`** (both removed 2026-07-27, feedback #295 — do not recreate either):
 

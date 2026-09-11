@@ -50,10 +50,14 @@ jobs:
       # committed dist/ doesn't match the fresh output (stale/unbuilt/orphaned).
       # dist/ is what actually ships (vendored into puminet5api; deploys never
       # build), so a src-only commit must go red here (feedback #135/#136).
-      # This REPLACES a separate `npm run type-check` step: an emitting tsc over
+      # This REPLACES the src half of `npm run type-check`: an emitting tsc over
       # the same tsconfig reports every error `--noEmit` would, so running both
-      # compiled the project twice for one set of diagnostics.
+      # compiled the project twice for one set of diagnostics. It does NOT cover
+      # test/ — the build tsconfig excludes it — so the noEmit lane below is the
+      # ONLY gate for test-tree type errors. Without it a red
+      # `type-check:test` rode master for days under a green badge (fb#1461).
       - run: npm run check:dist
+      - run: npm run type-check:test
       - run: npm run lint
       - run: npm test
 
