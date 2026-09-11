@@ -278,7 +278,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     tier: "developer",
     flags: [{ name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" }],
     outputShape:
-      "{ items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires reflect fb#1564 (both are now honoured by every reader); valueLength is LEN(apiKey), never the value.",
+      "{ items:[{ apiKeySourceId, apiKeySourceName, apiKeyName, entryTime, apiKeyActive, expires, valueLength, apiKeyDescription }], nextCursor, count } — apiKeyActive/expires are honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries and /api/apiKeys/check (fb#1564, fb#1592); valueLength is LEN(apiKey), never the value.",
     errors: [
       { origin: "client", exit: 4, match: "--asiakas is required", meaning: "--asiakas was not passed", remedy: "pass the target tenant's ownerAsiakasId — `ib company list` shows the ones you can reach" },
       intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
@@ -341,7 +341,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     ],
     notes: [
       "The 12h-ish config cache (both the /api/apiKeys/check cache and puminet7-functions-app's fleet-tracking cron cache) is invalidated on write — a set/revoke takes effect quickly, not after the cache TTL.",
-      "fb#1564 (apiKeyActive/expires now honoured by every reader) is what makes a later `revoke` on this same row actually take effect.",
+      "A later `revoke` on this same row takes effect in the readers that honour apiKeyActive/expires: getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592).",
     ],
     seeAlso: ["ib dev apikey revoke", "ib dev apikey verify", "ib dev apikey sources"],
     examples: [
@@ -352,7 +352,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
   {
     command: "ib dev apikey revoke",
     description:
-      "Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is exactly what fb#1564 makes meaningful (every reader now actually honours the flag). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.",
+      "Soft-revoke a credential (apiKeyActive=0) — preserves audit history rather than deleting the row, and is honoured by getApiKey/getApiKeys, the fleet-tracking and Fennoa cron queries, and /api/apiKeys/check (fb#1564, fb#1592). Idempotent: revoking an already-revoked key returns { revoked:true, alreadyRevoked:true } rather than erroring.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     mutates: true,

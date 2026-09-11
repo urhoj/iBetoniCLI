@@ -8,8 +8,10 @@
  *
  * INVARIANT: the credential value never appears in ANY response from this
  * group, under any code path — not on create, not on a dry run. The backend
- * enforces this (never selects/echoes the column); `set`'s "leaky mock" test
- * enforces it independently on the CLI side.
+ * enforces this (never selects/echoes the column) and its controller test
+ * asserts the absence. The CLI-side "leaky mock" tests strip nothing: they
+ * document that a leaked backend value would pass through untouched, i.e.
+ * where such a backend regression would become visible (fb#1593).
  *
  * Gating is split by verb, deliberately stricter than the rest of `ib dev`:
  * `set`/`revoke` require isSystemAdmin ONLY ("isAnyAdmin is NOT enough" per
