@@ -2276,7 +2276,6 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
-  exit 4 (HTTP 400)  Malformed --since value → Pass an ISO timestamp, e.g. 2026-09-13 or 2026-09-13T00:00:00Z
 
 EXAMPLES
   ib dev betomik-orderbook audit --since 2026-09-01
@@ -2445,7 +2444,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors }, digest }
+  { summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`

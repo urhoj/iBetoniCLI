@@ -160,7 +160,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "provider", type: "string", description: "bedrock (default) | local — only relevant for rows still needing AI cell extraction" },
     ],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
-    outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors }, digest }",
+    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors } }",
     errors: [
       { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
@@ -205,7 +205,6 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     outputShape: "ListEnvelope<{ auditId, entity, entityId, label, createdAt, digestedAt }>",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
-      { http: 400, exit: 4, meaning: "Malformed --since value", remedy: "Pass an ISO timestamp, e.g. 2026-09-13 or 2026-09-13T00:00:00Z" },
     ],
     examples: ["ib dev betomik-orderbook audit --since 2026-09-01"],
   },
