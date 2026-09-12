@@ -204,6 +204,20 @@ function assertGateUntil(value) {
     }
     return resolved;
 }
+/** Column width of cliFeedback.gateRef (nvarchar(200)). */
+export const GATE_REF_MAX = 200;
+/**
+ * Validate `--gate-ref` length CLIENT-SIDE (fb#1644): the backend enforces the
+ * column width, but as a Finnish SQL-shaped 400 ("Arvo on liian pitkä
+ * sarakkeeseen 'gateRef'") that names neither the flag nor the limit. An empty
+ * string is the CLEAR convention (see `clearHint`) and passes through.
+ */
+function assertGateRef(value) {
+    if (value && value.length > GATE_REF_MAX) {
+        failWith(`--gate-ref must be at most ${GATE_REF_MAX} chars (got ${value.length}).`, 4);
+    }
+    return value;
+}
 const MAX_FREETEXT = 200;
 /** Head/tail split for a truncated field (fb#714): appended updates land at the
  *  TAIL (`--append-description`), so a head-only cut discarded exactly the
@@ -544,7 +558,7 @@ function buildCreateBody(input) {
     if (input.gateKind)
         body.gateKind = input.gateKind;
     if (input.gateRef)
-        body.gateRef = input.gateRef;
+        body.gateRef = assertGateRef(input.gateRef);
     if (input.gateUntil !== undefined)
         body.gateUntil = assertGateUntil(input.gateUntil);
     const convId = Number(process.env.IB_CONVERSATION_ID);
@@ -1469,7 +1483,7 @@ export async function runFeedbackUpdate(client, id, input) {
     if (input.gateKind !== undefined)
         body.gateKind = input.gateKind;
     if (input.gateRef !== undefined)
-        body.gateRef = input.gateRef;
+        body.gateRef = assertGateRef(input.gateRef);
     if (input.gateUntil !== undefined)
         body.gateUntil = assertGateUntil(input.gateUntil);
     // Read-merge-write: --description REPLACES the filed report, which is the

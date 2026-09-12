@@ -523,6 +523,24 @@ describe("ib feedback create — gate fields (fb#446)", () => {
     });
     expect(post).not.toHaveBeenCalled();
   });
+
+  test("an over-long --gate-ref exits 4 CLIENT-SIDE, no POST (fb#1644)", async () => {
+    // The backend enforces the nvarchar(200) width, but as a Finnish SQL-shaped
+    // 400 that names neither the flag nor the limit.
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", gateKind: "owner-action", gateRef: "r".repeat(201) })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--gate-ref must be at most 200 chars \(got 201\)/),
+    });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("a --gate-ref of exactly 200 chars is sent as-is", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", gateKind: "owner-action", gateRef: "r".repeat(200) });
+    expect(post.mock.calls[0][1].gateRef).toHaveLength(200);
+  });
 });
 
 // ─── list ──────────────────────────────────────────────────────────────────
@@ -1482,6 +1500,16 @@ describe("ib feedback update — gate fields (fb#446)", () => {
       { gateRef: "", gateUntil: "" },
       expect.anything()
     );
+  });
+
+  test("an over-long --gate-ref exits 4 CLIENT-SIDE, no PUT (fb#1644)", async () => {
+    await expect(
+      runFeedbackUpdate(mockClient, 1, { gateKind: "owner-action", gateRef: "r".repeat(230) })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/--gate-ref must be at most 200 chars \(got 230\)/),
+    });
+    expect(put).not.toHaveBeenCalled();
   });
 
   test("a malformed --gate-until exits 4 CLIENT-SIDE, no PUT (fb#446)", async () => {

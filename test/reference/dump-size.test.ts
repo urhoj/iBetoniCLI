@@ -36,7 +36,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // not spelled like their flags; `ib betoni laatu list` gained --limit plus the
 // never-paginated note; `feedback cluster` lists its relations/related aliases. All of
 // it answers filed discoverability misses. 715,861 B measured. Headroom ~340 B.
-const DUMP_LIMIT_BYTES = 716_200;
+// 716,200 -> 716,600 on 2026-09-12 (fb#1644): `feedback create`/`update` --gate-ref
+// gained the client-side 200-char cap — one help-text clause each plus the errors
+// row the ERRORS-drift rule requires for a new failWith string; prose trimmed
+// first. ~716,470 B measured. Headroom ~130 B.
+const DUMP_LIMIT_BYTES = 716_600;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
