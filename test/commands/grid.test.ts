@@ -3,9 +3,17 @@ import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPalkkiTypeCreate,
   buildPalkkiTypeCreateBody,
+  resolvePalkkiTypeCreateBody,
 } from "../../src/commands/grid/index.js";
 
 const mockClient = mockApiClient();
+
+/** Build a minimal unsigned JWT (header.body.sig) with the given payload. */
+function jwt(payload: Record<string, unknown>): string {
+  const b64 = (o: unknown) =>
+    Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "none" })}.${b64(payload)}.sig`;
+}
 
 describe("ib grid palkki-type create", () => {
   beforeEach(() => {
@@ -87,5 +95,45 @@ describe("ib grid palkki-type create", () => {
       {}
     );
     expect(body).toEqual({ name: "from-body", ownerAsiakasId: 8 });
+  });
+
+  describe("resolvePalkkiTypeCreateBody (fb#1659 regression)", () => {
+    beforeEach(() => {
+      mockClient.getCurrentToken.mockReset();
+      mockClient.get.mockReset();
+    });
+
+    test("an explicit --body ownerAsiakasId survives when --owner is omitted (was clobbered pre-fix)", async () => {
+      const body = await resolvePalkkiTypeCreateBody(
+        mockClient,
+        { name: "HUOM", ownerAsiakasId: 27 },
+        { owner: undefined }
+      );
+      expect(body.ownerAsiakasId).toBe(27);
+      // The whole point of the fix: no active-company lookup should even run
+      // when the merged body already has an owner.
+      expect(mockClient.getCurrentToken).not.toHaveBeenCalled();
+      expect(mockClient.get).not.toHaveBeenCalled();
+    });
+
+    test("an explicit --owner still wins over a --body ownerAsiakasId (typed flags win, unchanged)", async () => {
+      const body = await resolvePalkkiTypeCreateBody(
+        mockClient,
+        { name: "HUOM", ownerAsiakasId: 27 },
+        { owner: 8 }
+      );
+      expect(body.ownerAsiakasId).toBe(8);
+      expect(mockClient.getCurrentToken).not.toHaveBeenCalled();
+    });
+
+    test("neither --owner nor --body ownerAsiakasId given -> defaults to the active company", async () => {
+      mockClient.getCurrentToken.mockReturnValue(jwt({ ownerAsiakasId: 8 }));
+      const body = await resolvePalkkiTypeCreateBody(
+        mockClient,
+        { name: "HUOM" },
+        { owner: undefined }
+      );
+      expect(body.ownerAsiakasId).toBe(8);
+    });
   });
 });

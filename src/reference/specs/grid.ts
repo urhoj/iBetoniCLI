@@ -5,8 +5,8 @@
 import type { CommandSpec } from "../../output/help.js";
 import { authErrors, intParseErr, FROM_JSON_BODY_FLAG } from "./shared.js";
 
-const PALKKI_TYPE_OWNER_ERR = intParseErr("--owner", "pass a non-negative ownerAsiakasId", 0);
-const PALKKI_TYPE_SORTNO_ERR = intParseErr("--sort-no", "pass a non-negative integer", 0);
+const OWNER_PARSE_ERR = intParseErr("--owner", "pass a non-negative ownerAsiakasId", 0);
+const SORT_NO_PARSE_ERR = intParseErr("--sort-no", "pass a non-negative integer", 0);
 
 export const GRID_SPECS: CommandSpec[] = [
   {
@@ -36,8 +36,8 @@ export const GRID_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ success, rowsAffected, palkkiType } — null on --dry-run, which returns { dryRun:true, wouldCreate, validation } instead",
     errors: [
-      PALKKI_TYPE_OWNER_ERR,
-      PALKKI_TYPE_SORTNO_ERR,
+      OWNER_PARSE_ERR,
+      SORT_NO_PARSE_ERR,
       {
         origin: "client",
         exit: 4,

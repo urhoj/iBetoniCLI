@@ -36,6 +36,23 @@ export function buildPalkkiTypeCreateBody(parsedBody, typed) {
     return body;
 }
 /**
+ * {@link buildPalkkiTypeCreateBody} plus the ownerAsiakasId default: resolved
+ * to the active company only when the merged body still has none (fb#1659).
+ * Split out of the create action so the default-vs-explicit-owner interaction
+ * is directly testable without parsing argv — resolving `owner` BEFORE the
+ * merge (the pre-fix shape) made it non-undefined by the time
+ * buildPalkkiTypeCreateBody's `typed.owner !== undefined` guard ran, so it
+ * always overwrote an ownerAsiakasId already present in --body/--from-json
+ * (mirrors the fix already used by `person create`).
+ */
+export async function resolvePalkkiTypeCreateBody(client, parsedBody, typed) {
+    const body = buildPalkkiTypeCreateBody(parsedBody, typed);
+    if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
+        body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(client, "pass --owner");
+    }
+    return body;
+}
+/**
  * POST /grid/palkkiType/new. `body.name` is REQUIRED (the backend falls back
  * to a placeholder name otherwise, which is never what a caller wants) —
  * checked here so the failure is a clear exit 4 instead of a silently wrong row.
@@ -93,11 +110,10 @@ export function registerGridCommands(parent, getClient) {
         }
         const client = await getClient();
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-        const owner = opts.owner !== undefined ? opts.owner : await resolveActiveOwnerAsiakasId(client, "pass --owner");
-        const body = buildPalkkiTypeCreateBody(parsed, {
+        const body = await resolvePalkkiTypeCreateBody(client, parsed, {
             name: opts.name,
             description: opts.description,
-            owner,
+            owner: opts.owner,
             active: opts.inactive ? false : undefined,
             vehicleAvailable: opts.vehicleAvailable ? true : opts.vehicleUnavailable ? false : undefined,
             sortNo: opts.sortNo,
