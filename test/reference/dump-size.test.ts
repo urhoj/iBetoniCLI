@@ -40,7 +40,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // gained the client-side 200-char cap — one help-text clause each plus the errors
 // row the ERRORS-drift rule requires for a new failWith string; prose trimmed
 // first. ~716,470 B measured. Headroom ~130 B.
-const DUMP_LIMIT_BYTES = 716_600;
+// 716,600 -> 718,944 on 2026-09-12 (tenant weekly report): two new read leaves
+// `ib dev betomik-orderbook runs` / `rows <runId>` over the validator's existing GET
+// routes — the read side the weekly Betomik report sums m³ and groups plates from;
+// 718,644 B measured. Headroom ~300 B, deliberately thin.
+const DUMP_LIMIT_BYTES = 718_944;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

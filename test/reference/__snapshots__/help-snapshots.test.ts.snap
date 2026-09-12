@@ -2265,6 +2265,63 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook rows matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook rows <runId> [flags]
+
+DESCRIPTION
+  Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of \`import\`; the weekly tenant report sums m3 and groups by plate from these rows.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <runId> NUMBER    importRunId from \`runs\` (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, maybeNote, m3, reviewStatus, reviewedBy }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 4 (HTTP 400)  Backend rejected runId → Pass a numeric importRunId
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+EXAMPLES
+  ib dev betomik-orderbook rows 1
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook runs matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook runs [flags]
+
+DESCRIPTION
+  List Betomik order-book import runs — sheet label, ISO year/week, row count, importedAt — newest first (GET /api/betomik-orderbook/runs). The week-selector for \`rows\`: pick the run whose isoYear/isoWeek match, latest importedAt if several.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+EXAMPLES
+  ib dev betomik-orderbook runs
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
 "USAGE
   ib dev cache clear [flags]

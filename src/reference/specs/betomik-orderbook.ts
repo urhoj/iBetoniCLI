@@ -28,4 +28,32 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       'ib dev betomik-orderbook import --from-json week40.json --reason "manual weekly import"',
     ],
   },
+  {
+    command: "ib dev betomik-orderbook runs",
+    description: "List Betomik order-book import runs — sheet label, ISO year/week, row count, importedAt — newest first (GET /api/betomik-orderbook/runs). The week-selector for `rows`: pick the run whose isoYear/isoWeek match, latest importedAt if several.",
+    tier: "developer",
+    auth: "any",
+    flags: [],
+    args: [],
+    outputShape: "ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>",
+    errors: [
+      { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
+    ],
+    examples: ["ib dev betomik-orderbook runs"],
+  },
+  {
+    command: "ib dev betomik-orderbook rows",
+    description: "Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of `import`; the weekly tenant report sums m3 and groups by plate from these rows.",
+    tier: "developer",
+    auth: "any",
+    flags: [],
+    args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
+    outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, maybeNote, m3, reviewStatus, reviewedBy }>",
+    errors: [
+      { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
+      { http: 400, exit: 4, meaning: "Backend rejected runId", remedy: "Pass a numeric importRunId" },
+      { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
+    ],
+    examples: ["ib dev betomik-orderbook rows 1"],
+  },
 ];
