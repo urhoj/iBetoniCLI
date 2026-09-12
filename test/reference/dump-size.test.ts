@@ -44,7 +44,14 @@ import { buildReference } from "../../src/reference/dump.js";
 // `ib dev betomik-orderbook runs` / `rows <runId>` over the validator's existing GET
 // routes — the read side the weekly Betomik report sums m³ and groups plates from;
 // 718,644 B measured. Headroom ~300 B, deliberately thin.
-const DUMP_LIMIT_BYTES = 718_944;
+// 718,944 -> 722,400 on 2026-09-12 (rebased onto the bump above): new domain
+// `ib grid palkki-type create` (Kalle Urho Oy -> Betomik Oy palkki-type
+// replication surfaced there was no `ib` write capability for
+// grid_palkkiTypes at all) — 15 flags, 3 error rows, 2 notes;
+// description/flags/notes trimmed twice first (was 4,476 B over the
+// pre-rebase limit, cut to 3,375 B over). One new command, not padding on an
+// existing one. 722,153 B measured after rebase. Headroom ~250 B.
+const DUMP_LIMIT_BYTES = 722_400;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

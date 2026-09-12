@@ -38,6 +38,7 @@ import { SIJAINTI_SPECS } from "./specs/sijainti.js";
 import { OHJE_SPECS } from "./specs/ohje.js";
 import { LEGAL_SPECS } from "./specs/legal.js";
 import { SCHEDULE_SPECS } from "./specs/schedule.js";
+import { GRID_SPECS } from "./specs/grid.js";
 import { LIFECYCLE_SPECS } from "./specs/lifecycle.js";
 import { JERRY_SPECS } from "./specs/jerry.js";
 import { DEV_SCHEMA_SPECS } from "./specs/dev-schema.js";
@@ -75,6 +76,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...OHJE_SPECS,
   ...LEGAL_SPECS,
   ...SCHEDULE_SPECS,
+  ...GRID_SPECS,
   ...LIFECYCLE_SPECS,
   ...JERRY_SPECS,
   ...DEV_SCHEMA_SPECS,

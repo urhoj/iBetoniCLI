@@ -605,6 +605,14 @@ ib glossary misses --top <n>
   ! --top must be an integer >= 1
   > (no hint)
 
+ib grid palkki-type create --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib grid palkki-type create --sort-no <n>
+  ! --sort-no must be an integer >= 0
+  > pass a non-negative integer
+
 ib jerry admin onboarding add --tier <n>
   ! --tier must be an integer >= 1
   > pass 1 (priority) or 2 (secondary)

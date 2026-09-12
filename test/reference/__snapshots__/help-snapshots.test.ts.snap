@@ -4922,6 +4922,62 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib grid palkki-type create matches snapshot 1`] = `
+"USAGE
+  ib grid palkki-type create [flags]
+
+DESCRIPTION
+  Create a palkki type — a grid bar/annotation category (blocks a vehicle?, report visibility, auto-creates an inventory transfer?, billable job?). POST /api/grid/palkkiType/new. REQUIRED: --name. --owner defaults to your active company; ownerAsiakasId 0 is the SHARED catalog every company inherits and needs sysadmin/developer. Typed flags win over --body.
+  Permissions: requires member of the target company (sysadmin/developer bypass; owner 0 requires sysadmin/developer).
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --name STRING    grid_palkkiType (REQUIRED)
+  --description STRING    grid_palkkiTypeDescription
+  --owner NUMBER    ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)
+  --inactive    active=false (default: active)
+  --vehicle-available    vehicleAvailable=true (default) — false blocks the vehicle for the day
+  --vehicle-unavailable    vehicleAvailable=false
+  --sort-no NUMBER    Explicit sortNo (default: MAX(sortNo)+10)
+  --show-report-time    showReportKlo=true (default) — show start/end time on reports
+  --hide-report-time    showReportKlo=false
+  --report-style STRING    reportStyle — CSS-in-JS fragment for the grid bar, e.g. 'fontWeight: "bold",'
+  --show-in-report    showInReport=true (default)
+  --hide-in-report    showInReport=false
+  --inventory-transfer    isInventoryTransfer=true (default: false) — auto-creates a delivery record
+  --job    isJob=true (default: false) — billable job type
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, rowsAffected, palkkiType } — null on --dry-run, which returns { dryRun:true, wouldCreate, validation } instead
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
+  exit 4 (client-side)  --name was not given (typed flag or --body) → pass --name
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - A company with ZERO rows here is the norm, not a gap: every company inherits 4 shared types (owner 0). Only Kalle Urho Oy had custom ones as of 2026-09; this command lets another company adopt the same set.
+  - No list/update/delete yet — GET /grid/getStaticData ignores its :ownerAsiakasId param and only ever answers for the CALLER's active company. Verify another tenant's rows via \`ib dev schema query\` instead (developer-only).
+
+EXAMPLES
+  ib grid palkki-type create --name "betonitoimitus" --owner 27 --vehicle-available --show-report-time
+  ib grid palkki-type create --body '{"name":"HUOM","ownerAsiakasId":27}'
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib help matches snapshot 1`] = `
 "USAGE
   ib help [<topic>] [flags]
