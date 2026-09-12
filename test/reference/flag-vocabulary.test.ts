@@ -76,12 +76,11 @@ describe("no new naming outliers", () => {
    * `--today` vs `--to` (a date bound vs a keyword), `--address2` vs
    * `--address` (postal line 2), `--all-companies` / `--allow-big-merge` vs
    * `--all`, `--from-brand` vs `--from` (sender identity vs date bound),
-   * `--sijainti-types` vs `--sijainti` (a type filter vs an id),
-   * `--vehicle-available`/`--vehicle-unavailable` (`ib grid palkki-type
-   * create`'s vehicleAvailable column — whether a palkki of this TYPE blocks
-   * the vehicle for the day) vs `--vehicle` (a vehicleId TARGET on 7 other
-   * commands) — mirrors the DB column name, and renaming away from it would
-   * make the flag harder to map back to `grid_palkkiTypes.vehicleAvailable`.
+   * `--sijainti-types` vs `--sijainti` (a type filter vs an id).
+   * (`--vehicle-available`/`--vehicle-unavailable` — `ib palkki type
+   * create|update`'s vehicleAvailable column vs `--vehicle`, a vehicleId
+   * TARGET — used to be listed here while they were singletons; since the
+   * update command shares them they are no longer outliers by definition.)
    */
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",
@@ -90,8 +89,6 @@ describe("no new naming outliers", () => {
     "allow-big-merge",
     "from-brand",
     "sijainti-types",
-    "vehicle-available",
-    "vehicle-unavailable",
   ]);
 
   /**

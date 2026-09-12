@@ -5037,62 +5037,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib grid palkki-type create matches snapshot 1`] = `
-"USAGE
-  ib grid palkki-type create [flags]
-
-DESCRIPTION
-  Create a palkki type — a grid bar/annotation category (blocks a vehicle?, report visibility, auto-creates an inventory transfer?, billable job?). POST /api/grid/palkkiType/new. REQUIRED: --name. --owner defaults to your active company; ownerAsiakasId 0 is the SHARED catalog every company inherits and needs sysadmin/developer. Typed flags win over --body.
-  Permissions: requires member of the target company (sysadmin/developer bypass; owner 0 requires sysadmin/developer).
-
-FLAGS
-  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
-  --name STRING    grid_palkkiType (REQUIRED)
-  --description STRING    grid_palkkiTypeDescription
-  --owner NUMBER    ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)
-  --inactive    active=false (default: active)
-  --vehicle-available    vehicleAvailable=true (default) — false blocks the vehicle for the day
-  --vehicle-unavailable    vehicleAvailable=false
-  --sort-no NUMBER    Explicit sortNo (default: MAX(sortNo)+10)
-  --show-report-time    showReportKlo=true (default) — show start/end time on reports
-  --hide-report-time    showReportKlo=false
-  --report-style STRING    reportStyle — CSS-in-JS fragment for the grid bar, e.g. 'fontWeight: "bold",'
-  --show-in-report    showInReport=true (default)
-  --hide-in-report    showInReport=false
-  --inventory-transfer    isInventoryTransfer=true (default: false) — auto-creates a delivery record
-  --job    isJob=true (default: false) — billable job type
-  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
-                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
-  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
-
-OUTPUT (JSON, stdout)
-  { success, rowsAffected, palkkiType } — null on --dry-run, which returns { dryRun:true, wouldCreate, validation } instead
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
-  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
-  exit 4 (client-side)  --name was not given (typed flag or --body) → pass --name
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - A company with ZERO rows here is the norm, not a gap: every company inherits 4 shared types (owner 0). Only Kalle Urho Oy had custom ones as of 2026-09; this command lets another company adopt the same set.
-  - No list/update/delete yet — GET /grid/getStaticData ignores its :ownerAsiakasId param and only ever answers for the CALLER's active company. Verify another tenant's rows via \`ib dev schema query\` instead (developer-only).
-
-EXAMPLES
-  ib grid palkki-type create --name "betonitoimitus" --owner 27 --vehicle-available --show-report-time
-  ib grid palkki-type create --body '{"name":"HUOM","ownerAsiakasId":27}'
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib help matches snapshot 1`] = `
 "USAGE
   ib help [<topic>] [flags]
@@ -10345,6 +10289,437 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib opendata weather worksite 1234
   ib opendata weather worksite 1234 --force-refresh
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki create matches snapshot 1`] = `
+"USAGE
+  ib palkki create [flags]
+
+DESCRIPTION
+  Create a grid bar on a vehicle-day. POST /api/cli/palkki/create. REQUIRED: --vehicle, --type; --date defaults to today, --start/--end to 07:00–16:00 Helsinki. The type is resolved by NAME within the owner company (+ the shared owner-0 catalogue); a miss 400s listing the valid names. The bar's day driver is auto-assigned from the vehicle's personPvm, exactly like the web grid.
+  Permissions: requires edit role in the owner company (requireCompanyRole tier edit).
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --vehicle NUMBER    vehicleId (REQUIRED)
+  --date STRING    Day: YYYY-MM-DD | today | tomorrow (default: today)
+  --start STRING    Start, HH:MM Helsinki wall-clock (default: 07:00)
+  --end STRING    End, HH:MM Helsinki wall-clock (default: 16:00)
+  --type STRING    Palkki type name or id (REQUIRED) — see \`ib palkki type list\`
+  --text STRING    Bar text
+  --keikka NUMBER    attachedKeikkaId — link the bar to a keikka
+  --worksite NUMBER    tyomaaId — destination for an inventory-transfer type
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --style STRING    style — CSS-in-JS fragment for this bar
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { ..., savedPalkki: { palkkiId, starttime, endtime, vehicleId, text, ownerAsiakasId, grid_palkkiTypeId, ... } } — --dry-run returns { dryRun:true, wouldCreate: <normalised body>, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --vehicle / --type / times missing (typed flag or --body) → pass --vehicle and --type (times default)
+  exit 4 (client-side)  --start/--end not HH:MM → pass e.g. --start 07:30
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 4 (HTTP 400)  Unknown palkki type for the owner company (the message lists valid names), timeStart >= timeEnd, or a missing field → pick a name from \`ib palkki type list\`; create one with \`ib palkki type create\`
+  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Times are Helsinki wall-clock composed into ISO instants client-side (DST-correct, same as every --time flag); the backend stores the instants exactly as the web grid does.
+  - Assigning a specific driver is a separate step: \`ib vehicle driver assign <vehicleId> <date> --person <id>\` updates personPvm + keikkaPerson + palkkiPerson together.
+
+SEE ALSO
+  ib palkki type list, ib palkki list, ib vehicle driver assign
+
+EXAMPLES
+  ib palkki create --vehicle 53 --date tomorrow --type huolto --text "Öljynvaihto" --reason "huoltokirja"
+  ib palkki create --vehicle 53 --type kommentti --start 12:00 --end 14:00 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki delete matches snapshot 1`] = `
+"USAGE
+  ib palkki delete <palkkiId> [flags]
+
+DESCRIPTION
+  Soft-delete a grid bar (sets deletedTime; DELETE /api/cli/palkki/delete/:id). Broadcasts palkki:deleted to open grids.
+  Permissions: requires edit role in the bar's company.
+
+ARGUMENTS
+  <palkkiId> NUMBER    grid_palkki_Id (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, ... } — --dry-run returns { dryRun:true, wouldDelete:{ palkkiId }, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - A bar that does not exist answers 403, not 404: the tenant gate resolves the owner first and fails closed.
+
+EXAMPLES
+  ib palkki delete 4821 --reason "duplicate"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki get matches snapshot 1`] = `
+"USAGE
+  ib palkki get <palkkiId> [flags]
+  (also: ib palkki show)
+
+DESCRIPTION
+  One palkki by id (GET /api/cli/palkki/get/:id). 404 unless its owner OR source company is one you belong to.
+  Permissions: requires member of the bar's owner or source company (sysadmin/developer bypass).
+
+ARGUMENTS
+  <palkkiId> NUMBER    grid_palkki_Id (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { palkkiId, date, start, end (Helsinki HH:MM), timeStart, timeEnd (ISO), vehicleId, typeId, typeName, text, style, ownerAsiakasId, sourceAsiakasId, attachedKeikkaId, deleted }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Palkki not found OR outside your companies → verify the id — a foreign tenant's bar 404s identically
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib palkki get 4821
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki list matches snapshot 1`] = `
+"USAGE
+  ib palkki list [flags]
+
+DESCRIPTION
+  Palkit (grid bars) of one company overlapping a day or a date range — optionally one vehicle. GET /api/cli/palkki/list. Soft-deleted bars are excluded unless --deleted. Max range 62 days.
+  Permissions: requires member of the target company (sysadmin/developer bypass).
+
+FLAGS
+  --date STRING    One day: YYYY-MM-DD | today | tomorrow (default: today)
+  --from STRING    Range start (YYYY-MM-DD)
+  --to STRING    Range end (YYYY-MM-DD, default: --from)
+  --vehicle NUMBER    Only this vehicleId
+  --owner NUMBER    Company whose palkit to list (default: active company)
+  --source NUMBER    Also include bars whose sourceAsiakasId is this company (cross-tenant drops)
+  --deleted    Include soft-deleted bars (deleted:true)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: { palkkiId, date, start, end (Helsinki HH:MM), timeStart, timeEnd (ISO), vehicleId, typeId, typeName, text, style, ownerAsiakasId, sourceAsiakasId, attachedKeikkaId, deleted }[], count, nextCursor: null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --date combined with --from/--to → pass one form
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (HTTP 400)  Bad date, to < from, or range over 62 days → fix the dates
+  exit 3 (HTTP 403)  --owner is not a company you belong to → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Overlap semantics: a bar is listed on every day it touches (starttime < dayEnd AND endtime > dayStart), unlike the web grid proc which drops bars crossing the window.
+  - Driver on a bar is NOT projected here — \`ib vehicle driver board <date>\` shows the day driver per vehicle.
+
+SEE ALSO
+  ib palkki get, ib palkki create, ib vehicle driver board
+
+EXAMPLES
+  ib palkki list --date tomorrow
+  ib palkki list --from 2026-09-14 --to 2026-09-20 --vehicle 53
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki type create matches snapshot 1`] = `
+"USAGE
+  ib palkki type create [flags]
+
+DESCRIPTION
+  Create a palkki type — a grid bar/annotation category (blocks a vehicle?, report visibility, auto-creates an inventory transfer?, billable job?). POST /api/grid/palkkiType/new. REQUIRED: --name. --owner defaults to your active company; ownerAsiakasId 0 is the SHARED catalog every company inherits and needs sysadmin/developer. Typed flags win over --body.
+  Permissions: requires member of the target company (sysadmin/developer bypass; owner 0 requires sysadmin/developer).
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --name STRING    grid_palkkiType (REQUIRED)
+  --description STRING    grid_palkkiTypeDescription
+  --owner NUMBER    ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)
+  --inactive    active=false (default: active)
+  --vehicle-available    vehicleAvailable=true (default) — false blocks the vehicle for the day
+  --vehicle-unavailable    vehicleAvailable=false
+  --sort-no NUMBER    Explicit sortNo (default: MAX(sortNo)+10)
+  --show-report-time    showReportKlo=true (default) — show start/end time on reports
+  --hide-report-time    showReportKlo=false
+  --report-style STRING    reportStyle — CSS-in-JS fragment for the grid bar, e.g. 'fontWeight: "bold",'
+  --show-in-report    showInReport=true (default)
+  --hide-in-report    showInReport=false
+  --inventory-transfer    isInventoryTransfer=true (default: false) — auto-creates a delivery record
+  --job    isJob=true (default: false) — billable job type
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, rowsAffected, palkkiType } — null on --dry-run, which returns { dryRun:true, wouldCreate, validation } instead
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
+  exit 4 (client-side)  --name was not given (typed flag or --body) → pass --name
+  exit 4 (client-side)  Both halves of an on/off flag pair were given → pass only one of --vehicle-available/--vehicle-unavailable, --show-report-time/--hide-report-time, --show-in-report/--hide-in-report
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - A company with ZERO rows here is the norm, not a gap: every company inherits 4 shared types (owner 0). Only Kalle Urho Oy had custom ones as of 2026-09; this command lets another company adopt the same set.
+
+SEE ALSO
+  ib palkki type list, ib palkki create
+
+EXAMPLES
+  ib palkki type create --name "betonitoimitus" --owner 27 --vehicle-available --show-report-time
+  ib palkki type create --body '{"name":"HUOM","ownerAsiakasId":27}'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki type delete matches snapshot 1`] = `
+"USAGE
+  ib palkki type delete <palkkiTypeId> [flags]
+
+DESCRIPTION
+  Delete a palkki type (DELETE /api/grid/palkkiType/delete/:id). Refused while any grid_palkit row still references it — deactivate with \`ib palkki type update <id> --inactive\` instead.
+  Permissions: requires member of the owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer).
+
+ARGUMENTS
+  <palkkiTypeId> NUMBER    grid_palkkiTypeId (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, rowsAffected } or { success:false, message } when still referenced — --dry-run returns { dryRun:true, wouldDelete:{ grid_palkkiTypeId }, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Palkki type not found  → verify the id with \`ib palkki type list\`
+  exit 3 (HTTP 403)  Not a member of the owning company → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --dry-run checks existence + membership only; the 'still referenced' refusal is evaluated on the live call and comes back as success:false (exit 0).
+
+EXAMPLES
+  ib palkki type delete 1003 --reason "luotu vahingossa"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki type list matches snapshot 1`] = `
+"USAGE
+  ib palkki type list [flags]
+
+DESCRIPTION
+  Palkki types one company can use: its own rows plus the shared catalogue (owner 0). GET /api/cli/palkki/type/list. Active only unless --all. The \`grid_palkkiType\` name is what \`ib palkki create --type\` takes.
+  Permissions: requires member of the target company (sysadmin/developer bypass).
+
+FLAGS
+  --owner NUMBER    Company (default: active company)
+  --all    Include inactive types
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: { grid_palkkiTypeId, grid_palkkiType, grid_palkkiTypeDescription, active, ownerAsiakasId, vehicleAvailable, sortNo, showReportKlo, reportStyle, showInReport, isInventoryTransfer, isJob }[], count, nextCursor: null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 3 (HTTP 403)  --owner is not a company you belong to → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib palkki type list
+  ib palkki type list --owner 27 --all
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki type update matches snapshot 1`] = `
+"USAGE
+  ib palkki type update <palkkiTypeId> [flags]
+
+DESCRIPTION
+  PARTIAL update of a palkki type — only the flags you pass change (the backend read-merges over the row). POST /api/grid/palkkiType/save/:id. Same flag vocabulary as create plus --active / --no-inventory-transfer / --no-job to switch a boolean off.
+  Permissions: requires member of the owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer).
+
+ARGUMENTS
+  <palkkiTypeId> NUMBER    grid_palkkiTypeId (required)
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --name STRING    grid_palkkiType
+  --description STRING    grid_palkkiTypeDescription
+  --owner NUMBER    Move to ownerAsiakasId (a company you belong to)
+  --active    active=true
+  --inactive    active=false
+  --vehicle-available    vehicleAvailable=true — false blocks the vehicle for the day
+  --vehicle-unavailable    vehicleAvailable=false
+  --sort-no NUMBER    sortNo
+  --show-report-time    showReportKlo=true — show start/end time on reports
+  --hide-report-time    showReportKlo=false
+  --report-style STRING    reportStyle — CSS-in-JS fragment for the grid bar, e.g. 'fontWeight: "bold",'
+  --show-in-report    showInReport=true
+  --hide-in-report    showInReport=false
+  --inventory-transfer    isInventoryTransfer=true — auto-creates a delivery record
+  --no-inventory-transfer    isInventoryTransfer=false
+  --job    isJob=true — billable job type
+  --no-job    isJob=false
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, rowsAffected, palkkiType: <merged row> } — --dry-run returns { dryRun:true, wouldUpdate: <merged row>, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No field flags and no --body → pass at least one field flag
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
+  exit 4 (client-side)  Both halves of an on/off flag pair were given → pass only one of --vehicle-available/--vehicle-unavailable, --show-report-time/--hide-report-time, --show-in-report/--hide-in-report, --active/--inactive
+  exit 5 (HTTP 404)  Palkki type not found  → verify the id with \`ib palkki type list\`
+  exit 3 (HTTP 403)  Not a member of the owning company / of --owner → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib palkki type update 1000 --description "Huoltopäivä" --hide-in-report
+  ib palkki type update 1000 --inactive --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki update matches snapshot 1`] = `
+"USAGE
+  ib palkki update <palkkiId> [flags]
+
+DESCRIPTION
+  PARTIAL update of a grid bar — only the flags you pass change (the backend read-merges over the row). POST /api/cli/palkki/update/:id. A time move (--date/--start/--end) reads the current bar first to fill the components you did not pass.
+  Permissions: requires edit role in the bar's company (and in --owner's, when re-homing).
+
+ARGUMENTS
+  <palkkiId> NUMBER    grid_palkki_Id (required)
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --vehicle NUMBER    Move the bar to this vehicleId
+  --date STRING    Move to this day (YYYY-MM-DD | today | tomorrow)
+  --start STRING    New start, HH:MM Helsinki
+  --end STRING    New end, HH:MM Helsinki
+  --type STRING    Palkki type name or id
+  --text STRING    Bar text
+  --keikka NUMBER    attachedKeikkaId — link the bar to a keikka
+  --worksite NUMBER    tyomaaId — destination for an inventory-transfer type
+  --owner NUMBER    Re-home to ownerAsiakasId (needs an edit role in BOTH companies)
+  --style STRING    style — CSS-in-JS fragment for this bar
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { ..., savedPalkki } — --dry-run returns { dryRun:true, wouldUpdate: <merged body>, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No field flags and no --body → pass at least one field flag
+  exit 4 (client-side)  --start/--end not HH:MM → pass e.g. --end 12:00
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
+  exit 5 (HTTP 404)  Palkki not found, soft-deleted, or outside your companies → verify with \`ib palkki get\`
+  exit 4 (HTTP 400)  Unknown palkki type, or timeStart >= timeEnd after the merge → check \`ib palkki type list\` / the times
+  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib palkki get, ib log entity
+
+EXAMPLES
+  ib palkki update 4821 --end 12:00 --reason "lyhennetty"
+  ib palkki update 4821 --vehicle 54 --dry-run
 "
 `;
 

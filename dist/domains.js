@@ -44,7 +44,7 @@ export const DOMAIN_REGISTRARS = new Map([
     ["jerry", async (p, d) => (await import("./commands/jerry/index.js")).registerJerryCommands(p, d.getClient)],
     ["message", async (p, d) => (await import("./commands/message/index.js")).registerMessageCommands(p, d.getClient)],
     ["schedule", async (p, d) => (await import("./commands/schedule/index.js")).registerScheduleCommands(p, d.getClient)],
-    ["grid", async (p, d) => (await import("./commands/grid/index.js")).registerGridCommands(p, d.getClient)],
+    ["palkki", async (p, d) => (await import("./commands/palkki/index.js")).registerPalkkiCommands(p, d.getClient)],
     ["stats", async (p, d) => (await import("./commands/stats/index.js")).registerStatsCommands(p, d.getClient)],
     ["log", async (p, d) => (await import("./commands/log/index.js")).registerLogCommands(p, d.getClient)],
     // `ib opendata` (canonical) houses building + weather + prh. The top-level

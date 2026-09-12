@@ -2,9 +2,12 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPalkkiTypeCreate,
-  buildPalkkiTypeCreateBody,
+  runPalkkiTypeUpdate,
+  runPalkkiTypeDelete,
+  runPalkkiTypeList,
+  buildPalkkiTypeBody,
   resolvePalkkiTypeCreateBody,
-} from "../../src/commands/grid/index.js";
+} from "../../src/commands/palkki/index.js";
 
 const mockClient = mockApiClient();
 
@@ -15,7 +18,7 @@ function jwt(payload: Record<string, unknown>): string {
   return `${b64({ alg: "none" })}.${b64(payload)}.sig`;
 }
 
-describe("ib grid palkki-type create", () => {
+describe("ib palkki type create", () => {
   beforeEach(() => {
     mockClient.post.mockReset();
   });
@@ -56,8 +59,8 @@ describe("ib grid palkki-type create", () => {
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 
-  test("buildPalkkiTypeCreateBody: typed flags map to the backend body shape and win over --body", () => {
-    const body = buildPalkkiTypeCreateBody(
+  test("buildPalkkiTypeBody: typed flags map to the backend body shape and win over --body", () => {
+    const body = buildPalkkiTypeBody(
       { name: "from-body", extra: "kept" },
       {
         name: "työmääräys",
@@ -89,8 +92,8 @@ describe("ib grid palkki-type create", () => {
     });
   });
 
-  test("buildPalkkiTypeCreateBody: an absent typed field leaves the --body value untouched", () => {
-    const body = buildPalkkiTypeCreateBody(
+  test("buildPalkkiTypeBody: an absent typed field leaves the --body value untouched", () => {
+    const body = buildPalkkiTypeBody(
       { name: "from-body", ownerAsiakasId: 8 },
       {}
     );
@@ -135,5 +138,35 @@ describe("ib grid palkki-type create", () => {
       );
       expect(body.ownerAsiakasId).toBe(8);
     });
+  });
+});
+
+describe("ib palkki type list / update / delete", () => {
+  beforeEach(() => {
+    mockClient.get.mockReset();
+    mockClient.post.mockReset();
+    mockClient.delete.mockReset();
+  });
+
+  test("list hits /api/cli/palkki/type/list with owner + all=1", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [], count: 0, nextCursor: null });
+    await runPalkkiTypeList(mockClient, { owner: 27, all: true });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/palkki/type/list?owner=27&all=1");
+    await runPalkkiTypeList(mockClient, {});
+    expect(mockClient.get).toHaveBeenLastCalledWith("/api/cli/palkki/type/list");
+  });
+
+  test("update posts the partial body to /save/:id with write headers; empty body exits 4 without a POST", async () => {
+    mockClient.post.mockResolvedValueOnce({ success: true });
+    await runPalkkiTypeUpdate(mockClient, 1000, { unit: "d", isActive: false }, { reason: "r" });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/grid/palkkiType/save/1000", { unit: "d", isActive: false }, { headers: { "X-Action-Reason": "r" } });
+    await expect(runPalkkiTypeUpdate(mockClient, 1000, {}, {})).rejects.toMatchObject({ exitCode: 4 });
+    expect(mockClient.post).toHaveBeenCalledTimes(1);
+  });
+
+  test("delete hits DELETE /delete/:id with the dry-run header", async () => {
+    mockClient.delete.mockResolvedValueOnce({ dryRun: true });
+    await runPalkkiTypeDelete(mockClient, 1003, { dryRun: true });
+    expect(mockClient.delete).toHaveBeenCalledWith("/api/grid/palkkiType/delete/1003", { headers: { "X-Dry-Run": "1" } });
   });
 });

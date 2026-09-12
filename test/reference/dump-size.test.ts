@@ -55,7 +55,12 @@ import { buildReference } from "../../src/reference/dump.js";
 // leaves (review / propose / ai-stats — the human-override + AI-proposer
 // loop of the Betomik pilot) plus the rows outputShape gaining the
 // rowKind/vehicle/ai columns. Headroom ~240 B.
-const DUMP_LIMIT_BYTES = 728_200;
+// 727,960 -> 743,327 B on 2026-09-12: `ib grid palkki-type create` re-homed as
+// `ib palkki type create` and the domain filled out — palkki list/get/create/
+// update/delete + type list/update/delete (8 new leaves over new
+// /api/cli/palkki/* adapter routes; palkki ROWS had no `ib` capability at
+// all, which the Betomik order-book sync needs next). Headroom ~270 B.
+const DUMP_LIMIT_BYTES = 743_600;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
