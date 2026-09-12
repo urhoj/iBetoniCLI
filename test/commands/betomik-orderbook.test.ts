@@ -7,6 +7,11 @@ import {
   runBetomikOrderbookReview,
   runBetomikOrderbookPropose,
   runBetomikOrderbookAiStats,
+  runBetomikOrderbookSync,
+  runBetomikOrderbookResync,
+  runBetomikOrderbookExtractPrompt,
+  runBetomikOrderbookExceptions,
+  runBetomikOrderbookAudit,
 } from "../../src/commands/betomikOrderbook/index.js";
 
 const mockClient = mockApiClient();
@@ -114,5 +119,68 @@ describe("ib dev betomik-orderbook review / propose / ai-stats", () => {
     const result = await runBetomikOrderbookAiStats(mockClient, 1);
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/1/ai-stats");
     expect((result as { scored: number }).scored).toBe(3);
+  });
+});
+
+describe("ib dev betomik-orderbook sync / resync / extract-prompt / exceptions / audit", () => {
+  beforeEach(() => {
+    mockClient.post.mockReset();
+    mockClient.get.mockReset();
+  });
+
+  test("sync: POST /api/betomik-orderbook/sync forwards body incl. mode/provider/digest + write headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ upsert: {}, summary: {} });
+    const body = {
+      sheetLabel: "x",
+      isoYear: 2026,
+      isoWeek: 38,
+      rows: [] as unknown[],
+      mode: "create",
+      provider: "local",
+      digest: true,
+    };
+    await runBetomikOrderbookSync(mockClient, body, { dryRun: true, reason: "tick" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/betomik-orderbook/sync",
+      expect.objectContaining({ mode: "create", provider: "local", digest: true }),
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "tick" } }
+    );
+  });
+
+  test("resync: POST /api/betomik-orderbook/runs/:runId/sync with the mode/provider body", async () => {
+    mockClient.post.mockResolvedValueOnce({});
+    await runBetomikOrderbookResync(mockClient, 5, { mode: "full" }, {});
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/betomik-orderbook/runs/5/sync",
+      { mode: "full" },
+      { headers: {} }
+    );
+  });
+
+  test("extract-prompt: GET /api/betomik-orderbook/extract-prompt, body returned as-is", async () => {
+    mockClient.get.mockResolvedValueOnce({ system: "s", schema: {}, cells: [], toolName: "t" });
+    const result = await runBetomikOrderbookExtractPrompt(mockClient);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/extract-prompt");
+    expect(result).toEqual({ system: "s", schema: {}, cells: [], toolName: "t" });
+  });
+
+  test("exceptions: GET /api/betomik-orderbook/runs/:runId/exceptions, unwraps {items} into a ListEnvelope", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [{ auditId: 1 }] });
+    const result = await runBetomikOrderbookExceptions(mockClient, 5);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/5/exceptions");
+    expect(result).toEqual({ items: [{ auditId: 1 }], nextCursor: null, count: 1 });
+  });
+
+  test("audit: GET /api/betomik-orderbook/audit?since=<iso>, unwraps {items} into a ListEnvelope", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [] });
+    const result = await runBetomikOrderbookAudit(mockClient, { since: "2026-09-13" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/audit?since=2026-09-13");
+    expect(result).toEqual({ items: [], nextCursor: null, count: 0 });
+  });
+
+  test("audit: no --since omits the query string entirely", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [] });
+    await runBetomikOrderbookAudit(mockClient, {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/audit");
   });
 });

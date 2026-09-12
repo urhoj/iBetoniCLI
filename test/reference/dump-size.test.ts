@@ -60,7 +60,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // update/delete + type list/update/delete (8 new leaves over new
 // /api/cli/palkki/* adapter routes; palkki ROWS had no `ib` capability at
 // all, which the Betomik order-book sync needs next). Headroom ~270 B.
-const DUMP_LIMIT_BYTES = 743_600;
+// 2026-09-13: +5 betomik-orderbook sync commands (sync / resync /
+// extract-prompt / exceptions / audit) — the write-then-verify loop that
+// closes the Betomik order-book pipeline (import -> review/propose -> sync).
+// 748,339 B measured; limit raised to that + 2,000 B headroom.
+const DUMP_LIMIT_BYTES = 750_339;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

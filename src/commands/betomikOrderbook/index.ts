@@ -83,6 +83,62 @@ export async function runBetomikOrderbookAiStats(client: ApiClient, runId: numbe
   return client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/ai-stats`);
 }
 
+/** Sync a Betomik order-book payload to keikka/palkki rows (POST /api/betomik-orderbook/sync). */
+export async function runBetomikOrderbookSync(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/betomik-orderbook/sync", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** Re-run sync for an already-imported run (POST /api/betomik-orderbook/runs/:runId/sync). */
+export async function runBetomikOrderbookResync(
+  client: ApiClient,
+  runId: number,
+  body: { mode?: string; provider?: string },
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/betomik-orderbook/runs/${runId}/sync`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** Extraction prompt template used by the AI cell extractor (GET /api/betomik-orderbook/extract-prompt). */
+export async function runBetomikOrderbookExtractPrompt(client: ApiClient): Promise<unknown> {
+  return client.get<unknown>("/api/betomik-orderbook/extract-prompt");
+}
+
+/** Blocked/exception rows of one sync run (GET /api/betomik-orderbook/runs/:runId/exceptions). */
+export async function runBetomikOrderbookExceptions(
+  client: ApiClient,
+  runId: number
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  const raw = await client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/exceptions`);
+  return listEnvelope(itemsOf<Record<string, unknown>>(raw));
+}
+
+export interface BetomikAuditRow {
+  auditId: number;
+  entity: string;
+  entityId: number;
+  label: string;
+  createdAt: string;
+  digestedAt: string | null;
+}
+
+/** Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit). */
+export async function runBetomikOrderbookAudit(
+  client: ApiClient,
+  { since }: { since?: string }
+): Promise<ListEnvelope<BetomikAuditRow>> {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : "";
+  const raw = await client.get<unknown>(`/api/betomik-orderbook/audit${qs}`);
+  return listEnvelope(itemsOf<BetomikAuditRow>(raw));
+}
+
 export function registerBetomikOrderbookCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
@@ -159,6 +215,67 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runBetomikOrderbookAiStats(client, parseId(idStr, "runId"))
+      )
+    );
+
+  const syncCmd = addJsonBodyOptions(group.command("sync"))
+    .option("--mode <mode>", "shadow (default) | create | full")
+    .option("--provider <name>", "bedrock (default) | local")
+    .option("--digest", "Include a digest summary of the sync in the response");
+  addWriteFlagsToCommand(syncCmd).action(
+    guarded(
+      async (
+        opts: WriteFlags & JsonBodyFlags & { mode?: string; provider?: string; digest?: boolean }
+      ) => {
+        const jsonBody = resolveJsonBody(syncCmd, opts, { required: true });
+        const body: Record<string, unknown> = {
+          ...jsonBody,
+          ...(opts.mode && { mode: opts.mode }),
+          ...(opts.provider && { provider: opts.provider }),
+          ...(opts.digest && { digest: true }),
+        };
+        const client = await getClient();
+        writeJson(await runBetomikOrderbookSync(client, body, opts));
+      }
+    )
+  );
+
+  const resyncCmd = group
+    .command("resync <runId>")
+    .description("Re-run sync for an already-imported run without re-importing rows")
+    .option("--mode <mode>", "shadow (default) | create | full")
+    .option("--provider <name>", "bedrock (default) | local");
+  addWriteFlagsToCommand(resyncCmd).action(
+    guarded(async (idStr: string, opts: WriteFlags & { mode?: string; provider?: string }) => {
+      const client = await getClient();
+      const body: { mode?: string; provider?: string } = {};
+      if (opts.mode) body.mode = opts.mode;
+      if (opts.provider) body.provider = opts.provider;
+      writeJson(await runBetomikOrderbookResync(client, parseId(idStr, "runId"), body, opts));
+    })
+  );
+
+  group
+    .command("extract-prompt")
+    .description("Extraction prompt template used by the AI cell extractor (system, schema, cells, toolName)")
+    .action(jsonAction(getClient, (client) => runBetomikOrderbookExtractPrompt(client)));
+
+  group
+    .command("exceptions <runId>")
+    .description("Blocked/exception rows from one sync run")
+    .action(
+      jsonAction(getClient, (client, idStr: string) =>
+        runBetomikOrderbookExceptions(client, parseId(idStr, "runId"))
+      )
+    );
+
+  group
+    .command("audit")
+    .description("Sync audit trail (entities written/digested), optionally since a given ISO timestamp")
+    .option("--since <iso>", "Only rows created at/after this ISO timestamp")
+    .action(
+      jsonAction(getClient, (client, opts: { since?: string }) =>
+        runBetomikOrderbookAudit(client, { since: opts.since })
       )
     );
 }
