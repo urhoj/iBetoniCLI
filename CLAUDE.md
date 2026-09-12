@@ -280,7 +280,7 @@ The backend speaks Finnish; the CLI mostly preserves it: `keikka` (delivery orde
 
 - Vitest, `globals: false` (import `describe`/`test`/`expect`/`vi` explicitly). Tests live in `test/` mirroring `src/`.
 - Mock the `ApiClient` with `vi.fn()` for `get/post/put/delete/getCurrentToken`; assert on the exact path/body and the projected return shape (see `test/commands/company.test.ts`).
-- After changing help/spec rendering, refresh snapshots: `npx vitest run -u`.
+- After changing help/spec rendering, refresh snapshots: `npx vitest run -u`. **Then do not touch a spec again without re-running the snapshot suite** — a spec edit made after the refresh and verified only by the command's own unit test shipped a stale `help-snapshots` snap to master and turned CI red, which also skips the vendored-copy bump into puminet5api (fb#1667).
 
 ### Local backend e2e
 

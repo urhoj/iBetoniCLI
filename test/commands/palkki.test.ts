@@ -88,3 +88,20 @@ describe("run* functions", () => {
     expect(await runPalkkiDelete(mockClient, 4821, {})).toEqual({ deleted: true, palkkiId: 4821 });
   });
 });
+
+describe("ib palkki list — range flag guards (action level)", () => {
+  const opts = { token: "t", endpoint: "http://127.0.0.1:9" };
+
+  test("--to without --from exits 4 instead of silently listing today (fb#1669)", async () => {
+    const { runArgv } = await import("../../src/runArgv.js");
+    const r = await runArgv(["palkki", "list", "--to", "2026-10-01"], opts);
+    expect(r.exitCode).toBe(4);
+    expect(JSON.parse(r.stderr).error).toMatch(/--to needs --from/);
+  });
+
+  test("--date combined with --from exits 4", async () => {
+    const { runArgv } = await import("../../src/runArgv.js");
+    const r = await runArgv(["palkki", "list", "--date", "today", "--from", "2026-10-01"], opts);
+    expect(r.exitCode).toBe(4);
+  });
+});
