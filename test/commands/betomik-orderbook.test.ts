@@ -4,6 +4,9 @@ import {
   runBetomikOrderbookImport,
   runBetomikOrderbookRuns,
   runBetomikOrderbookRows,
+  runBetomikOrderbookReview,
+  runBetomikOrderbookPropose,
+  runBetomikOrderbookAiStats,
 } from "../../src/commands/betomikOrderbook/index.js";
 
 const mockClient = mockApiClient();
@@ -71,5 +74,45 @@ describe("ib dev betomik-orderbook runs / rows", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/7/rows");
     expect(result.count).toBe(1);
     expect(result.items[0]).toMatchObject({ plate: "GNG-544", m3: 12.5 });
+  });
+});
+
+describe("ib dev betomik-orderbook review / propose / ai-stats", () => {
+  beforeEach(() => {
+    mockClient.post.mockReset();
+    mockClient.get.mockReset();
+  });
+
+  test("review: POST /rows/:rowId/review with the override body + write-flag headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ updated: true });
+    const result = await runBetomikOrderbookReview(
+      mockClient,
+      143,
+      { status: "approved", rowKind: "palkki", palkkiType: "pois ajosta" },
+      { reason: "Halli-rivi", dryRun: true }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/betomik-orderbook/rows/143/review",
+      { status: "approved", rowKind: "palkki", palkkiType: "pois ajosta" },
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "Halli-rivi" } }
+    );
+    expect(result).toEqual({ updated: true });
+  });
+
+  test("propose: POST /runs/:runId/propose with provider/force + headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ runId: 1, proposed: 175, failed: 1 });
+    await runBetomikOrderbookPropose(mockClient, 1, { provider: "local", force: true }, { reason: "bake-off" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/betomik-orderbook/runs/1/propose",
+      { provider: "local", force: true },
+      { headers: { "X-Action-Reason": "bake-off" } }
+    );
+  });
+
+  test("ai-stats: GET /runs/:runId/ai-stats, body returned as-is", async () => {
+    mockClient.get.mockResolvedValueOnce({ runId: 1, scored: 3, humanAgreement: { rowKind: { n: 3, agree: 3, rate: 1 } } });
+    const result = await runBetomikOrderbookAiStats(mockClient, 1);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/1/ai-stats");
+    expect((result as { scored: number }).scored).toBe(3);
   });
 });

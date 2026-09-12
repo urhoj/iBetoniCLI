@@ -51,7 +51,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // description/flags/notes trimmed twice first (was 4,476 B over the
 // pre-rebase limit, cut to 3,375 B over). One new command, not padding on an
 // existing one. 722,153 B measured after rebase. Headroom ~250 B.
-const DUMP_LIMIT_BYTES = 722_400;
+// 722,153 -> 727,960 B on 2026-09-12: three new `ib dev betomik-orderbook`
+// leaves (review / propose / ai-stats — the human-override + AI-proposer
+// loop of the Betomik pilot) plus the rows outputShape gaining the
+// rowKind/vehicle/ai columns. Headroom ~240 B.
+const DUMP_LIMIT_BYTES = 728_200;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

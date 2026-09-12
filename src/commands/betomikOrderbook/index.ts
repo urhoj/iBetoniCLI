@@ -47,6 +47,42 @@ export async function runBetomikOrderbookRows(
   return listEnvelope(itemsOf<Record<string, unknown>>(raw));
 }
 
+export interface BetomikReviewBody {
+  status: string;
+  rowKind?: string;
+  palkkiType?: string;
+  notes?: string;
+}
+
+/** Review one staging row (POST /api/betomik-orderbook/rows/:rowId/review). */
+export async function runBetomikOrderbookReview(
+  client: ApiClient,
+  rowId: number,
+  body: BetomikReviewBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/betomik-orderbook/rows/${rowId}/review`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** Run the AI proposer over one run (POST /api/betomik-orderbook/runs/:runId/propose). */
+export async function runBetomikOrderbookPropose(
+  client: ApiClient,
+  runId: number,
+  body: { provider?: string; force?: boolean },
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/betomik-orderbook/runs/${runId}/propose`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** AI-vs-human agreement for one run (GET /api/betomik-orderbook/runs/:runId/ai-stats). */
+export async function runBetomikOrderbookAiStats(client: ApiClient, runId: number): Promise<unknown> {
+  return client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/ai-stats`);
+}
+
 export function registerBetomikOrderbookCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
@@ -76,6 +112,53 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runBetomikOrderbookRows(client, parseId(idStr, "runId"))
+      )
+    );
+
+  const reviewCmd = group
+    .command("review <rowId>")
+    .description("Review one staging row: set status, optionally override keikka/palkki + palkki type")
+    .requiredOption("--status <status>", "pending | approved | rejected")
+    .option("--row-kind <kind>", "keikka | palkki")
+    .option("--palkki-type <name>", "one of the tenant's grid_palkkiTypes names")
+    .option("--note <text>", "reviewNotes");
+  addWriteFlagsToCommand(reviewCmd).action(
+    guarded(
+      async (
+        idStr: string,
+        opts: WriteFlags & { status: string; rowKind?: string; palkkiType?: string; note?: string }
+      ) => {
+        const client = await getClient();
+        const body: BetomikReviewBody = { status: opts.status };
+        if (opts.rowKind) body.rowKind = opts.rowKind;
+        if (opts.palkkiType) body.palkkiType = opts.palkkiType;
+        if (opts.note) body.notes = opts.note;
+        writeJson(await runBetomikOrderbookReview(client, parseId(idStr, "rowId"), body, opts));
+      }
+    )
+  );
+
+  const proposeCmd = group
+    .command("propose <runId>")
+    .description("Run the AI proposer over one run (stores a proposal per row in aiJson)")
+    .option("--provider <name>", "bedrock (default) | local")
+    .option("--force", "Re-propose rows that already carry a proposal");
+  addWriteFlagsToCommand(proposeCmd).action(
+    guarded(async (idStr: string, opts: WriteFlags & { provider?: string; force?: boolean }) => {
+      const client = await getClient();
+      const body: { provider?: string; force?: boolean } = {};
+      if (opts.provider) body.provider = opts.provider;
+      if (opts.force) body.force = true;
+      writeJson(await runBetomikOrderbookPropose(client, parseId(idStr, "runId"), body, opts));
+    })
+  );
+
+  group
+    .command("ai-stats <runId>")
+    .description("AI-vs-human agreement for one run's approved rows")
+    .action(
+      jsonAction(getClient, (client, idStr: string) =>
+        runBetomikOrderbookAiStats(client, parseId(idStr, "runId"))
       )
     );
 }

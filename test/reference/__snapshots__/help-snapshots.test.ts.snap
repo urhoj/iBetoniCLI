@@ -2226,6 +2226,36 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook ai-stats matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook ai-stats <runId> [flags]
+
+DESCRIPTION
+  Agreement of stored AI proposals with the human-APPROVED rows of one run (GET /api/betomik-orderbook/runs/:runId/ai-stats). humanAgreement (rowKind, palkkiType) is the only true accuracy figure; parserAgreement (customer/site/plant/drivers) compares the AI to the deterministic parser, a triage signal, not accuracy. byConfidence buckets rowKind agreement at confidence >= 0.7/0.8/0.9 — the input to an auto-approve threshold decision.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <runId> NUMBER    importRunId from \`runs\` (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { runId, models, proposed, errored, scored, humanAgreement: { rowKind: {n,agree,rate}, palkkiType }, parserAgreement: { customer, site, plant, drivers }, byConfidence: [{ min, n, agree, rate }], note }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+
+EXAMPLES
+  ib dev betomik-orderbook ai-stats 1
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook import matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook import --body <body> [flags]
@@ -2265,6 +2295,88 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook propose matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook propose <runId> [flags]
+
+DESCRIPTION
+  Run the AI proposer over one import run (POST /api/betomik-orderbook/runs/:runId/propose): an LLM sees ONLY each row's raw sheet cells and proposes {rowKind, palkkiType, customer, site, plant, drivers, confidence, reason}, stored in aiJson beside the deterministic parse. Proposals never change rowKind/palkkiType — a human does, via \`review\`. Skips rows that already carry a non-error proposal unless --force. Synchronous, ~2 min per 176-row week.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <runId> NUMBER    importRunId from \`runs\` (required)
+
+FLAGS
+  --provider STRING    bedrock (Claude via AWS Bedrock EU, default) | local (OpenAI-compatible LAN server from AI_LOCAL_BASE_URL/AI_LOCAL_MODEL — the backend must be able to reach it)
+  --force    Re-propose every row, overwriting existing proposals
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { runId, provider, model, proposed, failed, skipped, sampleError } — per-row failures are stored as aiJson {error} and counted in failed; --dry-run returns { dryRun:true, wouldPropose:{ runId, provider, rows, skipped } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 4 (HTTP 400)  Unknown provider, or the provider is not configured (AI_BEDROCK_MODEL / AI_LOCAL_BASE_URL) → Use --provider bedrock|local and configure the backend's env for it
+  exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can run the proposer
+  exit 1 (HTTP 500)  The FIRST row failed (bad model id, missing AWS credentials, unreachable local server) — nothing was stored → Fix the provider configuration and re-run; later rows fail individually into aiJson {error} instead
+
+EXAMPLES
+  ib dev betomik-orderbook propose 1 --dry-run
+  ib dev betomik-orderbook propose 1 --provider bedrock --reason "week 37 proposals"
+  ib --endpoint http://127.0.0.1:3000 dev betomik-orderbook propose 1 --provider local --force
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook review matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook review <rowId> --status <status> [flags]
+
+DESCRIPTION
+  Review one staging row by id (POST /api/betomik-orderbook/rows/:rowId/review): set reviewStatus and optionally override the keikka/palkki classification. The human's --row-kind/--palkki-type is the ground truth the AI proposer is measured against (\`ai-stats\`).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <rowId> NUMBER    betomikOrderbookImportRowId from \`rows\` (required)
+
+FLAGS
+  --status STRING    pending | approved | rejected (required)
+  --row-kind STRING    keikka | palkki — override the parser's classification
+  --palkki-type STRING    one of the tenant's active grid_palkkiTypes names (e.g. huolto, pois ajosta, kommentti); ignored/cleared when --row-kind keikka
+  --note STRING    reviewNotes (kept when omitted)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { updated: boolean } — updated:false means no row with that id under the Betomik tenant
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  rowId is not a positive integer → Pass the betomikOrderbookImportRowId from \`ib dev betomik-orderbook rows <runId>\`
+  exit 4 (HTTP 400)  Bad status / rowKind / palkkiType → status: pending|approved|rejected; rowKind: keikka|palkki; palkkiType must be one of the names the 400 message lists
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+EXAMPLES
+  ib dev betomik-orderbook review 143 --status approved --row-kind palkki --palkki-type "pois ajosta" --reason "Halli-rivi, laivaan"
+  ib dev betomik-orderbook review 8 --status approved --row-kind keikka --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook rows matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook rows <runId> [flags]
@@ -2284,12 +2396,15 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, maybeNote, m3, reviewStatus, reviewedBy }>
+  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
   exit 4 (HTTP 400)  Backend rejected runId → Pass a numeric importRunId
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+NOTES
+  - rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via \`review\`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see \`propose\`/\`ai-stats\`.
 
 EXAMPLES
   ib dev betomik-orderbook rows 1
