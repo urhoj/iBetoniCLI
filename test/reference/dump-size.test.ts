@@ -64,7 +64,15 @@ import { buildReference } from "../../src/reference/dump.js";
 // extract-prompt / exceptions / audit) — the write-then-verify loop that
 // closes the Betomik order-book pipeline (import -> review/propose -> sync).
 // 748,339 B measured; limit raised to that + 2,000 B headroom.
-const DUMP_LIMIT_BYTES = 750_339;
+// 750,339 -> 750,100 on 2026-09-12 (final review of the betomik-orderbook
+// specs): `sync`/`resync` gained dry-run notes (a dry run still writes ledger
+// state and still pays for extractions), `--digest` now says it SENDS MAIL,
+// `audit` says what it actually lists (auto-created entities, not keikkas) and
+// `exceptions` names its columns. 749,754 B measured — a net +1,415 B, but the
+// previous bump's 2,000 B of unearned headroom is handed back at the same
+// time, so the limit TIGHTENS. Headroom kept thin (~346 B) per this file's
+// convention: growth stays a decision, not a drift.
+const DUMP_LIMIT_BYTES = 750_100;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

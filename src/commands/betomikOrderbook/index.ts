@@ -122,6 +122,8 @@ export async function runBetomikOrderbookExceptions(
 
 export interface BetomikAuditRow {
   auditId: number;
+  /** The ledger row whose sync created this entity — the join back to `rows`/`exceptions`. */
+  importRowId: number | null;
   entity: string;
   entityId: number;
   label: string;
@@ -221,7 +223,10 @@ export function registerBetomikOrderbookCommands(
   const syncCmd = addJsonBodyOptions(group.command("sync"))
     .option("--mode <mode>", "shadow (default) | create | full")
     .option("--provider <name>", "bedrock (default) | local")
-    .option("--digest", "Include a digest summary of the sync in the response");
+    .option(
+      "--digest",
+      "Send the daily digest e-mail to the owner after the sync and stamp the included audit rows as digested — a real side effect, not a response field"
+    );
   addWriteFlagsToCommand(syncCmd).action(
     guarded(
       async (
