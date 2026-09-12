@@ -1132,6 +1132,18 @@ describe("did-you-mean prefers a read over an equally near write (fb#1522)", () 
     expect(env.didYouMean).toBe("list");
     expect(env.hint).not.toContain("WRITE");
   });
+
+  // fb#1642: only ~21 specs set `mutates: true`; 110 mark a write with
+  // `writeFlags: true` alone. A classifier reading `mutates` directly missed
+  // every one of those, so the rule above silently did not apply to most of
+  // the write surface — the dev-feedback specs it was tested on happen to set
+  // both. `ib attachment upload` is writeFlags-only.
+  test("a writeFlags-only write is classified as a write too (fb#1642)", () => {
+    const attachment = program.commands.find((c) => c.name() === "attachment")!;
+    const env = buildUnknownCommandEnvelope(attachment, "uplaod", "developer");
+    expect(env.didYouMean).toBe("upload");
+    expect(env.hint).toContain("Did you mean `ib attachment upload` (a WRITE command)?");
+  });
 });
 
 // fb#1154: the actionable sentence must aim at the likeliest intent. Edit

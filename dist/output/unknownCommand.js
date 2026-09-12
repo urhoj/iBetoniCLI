@@ -343,8 +343,13 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     // so a read intent must not be sent at a mutating command by accident.
     // closestName keeps the FIRST candidate on a tie, so ordering the reads first
     // is the whole tie-break — a clearly nearer write still wins, and is then
-    // labelled as one so the caller can notice before running it.
-    const isWrite = (name) => Boolean(specForPath(`${group} ${name}`)?.mutates);
+    // labelled as one so the caller can notice before running it. Classified by
+    // isWriteSpec, never by `mutates` alone: 110 specs mark a write with
+    // `writeFlags: true` only, and reading the one field missed them all (fb#1642).
+    const isWrite = (name) => {
+        const spec = specForPath(`${group} ${name}`);
+        return Boolean(spec && isWriteSpec(spec));
+    };
     const candidates = [...available.filter((n) => !isWrite(n)), ...available.filter(isWrite)];
     const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, candidates);
     const discover = discoverHint(group);
