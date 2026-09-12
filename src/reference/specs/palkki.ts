@@ -100,6 +100,7 @@ export const PALKKI_SPECS: CommandSpec[] = [
     outputShape: `{ items: ${PALKKI_ROW_SHAPE}[], count, nextCursor: null }`,
     errors: [
       { origin: "client", exit: 4, match: "either --date or --from/--to", meaning: "--date combined with --from/--to", remedy: "pass one form" },
+      { origin: "client", exit: 4, match: "--to needs --from", meaning: "--to given without --from (would otherwise silently collapse to today)", remedy: "pass --from <date> too, or --date for one day" },
       intParseErr("--vehicle", "pass a positive vehicleId"),
       intParseErr("--owner", "pass a positive ownerAsiakasId"),
       intParseErr("--source", "pass a positive asiakasId"),

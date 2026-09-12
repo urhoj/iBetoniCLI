@@ -10608,6 +10608,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --date combined with --from/--to → pass one form
+  exit 4 (client-side)  --to given without --from (would otherwise silently collapse to today) → pass --from <date> too, or --date for one day
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive asiakasId

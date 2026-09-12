@@ -308,7 +308,7 @@ function addPalkkiTypeFlags(cmd: Command, isUpdate: boolean): Command {
   return c;
 }
 
-function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts, isUpdate: boolean): PalkkiTypeFields {
+function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts): PalkkiTypeFields {
   const pairs: Array<[boolean | undefined, boolean | undefined, string]> = [
     [opts.vehicleAvailable, opts.vehicleUnavailable, "--vehicle-available / --vehicle-unavailable"],
     [opts.showReportTime, opts.hideReportTime, "--show-report-time / --hide-report-time"],
@@ -317,9 +317,8 @@ function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts, isUpdate: boolean): Palk
   ];
   for (const [a, b, label] of pairs) if (a && b) failWith(`Pass at most one of ${label}`, 4);
   const tri = (on?: boolean, off?: boolean) => (on ? true : off ? false : undefined);
-  // Commander's --no-X sets opts.X = false only when the negated form was
-  // registered (update); on create a plain --job is true|undefined.
-  const negatable = (v: boolean | undefined) => (isUpdate ? v : v ? true : undefined);
+  // --job / --inventory-transfer read true|undefined on create; on update the
+  // registered --no-X twin makes them true|false|undefined — pass through as-is.
   return {
     name: opts.name,
     description: opts.description,
@@ -330,8 +329,8 @@ function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts, isUpdate: boolean): Palk
     showReportKlo: tri(opts.showReportTime, opts.hideReportTime),
     reportStyle: opts.reportStyle,
     showInReport: tri(opts.showInReport, opts.hideInReport),
-    isInventoryTransfer: negatable(opts.inventoryTransfer),
-    isJob: negatable(opts.job),
+    isInventoryTransfer: opts.inventoryTransfer,
+    isJob: opts.job,
   };
 }
 
@@ -406,6 +405,7 @@ export function registerPalkkiCommands(
     .action(
       jsonAction(getClient, (client, opts: PalkkiListFilter) => {
         if (opts.date && (opts.from || opts.to)) failWith("Pass either --date or --from/--to, not both", 4);
+        if (opts.to && !opts.from) failWith("--to needs --from (a range start); for one day use --date", 4);
         const from = resolveDate(opts.from);
         return runPalkkiList(client, {
           ...opts,
@@ -471,7 +471,7 @@ export function registerPalkkiCommands(
     guarded(async (opts: PalkkiTypeOpts) => {
       const client = await getClient();
       const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-      const body = await resolvePalkkiTypeCreateBody(client, parsed, palkkiTypeFieldsFromOpts(opts, false));
+      const body = await resolvePalkkiTypeCreateBody(client, parsed, palkkiTypeFieldsFromOpts(opts));
       writeJson(await runPalkkiTypeCreate(client, body, opts));
     })
   );
@@ -480,7 +480,7 @@ export function registerPalkkiCommands(
     guarded(async (idStr: string, opts: PalkkiTypeOpts) => {
       const client = await getClient();
       const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-      const body = buildPalkkiTypeBody(parsed, palkkiTypeFieldsFromOpts(opts, true));
+      const body = buildPalkkiTypeBody(parsed, palkkiTypeFieldsFromOpts(opts));
       writeJson(await runPalkkiTypeUpdate(client, parseId(idStr, "palkkiTypeId"), body, opts));
     })
   );
