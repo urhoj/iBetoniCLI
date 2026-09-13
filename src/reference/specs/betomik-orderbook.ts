@@ -139,9 +139,8 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     ],
     args: [],
     notes: [
-      "--dry-run suppresses the keikka/palkki writes and the auto-creates, NOT the ledger: syncStatus/plannedAction/blockReason are still written for every row.",
-      "A dry run WITH --provider still performs (and pays for) the AI cell extractions and stores extractedJson — --dry-run is about entity writes, not about the model calls.",
-      "--digest SENDS MAIL to the owner and marks the audit rows it listed as digested; it is not a response-only summary and a dry run does not suppress it.",
+      "--dry-run short-circuits BEFORE the upsert, ledger writes, AI extraction, and --digest — it validates and returns only { wouldSync }, never touching the DB. Unlike `resync`'s dry run, no ledger state is written and no extraction runs.",
+      "--digest only fires on a REAL (non-dry-run) sync — a dry run's wouldSync response never reaches it.",
     ],
     outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
     errors: [
