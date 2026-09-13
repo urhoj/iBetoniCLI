@@ -2591,7 +2591,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can trigger a sync
-  exit 4 (HTTP 400)  Missing sheetLabel/isoYear/isoWeek/rows, unknown mode/provider, provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or more than 40 rows without \`extracted\` for the chosen provider → Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted
+  exit 4 (HTTP 400)  Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider → Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local
+  exit 4 (HTTP 400)  With --provider set on a REAL sync (not --dry-run): provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or >40 rows lack \`extracted\` — neither check runs on --dry-run or without --provider → Configure AI_BEDROCK_MODEL/AI_BEDROCK_ENABLED or AI_LOCAL_BASE_URL/AI_LOCAL_MODEL; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted
   exit 4 (client-side)  No --body or --from-json payload given → Pass --from-json <file|-> or --body '<json>'
 
 NOTES

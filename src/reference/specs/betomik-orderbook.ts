@@ -145,7 +145,8 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
-      { http: 400, exit: 4, meaning: "Missing sheetLabel/isoYear/isoWeek/rows, unknown mode/provider, provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or more than 40 rows without `extracted` for the chosen provider", remedy: "Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted" },
+      { http: 400, exit: 4, meaning: "Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider", remedy: "Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local" },
+      { http: 400, exit: 4, match: ["yhtään llm-tarjoajaa", "ilman extracted-kenttää"], meaning: "With --provider set on a REAL sync (not --dry-run): provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or >40 rows lack `extracted` — neither check runs on --dry-run or without --provider", remedy: "Configure AI_BEDROCK_MODEL/AI_BEDROCK_ENABLED or AI_LOCAL_BASE_URL/AI_LOCAL_MODEL; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted" },
       { origin: "client", exit: 4, meaning: "No --body or --from-json payload given", remedy: "Pass --from-json <file|-> or --body '<json>'" },
     ],
     examples: [

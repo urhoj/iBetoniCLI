@@ -13,6 +13,8 @@ import {
   runBetomikOrderbookExceptions,
   runBetomikOrderbookAudit,
 } from "../../src/commands/betomikOrderbook/index.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { CliError, hintDetailForError } from "../../src/api/errors.js";
 
 const mockClient = mockApiClient();
 
@@ -182,5 +184,39 @@ describe("ib dev betomik-orderbook sync / resync / extract-prompt / exceptions /
     mockClient.get.mockResolvedValueOnce({ items: [] });
     await runBetomikOrderbookAudit(mockClient, {});
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/audit");
+  });
+});
+
+// fb#1681 — `sync`'s single combined 400 row used to mix four causes into one
+// meaning/remedy pair. Two of them (provider not configured, too many un-extracted
+// rows) only fire on a REAL sync — POST /sync short-circuits before reaching either
+// check on --dry-run. Splitting the row without a `match` on the new one would have
+// silently reintroduced fb#485 (matchHttpRow's status-only catch-all always wins when
+// no row's `match` hits), so these assert against the REAL puminet5api message text
+// (routes/betomikOrderbookRoutes.js:319, modules/betomikOrderbook/llm.js:125) to prove
+// each cause reaches its own remedy rather than the generic payload one.
+describe("ib dev betomik-orderbook sync — 400 remedy disambiguation (fb#1681)", () => {
+  const syncErrors = () =>
+    COMMAND_SPECS.find((s) => s.command === "ib dev betomik-orderbook sync")!.errors;
+
+  test("a real 'no LLM provider configured' 400 gets the provider remedy", () => {
+    const err = new CliError(
+      "Yhtään LLM-tarjoajaa ei saatu käyttöön: bedrock: Bedrock ei ole konfiguroitu (AI_BEDROCK_MODEL / AI_BEDROCK_ENABLED)",
+      400, null, 4
+    );
+    expect(hintDetailForError(err, syncErrors()).hint).toMatch(/AI_BEDROCK_MODEL|AI_LOCAL_BASE_URL/);
+  });
+
+  test("a real 'too many un-extracted rows' 400 gets the extractor-script remedy", () => {
+    const err = new CliError(
+      "yli 40 riviä ilman extracted-kenttää — aja LAN-poiminta (betomik-orderbook-extract.py) ensin",
+      400, null, 4
+    );
+    expect(hintDetailForError(err, syncErrors()).hint).toMatch(/betomik-orderbook-extract\.py/);
+  });
+
+  test("a real missing-fields 400 still falls to the general payload remedy", () => {
+    const err = new CliError("sheetLabel, isoYear, isoWeek ja vähintään yksi rows-alkio vaaditaan", 400, null, 4);
+    expect(hintDetailForError(err, syncErrors()).hint).toMatch(/--mode shadow\|create\|full/);
   });
 });
