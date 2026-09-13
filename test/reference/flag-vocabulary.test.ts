@@ -81,6 +81,12 @@ describe("no new naming outliers", () => {
    * create|update`'s vehicleAvailable column vs `--vehicle`, a vehicleId
    * TARGET — used to be listed here while they were singletons; since the
    * update command shares them they are no longer outliers by definition.)
+   *
+   * `--in` (`ib search`'s comma-separated entity-type scope filter, e.g.
+   * `--in customer,vehicle`) started colliding once `ib palkki color
+   * create|update` pushed `--inactive` (isActive=false) past COMMON_THRESHOLD
+   * — an accidental stem match (`inactive`.startsWith(`in`)), not a spelling
+   * drift of the same parameter.
    */
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",
@@ -89,6 +95,7 @@ describe("no new naming outliers", () => {
     "allow-big-merge",
     "from-brand",
     "sijainti-types",
+    "in",
   ]);
 
   /**

@@ -1069,6 +1069,38 @@ ib opendata weather pumping --lng <n>
   ! --lng must be a number
   > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
 
+ib palkki color create --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color create --sort-no <n>
+  ! --sort-no must be an integer >= 0
+  > pass a non-negative integer
+
+ib palkki color delete --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color get --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color list --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color reorder --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color update --owner <id>
+  ! --owner must be an integer >= 0
+  > pass a non-negative ownerAsiakasId
+
+ib palkki color update --sort-no <n>
+  ! --sort-no must be an integer >= 0
+  > pass a non-negative integer
+
 ib palkki create --keikka <id>
   ! --keikka must be an integer >= 1
   > pass a positive keikkaId

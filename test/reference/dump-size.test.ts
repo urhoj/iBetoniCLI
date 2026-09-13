@@ -76,7 +76,10 @@ import { buildReference } from "../../src/reference/dump.js";
 // fk sources/list/set/remove` (+ `person fk import`) over the pre-existing
 // backend routes; the Betomik driver-nickname load (T5) had no `ib` path at
 // all. 771,734 B measured; limit = that + ~350 B, same thin headroom.
-const DUMP_LIMIT_BYTES = 772_100;
+// Bumped 772_100 -> 785_000 for the `ib palkki color` command group (6 new
+// leaves: list/get/create/update/delete/reorder — grid bar-coloring rules,
+// "Palkkiväritykset"; fb#1690/fb#1694).
+const DUMP_LIMIT_BYTES = 785_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

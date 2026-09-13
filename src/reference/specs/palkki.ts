@@ -71,6 +71,60 @@ const pairErr = (isUpdate: boolean): CommandError => ({
   remedy: `pass only one of --vehicle-available/--vehicle-unavailable, --show-report-time/--hide-report-time, --show-in-report/--hide-in-report${isUpdate ? ", --active/--inactive" : ""}`,
 });
 
+/** Flags shared by `palkki color create` and `palkki color update`. */
+function palkkiColorFlags(isUpdate: boolean): CommandFlag[] {
+  return [
+    BODY_FLAG,
+    { name: "title", type: "string", description: isUpdate ? "title" : "title (REQUIRED)" },
+    { name: "ehto", type: "string", description: "ehto — the keikkaEval condition this rule matches against a keikka; evaluated by the web grid only (no local or server-side syntax check)" },
+    { name: "style", type: "string", description: 'style — CSS-in-JS fragment applied to the grid bar, e.g. \'backgroundColor: "#f44336",\'' },
+    { name: "comment", type: "string", description: "comment — free-text note, not shown in the grid" },
+    { name: "sort-no", type: "number", description: "sortNo — evaluation order (first matching active rule wins); default: the row's own id" },
+    { name: "owner", type: "number", description: isUpdate ? "Move to ownerAsiakasId (a company you belong to)" : "ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)" },
+    { name: "icon-name", type: "string", description: "iconName — icon shown on the bar when this rule matches" },
+    { name: "icon-color", type: "string", description: "iconColor" },
+    { name: "icon-background-color", type: "string", description: "iconBackgroundColor" },
+    ...(isUpdate ? [{ name: "active", type: "boolean", description: "isActive=true" } as CommandFlag] : []),
+    { name: "inactive", type: "boolean", description: `isActive=false${isUpdate ? "" : " (default: active)"}` },
+    FROM_JSON_BODY_FLAG,
+  ];
+}
+
+const palkkiColorPairErr: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "Pass at most one of --active / --inactive",
+  meaning: "Both halves of the --active/--inactive pair were given",
+  remedy: "pass only one of --active / --inactive",
+};
+
+const PALKKI_COLOR_ROW_SHAPE =
+  "{ barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }";
+
+/**
+ * Not-found on a bar-coloring rule has TWO origins on create/update/delete:
+ * the CLI's own client-side lookup (no "get one" endpoint exists — `get`,
+ * and every --dry-run preview, resolve by listing the owner and filtering)
+ * answers exit 5 locally; the LIVE (non-dry-run) write hits the real backend
+ * route, which now also 404s a missing id for real (fb#1694 fix).
+ */
+const PALKKI_COLOR_CLIENT_NOT_FOUND: CommandError = {
+  origin: "client",
+  exit: 5,
+  match: "not found for owner",
+  meaning: "No such barColorId in the resolved owner's list (client-side lookup — used by get and every --dry-run preview)",
+  remedy: "check the id with `ib palkki color list`, or pass --owner",
+};
+const palkkiColorNotFoundErrors = (): CommandError[] => [
+  PALKKI_COLOR_CLIENT_NOT_FOUND,
+  apiErr(404, "No such bar-coloring rule (live write only — the client-side lookup above catches this earlier for get/--dry-run)", "verify the id with `ib palkki color list`"),
+];
+
+const PALKKI_COLOR_OWNER_ERRORS: CommandError[] = [
+  OWNER_PARSE_ERR,
+  apiErr(403, "Not a member of the owning company (or, on update, of the NEW --owner when re-homing) — sysadmin/developer bypass; owner 0 requires sysadmin/developer", "check `ib company`"),
+];
+
 /** Parse rows for the four integer flags `palkki create|update` share. */
 const PALKKI_INT_ERRORS: CommandError[] = [
   intParseErr("--vehicle", "pass a positive vehicleId"),
@@ -270,5 +324,114 @@ export const PALKKI_SPECS: CommandSpec[] = [
     ],
     notes: ["--dry-run checks existence + membership only; the 'still referenced' refusal is evaluated on the live call and comes back as success:false (exit 0)."],
     examples: ['ib palkki type delete 1003 --reason "luotu vahingossa"'],
+  },
+  {
+    command: "ib palkki color list",
+    description:
+      "Bar-coloring rules ('Palkkiväritykset' in Grid settings) one company can use — condition-based coloring/icon rules for grid bars, evaluated client-side (keikkaEval on `ehto`) by the web grid. Distinct from `ib palkki type` ('Palkkilajit'). GET /api/grid/barColors/list/:owner (bare array, projected here).",
+    permissions: ["membership or view-tier role on the owner (requireAsiakasReadAccess; sysadmin/developer bypass)"],
+    flags: [{ name: "owner", type: "number", description: "Company whose bar-coloring rules to list (default: active company)" }],
+    outputShape: `{ items: ${PALKKI_COLOR_ROW_SHAPE}[], count, nextCursor: null }`,
+    errors: [
+      OWNER_PARSE_ERR,
+      apiErr(403, "--owner is not a company you belong to (or hold a view-tier role over)", "check `ib company`"),
+      ...authErrors(),
+    ],
+    notes: ["Rows are NOT paginated by the backend — the whole owner's set comes back in one call; typically a handful of rules."],
+    seeAlso: ["ib palkki color get", "ib palkki color create", "ib palkki type list"],
+    examples: ["ib palkki color list", "ib palkki color list --owner 27"],
+  },
+  {
+    command: "ib palkki color get",
+    aliases: ["ib palkki color show"],
+    description: "One bar-coloring rule by id. No backend 'get one' route exists — resolved by listing the owner and filtering client-side.",
+    permissions: ["same as `ib palkki color list` for the resolved --owner"],
+    args: [{ name: "barColorId", type: "number", description: "grid_barColors.barColorId" }],
+    flags: [{ name: "owner", type: "number", description: "Company to look the row up under (default: active company)" }],
+    outputShape: PALKKI_COLOR_ROW_SHAPE,
+    errors: [OWNER_PARSE_ERR, PALKKI_COLOR_CLIENT_NOT_FOUND, apiErr(403, "--owner is not a company you belong to", "check `ib company`"), ...authErrors()],
+    examples: ["ib palkki color get 12", "ib palkki color get 12 --owner 27"],
+  },
+  {
+    command: "ib palkki color create",
+    description:
+      "Create a bar-coloring rule. POST /api/grid/barColors/save with no barColorId (a true upsert — the backend's INSERT branch). REQUIRED: --title. --owner defaults to your active company; 0 is the shared/global catalog (sysadmin/developer only). No server-side X-Dry-Run support on this route, so --dry-run resolves entirely CLIENT-SIDE (the write is never sent).",
+    permissions: ["member of the target company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694"],
+    flags: palkkiColorFlags(false),
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "{ barColorId, barColor: <saved row> } — --dry-run returns { dryRun:true, wouldCreate: <body> } without sending any request",
+    errors: [
+      { origin: "client", exit: 4, match: "create requires:", meaning: "--title was not given (typed flag or --body)", remedy: "pass --title" },
+      SORT_NO_PARSE_ERR,
+      ...PALKKI_COLOR_OWNER_ERRORS,
+      ...authErrors(),
+    ],
+    notes: [
+      "--reason is accepted (the write-safety trio) but currently has no effect: bar colors carry no ChangeTracker audit trail, unlike `ib palkki`/`ib palkki type`.",
+      "ehto is free text, matched by the web grid's keikkaEval formula engine — there is no CLI or backend syntax check; a malformed expression is accepted here and simply never matches (or errors silently) in the grid.",
+    ],
+    seeAlso: ["ib palkki color list", "ib palkki color update", "ib palkki type create"],
+    examples: [
+      'ib palkki color create --title "Myöhässä" --ehto "keikka.late" --style \'backgroundColor: "#f44336",\' --icon-name warning',
+      'ib palkki color create --title "Testi" --dry-run',
+    ],
+  },
+  {
+    command: "ib palkki color update",
+    description:
+      "PARTIAL update of a bar-coloring rule — only the flags you pass change (the backend read-merges over the row, same route as create: POST /api/grid/barColors/save with barColorId set). --dry-run resolves CLIENT-SIDE: it looks the row up under the ACTIVE company (an --owner on this command re-homes the row and is NOT used to locate it for the preview) and previews the merge without sending anything.",
+    permissions: ["member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694"],
+    args: [{ name: "barColorId", type: "number", description: "grid_barColors.barColorId" }],
+    flags: palkkiColorFlags(true),
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "{ barColorId, barColor: <merged row> } — --dry-run returns { dryRun:true, wouldUpdate: <merged row> } without sending any request",
+    errors: [
+      { origin: "client", exit: 4, match: "Nothing to update", meaning: "No field flags and no --body", remedy: "pass at least one field flag" },
+      SORT_NO_PARSE_ERR,
+      palkkiColorPairErr,
+      ...palkkiColorNotFoundErrors(),
+      ...PALKKI_COLOR_OWNER_ERRORS,
+      ...authErrors(),
+    ],
+    notes: ["--reason is accepted but has no effect — see `ib palkki color create`'s notes."],
+    seeAlso: ["ib palkki color get"],
+    examples: ['ib palkki color update 12 --style \'backgroundColor: "#4caf50",\'', "ib palkki color update 12 --title Testi --dry-run"],
+  },
+  {
+    command: "ib palkki color delete",
+    description: "Delete a bar-coloring rule. DELETE /api/grid/barColors/delete/:id (hard delete — unlike `ib palkki delete`, there is no soft-delete/deletedTime column here). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).",
+    permissions: ["member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694"],
+    args: [{ name: "barColorId", type: "number", description: "grid_barColors.barColorId" }],
+    flags: [{ name: "owner", type: "number", description: "Company to look the row up under for --dry-run (default: active company); ignored on a live delete" }],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "{ success: true } — --dry-run returns { dryRun:true, wouldDelete:{ barColorId } } without sending any request",
+    errors: [OWNER_PARSE_ERR, ...palkkiColorNotFoundErrors(), apiErr(403, "Not a member of the row's owning company", "check `ib company`"), ...authErrors()],
+    notes: ["This is a HARD delete — there is no soft-delete/undo for bar-coloring rules (contrast `ib palkki delete`, which sets deletedTime)."],
+    examples: ['ib palkki color delete 12 --reason "duplicate"', "ib palkki color delete 12 --dry-run"],
+  },
+  {
+    command: "ib palkki color reorder",
+    description:
+      "Swap sortNo between two bar-coloring rules (the FE's adjacent up/down reorder). POST /api/grid/barColors/reorder blindly assigns whatever sortNo it is given — no server-side lookup — so the CLI resolves both rows' CURRENT sortNo first (same client-side lookup as `get`, under one shared --owner) and sends the swap. --dry-run resolves the same lookup and previews without sending the POST.",
+    permissions: ["member of the shared owning company for BOTH ids (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694"],
+    args: [
+      { name: "barColorId1", type: "number", description: "grid_barColors.barColorId" },
+      { name: "barColorId2", type: "number", description: "grid_barColors.barColorId" },
+    ],
+    flags: [{ name: "owner", type: "number", description: "Company both rows belong to (default: active company)" }],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "{ success: true } — --dry-run returns { dryRun:true, wouldReorder:{ barColorId1, sortNo1, barColorId2, sortNo2 } } without sending any request",
+    errors: [
+      OWNER_PARSE_ERR,
+      { origin: "client", exit: 5, match: "not found for owner", meaning: "Either id is not in the resolved --owner's list — including two rows that legitimately belong to DIFFERENT companies, which this local lookup cannot tell apart from a bad id", remedy: "verify both ids with `ib palkki color list --owner <id>`; a cross-company swap is refused either way (also enforced server-side, fb#1694)" },
+      apiErr(403, "Not a member of the shared owning company", "check `ib company`"),
+      ...authErrors(),
+    ],
+    seeAlso: ["ib palkki color list", "ib palkki color get"],
+    examples: ["ib palkki color reorder 12 13", "ib palkki color reorder 12 13 --owner 27 --dry-run"],
   },
 ];

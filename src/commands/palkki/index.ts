@@ -6,6 +6,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
+import { toListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
@@ -124,6 +125,201 @@ export async function runPalkkiTypeList(
   return client.get<unknown>(
     `/api/cli/palkki/type/list${qs({ owner: opts.owner, all: opts.all ? 1 : undefined })}`
   );
+}
+
+// ---------------------------------------------------------------------------
+// Palkki COLORS (grid_barColors — condition-based bar coloring/icon rules,
+// "Palkkiväritykset" in Grid settings; distinct from Palkki TYPE above, which
+// is "Palkkilajit". No X-Dry-Run backend support on these routes, so --dry-run
+// is resolved entirely CLIENT-SIDE here — the write is never sent.
+// ---------------------------------------------------------------------------
+
+/** Typed convenience fields for `palkki color create|update`, mapped to backend body keys. */
+export interface PalkkiColorFields {
+  title?: string;
+  ehto?: string;
+  style?: string;
+  comment?: string;
+  sortNo?: number;
+  owner?: number;
+  active?: boolean;
+  iconName?: string;
+  iconColor?: string;
+  iconBackgroundColor?: string;
+}
+
+/** Merge typed convenience flags over a parsed --body object (typed flags win). */
+export function buildPalkkiColorBody(
+  parsedBody: Record<string, unknown>,
+  typed: PalkkiColorFields
+): Record<string, unknown> {
+  const body = { ...parsedBody };
+  if (typed.title !== undefined) body.title = typed.title;
+  if (typed.ehto !== undefined) body.ehto = typed.ehto;
+  if (typed.style !== undefined) body.style = typed.style;
+  if (typed.comment !== undefined) body.comment = typed.comment;
+  if (typed.sortNo !== undefined) body.sortNo = typed.sortNo;
+  if (typed.owner !== undefined) body.ownerAsiakasId = typed.owner;
+  if (typed.active !== undefined) body.isActive = typed.active;
+  if (typed.iconName !== undefined) body.iconName = typed.iconName;
+  if (typed.iconColor !== undefined) body.iconColor = typed.iconColor;
+  if (typed.iconBackgroundColor !== undefined) body.iconBackgroundColor = typed.iconBackgroundColor;
+  return body;
+}
+
+/**
+ * {@link buildPalkkiColorBody} plus the ownerAsiakasId default: resolved to the
+ * active company only when the merged body still has none — an ownerAsiakasId
+ * already present in --body/--from-json must not be clobbered (mirrors
+ * resolvePalkkiTypeCreateBody, fb#1659).
+ */
+export async function resolvePalkkiColorCreateBody(
+  client: ApiClient,
+  parsedBody: Record<string, unknown>,
+  typed: PalkkiColorFields
+): Promise<Record<string, unknown>> {
+  const body = buildPalkkiColorBody(parsedBody, typed);
+  if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
+    body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(client, "pass --owner");
+  }
+  return body;
+}
+
+export interface PalkkiColorRow {
+  barColorId: number;
+  title: string | null;
+  ehto: string | null;
+  style: string | null;
+  comment: string | null;
+  sortNo: number;
+  ownerAsiakasId: number;
+  isActive: boolean;
+  iconName: string | null;
+  iconColor: string | null;
+  iconBackgroundColor: string | null;
+  [k: string]: unknown;
+}
+
+/**
+ * GET /api/grid/barColors/list/:ownerAsiakasId — a bare array with a REQUIRED
+ * path param (unlike `palkki type list`'s dedicated CLI route), projected here
+ * into the standard list envelope.
+ */
+export async function runPalkkiColorList(
+  client: ApiClient,
+  opts: { owner?: number }
+): Promise<unknown> {
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner"));
+  const raw = await client.get<PalkkiColorRow[]>(`/api/grid/barColors/list/${owner}`);
+  return toListEnvelope<PalkkiColorRow>(raw);
+}
+
+/**
+ * No dedicated "get one" endpoint exists server-side — resolve by listing the
+ * row's owner and filtering client-side (exit 5 if not found in that owner's
+ * list). Also the shared lookup `delete`/`reorder --dry-run` use to preview
+ * without ever sending the write, and `reorder` uses live to resolve both
+ * rows' current sortNo (the backend swap endpoint has no lookup of its own).
+ */
+export async function runPalkkiColorGet(
+  client: ApiClient,
+  barColorId: number,
+  opts: { owner?: number } = {}
+): Promise<PalkkiColorRow> {
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner"));
+  const rows = await client.get<PalkkiColorRow[]>(`/api/grid/barColors/list/${owner}`);
+  const row = (rows ?? []).find((r) => r.barColorId === barColorId);
+  if (!row) {
+    failWith(
+      `barColorId ${barColorId} not found for owner ${owner}`,
+      5,
+      "check the id with `ib palkki color list`, or pass --owner if it belongs to a different company"
+    );
+  }
+  return row;
+}
+
+/** POST /grid/barColors/save with no barColorId (create). `body.title` is REQUIRED. */
+export async function runPalkkiColorCreate(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  if (typeof body.title !== "string" || !body.title.trim()) {
+    failWith("create requires: --title", 4);
+  }
+  if (flags.dryRun) return { dryRun: true, wouldCreate: body };
+  return client.post<unknown>("/api/grid/barColors/save", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * POST /grid/barColors/save with barColorId set — PARTIAL (the backend
+ * read-merges over the row). `--owner` on `palkki color update` re-homes the
+ * row; the --dry-run preview lookup below always resolves under the ACTIVE
+ * company (re-homing a row you can't yet see under your own company is not
+ * supported by this preview).
+ */
+export async function runPalkkiColorUpdate(
+  client: ApiClient,
+  barColorId: number,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  if (Object.keys(body).length === 0) {
+    failWith("Nothing to update: pass at least one field flag (or --body/--from-json)", 4);
+  }
+  if (flags.dryRun) {
+    const existing = await runPalkkiColorGet(client, barColorId);
+    return { dryRun: true, wouldUpdate: { ...existing, ...body, barColorId } };
+  }
+  return client.post<unknown>("/api/grid/barColors/save", { ...body, barColorId }, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** DELETE /grid/barColors/delete/:id. --dry-run resolves locally (get first — 404s as exit 5 if missing — no DELETE issued). */
+export async function runPalkkiColorDelete(
+  client: ApiClient,
+  barColorId: number,
+  flags: WriteFlags,
+  opts: { owner?: number } = {}
+): Promise<unknown> {
+  if (flags.dryRun) {
+    await runPalkkiColorGet(client, barColorId, opts);
+    return { dryRun: true, wouldDelete: { barColorId } };
+  }
+  return client.delete<unknown>(`/api/grid/barColors/delete/${barColorId}`, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * Swaps sortNo between two bar-coloring rules (the FE's adjacent up/down
+ * reorder). POST /grid/barColors/reorder blindly assigns whatever sortNo
+ * values it is given — no server-side lookup — so both rows' CURRENT sortNo
+ * are resolved first via `runPalkkiColorGet`, scoped to the same --owner
+ * (default: active company); a barColorId2 that isn't in that owner's list
+ * exits 5 locally before any write is attempted.
+ */
+export async function runPalkkiColorReorder(
+  client: ApiClient,
+  barColorId1: number,
+  barColorId2: number,
+  flags: WriteFlags,
+  opts: { owner?: number } = {}
+): Promise<unknown> {
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner"));
+  const [row1, row2] = await Promise.all([
+    runPalkkiColorGet(client, barColorId1, { owner }),
+    runPalkkiColorGet(client, barColorId2, { owner }),
+  ]);
+  const swapBody = { barColorId1, sortNo1: row2.sortNo, barColorId2, sortNo2: row1.sortNo };
+  if (flags.dryRun) return { dryRun: true, wouldReorder: swapBody };
+  return client.post<unknown>("/api/grid/barColors/reorder", swapBody, {
+    headers: writeFlagsToHeaders(flags),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -334,6 +530,71 @@ function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts): PalkkiTypeFields {
   };
 }
 
+type PalkkiColorOpts = WriteFlags & {
+  body?: string;
+  fromJson?: string;
+  title?: string;
+  ehto?: string;
+  style?: string;
+  comment?: string;
+  sortNo?: number;
+  owner?: number;
+  active?: boolean;
+  inactive?: boolean;
+  iconName?: string;
+  iconColor?: string;
+  iconBackgroundColor?: string;
+};
+
+function addPalkkiColorFlags(cmd: Command, isUpdate: boolean): Command {
+  const c = addJsonBodyOptions(cmd)
+    .option("--title <t>", isUpdate ? "title" : "title (REQUIRED)")
+    .option(
+      "--ehto <expr>",
+      "ehto — the keikkaEval condition this rule matches against a keikka; evaluated by the web grid only (no local or server-side syntax check)"
+    )
+    .option(
+      "--style <css>",
+      'style — a raw CSS-in-JS fragment applied to the grid bar, e.g. \'backgroundColor: "#f44336",\''
+    )
+    .option("--comment <c>", "comment — free-text note, not shown in the grid")
+    .option(
+      "--sort-no <n>",
+      "sortNo — evaluation order (first matching active rule wins); default: the row's own id",
+      intFlag("--sort-no", 0)
+    )
+    .option(
+      "--owner <id>",
+      isUpdate
+        ? "Move to ownerAsiakasId (must be a company you belong to)"
+        : "Owning ownerAsiakasId (defaults to active company; 0 = the shared/global catalog, sysadmin/developer only)",
+      intFlag("--owner", 0)
+    )
+    .option("--icon-name <name>", "iconName — icon shown on the bar when this rule matches")
+    .option("--icon-color <css>", "iconColor")
+    .option("--icon-background-color <css>", "iconBackgroundColor");
+  if (isUpdate) c.option("--active", "isActive = true");
+  c.option("--inactive", isUpdate ? "isActive = false" : "Create as isActive=false (default: active)");
+  return c;
+}
+
+function palkkiColorFieldsFromOpts(opts: PalkkiColorOpts): PalkkiColorFields {
+  if (opts.active && opts.inactive) failWith("Pass at most one of --active / --inactive", 4);
+  const tri = (on?: boolean, off?: boolean) => (on ? true : off ? false : undefined);
+  return {
+    title: opts.title,
+    ehto: opts.ehto,
+    style: opts.style,
+    comment: opts.comment,
+    sortNo: opts.sortNo,
+    owner: opts.owner,
+    active: tri(opts.active, opts.inactive),
+    iconName: opts.iconName,
+    iconColor: opts.iconColor,
+    iconBackgroundColor: opts.iconBackgroundColor,
+  };
+}
+
 type PalkkiOpts = WriteFlags & {
   body?: string;
   fromJson?: string;
@@ -379,11 +640,14 @@ function palkkiFieldsFromOpts(opts: PalkkiOpts): PalkkiFields {
 }
 
 /**
- * Register `ib palkki` — grid bars (palkit) and their type catalogue.
+ * Register `ib palkki` — grid bars (palkit), their type catalogue, and their
+ * condition-based coloring rules.
  *
  *   list | get | create | update | delete            /api/cli/palkki/*
  *   type list                                        /api/cli/palkki/type/list
  *   type create | update | delete                    /api/grid/palkkiType/*
+ *   color list | get | create | update | delete |     /api/grid/barColors/*
+ *     reorder
  *
  * Driver assignment on a palkki stays on `ib vehicle driver assign` (it keeps
  * personPvm / keikkaPerson / palkkiPerson in sync for the whole vehicle-day).
@@ -490,4 +754,73 @@ export function registerPalkkiCommands(
       runPalkkiTypeDelete(client, parseId(idStr, "palkkiTypeId"), opts)
     )
   );
+
+  const c = p.command("color").description("Palkki color (bar coloring rule) commands");
+
+  c.command("list")
+    .option(
+      "--owner <id>",
+      "Company whose bar-coloring rules to list (default: active company)",
+      intFlag("--owner", 0)
+    )
+    .action(jsonAction(getClient, (client, opts: { owner?: number }) => runPalkkiColorList(client, opts)));
+
+  c.command("get <barColorId>")
+    .alias("show")
+    .option(
+      "--owner <id>",
+      "Company to look the row up under (default: active company)",
+      intFlag("--owner", 0)
+    )
+    .action(
+      jsonAction(getClient, (client, idStr: string, opts: { owner?: number }) =>
+        runPalkkiColorGet(client, parseId(idStr, "barColorId"), opts)
+      )
+    );
+
+  addWriteFlagsToCommand(addPalkkiColorFlags(c.command("create"), false)).action(
+    guarded(async (opts: PalkkiColorOpts) => {
+      const client = await getClient();
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
+      const body = await resolvePalkkiColorCreateBody(client, parsed, palkkiColorFieldsFromOpts(opts));
+      writeJson(await runPalkkiColorCreate(client, body, opts));
+    })
+  );
+
+  addWriteFlagsToCommand(addPalkkiColorFlags(c.command("update <barColorId>"), true)).action(
+    guarded(async (idStr: string, opts: PalkkiColorOpts) => {
+      const client = await getClient();
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
+      const body = buildPalkkiColorBody(parsed, palkkiColorFieldsFromOpts(opts));
+      writeJson(await runPalkkiColorUpdate(client, parseId(idStr, "barColorId"), body, opts));
+    })
+  );
+
+  addWriteFlagsToCommand(c.command("delete <barColorId>"))
+    .option(
+      "--owner <id>",
+      "Company to look the row up under for --dry-run (default: active company); ignored on a live delete",
+      intFlag("--owner", 0)
+    )
+    .action(
+      jsonAction(getClient, (client, idStr: string, opts: WriteFlags & { owner?: number }) =>
+        runPalkkiColorDelete(client, parseId(idStr, "barColorId"), opts, { owner: opts.owner })
+      )
+    );
+
+  addWriteFlagsToCommand(c.command("reorder <barColorId1> <barColorId2>"))
+    .option("--owner <id>", "Company both rows belong to (default: active company)", intFlag("--owner", 0))
+    .action(
+      jsonAction(
+        getClient,
+        (client, id1Str: string, id2Str: string, opts: WriteFlags & { owner?: number }) =>
+          runPalkkiColorReorder(
+            client,
+            parseId(id1Str, "barColorId1"),
+            parseId(id2Str, "barColorId2"),
+            opts,
+            { owner: opts.owner }
+          )
+      )
+    );
 }

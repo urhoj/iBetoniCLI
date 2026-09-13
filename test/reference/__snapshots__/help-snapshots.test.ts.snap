@@ -10633,6 +10633,279 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib palkki color create matches snapshot 1`] = `
+"USAGE
+  ib palkki color create [flags]
+
+DESCRIPTION
+  Create a bar-coloring rule. POST /api/grid/barColors/save with no barColorId (a true upsert — the backend's INSERT branch). REQUIRED: --title. --owner defaults to your active company; 0 is the shared/global catalog (sysadmin/developer only). No server-side X-Dry-Run support on this route, so --dry-run resolves entirely CLIENT-SIDE (the write is never sent).
+  Permissions: requires member of the target company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694.
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --title STRING    title (REQUIRED)
+  --ehto STRING    ehto — the keikkaEval condition this rule matches against a keikka; evaluated by the web grid only (no local or server-side syntax check)
+  --style STRING    style — CSS-in-JS fragment applied to the grid bar, e.g. 'backgroundColor: "#f44336",'
+  --comment STRING    comment — free-text note, not shown in the grid
+  --sort-no NUMBER    sortNo — evaluation order (first matching active rule wins); default: the row's own id
+  --owner NUMBER    ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)
+  --icon-name STRING    iconName — icon shown on the bar when this rule matches
+  --icon-color STRING    iconColor
+  --icon-background-color STRING    iconBackgroundColor
+  --inactive    isActive=false (default: active)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { barColorId, barColor: <saved row> } — --dry-run returns { dryRun:true, wouldCreate: <body> } without sending any request
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --title was not given (typed flag or --body) → pass --title
+  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 3 (HTTP 403)  Not a member of the owning company (or, on update, of the NEW --owner when re-homing) — sysadmin/developer bypass; owner 0 requires sysadmin/developer → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --reason is accepted (the write-safety trio) but currently has no effect: bar colors carry no ChangeTracker audit trail, unlike \`ib palkki\`/\`ib palkki type\`.
+  - ehto is free text, matched by the web grid's keikkaEval formula engine — there is no CLI or backend syntax check; a malformed expression is accepted here and simply never matches (or errors silently) in the grid.
+
+SEE ALSO
+  ib palkki color list, ib palkki color update, ib palkki type create
+
+EXAMPLES
+  ib palkki color create --title "Myöhässä" --ehto "keikka.late" --style 'backgroundColor: "#f44336",' --icon-name warning
+  ib palkki color create --title "Testi" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki color delete matches snapshot 1`] = `
+"USAGE
+  ib palkki color delete <barColorId> [flags]
+
+DESCRIPTION
+  Delete a bar-coloring rule. DELETE /api/grid/barColors/delete/:id (hard delete — unlike \`ib palkki delete\`, there is no soft-delete/deletedTime column here). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).
+  Permissions: requires member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694.
+
+ARGUMENTS
+  <barColorId> NUMBER    grid_barColors.barColorId (required)
+
+FLAGS
+  --owner NUMBER    Company to look the row up under for --dry-run (default: active company); ignored on a live delete
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success: true } — --dry-run returns { dryRun:true, wouldDelete:{ barColorId } } without sending any request
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 5 (client-side)  No such barColorId in the resolved owner's list (client-side lookup — used by get and every --dry-run preview) → check the id with \`ib palkki color list\`, or pass --owner
+  exit 5 (HTTP 404)  No such bar-coloring rule (live write only — the client-side lookup above catches this earlier for get/--dry-run) → verify the id with \`ib palkki color list\`
+  exit 3 (HTTP 403)  Not a member of the row's owning company → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - This is a HARD delete — there is no soft-delete/undo for bar-coloring rules (contrast \`ib palkki delete\`, which sets deletedTime).
+
+EXAMPLES
+  ib palkki color delete 12 --reason "duplicate"
+  ib palkki color delete 12 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki color get matches snapshot 1`] = `
+"USAGE
+  ib palkki color get <barColorId> [flags]
+  (also: ib palkki color show)
+
+DESCRIPTION
+  One bar-coloring rule by id. No backend 'get one' route exists — resolved by listing the owner and filtering client-side.
+  Permissions: requires same as \`ib palkki color list\` for the resolved --owner.
+
+ARGUMENTS
+  <barColorId> NUMBER    grid_barColors.barColorId (required)
+
+FLAGS
+  --owner NUMBER    Company to look the row up under (default: active company)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 5 (client-side)  No such barColorId in the resolved owner's list (client-side lookup — used by get and every --dry-run preview) → check the id with \`ib palkki color list\`, or pass --owner
+  exit 3 (HTTP 403)  --owner is not a company you belong to → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib palkki color get 12
+  ib palkki color get 12 --owner 27
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki color list matches snapshot 1`] = `
+"USAGE
+  ib palkki color list [flags]
+
+DESCRIPTION
+  Bar-coloring rules ('Palkkiväritykset' in Grid settings) one company can use — condition-based coloring/icon rules for grid bars, evaluated client-side (keikkaEval on \`ehto\`) by the web grid. Distinct from \`ib palkki type\` ('Palkkilajit'). GET /api/grid/barColors/list/:owner (bare array, projected here).
+  Permissions: requires membership or view-tier role on the owner (requireAsiakasReadAccess; sysadmin/developer bypass).
+
+FLAGS
+  --owner NUMBER    Company whose bar-coloring rules to list (default: active company)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }[], count, nextCursor: null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 3 (HTTP 403)  --owner is not a company you belong to (or hold a view-tier role over) → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Rows are NOT paginated by the backend — the whole owner's set comes back in one call; typically a handful of rules.
+
+SEE ALSO
+  ib palkki color get, ib palkki color create, ib palkki type list
+
+EXAMPLES
+  ib palkki color list
+  ib palkki color list --owner 27
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki color reorder matches snapshot 1`] = `
+"USAGE
+  ib palkki color reorder <barColorId1> <barColorId2> [flags]
+
+DESCRIPTION
+  Swap sortNo between two bar-coloring rules (the FE's adjacent up/down reorder). POST /api/grid/barColors/reorder blindly assigns whatever sortNo it is given — no server-side lookup — so the CLI resolves both rows' CURRENT sortNo first (same client-side lookup as \`get\`, under one shared --owner) and sends the swap. --dry-run resolves the same lookup and previews without sending the POST.
+  Permissions: requires member of the shared owning company for BOTH ids (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694.
+
+ARGUMENTS
+  <barColorId1> NUMBER    grid_barColors.barColorId (required)
+  <barColorId2> NUMBER    grid_barColors.barColorId (required)
+
+FLAGS
+  --owner NUMBER    Company both rows belong to (default: active company)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success: true } — --dry-run returns { dryRun:true, wouldReorder:{ barColorId1, sortNo1, barColorId2, sortNo2 } } without sending any request
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 5 (client-side)  Either id is not in the resolved --owner's list — including two rows that legitimately belong to DIFFERENT companies, which this local lookup cannot tell apart from a bad id → verify both ids with \`ib palkki color list --owner <id>\`; a cross-company swap is refused either way (also enforced server-side, fb#1694)
+  exit 3 (HTTP 403)  Not a member of the shared owning company → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib palkki color list, ib palkki color get
+
+EXAMPLES
+  ib palkki color reorder 12 13
+  ib palkki color reorder 12 13 --owner 27 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib palkki color update matches snapshot 1`] = `
+"USAGE
+  ib palkki color update <barColorId> [flags]
+
+DESCRIPTION
+  PARTIAL update of a bar-coloring rule — only the flags you pass change (the backend read-merges over the row, same route as create: POST /api/grid/barColors/save with barColorId set). --dry-run resolves CLIENT-SIDE: it looks the row up under the ACTIVE company (an --owner on this command re-homes the row and is NOT used to locate it for the preview) and previews the merge without sending anything.
+  Permissions: requires member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694.
+
+ARGUMENTS
+  <barColorId> NUMBER    grid_barColors.barColorId (required)
+
+FLAGS
+  --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
+  --title STRING    title
+  --ehto STRING    ehto — the keikkaEval condition this rule matches against a keikka; evaluated by the web grid only (no local or server-side syntax check)
+  --style STRING    style — CSS-in-JS fragment applied to the grid bar, e.g. 'backgroundColor: "#f44336",'
+  --comment STRING    comment — free-text note, not shown in the grid
+  --sort-no NUMBER    sortNo — evaluation order (first matching active rule wins); default: the row's own id
+  --owner NUMBER    Move to ownerAsiakasId (a company you belong to)
+  --icon-name STRING    iconName — icon shown on the bar when this rule matches
+  --icon-color STRING    iconColor
+  --icon-background-color STRING    iconBackgroundColor
+  --active    isActive=true
+  --inactive    isActive=false
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { barColorId, barColor: <merged row> } — --dry-run returns { dryRun:true, wouldUpdate: <merged row> } without sending any request
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No field flags and no --body → pass at least one field flag
+  exit 4 (client-side)  --sort-no is not an integer >= 0, rejected locally before any request → pass a non-negative integer
+  exit 4 (client-side)  Both halves of the --active/--inactive pair were given → pass only one of --active / --inactive
+  exit 5 (client-side)  No such barColorId in the resolved owner's list (client-side lookup — used by get and every --dry-run preview) → check the id with \`ib palkki color list\`, or pass --owner
+  exit 5 (HTTP 404)  No such bar-coloring rule (live write only — the client-side lookup above catches this earlier for get/--dry-run) → verify the id with \`ib palkki color list\`
+  exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
+  exit 3 (HTTP 403)  Not a member of the owning company (or, on update, of the NEW --owner when re-homing) — sysadmin/developer bypass; owner 0 requires sysadmin/developer → check \`ib company\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --reason is accepted but has no effect — see \`ib palkki color create\`'s notes.
+
+SEE ALSO
+  ib palkki color get
+
+EXAMPLES
+  ib palkki color update 12 --style 'backgroundColor: "#4caf50",'
+  ib palkki color update 12 --title Testi --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib palkki create matches snapshot 1`] = `
 "USAGE
   ib palkki create [flags]
