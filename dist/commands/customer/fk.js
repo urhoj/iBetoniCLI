@@ -3,7 +3,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlag
 import { failWith, writeJson } from "../../output/json.js";
 import { addAsiakasTargetOption, addOwnerOption, parseId, resolveAsiakasTarget } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { registerFkSourcesLeaf, resolveFkSource, resolveOwner } from "../_shared/foreignKeys.js";
+import { dryRunOr, registerFkSourcesLeaf, resolveFkSource, resolveOwner } from "../_shared/foreignKeys.js";
 async function fetchCustomerFks(client, asiakasId, owner) {
     const rows = unwrapRows(await client.get(`/api/foreignKey/customer/${asiakasId}/${owner}`));
     return rows.map((r) => ({
@@ -31,7 +31,7 @@ export async function runCustomerFkSet(client, asiakasId, input, flags) {
         action: !row ? "inserted" : row.key === key ? "unchanged" : "updated",
     };
     if (flags.dryRun)
-        return { dryRun: true, would: result };
+        return dryRunOr(flags, result);
     if (result.action !== "unchanged") {
         // The handler answers HTTP 200 { success:false, error } on a SQL failure
         // (e.g. the (foreignKey, foreignAsiakasId) unique index) — surface it as exit 6.
@@ -58,7 +58,7 @@ export async function runCustomerFkRemove(client, asiakasId, idStr, opts, flags)
         sourceId: row.sourceId,
     };
     if (flags.dryRun)
-        return { dryRun: true, would: result };
+        return dryRunOr(flags, result);
     await client.delete(`/api/foreignKey/customer/${id}/${owner}`, { headers: writeFlagsToHeaders(flags) });
     return result;
 }

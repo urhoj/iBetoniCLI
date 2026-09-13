@@ -19,6 +19,7 @@ import { failWith, writeJson } from "../../output/json.js";
 import { addOwnerOption, parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import {
+  dryRunOr,
   fetchFkSources,
   normKey,
   pickFkSource,
@@ -26,6 +27,7 @@ import {
   resolveOwner,
   sourceNameOf,
   type FkSource,
+  type MaybeDryRun,
 } from "../_shared/foreignKeys.js";
 import { resolvePersonRef } from "../notification/index.js";
 
@@ -161,13 +163,12 @@ export async function runPersonFkSet(
   person: string,
   input: PersonFkSetInput,
   flags: WriteFlags
-): Promise<PersonFkSetResult | { dryRun: true; would: PersonFkSetResult }> {
+): Promise<MaybeDryRun<PersonFkSetResult>> {
   const owner = resolveOwner(client, input.owner);
   const personId = await resolvePersonRef(client, person);
   const [sources, existing] = await Promise.all([fetchFkSources(client, owner), fetchPersonFks(client, personId, owner)]);
   const source = pickFkSource(sources, input.source, owner);
-  const result = await applyPersonFkSet(client, personId, owner, source, existing, input, flags);
-  return flags.dryRun ? { dryRun: true, would: result } : result;
+  return dryRunOr(flags, await applyPersonFkSet(client, personId, owner, source, existing, input, flags));
 }
 
 export interface PersonFkRemoveResult {
@@ -186,7 +187,7 @@ export async function runPersonFkRemove(
   idStr: string,
   opts: { owner?: number },
   flags: WriteFlags
-): Promise<PersonFkRemoveResult | { dryRun: true; would: PersonFkRemoveResult }> {
+): Promise<MaybeDryRun<PersonFkRemoveResult>> {
   const id = parseId(idStr, "personForeignKeyId");
   const owner = resolveOwner(client, opts.owner);
   const personId = await resolvePersonRef(client, person);
@@ -204,7 +205,7 @@ export async function runPersonFkRemove(
     source: sourceNameOf(sources, Number(row.foreignKeySourceId)),
     sourceId: Number(row.foreignKeySourceId),
   };
-  if (flags.dryRun) return { dryRun: true, would: result };
+  if (flags.dryRun) return dryRunOr(flags, result);
   // foreignKeySourceId -1 + id is the proc's DELETE branch; the other fields ride along unused.
   await client.post(
     savePath(personId, owner),
@@ -235,9 +236,11 @@ export interface PersonFkImportResult {
 /**
  * Batch `set`: `[{ personId, key, source?, text?, disabled? }]`. Numeric
  * personId only (no batch name resolution — Betomik's placeholder drivers
- * share names). ONE GET per person, then its rows in input order; a key
- * inserted earlier in the same run is seen by later rows for that person, so
- * a duplicate within the file reads `unchanged` instead of doubling.
+ * share names). Duplicates WITHIN the file (same person + source + key) are
+ * settled before any write: an identical repeat reads `unchanged`, a repeat
+ * with a different text/disabled fails its own row — the backend cannot
+ * update a row this run just inserted (the proc returns no id). Then ONE GET
+ * per person and its rows in input order.
  */
 export async function runPersonFkImport(
   client: ApiClient,
@@ -267,7 +270,14 @@ export async function runPersonFkImport(
     }
     if (!source) return fail("no source: pass --source <name|id> or a per-row `source`");
     const list = byPerson.get(personId) ?? [];
-    list.push({ i, personId, key, source, text: typeof e.text === "string" ? e.text : undefined, disabled: e.disabled === true });
+    const row: Parsed = { i, personId, key, source, text: typeof e.text === "string" ? e.text : undefined, disabled: e.disabled === true };
+    const dup = list.find((p) => p.source === source && normKey(p.key) === normKey(key));
+    if (dup) {
+      if (dup.text === row.text && dup.disabled === row.disabled) results[i] = { personId, key, ok: true, action: "unchanged" };
+      else fail(`duplicate of row ${dup.i + 1} (same source + key) with a different text/disabled — keep one`);
+      return;
+    }
+    list.push(row);
     byPerson.set(personId, list);
   });
 
@@ -282,12 +292,6 @@ export async function runPersonFkImport(
     for (const r of rows) {
       try {
         const res = await applyPersonFkSet(client, personId, owner, r.source, existing, r, flags);
-        if (res.action === "inserted") {
-          existing.push({ personForeignKeyId: 0, foreignKey: r.key, foreignKeySourceId: r.source.foreignKeySourceId, foreignKeyText: r.text ?? null, isDisabled: r.disabled });
-        } else if (res.action === "updated") {
-          const row = existing.find((x) => x.personForeignKeyId === res.personForeignKeyId);
-          if (row) { row.isDisabled = r.disabled; if (r.text !== undefined) row.foreignKeyText = r.text; }
-        }
         results[r.i] = { personId, key: r.key, ok: true, action: res.action };
       } catch (err) {
         results[r.i] = { personId, key: r.key, ok: false, error: errorMessage(err) };

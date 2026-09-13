@@ -3,7 +3,7 @@
 // can spread each one right after its domain's segment; order within each list
 // is load-bearing (catalogue order drives sibling-suggestion ranking and the
 // parse-guard-hint snapshots).
-import type { CommandError, CommandFlag, CommandSpec } from "../../output/help.js";
+import type { CommandArg, CommandError, CommandFlag, CommandSpec } from "../../output/help.js";
 import { ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, OWNER_ASIAKAS_FLAG, PERSON_SCOPE_404_REMEDY, apiErr, intParseErr } from "./shared.js";
 
 const SOURCE_FLAG: CommandFlag = {
@@ -43,6 +43,11 @@ const idParseErr = (name: string): CommandError => ({
   meaning: `<${name}> is not a positive integer`,
   remedy: `pass a numeric ${name}`,
 });
+const PERSON_ARG: CommandArg = { name: "person", type: "string", description: "personId or a name resolved within your active company" };
+const NO_PERSON_ERR: CommandError = { origin: "client", exit: 5, match: "No person matches", meaning: "The <person> name resolved to nobody in your active company", remedy: PERSON_SCOPE_404_REMEDY };
+const VEHICLE_ID_ARG: CommandArg = { name: "vehicleId", type: "number", description: "vehicle id" };
+const VEHICLE_ID_ERR = idParseErr("vehicleId");
+const ASIAKAS_ID_ARG: CommandArg = { name: "asiakasId", type: "number", required: false, description: "customer id — or pass --asiakas" };
 const READ_403 = apiErr(403, "No read access to the owner tenant", "you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass");
 const EDIT_403 = apiErr(403, "No edit role on the owner tenant", "requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass");
 const OWNER_NOTE =
@@ -67,13 +72,13 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     description:
       "List a person's foreign keys (dbo.personForeignKeys) for one owner tenant — every external id / nickname per source, with the source NAME resolved. Many keys per source are allowed (one row per nickname).",
     permissions: ["membership of the owner tenant (read)"],
-    args: [{ name: "person", type: "string", description: "personId or a name resolved within your active company" }],
+    args: [PERSON_ARG],
     flags: [OWNER_ASIAKAS_FLAG],
     outputShape: "ListEnvelope<{ personForeignKeyId, key, source, sourceId, text, isDisabled, entryTime }> (`source` null when the id is not in the owner's source list)",
     errors: [
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
-      { origin: "client", exit: 5, match: "No person matches", meaning: "The <person> name resolved to nobody in your active company", remedy: PERSON_SCOPE_404_REMEDY },
+      NO_PERSON_ERR,
       READ_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -86,7 +91,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     description:
       "Add or update ONE foreign key on a person: --source + --key. Reads the existing rows first and matches on source + key (trimmed, case-insensitive — the same rule the Betomik driver matcher applies), so re-running never duplicates: a match with the same --text/--disabled is `unchanged` and sends nothing; a different label/flag updates that row by id; no match inserts. --dry-run resolves client-side (the route has no server dry-run) and returns the plan.",
     permissions: ["edit-tier company role on the owner tenant"],
-    args: [{ name: "person", type: "string", description: "personId or a name resolved within your active company" }],
+    args: [PERSON_ARG],
     flags: [
       SOURCE_FLAG,
       KEY_FLAG,
@@ -102,7 +107,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
-      { origin: "client", exit: 5, match: "No person matches", meaning: "The <person> name resolved to nobody in your active company", remedy: PERSON_SCOPE_404_REMEDY },
+      NO_PERSON_ERR,
       apiErr(400, "Invalid personId / ownerAsiakasId", "pass positive integers"),
       EDIT_403,
       apiErr(409, "The row to update vanished between read and write", "re-run — the next pass inserts"),
@@ -122,7 +127,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       "Delete ONE foreign key row by personForeignKeyId. The id must be on that person for that owner (checked client-side first — the backend delete is by id only), otherwise exit 5 and nothing is sent. --dry-run resolves client-side.",
     permissions: ["edit-tier company role on the owner tenant"],
     args: [
-      { name: "person", type: "string", description: "personId or a name resolved within your active company" },
+      PERSON_ARG,
       { name: "personForeignKeyId", type: "number", description: "row id from `ib person fk list`" },
     ],
     flags: [OWNER_ASIAKAS_FLAG],
@@ -134,7 +139,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       { origin: "client", exit: 5, match: "is not on person", meaning: "That personForeignKeyId is not among this person's rows for this owner", remedy: "`ib person fk list <person> --owner <id>` shows the ids" },
-      { origin: "client", exit: 5, match: "No person matches", meaning: "The <person> name resolved to nobody in your active company", remedy: PERSON_SCOPE_404_REMEDY },
+      NO_PERSON_ERR,
       EDIT_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -144,7 +149,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
   {
     command: "ib person fk import",
     description:
-      "Batch `set` from a JSON array — the one-pass load for a driver nickname list. Rows: { personId, key, source?, text?, disabled? }; `source` per row or the --source default; numeric personId only (no batch name resolution). ONE read per person, then each row planned like `set` (inserted / updated / unchanged), so a key repeated in the file lands once. Rows missing personId/key/source are reported failed without a request; a failing write fails only its own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read `failed`.",
+      "Batch `set` from a JSON array — the one-pass load for a driver nickname list. Rows: { personId, key, source?, text?, disabled? }; `source` per row or the --source default; numeric personId only (no batch name resolution). In-file duplicates (same person + source + key) are settled first: an identical repeat reads `unchanged`, one with a different text/disabled fails its own row. Then ONE read per person and each row planned like `set` (inserted / updated / unchanged). Rows missing personId/key/source are reported failed without a request; a failing write fails only its own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read `failed`.",
     permissions: ["edit-tier company role on the owner tenant"],
     args: [{ name: "file", type: "string", description: "JSON array file, or - for stdin (argv-safe for ä/ö)" }],
     flags: [
@@ -178,7 +183,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
     description:
       "List a customer's foreign keys (dbo.asiakasForeignKeys) for one owner tenant — the external id per source (e.g. an accounting-system customer number). One key per source.",
     permissions: ["membership of the owner tenant (read)"],
-    args: [{ name: "asiakasId", type: "number", required: false, description: "customer id — or pass --asiakas" }],
+    args: [ASIAKAS_ID_ARG],
     flags: [ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG],
     outputShape: "ListEnvelope<{ asiakasForeignKeyId, key, source, sourceId, entryTime }>",
     errors: [TARGET_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, READ_403, ...COMMON_AUTH_ERRORS],
@@ -191,7 +196,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
     description:
       "Set a customer's foreign key on one source (server upsert keyed by customer + source + owner). The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).",
     permissions: ["edit-tier company role on the owner tenant"],
-    args: [{ name: "asiakasId", type: "number", required: false, description: "customer id — or pass --asiakas" }],
+    args: [ASIAKAS_ID_ARG],
     flags: [ASIAKAS_TARGET_FLAG, SOURCE_FLAG, KEY_FLAG, OWNER_ASIAKAS_FLAG],
     writeFlags: true,
     dryRunKind: "client",
@@ -247,10 +252,10 @@ export const VEHICLE_FK_SPECS: CommandSpec[] = [
     command: "ib vehicle fk get",
     description: "Read a vehicle's foreign key on ONE source (dbo.vehicleForeignKeys — e.g. the GPS provider's unit id). One key per source; `key` null when unset.",
     permissions: ["read access to the vehicle's owner tenant"],
-    args: [{ name: "vehicleId", type: "number", description: "vehicle id" }],
+    args: [VEHICLE_ID_ARG],
     flags: [SOURCE_FLAG, OWNER_ASIAKAS_FLAG],
     outputShape: "{ vehicleId, source, sourceId, key: string|null }",
-    errors: [idParseErr("vehicleId"), OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, READ_403, ...COMMON_AUTH_ERRORS],
+    errors: [VEHICLE_ID_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, READ_403, ...COMMON_AUTH_ERRORS],
     notes: [VEHICLE_OWNER_NOTE],
     seeAlso: ["ib vehicle fk list", "ib vehicle fk set"],
     examples: ["ib vehicle fk get 135 --source mapon", "ib vehicle fk get 135 --source ecofleet --owner 27"],
@@ -259,10 +264,10 @@ export const VEHICLE_FK_SPECS: CommandSpec[] = [
     command: "ib vehicle fk list",
     description: "All foreign keys on a vehicle: the backend has no list route, so this reads the owner's source list and fetches each source in parallel, keeping the ones that are set.",
     permissions: ["read access to the vehicle's owner tenant"],
-    args: [{ name: "vehicleId", type: "number", description: "vehicle id" }],
+    args: [VEHICLE_ID_ARG],
     flags: [OWNER_ASIAKAS_FLAG],
     outputShape: "ListEnvelope<{ vehicleId, key, source, sourceId }>",
-    errors: [idParseErr("vehicleId"), OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, READ_403, ...COMMON_AUTH_ERRORS],
+    errors: [VEHICLE_ID_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, READ_403, ...COMMON_AUTH_ERRORS],
     notes: [VEHICLE_OWNER_NOTE, "One GET per source of the owner (~10); a source missing from `--owner`'s list is not probed."],
     seeAlso: ["ib vehicle fk get", "ib vehicle fk sources"],
     examples: ["ib vehicle fk list 135", "ib vehicle fk list 135 --owner 27"],
@@ -272,12 +277,12 @@ export const VEHICLE_FK_SPECS: CommandSpec[] = [
     description:
       "Set a vehicle's foreign key on one source (replaces the previous value — one key per source). An identical key is `unchanged` and sends nothing. --dry-run is SERVER-side: the route honours X-Dry-Run and echoes the would-be row without writing.",
     permissions: ["edit-tier role on the vehicle's owner tenant (vehicleHandler / asiakasAdmin)"],
-    args: [{ name: "vehicleId", type: "number", description: "vehicle id" }],
+    args: [VEHICLE_ID_ARG],
     flags: [SOURCE_FLAG, KEY_FLAG, OWNER_ASIAKAS_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ vehicleId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same }, server:{ dryRun:true, wouldUpdate } }",
-    errors: [idParseErr("vehicleId"), OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, EDIT_403, ...COMMON_AUTH_ERRORS],
+    errors: [VEHICLE_ID_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, EDIT_403, ...COMMON_AUTH_ERRORS],
     notes: [VEHICLE_OWNER_NOTE, ACTIONS_NOTE],
     seeAlso: ["ib vehicle fk get", "ib vehicle fk remove"],
     examples: ["ib vehicle fk set 135 --source mapon --key 12345 --reason 'GPS unit installed'", "ib vehicle fk set 135 --source mapon --key 12345 --dry-run"],
@@ -287,12 +292,12 @@ export const VEHICLE_FK_SPECS: CommandSpec[] = [
     description:
       "Clear a vehicle's foreign key on one source. Sends the backend's delete form (an empty key on `/foreignKeys/set`); when nothing is set the result is `unchanged` and nothing is sent. --dry-run is SERVER-side (echoes `wouldUpdate` with the empty key).",
     permissions: ["edit-tier role on the vehicle's owner tenant (vehicleHandler / asiakasAdmin)"],
-    args: [{ name: "vehicleId", type: "number", description: "vehicle id" }],
+    args: [VEHICLE_ID_ARG],
     flags: [SOURCE_FLAG, OWNER_ASIAKAS_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ vehicleId, source, sourceId, key (the value removed), action: removed|unchanged } · dry-run: { dryRun:true, would:{ …same }, server }",
-    errors: [idParseErr("vehicleId"), OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, EDIT_403, ...COMMON_AUTH_ERRORS],
+    errors: [VEHICLE_ID_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, SOURCE_UNKNOWN_ERR, EDIT_403, ...COMMON_AUTH_ERRORS],
     notes: [VEHICLE_OWNER_NOTE],
     seeAlso: ["ib vehicle fk get", "ib vehicle fk set"],
     examples: ["ib vehicle fk remove 135 --source mapon --reason 'unit moved'", "ib vehicle fk remove 135 --source mapon --dry-run"],

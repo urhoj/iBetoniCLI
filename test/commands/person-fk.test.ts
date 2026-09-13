@@ -150,6 +150,24 @@ describe("person fk import", () => {
     expect(out).toMatchObject({ ok: 4, failed: 2, inserted: 2, updated: 0, unchanged: 2 });
   });
 
+  test("an in-file repeat with a different text/disabled fails its own row, never a POST with a fake id (fb#1687)", async () => {
+    const c = client([]);
+    const out = await runPersonFkImport(
+      c,
+      [{ personId: 1, key: "a" }, { personId: 1, key: "A ", disabled: true }, { personId: 1, key: "a", text: "x" }],
+      { source: "42", owner: 27 },
+      {}
+    );
+    expect(c.post).toHaveBeenCalledTimes(1);
+    expect(c.post.mock.calls[0][1]).toMatchObject({ personForeignKeyId: null, foreignKey: "a" });
+    expect(out.results.map((r) => [r.ok, r.action ?? r.error])).toEqual([
+      [true, "inserted"],
+      [false, expect.stringContaining("duplicate of row 1")],
+      [false, expect.stringContaining("duplicate of row 1")],
+    ]);
+    expect(out).toMatchObject({ ok: 1, failed: 2, inserted: 1 });
+  });
+
   test("dry-run plans every row and never POSTs", async () => {
     const c = client([]);
     const out = await runPersonFkImport(c, [{ personId: 1, key: "a" }], { source: "42", owner: 27 }, { dryRun: true });

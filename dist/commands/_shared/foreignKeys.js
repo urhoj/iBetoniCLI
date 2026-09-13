@@ -3,11 +3,11 @@ import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { failWith } from "../../output/json.js";
 import { addOwnerOption } from "../../targets.js";
 import { jsonAction } from "./action.js";
-export const OWNER_HINT = "pass --owner <id>, or run `ib auth switch`";
 /** `--owner` when given, else the active company from the token (exit 4 when neither resolves). */
 export function resolveOwner(client, owner) {
-    return owner ?? ownerAsiakasIdFromToken(client, OWNER_HINT);
+    return owner ?? ownerAsiakasIdFromToken(client);
 }
+export const dryRunOr = (flags, result) => flags.dryRun ? { dryRun: true, would: result } : result;
 /** trim + lowercase — the same rule the Betomik driver matcher applies to a nickname. */
 export const normKey = (s) => String(s ?? "").trim().toLowerCase();
 export async function fetchFkSources(client, owner) {

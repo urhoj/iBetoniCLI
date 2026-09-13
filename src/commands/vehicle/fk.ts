@@ -15,7 +15,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "..
 import { writeJson } from "../../output/json.js";
 import { addOwnerOption, parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { fetchFkSources, pickFkSource, registerFkSourcesLeaf, resolveOwner, type FkSource } from "../_shared/foreignKeys.js";
+import { fetchFkSources, registerFkSourcesLeaf, resolveFkSource, resolveOwner } from "../_shared/foreignKeys.js";
 
 export interface VehicleFkRow {
   vehicleId: number;
@@ -30,16 +30,12 @@ async function fetchVehicleFk(client: ApiClient, vehicleId: number, sourceId: nu
   return key == null || key === "" ? null : String(key);
 }
 
-async function sourceFor(client: ApiClient, owner: number, ref: string): Promise<FkSource> {
-  return pickFkSource(await fetchFkSources(client, owner), ref, owner);
-}
-
 export async function runVehicleFkGet(
   client: ApiClient,
   vehicleId: number,
   opts: { source: string; owner?: number }
 ): Promise<{ vehicleId: number; source: string; sourceId: number; key: string | null }> {
-  const source = await sourceFor(client, resolveOwner(client, opts.owner), opts.source);
+  const source = await resolveFkSource(client, resolveOwner(client, opts.owner), opts.source);
   const key = await fetchVehicleFk(client, vehicleId, source.foreignKeySourceId);
   return { vehicleId, source: source.name, sourceId: source.foreignKeySourceId, key };
 }
@@ -61,49 +57,55 @@ export interface VehicleFkWriteResult {
   action: "inserted" | "updated" | "unchanged" | "removed";
 }
 
-const SET_PATH = "/api/vehicle/foreignKeys/set";
+type VehicleFkWrite = VehicleFkWriteResult | { dryRun: true; would: VehicleFkWriteResult; server: unknown };
 
-export async function runVehicleFkSet(
+/**
+ * One body for set (nextKey = the new value) and remove (nextKey = "", the
+ * backend's delete form). Reads the current key to name the action; `unchanged`
+ * sends nothing. Otherwise POSTs — the route honours X-Dry-Run and echoes the
+ * would-be row, returned under `server`.
+ */
+async function writeVehicleFk(
+  client: ApiClient,
+  vehicleId: number,
+  input: { source: string; owner?: number },
+  nextKey: string,
+  flags: WriteFlags
+): Promise<VehicleFkWrite> {
+  const source = await resolveFkSource(client, resolveOwner(client, input.owner), input.source);
+  const current = await fetchVehicleFk(client, vehicleId, source.foreignKeySourceId);
+  const removing = nextKey === "";
+  const result: VehicleFkWriteResult = {
+    vehicleId,
+    source: source.name,
+    sourceId: source.foreignKeySourceId,
+    key: removing ? current : nextKey,
+    action: removing
+      ? (current === null ? "unchanged" : "removed")
+      : (current === null ? "inserted" : current === nextKey ? "unchanged" : "updated"),
+  };
+  if (result.action === "unchanged") return flags.dryRun ? { dryRun: true, would: result, server: null } : result;
+  const server = await client.post(
+    "/api/vehicle/foreignKeys/set",
+    { vehicleId, foreignKeySourceId: source.foreignKeySourceId, foreignKey: nextKey },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+  return flags.dryRun ? { dryRun: true, would: result, server } : result;
+}
+
+export const runVehicleFkSet = (
   client: ApiClient,
   vehicleId: number,
   input: { source: string; key: string; owner?: number },
   flags: WriteFlags
-): Promise<VehicleFkWriteResult | { dryRun: true; would: VehicleFkWriteResult; server: unknown }> {
-  const source = await sourceFor(client, resolveOwner(client, input.owner), input.source);
-  const current = await fetchVehicleFk(client, vehicleId, source.foreignKeySourceId);
-  const key = input.key.trim();
-  const result: VehicleFkWriteResult = {
-    vehicleId,
-    source: source.name,
-    sourceId: source.foreignKeySourceId,
-    key,
-    action: current === null ? "inserted" : current === key ? "unchanged" : "updated",
-  };
-  if (result.action === "unchanged") return result;
-  // Server-side dry-run: the handler echoes { dryRun:true, wouldUpdate } and skips the write.
-  const server = await client.post(SET_PATH, { vehicleId, foreignKeySourceId: source.foreignKeySourceId, foreignKey: key }, { headers: writeFlagsToHeaders(flags) });
-  return flags.dryRun ? { dryRun: true, would: result, server } : result;
-}
+): Promise<VehicleFkWrite> => writeVehicleFk(client, vehicleId, input, input.key.trim(), flags);
 
-export async function runVehicleFkRemove(
+export const runVehicleFkRemove = (
   client: ApiClient,
   vehicleId: number,
   input: { source: string; owner?: number },
   flags: WriteFlags
-): Promise<VehicleFkWriteResult | { dryRun: true; would: VehicleFkWriteResult; server: unknown }> {
-  const source = await sourceFor(client, resolveOwner(client, input.owner), input.source);
-  const current = await fetchVehicleFk(client, vehicleId, source.foreignKeySourceId);
-  const result: VehicleFkWriteResult = {
-    vehicleId,
-    source: source.name,
-    sourceId: source.foreignKeySourceId,
-    key: current,
-    action: current === null ? "unchanged" : "removed",
-  };
-  if (result.action === "unchanged") return result;
-  const server = await client.post(SET_PATH, { vehicleId, foreignKeySourceId: source.foreignKeySourceId, foreignKey: "" }, { headers: writeFlagsToHeaders(flags) });
-  return flags.dryRun ? { dryRun: true, would: result, server } : result;
-}
+): Promise<VehicleFkWrite> => writeVehicleFk(client, vehicleId, input, "", flags);
 
 export function registerVehicleFkCommands(vehicle: Command, getClient: () => Promise<ApiClient>): void {
   const fk = vehicle.command("fk").description("Manage a vehicle's foreign keys (external ids per source, e.g. GPS unit ids)");

@@ -9,6 +9,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
+import type { WriteFlags } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { failWith } from "../../output/json.js";
 import { addOwnerOption } from "../../targets.js";
@@ -21,12 +22,15 @@ export interface FkSource {
   ownerAsiakasId: number | null;
 }
 
-export const OWNER_HINT = "pass --owner <id>, or run `ib auth switch`";
-
 /** `--owner` when given, else the active company from the token (exit 4 when neither resolves). */
 export function resolveOwner(client: ApiClient, owner?: number): number {
-  return owner ?? ownerAsiakasIdFromToken(client, OWNER_HINT);
+  return owner ?? ownerAsiakasIdFromToken(client);
 }
+
+/** Client-side dry-run envelope shared by the person/customer writes: the plan, never sent. */
+export type MaybeDryRun<T> = T | { dryRun: true; would: T };
+export const dryRunOr = <T>(flags: WriteFlags, result: T): MaybeDryRun<T> =>
+  flags.dryRun ? { dryRun: true, would: result } : result;
 
 /** trim + lowercase — the same rule the Betomik driver matcher applies to a nickname. */
 export const normKey = (s: unknown): string => String(s ?? "").trim().toLowerCase();

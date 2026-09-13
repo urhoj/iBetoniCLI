@@ -11657,7 +11657,7 @@ exports[`Help snapshots — contract stability > help for ib person fk import ma
   ib person fk import <file> [flags]
 
 DESCRIPTION
-  Batch \`set\` from a JSON array — the one-pass load for a driver nickname list. Rows: { personId, key, source?, text?, disabled? }; \`source\` per row or the --source default; numeric personId only (no batch name resolution). ONE read per person, then each row planned like \`set\` (inserted / updated / unchanged), so a key repeated in the file lands once. Rows missing personId/key/source are reported failed without a request; a failing write fails only its own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read \`failed\`.
+  Batch \`set\` from a JSON array — the one-pass load for a driver nickname list. Rows: { personId, key, source?, text?, disabled? }; \`source\` per row or the --source default; numeric personId only (no batch name resolution). In-file duplicates (same person + source + key) are settled first: an identical repeat reads \`unchanged\`, one with a different text/disabled fails its own row. Then ONE read per person and each row planned like \`set\` (inserted / updated / unchanged). Rows missing personId/key/source are reported failed without a request; a failing write fails only its own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read \`failed\`.
   Permissions: requires edit-tier company role on the owner tenant.
 
 ARGUMENTS

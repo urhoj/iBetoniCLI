@@ -15,7 +15,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "..
 import { failWith, writeJson } from "../../output/json.js";
 import { addAsiakasTargetOption, addOwnerOption, parseId, resolveAsiakasTarget } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { registerFkSourcesLeaf, resolveFkSource, resolveOwner } from "../_shared/foreignKeys.js";
+import { dryRunOr, registerFkSourcesLeaf, resolveFkSource, resolveOwner, type MaybeDryRun } from "../_shared/foreignKeys.js";
 
 export interface CustomerFkRow {
   asiakasForeignKeyId: number;
@@ -54,7 +54,7 @@ export async function runCustomerFkSet(
   asiakasId: number,
   input: { source: string; key: string; owner?: number },
   flags: WriteFlags
-): Promise<CustomerFkSetResult | { dryRun: true; would: CustomerFkSetResult }> {
+): Promise<MaybeDryRun<CustomerFkSetResult>> {
   const owner = resolveOwner(client, input.owner);
   const [source, existing] = await Promise.all([resolveFkSource(client, owner, input.source), fetchCustomerFks(client, asiakasId, owner)]);
   const row = existing.find((r) => r.sourceId === source.foreignKeySourceId);
@@ -67,7 +67,7 @@ export async function runCustomerFkSet(
     key,
     action: !row ? "inserted" : row.key === key ? "unchanged" : "updated",
   };
-  if (flags.dryRun) return { dryRun: true, would: result };
+  if (flags.dryRun) return dryRunOr(flags, result);
   if (result.action !== "unchanged") {
     // The handler answers HTTP 200 { success:false, error } on a SQL failure
     // (e.g. the (foreignKey, foreignAsiakasId) unique index) — surface it as exit 6.
@@ -97,7 +97,7 @@ export async function runCustomerFkRemove(
   idStr: string,
   opts: { owner?: number },
   flags: WriteFlags
-): Promise<CustomerFkRemoveResult | { dryRun: true; would: CustomerFkRemoveResult }> {
+): Promise<MaybeDryRun<CustomerFkRemoveResult>> {
   const id = parseId(idStr, "asiakasForeignKeyId");
   const owner = resolveOwner(client, opts.owner);
   const row = (await fetchCustomerFks(client, asiakasId, owner)).find((r) => r.asiakasForeignKeyId === id);
@@ -113,7 +113,7 @@ export async function runCustomerFkRemove(
     source: row.source,
     sourceId: row.sourceId,
   };
-  if (flags.dryRun) return { dryRun: true, would: result };
+  if (flags.dryRun) return dryRunOr(flags, result);
   await client.delete(`/api/foreignKey/customer/${id}/${owner}`, { headers: writeFlagsToHeaders(flags) });
   return result;
 }

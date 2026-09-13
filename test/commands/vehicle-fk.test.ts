@@ -56,6 +56,14 @@ describe("vehicle fk", () => {
     const out = await runVehicleFkSet(c, 135, { source: "mapon", key: "x", owner: 27 }, { dryRun: true });
     expect(c.post).toHaveBeenCalledWith("/api/vehicle/foreignKeys/set", expect.anything(), { headers: { "X-Dry-Run": "1" } });
     expect(out).toMatchObject({ dryRun: true, would: { action: "inserted", key: "x" } });
+    // unchanged + dry-run: still the envelope (nothing to send, so no server echo)
+    const c2 = client({ 6: "x" });
+    expect(await runVehicleFkSet(c2, 135, { source: "mapon", key: "x", owner: 27 }, { dryRun: true })).toEqual({
+      dryRun: true,
+      would: expect.objectContaining({ action: "unchanged" }),
+      server: null,
+    });
+    expect(c2.post).not.toHaveBeenCalled();
   });
 
   test("remove sends the empty-key form the backend treats as delete; nothing there → unchanged, no POST", async () => {
