@@ -72,7 +72,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // previous bump's 2,000 B of unearned headroom is handed back at the same
 // time, so the limit TIGHTENS. Headroom kept thin (~346 B) per this file's
 // convention: growth stays a decision, not a drift.
-const DUMP_LIMIT_BYTES = 750_100;
+// 2026-09-13 (fb#1683): +14 foreign-key leaves — `ib person|customer|vehicle
+// fk sources/list/set/remove` (+ `person fk import`) over the pre-existing
+// backend routes; the Betomik driver-nickname load (T5) had no `ib` path at
+// all. 771,734 B measured; limit = that + ~350 B, same thin headroom.
+const DUMP_LIMIT_BYTES = 772_100;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

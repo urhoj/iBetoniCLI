@@ -18,6 +18,7 @@ import { registerPersonLinkCommands } from "../_shared/personLink.js";
 import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
+import { registerCustomerFkCommands } from "./fk.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
 export { runCustomerPrhById, runCustomerPrhSearch };
 /**
@@ -707,6 +708,7 @@ export function runCustomerMerge(client, opts, flags) {
  */
 export function registerCustomerCommands(parent, getClient) {
     const c = parent.command("customer").description("Customer commands");
+    registerCustomerFkCommands(c, getClient);
     c.command("list")
         .option("--limit <n>", "", cappedInt(500))
         .option("--cursor <c>")

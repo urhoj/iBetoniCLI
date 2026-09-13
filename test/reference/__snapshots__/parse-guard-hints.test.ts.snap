@@ -361,6 +361,22 @@ ib customer duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib customer fk list --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib customer fk remove --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib customer fk set --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib customer fk sources --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib customer list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 with NO cursor pagination (nextCursor is always null, even when truncated) — narrow with --ids/--since/--sort instead of paging
@@ -1149,6 +1165,26 @@ ib person duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib person fk import --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk list --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk remove --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk set --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk sources --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib person get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -1436,6 +1472,26 @@ ib vehicle driver assign --person <pid>
 ib vehicle driver default set --person <pid>
   ! --person must be an integer >= 1
   > pass a positive personId
+
+ib vehicle fk get --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib vehicle fk list --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib vehicle fk remove --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib vehicle fk set --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib vehicle fk sources --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
 ib vehicle get --asiakas <id>
   ! --asiakas must be an integer >= 1

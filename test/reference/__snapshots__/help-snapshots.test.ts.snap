@@ -1387,6 +1387,180 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer fk list matches snapshot 1`] = `
+"USAGE
+  ib customer fk list [<asiakasId>] [flags]
+
+DESCRIPTION
+  List a customer's foreign keys (dbo.asiakasForeignKeys) for one owner tenant — the external id per source (e.g. an accounting-system customer number). One key per source.
+  Permissions: requires membership of the owner tenant (read).
+
+ARGUMENTS
+  <asiakasId> NUMBER    customer id — or pass --asiakas (optional)
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasForeignKeyId, key, source, sourceId, entryTime }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --asiakas <id>
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+
+SEE ALSO
+  ib customer fk set, ib customer fk sources
+
+EXAMPLES
+  ib customer fk list 1234
+  ib customer fk list --asiakas 1234 --owner 8
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer fk remove matches snapshot 1`] = `
+"USAGE
+  ib customer fk remove <asiakasId> <asiakasForeignKeyId> [flags]
+
+DESCRIPTION
+  Delete ONE customer foreign-key row by asiakasForeignKeyId. The id must be on that customer for that owner (checked client-side; the backend delete is also owner-scoped), otherwise exit 5 and nothing is sent. --dry-run resolves client-side.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <asiakasId> NUMBER    customer id (required)
+  <asiakasForeignKeyId> NUMBER    row id from \`ib customer fk list\` (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { action:'removed', asiakasId, ownerAsiakasId, asiakasForeignKeyId, key, source, sourceId } · dry-run: { dryRun:true, would:{ …same } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <asiakasId> is not a positive integer → pass a numeric asiakasId
+  exit 4 (client-side)  <asiakasForeignKeyId> is not a positive integer → pass a numeric asiakasForeignKeyId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 5 (client-side)  That asiakasForeignKeyId is not among this customer's rows for this owner → \`ib customer fk list <asiakasId> --owner <id>\` shows the ids
+  exit 5 (HTTP 404)  Row not found for this owner (deleted meanwhile) → re-list
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib customer fk list
+
+EXAMPLES
+  ib customer fk remove 1234 55 --reason 'wrong number'
+  ib customer fk remove 1234 55 --owner 8 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer fk set matches snapshot 1`] = `
+"USAGE
+  ib customer fk set [<asiakasId>] --source <source> --key <key> [flags]
+
+DESCRIPTION
+  Set a customer's foreign key on one source (server upsert keyed by customer + source + owner). The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <asiakasId> NUMBER    customer id — or pass --asiakas (optional)
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --key STRING    The foreign key value (external id / nickname); trimmed (required)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --asiakas <id>
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 6 (client-side)  The backend answered 200 with { success:false } — usually the UNIQUE (foreignKey, owner) index: that key already belongs to another customer of this owner → find the holder with \`ib customer fk list <other> --owner <id>\` and remove it, or use a different key
+  exit 4 (HTTP 400)  Missing asiakasId / source / key / owner → pass all four
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - Write results carry \`action\`: inserted | updated | unchanged (no request sent) | removed.
+  - foreignKey is nvarchar(50).
+
+SEE ALSO
+  ib customer fk list, ib customer fk remove
+
+EXAMPLES
+  ib customer fk set 1234 --source fennoa --key F-1001 --reason 'accounting link'
+  ib customer fk set 1234 --source fennoa --key F-1001 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer fk sources matches snapshot 1`] = `
+"USAGE
+  ib customer fk sources [flags]
+
+DESCRIPTION
+  List the foreign-key SOURCES (dbo.foreignKeySources) usable on --source for this owner: the tenant's own rows plus the global ones. Same list for person/customer/vehicle keys.
+  Permissions: requires membership of the owner tenant.
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ foreignKeySourceId, name, column, ownerAsiakasId }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer fk sources
+  ib customer fk sources --owner 27
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer get matches snapshot 1`] = `
 "USAGE
   ib customer get <asiakasId> [flags]
@@ -11478,6 +11652,229 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person fk import matches snapshot 1`] = `
+"USAGE
+  ib person fk import <file> [flags]
+
+DESCRIPTION
+  Batch \`set\` from a JSON array — the one-pass load for a driver nickname list. Rows: { personId, key, source?, text?, disabled? }; \`source\` per row or the --source default; numeric personId only (no batch name resolution). ONE read per person, then each row planned like \`set\` (inserted / updated / unchanged), so a key repeated in the file lands once. Rows missing personId/key/source are reported failed without a request; a failing write fails only its own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read \`failed\`.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <file> STRING    JSON array file, or - for stdin (argv-safe for ä/ö) (required)
+
+FLAGS
+  --source STRING    Default source (name or id) for rows without their own \`source\`
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { dryRun?, results:[{ personId, key, ok, action?, error? }] (input order), ok, failed, inserted, updated, unchanged }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  File is not valid JSON, or its root is not an array → pass a JSON array of { personId, key, source?, text?, disabled? } (or - for stdin)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - Per-row source errors are reported in \`results\`, not thrown; an unknown --source DEFAULT exits 4 before any request.
+
+SEE ALSO
+  ib person fk set, ib dev betomik-orderbook sync
+
+EXAMPLES
+  ib person fk import nicknames.json --source betomik-orderbook --owner 27 --reason 'T5 list'
+  echo '[{"personId":6354,"key":"Tomppa"},{"personId":6354,"key":"Toomas"}]' | ib person fk import - --source betomik-orderbook --owner 27 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person fk list matches snapshot 1`] = `
+"USAGE
+  ib person fk list <person> [flags]
+
+DESCRIPTION
+  List a person's foreign keys (dbo.personForeignKeys) for one owner tenant — every external id / nickname per source, with the source NAME resolved. Many keys per source are allowed (one row per nickname).
+  Permissions: requires membership of the owner tenant (read).
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personForeignKeyId, key, source, sourceId, text, isDisabled, entryTime }> (\`source\` null when the id is not in the owner's source list)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 5 (client-side)  The <person> name resolved to nobody in your active company → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+
+SEE ALSO
+  ib person fk set, ib person fk sources
+
+EXAMPLES
+  ib person fk list 6354 --owner 27
+  ib person fk list 'Matti Virtanen'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person fk remove matches snapshot 1`] = `
+"USAGE
+  ib person fk remove <person> <personForeignKeyId> [flags]
+
+DESCRIPTION
+  Delete ONE foreign key row by personForeignKeyId. The id must be on that person for that owner (checked client-side first — the backend delete is by id only), otherwise exit 5 and nothing is sent. --dry-run resolves client-side.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+  <personForeignKeyId> NUMBER    row id from \`ib person fk list\` (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { action:'removed', personId, ownerAsiakasId, personForeignKeyId, key, source, sourceId } · dry-run: { dryRun:true, would:{ …same } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <personForeignKeyId> is not a positive integer → pass a numeric personForeignKeyId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 5 (client-side)  That personForeignKeyId is not among this person's rows for this owner → \`ib person fk list <person> --owner <id>\` shows the ids
+  exit 5 (client-side)  The <person> name resolved to nobody in your active company → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person fk list
+
+EXAMPLES
+  ib person fk remove 6354 900 --owner 27 --reason 'typo'
+  ib person fk remove 6354 900 --owner 27 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person fk set matches snapshot 1`] = `
+"USAGE
+  ib person fk set <person> --source <source> --key <key> [flags]
+
+DESCRIPTION
+  Add or update ONE foreign key on a person: --source + --key. Reads the existing rows first and matches on source + key (trimmed, case-insensitive — the same rule the Betomik driver matcher applies), so re-running never duplicates: a match with the same --text/--disabled is \`unchanged\` and sends nothing; a different label/flag updates that row by id; no match inserts. --dry-run resolves client-side (the route has no server dry-run) and returns the plan.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+
+FLAGS
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --key STRING    The foreign key value (external id / nickname); trimmed (required)
+  --text STRING    Free label stored in foreignKeyText (omit = keep the stored one on update)
+  --disabled    Store the row disabled (ignored by matchers); omit = enabled
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { personId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged, personForeignKeyId } (id null after an insert — the proc returns none) · dry-run: { dryRun:true, would:{ …same } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 5 (client-side)  The <person> name resolved to nobody in your active company → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 4 (HTTP 400)  Invalid personId / ownerAsiakasId → pass positive integers
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 4 (HTTP 409)  The row to update vanished between read and write → re-run — the next pass inserts
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - Write results carry \`action\`: inserted | updated | unchanged (no request sent) | removed.
+  - Betomik nicknames: matching is case-insensitive and only \`isDisabled:false\` rows count, so \`--disabled\` parks a nickname without deleting it.
+
+SEE ALSO
+  ib person fk import, ib person fk list, ib person fk remove
+
+EXAMPLES
+  ib person fk set 6354 --source betomik-orderbook --key Tomppa --owner 27 --reason 'T5 nicknames'
+  ib person fk set 6354 --source betomik-orderbook --key Tomppa --owner 27 --dry-run
+  ib person fk set 6354 --source 42 --key Tomppa --text 'sheet spelling' --disabled --owner 27
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person fk sources matches snapshot 1`] = `
+"USAGE
+  ib person fk sources [flags]
+
+DESCRIPTION
+  List the foreign-key SOURCES (dbo.foreignKeySources) usable on --source for this owner: the tenant's own rows plus the global ones. Same list for person/customer/vehicle keys.
+  Permissions: requires membership of the owner tenant.
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ foreignKeySourceId, name, column, ownerAsiakasId }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person fk sources
+  ib person fk sources --owner 27
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
 "USAGE
   ib person get <personId> [flags]
@@ -14158,6 +14555,222 @@ EXAMPLES
   ib vehicle driver who 53 today
   ib vehicle driver who 53 2026-06-10
   ib vehicle driver who 53 --date 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle fk get matches snapshot 1`] = `
+"USAGE
+  ib vehicle fk get <vehicleId> --source <source> [flags]
+
+DESCRIPTION
+  Read a vehicle's foreign key on ONE source (dbo.vehicleForeignKeys — e.g. the GPS provider's unit id). One key per source; \`key\` null when unset.
+  Permissions: requires read access to the vehicle's owner tenant.
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicle id (required)
+
+FLAGS
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { vehicleId, source, sourceId, key: string|null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <vehicleId> is not a positive integer → pass a numeric vehicleId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Vehicle keys carry no owner column — the tenant gate is the VEHICLE's owner, server-side. \`--owner\` only picks whose source list \`--source\` resolves against (default: the active company).
+
+SEE ALSO
+  ib vehicle fk list, ib vehicle fk set
+
+EXAMPLES
+  ib vehicle fk get 135 --source mapon
+  ib vehicle fk get 135 --source ecofleet --owner 27
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle fk list matches snapshot 1`] = `
+"USAGE
+  ib vehicle fk list <vehicleId> [flags]
+
+DESCRIPTION
+  All foreign keys on a vehicle: the backend has no list route, so this reads the owner's source list and fetches each source in parallel, keeping the ones that are set.
+  Permissions: requires read access to the vehicle's owner tenant.
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicle id (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, key, source, sourceId }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <vehicleId> is not a positive integer → pass a numeric vehicleId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Vehicle keys carry no owner column — the tenant gate is the VEHICLE's owner, server-side. \`--owner\` only picks whose source list \`--source\` resolves against (default: the active company).
+  - One GET per source of the owner (~10); a source missing from \`--owner\`'s list is not probed.
+
+SEE ALSO
+  ib vehicle fk get, ib vehicle fk sources
+
+EXAMPLES
+  ib vehicle fk list 135
+  ib vehicle fk list 135 --owner 27
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle fk remove matches snapshot 1`] = `
+"USAGE
+  ib vehicle fk remove <vehicleId> --source <source> [flags]
+
+DESCRIPTION
+  Clear a vehicle's foreign key on one source. Sends the backend's delete form (an empty key on \`/foreignKeys/set\`); when nothing is set the result is \`unchanged\` and nothing is sent. --dry-run is SERVER-side (echoes \`wouldUpdate\` with the empty key).
+  Permissions: requires edit-tier role on the vehicle's owner tenant (vehicleHandler / asiakasAdmin).
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicle id (required)
+
+FLAGS
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { vehicleId, source, sourceId, key (the value removed), action: removed|unchanged } · dry-run: { dryRun:true, would:{ …same }, server }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <vehicleId> is not a positive integer → pass a numeric vehicleId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Vehicle keys carry no owner column — the tenant gate is the VEHICLE's owner, server-side. \`--owner\` only picks whose source list \`--source\` resolves against (default: the active company).
+
+SEE ALSO
+  ib vehicle fk get, ib vehicle fk set
+
+EXAMPLES
+  ib vehicle fk remove 135 --source mapon --reason 'unit moved'
+  ib vehicle fk remove 135 --source mapon --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle fk set matches snapshot 1`] = `
+"USAGE
+  ib vehicle fk set <vehicleId> --source <source> --key <key> [flags]
+
+DESCRIPTION
+  Set a vehicle's foreign key on one source (replaces the previous value — one key per source). An identical key is \`unchanged\` and sends nothing. --dry-run is SERVER-side: the route honours X-Dry-Run and echoes the would-be row without writing.
+  Permissions: requires edit-tier role on the vehicle's owner tenant (vehicleHandler / asiakasAdmin).
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicle id (required)
+
+FLAGS
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --key STRING    The foreign key value (external id / nickname); trimmed (required)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { vehicleId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same }, server:{ dryRun:true, wouldUpdate } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  <vehicleId> is not a positive integer → pass a numeric vehicleId
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Vehicle keys carry no owner column — the tenant gate is the VEHICLE's owner, server-side. \`--owner\` only picks whose source list \`--source\` resolves against (default: the active company).
+  - Write results carry \`action\`: inserted | updated | unchanged (no request sent) | removed.
+
+SEE ALSO
+  ib vehicle fk get, ib vehicle fk remove
+
+EXAMPLES
+  ib vehicle fk set 135 --source mapon --key 12345 --reason 'GPS unit installed'
+  ib vehicle fk set 135 --source mapon --key 12345 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle fk sources matches snapshot 1`] = `
+"USAGE
+  ib vehicle fk sources [flags]
+
+DESCRIPTION
+  List the foreign-key SOURCES (dbo.foreignKeySources) usable on --source for this owner: the tenant's own rows plus the global ones. Same list for person/customer/vehicle keys.
+  Permissions: requires membership of the owner tenant.
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ foreignKeySourceId, name, column, ownerAsiakasId }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle fk sources
+  ib vehicle fk sources --owner 27
 "
 `;
 

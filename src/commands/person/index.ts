@@ -43,6 +43,7 @@ import { CliError } from "../../api/errors.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
+import { registerPersonFkCommands } from "./fk.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -679,6 +680,7 @@ export function registerPersonCommands(
   const p = parent.command("person").description("Person commands");
   registerPersonDayCommands(p, getClient);
   registerPersonEmailCommands(p, getClient);
+  registerPersonFkCommands(p, getClient);
   registerPersonAbsencesCommand(p, getClient);
   registerPersonActivityCommand(p, getClient);
 

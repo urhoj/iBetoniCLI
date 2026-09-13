@@ -34,6 +34,7 @@ import { PERSON_SPECS } from "./specs/person.js";
 import { VEHICLE_SPECS } from "./specs/vehicle.js";
 import { NOTIFICATION_SPECS } from "./specs/notification.js";
 import { PERSON_EMAIL_SPECS } from "./specs/person-email.js";
+import { CUSTOMER_FK_SPECS, PERSON_FK_SPECS, VEHICLE_FK_SPECS } from "./specs/foreign-keys.js";
 import { SIJAINTI_SPECS } from "./specs/sijainti.js";
 import { OHJE_SPECS } from "./specs/ohje.js";
 import { LEGAL_SPECS } from "./specs/legal.js";
@@ -67,11 +68,14 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...COMPANY_SPECS,
   ...KEIKKA_SPECS,
   ...CUSTOMER_SPECS,
+  ...CUSTOMER_FK_SPECS,
   ...WORKSITE_SPECS,
   ...PERSON_SPECS,
   ...VEHICLE_SPECS,
+  ...VEHICLE_FK_SPECS,
   ...NOTIFICATION_SPECS,
   ...PERSON_EMAIL_SPECS,
+  ...PERSON_FK_SPECS,
   ...SIJAINTI_SPECS,
   ...OHJE_SPECS,
   ...LEGAL_SPECS,

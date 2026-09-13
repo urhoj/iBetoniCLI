@@ -33,6 +33,7 @@ import {
 } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
+import { registerCustomerFkCommands } from "./fk.js";
 import {
   projectHistoryRow,
   type ChangeHistoryItem,
@@ -1066,6 +1067,7 @@ export function registerCustomerCommands(
   getClient: () => Promise<ApiClient>
 ): void {
   const c = parent.command("customer").description("Customer commands");
+  registerCustomerFkCommands(c, getClient);
 
   c.command("list")
     .option("--limit <n>", "", cappedInt(500))

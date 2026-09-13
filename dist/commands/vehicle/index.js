@@ -8,6 +8,7 @@ import { registerVehicleDriverCommands } from "./driver.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
 import { registerLogAlias } from "../log/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
+import { registerVehicleFkCommands } from "./fk.js";
 import { qs } from "../../api/query.js";
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -405,6 +406,7 @@ export function registerVehicleCommands(parent, getClient) {
     // in domains.ts maps the token for selective registration; this makes
     // Commander dispatch it.
     const v = parent.command("vehicle").aliases(["vehicles"]).description("Vehicle commands");
+    registerVehicleFkCommands(v, getClient);
     v.command("list")
         .option("--limit <n>", "", cappedInt(500))
         .option("--cursor <c>")
