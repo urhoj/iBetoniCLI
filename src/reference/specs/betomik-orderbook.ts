@@ -1,6 +1,17 @@
 import type { CommandSpec } from "../../output/help.js";
 import { FROM_JSON_BODY_FLAG } from "./shared.js";
 
+/**
+ * The `canView()` gate in puminet5api routes/betomikOrderbookRoutes.js —
+ * BROADER than the isSystemAdminOrDeveloper-only gate the import/sync/AI half of
+ * this family uses, so it has to be stated explicitly. The read commands carried
+ * `auth:"any"`, which renders "requires login (any authenticated user)" directly
+ * above a 403 row saying the opposite, and `tier:"developer"` hid them from the
+ * very Betomik admins that 403 remedy invites (fb#1664).
+ */
+const BETOMIK_VIEW_PERMISSION =
+  "isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced";
+
 export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
   {
     command: "ib dev betomik-orderbook import",
@@ -32,7 +43,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook runs",
     description: "List Betomik order-book import runs — sheet label, ISO year/week, row count, importedAt — newest first (GET /api/betomik-orderbook/runs). The week-selector for `rows`: pick the run whose isoYear/isoWeek match, latest importedAt if several.",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],
     args: [],
     outputShape: "ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>",
@@ -45,7 +56,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook rows",
     description: "Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of `import`; the weekly tenant report sums m3 and groups by plate from these rows.",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>",
@@ -64,7 +75,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook review",
     description: "Review one staging row by id (POST /api/betomik-orderbook/rows/:rowId/review): set reviewStatus and optionally override the keikka/palkki classification. The human's --row-kind/--palkki-type is the ground truth the AI proposer is measured against (`ai-stats`).",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     writeFlags: true,
     dryRunKind: "server",
     flags: [
@@ -195,7 +206,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook exceptions",
     description: "Blocked/exception rows from one sync run (GET /api/betomik-orderbook/runs/:runId/exceptions) — rows `sync`/`resync` could not write (unresolved customer/site/plant, ambiguous driver, etc.), for a human to resolve via `review` before the next resync.",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, jobDate, plate, driverName, customerGuess, siteText, rowKind, syncStatus, plannedAction, blockReason, keikkaId, palkkiId }> — syncStatus is always 'blocked'; frozen/synced/removed rows are never returned",
@@ -210,7 +221,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook fleet",
     description: "Fleet drift for one import run (GET /api/betomik-orderbook/runs/:runId/fleet): every vehicle the sheet ran that week (plate, BETOMIK NRO, RUDUS NRO, maker, boom, PUMPUT/PUMIT table, days) matched to betoni.online, with findings a per-row match cannot see — retired-but-running, changed fleet/Rudus number, boom, maker, type off the boom rule (<= 33 m Pumi, above Pumppu), name off the `<vehicleNo> B|P<boom> <plate>` convention, grid order (sortNo) off the sheet order — plus active vehicles the sheet never runs. The sheet is the fleet truth, so each finding is a change to make in betoni.online (`ib vehicle update`).",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     outputShape: "{ vehicles: [{ plate, betomikNo, rudusNo, maker, boom, table: 'large'|'small', days, rows, vehicleId, name, findings: [{ code: 'missing'|'duplicate'|'retired'|'vehicleNo'|'rudusNo'|'boom'|'maker'|'type'|'name'|'sortNo'|'ambiguous', message }], expected: { vehicleNo, vehiclePuomi, vehicleTypeName, typeLetter, name, memo, sortNo } }], pseudo: [{ label, kind: 'extra'|'mixer'|'loan'|'note', days, rows }], notInSheet: [{ vehicleId, name, plate, vehicleNo, vehiclePuomi, lastDate }], summary: { sheetVehicles, withFindings, notInSheet, pseudo } }",
@@ -228,7 +239,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     command: "ib dev betomik-orderbook audit",
     description: "Entities the sync AUTO-CREATED (customers, worksites, contact persons) — one row each; `digestedAt` = already included in a sent digest (GET /api/betomik-orderbook/audit), newest first; --since narrows to entities created at/after that ISO timestamp.",
     tier: "developer",
-    auth: "any",
+    permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [{ name: "since", type: "string", description: "ISO timestamp — only rows created at/after it" }],
     args: [],
     outputShape: "ListEnvelope<{ auditId, importRowId, entity: 'asiakas'|'tyomaa'|'person', entityId, label, createdAt, digestedAt }>",

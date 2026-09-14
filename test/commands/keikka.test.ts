@@ -91,6 +91,31 @@ describe("ib keikka latest (windowed backward search)", () => {
     const last = new URL("http://x" + String(getMock.mock.calls.at(-1)![0]));
     expect(last.searchParams.get("from")).toBe(addDaysISO(today, -9));
   });
+
+  // fb#1641: --asiakas is the TENANT and --customer the order's customer, and the
+  // two are confusable enough that a rejected --asiakas used to be answered with
+  // "Did you mean --customer?" — following it silently queried the wrong scope.
+  // Both must survive the walk as DISTINCT params, on every window.
+  test("--asiakas is forwarded to every window alongside a distinct --customer", async () => {
+    getMock
+      .mockResolvedValueOnce(envelope([])) // 7-day window: empty
+      .mockResolvedValueOnce(envelope([{ keikkaId: 7, pvm: "2026-05-22" }]));
+    await runKeikkaLatest(mockClient, { asiakas: 27, customer: 1349 });
+    expect(getMock).toHaveBeenCalledTimes(2);
+    for (const call of getMock.mock.calls) {
+      const url = new URL("http://x" + String(call[0]));
+      expect(url.searchParams.get("asiakas")).toBe("27");
+      expect(url.searchParams.get("customer")).toBe("1349");
+    }
+  });
+
+  test("--asiakas alone sends no customer param (the tenant is not a customer filter)", async () => {
+    getMock.mockResolvedValue(envelope([]));
+    await runKeikkaLatest(mockClient, { asiakas: 27, lookback: 10 });
+    const url = new URL("http://x" + String(getMock.mock.calls[0][0]));
+    expect(url.searchParams.get("asiakas")).toBe("27");
+    expect(url.searchParams.has("customer")).toBe(false);
+  });
 });
 
 describe("runKeikkaValidate", () => {

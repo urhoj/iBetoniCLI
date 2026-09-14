@@ -2437,7 +2437,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   Entities the sync AUTO-CREATED (customers, worksites, contact persons) — one row each; \`digestedAt\` = already included in a sent digest (GET /api/betomik-orderbook/audit), newest first; --since narrows to entities created at/after that ISO timestamp.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 FLAGS
   --since STRING    ISO timestamp — only rows created at/after it
@@ -2463,7 +2463,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   Blocked/exception rows from one sync run (GET /api/betomik-orderbook/runs/:runId/exceptions) — rows \`sync\`/\`resync\` could not write (unresolved customer/site/plant, ambiguous driver, etc.), for a human to resolve via \`review\` before the next resync.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 ARGUMENTS
   <runId> NUMBER    importRunId from \`runs\` (required)
@@ -2519,7 +2519,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   Fleet drift for one import run (GET /api/betomik-orderbook/runs/:runId/fleet): every vehicle the sheet ran that week (plate, BETOMIK NRO, RUDUS NRO, maker, boom, PUMPUT/PUMIT table, days) matched to betoni.online, with findings a per-row match cannot see — retired-but-running, changed fleet/Rudus number, boom, maker, type off the boom rule (<= 33 m Pumi, above Pumppu), name off the \`<vehicleNo> B|P<boom> <plate>\` convention, grid order (sortNo) off the sheet order — plus active vehicles the sheet never runs. The sheet is the fleet truth, so each finding is a change to make in betoni.online (\`ib vehicle update\`).
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 ARGUMENTS
   <runId> NUMBER    importRunId from \`runs\` (required)
@@ -2677,7 +2677,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   Review one staging row by id (POST /api/betomik-orderbook/rows/:rowId/review): set reviewStatus and optionally override the keikka/palkki classification. The human's --row-kind/--palkki-type is the ground truth the AI proposer is measured against (\`ai-stats\`).
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 ARGUMENTS
   <rowId> NUMBER    betomikOrderbookImportRowId from \`rows\` (required)
@@ -2718,7 +2718,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of \`import\`; the weekly tenant report sums m3 and groups by plate from these rows.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 ARGUMENTS
   <runId> NUMBER    importRunId from \`runs\` (required)
@@ -2752,7 +2752,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
 
 DESCRIPTION
   List Betomik order-book import runs — sheet label, ISO year/week, row count, importedAt — newest first (GET /api/betomik-orderbook/runs). The week-selector for \`rows\`: pick the run whose isoYear/isoWeek match, latest importedAt if several.
-  Auth: requires login (any authenticated user).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 FLAGS
   (none)
@@ -7296,12 +7296,13 @@ exports[`Help snapshots — contract stability > help for ib keikka latest match
   ib keikka latest [flags]
 
 DESCRIPTION
-  The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today.
-  Permissions: requires auth.page.grid.tilaus.read.
+  The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today. --asiakas searches ANOTHER company's orders (cross-tenant; see PERMISSIONS).
+  Permissions: requires auth.page.grid.tilaus.read, --asiakas: sysadmin/developer or global viewer (server-enforced).
 
 FLAGS
   --status STRING    Filter by status (keikkaTilaId — e.g. 9 = Toimitettu; see the \`tila\` GLOSSARY legend)
-  --customer NUMBER    Filter by asiakasId
+  --customer NUMBER    Filter by the ORDER's customer (keikka.asiakasId) inside the tenant being searched — NOT the tenant itself; use --asiakas for that
+  --asiakas NUMBER    Search another company's orders (cross-tenant). Sysadmin/developer or global viewer; default = active company.
   --vehicle NUMBER    Filter by vehicleId
   --worksite NUMBER    Filter by worksite (tyomaaId)
   --lookback NUMBER    How far back from today to search, in days (max 3650) (default: 365)
@@ -7315,15 +7316,17 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a tenant), or omit it for the active company
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
   exit 4 (client-side)  --lookback is not an integer >= 0, rejected locally before any request → pass a non-negative integer number of days (max 3650)
+  exit 3 (HTTP 403)  No read access to the requested --asiakas company → omit --asiakas for the active company, or use a sysadmin/developer or global-viewer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Client-side windowed search over \`keikka list\`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most). \`item: null\` + the \`searched\` range echo = genuinely nothing within --lookback.
+  - Client-side windowed search over \`keikka list\`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most), so every filter — --asiakas included — applies to each window. \`item: null\` + the \`searched\` range echo = genuinely nothing within --lookback.
   - Windows truncated at the 500-row server cap are halved toward their newest end, so the true latest row cannot be hidden by truncation.
   - Statuses 9/12/13 are all 'Toimitettu' — query the one you mean (no multi-status filter in v1).
 
@@ -7334,6 +7337,7 @@ EXAMPLES
   ib keikka latest
   ib keikka latest --status 9
   ib keikka latest --customer 1349 --lookback 730
+  ib keikka latest --asiakas 27 --lookback 365
 "
 `;
 

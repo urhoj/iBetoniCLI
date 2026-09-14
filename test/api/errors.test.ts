@@ -54,6 +54,37 @@ describe("hintForError — 404 deploy-gate disambiguation", () => {
   });
 });
 
+// fb#1585: the generic exit-7 remedy recommended `--idempotency-key` to EVERY
+// write, including the ones that deliberately do not accept it (`feedback create`
+// keeps writeFlags:false — a META request). An agent that followed its own error
+// message got exit 4, then either abandoned the filing or re-ran blind and
+// duplicated the row. The clause is now offered only where the flag exists.
+describe("hintForError — exit-7 replay clause is gated on the command's write flags", () => {
+  const netErr = () => new CliError("Network error: fetch failed", 0, null, 7);
+
+  test("a command declaring the write-safety trio IS offered --idempotency-key", () => {
+    expect(hintForError(netErr(), null, true)).toMatch(/--idempotency-key/);
+  });
+
+  test("a command without it is NOT — but keeps the verify-then-re-run half", () => {
+    const hint = hintForError(netErr(), null, false) ?? "";
+    expect(hint).not.toMatch(/--idempotency-key/);
+    expect(hint).toMatch(/confirm it did not land/);
+    expect(hint).toMatch(/connectivity|network/i);
+  });
+
+  test("absent spec context withholds the clause — the safe direction", () => {
+    expect(hintForError(netErr(), null) ?? "").not.toMatch(/--idempotency-key/);
+  });
+
+  test("a command's OWN exit-7 remedy still wins over the generic one", () => {
+    const specErrors = [
+      { origin: "client" as const, exit: 7, match: "fetch failed", meaning: "network", remedy: "retry later" },
+    ];
+    expect(hintForError(netErr(), specErrors, true)).toBe("retry later");
+  });
+});
+
 // The matcher keys a spec row to an error by its DECLARED origin: `http` for
 // server-originated failures, `origin: "client"` (matched on `exit`) for ones the
 // CLI raised locally. A server row that forgets `http` is unreachable for a real

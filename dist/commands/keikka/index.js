@@ -91,6 +91,7 @@ export async function runKeikkaLatest(client, opts) {
     const base = {
         status: opts.status,
         customer: opts.customer,
+        asiakas: opts.asiakas,
         vehicle: opts.vehicle,
         worksite: opts.worksite,
         limit: 500,
@@ -413,6 +414,7 @@ export function registerKeikkaCommands(parent, getClient) {
     k.command("latest")
         .option("--status <s>")
         .option("--customer <id>", "", intFlag("--customer", 1))
+        .option("--asiakas <id>", "", intFlag("--asiakas", 1))
         .option("--vehicle <id>", "", intFlag("--vehicle", 1))
         .option("--worksite <id>", "", intFlag("--worksite", 1))
         .option("--lookback <days>", "", intFlag("--lookback", 0))

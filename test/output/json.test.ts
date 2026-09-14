@@ -6,6 +6,7 @@ import {
   failWith,
   errorMessage,
   setActiveCommandErrors,
+  setActiveSpecWriteFlags,
   setListColumns,
   setOutputMode,
   setProjectionColumns,
@@ -76,6 +77,23 @@ describe("JSON output", () => {
     writeError(new CliError("Network error: ECONNREFUSED", 0, null, 7));
     const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
     expect(parsed.hint).toMatch(/connectivity|network/i);
+  });
+
+  // fb#1585 — the state half of the fix: the envelope has to consult the ACTIVE
+  // command's spec rather than emit a hardcoded clause. Ends on `false` (the
+  // module default) so the flag cannot leak into the tests below.
+  test("writeError recommends --idempotency-key on exit 7 only when the active spec declares write flags", () => {
+    setActiveSpecWriteFlags(true);
+    writeError(new CliError("Network error: fetch failed", 0, null, 7));
+    expect(JSON.parse(String(stderrSpy.mock.calls.at(-1)![0])).hint).toMatch(
+      /--idempotency-key/
+    );
+
+    setActiveSpecWriteFlags(false);
+    writeError(new CliError("Network error: fetch failed", 0, null, 7));
+    expect(JSON.parse(String(stderrSpy.mock.calls.at(-1)![0])).hint).not.toMatch(
+      /--idempotency-key/
+    );
   });
 
   // exitWithError sets process.exitCode (natural drain) instead of calling

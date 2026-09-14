@@ -13,7 +13,7 @@ import { getEmbeddedCtx, type EmbeddedCtx } from "../embedded.js";
 import { recordFriction } from "../friction.js";
 
 /**
- * Per-run output state — the four fields an embedded run must not share with a
+ * Per-run output state — the five fields an embedded run must not share with a
  * concurrent one. Every read and write goes through {@link state}: the active
  * EmbeddedCtx when one is installed (each field is required there, so an
  * embedded run can never fall through to — or leak into — the module copy),
@@ -24,6 +24,10 @@ import { recordFriction } from "../friction.js";
  *   command's OWN documented remedy into the envelope `hint` (feedback #25)
  *   instead of only the generic per-status hint. `null` = no spec context
  *   (tests, spec-less commands) → generic hints only.
+ * - `activeSpecWriteFlags`: whether that same command declares the write-safety
+ *   trio, seeded beside `activeCommandErrors`. Gates the `--idempotency-key`
+ *   clause of the generic exit-7 remedy, which used to recommend the flag to
+ *   commands that reject it (fb#1585). `false` = withhold the clause.
  * - `listColumns`: columns the running command's list table should show under
  *   `--pretty`: the CommandSpec's `prettyColumns` (set by `applySpecErrors`),
  *   overridden by the global `--columns`. `null` = let `renderList` pick.
@@ -37,10 +41,15 @@ import { recordFriction } from "../friction.js";
  */
 const moduleState: Pick<
   EmbeddedCtx,
-  "outputMode" | "activeCommandErrors" | "listColumns" | "projectionColumns"
+  | "outputMode"
+  | "activeCommandErrors"
+  | "activeSpecWriteFlags"
+  | "listColumns"
+  | "projectionColumns"
 > = {
   outputMode: "json",
   activeCommandErrors: null,
+  activeSpecWriteFlags: false,
   listColumns: null,
   projectionColumns: null,
 };
@@ -61,6 +70,11 @@ function emitStderr(line: string): void {
 
 export function setActiveCommandErrors(rows: CommandError[] | null): void {
   state().activeCommandErrors = rows;
+}
+
+/** Seeded beside {@link setActiveCommandErrors} from the same CommandSpec. */
+export function setActiveSpecWriteFlags(accepts: boolean): void {
+  state().activeSpecWriteFlags = accepts;
 }
 
 export function setListColumns(cols: readonly string[] | null): void {
@@ -275,8 +289,14 @@ export function writeError(err: unknown): void {
         : {};
     // `hint` points an agent at the next step without it having to have read
     // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
-    // Prefers the running command's own spec remedy when one matches.
-    const { hint, source } = hintDetailForError(err, activeErrors);
+    // Prefers the running command's own spec remedy when one matches. The
+    // write-flags flag keeps the generic exit-7 remedy from recommending
+    // --idempotency-key to a command that rejects it (fb#1585).
+    const { hint, source } = hintDetailForError(
+      err,
+      activeErrors,
+      state().activeSpecWriteFlags
+    );
     // Local best-effort friction capture (non-embedded only) — the universal
     // error funnel, so every non-zero exit is logged for the feedback groom
     // step. Record the hint alongside the message when one was displayed, so

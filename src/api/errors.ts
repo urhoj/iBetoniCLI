@@ -155,12 +155,16 @@ function matchHttpRow(
  * row at that exit. Falls back to the per-status generic hint so an
  * agent that hasn't read --help beforehand still gets pointed at the next
  * step (most importantly the 404 deploy-gate ambiguity). `null` = no hint.
+ *
+ * `writeFlags` says whether the RUNNING command accepts the write-safety trio.
+ * It gates the replay clause of the exit-7 remedy — see {@link genericHint}.
  */
 export function hintForError(
   err: CliError,
-  specErrors?: CommandError[] | null
+  specErrors?: CommandError[] | null,
+  writeFlags?: boolean
 ): string | null {
-  return hintDetailForError(err, specErrors).hint;
+  return hintDetailForError(err, specErrors, writeFlags).hint;
 }
 
 /**
@@ -189,7 +193,8 @@ export type HintDetail = { hint: string | null; source: HintSource | null };
  */
 export function hintDetailForError(
   err: CliError,
-  specErrors?: CommandError[] | null
+  specErrors?: CommandError[] | null,
+  writeFlags?: boolean
 ): HintDetail {
   // A not-deployed/unknown route is a DIFFERENT failure class than any documented
   // resource-404, so it wins over the command's own 404 remedy. The backend marks
@@ -218,18 +223,28 @@ export function hintDetailForError(
   if (httpRow?.remedy) return { hint: httpRow.remedy, source: "spec" };
   const clientRow = err.statusCode === 0 ? matchClientRow(err, specErrors) : undefined;
   if (clientRow?.remedy) return { hint: clientRow.remedy, source: "spec" };
-  const generic = genericHint(err);
+  const generic = genericHint(err, writeFlags);
   return generic ? { hint: generic, source: "generic" } : { hint: null, source: null };
 }
 
 /** The per-status / per-exit fallback remedy — what to say when nothing command-specific matched. */
-function genericHint(err: CliError): string | null {
+function genericHint(err: CliError, writeFlags?: boolean): string | null {
   if (err.exitCode === 7) {
     // Idempotent reads are already retried twice with backoff before this
     // surfaces (feedback #318), so by the time a caller sees exit 7 on a GET
     // the failure has persisted — saying so stops them burning a retry loop of
     // their own. Writes are NOT retried (a lost reply could mean it landed).
-    return "network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL. Idempotent reads were already retried automatically; a write is not retried, so re-run it only if you can confirm it did not land (or pass --idempotency-key).";
+    //
+    // The replay clause is offered ONLY when the running command actually
+    // declares the write-safety trio (fb#1585). It used to be unconditional, so
+    // a network failure on `ib dev feedback create` — which deliberately keeps
+    // `writeFlags:false`, being a META request — told the caller to pass a flag
+    // that same command then rejected with exit 4. An agent following its own
+    // error message into a dead end either abandons the filing or re-runs blind
+    // and duplicates the row. Absent spec context the clause is withheld: not
+    // recommending a flag is recoverable, recommending a rejected one is not.
+    const replay = writeFlags ? " (or pass --idempotency-key)" : "";
+    return `network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL. Idempotent reads were already retried automatically; a write is not retried, so re-run it only if you can confirm it did not land${replay}.`;
   }
   switch (err.statusCode) {
     case 401:

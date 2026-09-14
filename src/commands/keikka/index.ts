@@ -103,7 +103,14 @@ export async function runKeikkaList(
 /** Filters for `ib keikka latest` (a date-less "most recent matching" query). */
 export interface KeikkaLatestFilter {
   status?: string;
+  /** The ORDER's customer (keikka.asiakasId) inside the tenant being searched — NOT the tenant. */
   customer?: number;
+  /**
+   * Tenant override, forwarded to every window's `keikka list` call (fb#1641);
+   * sysadmin/developer-gated server-side. `latest` is a pure client-side walk
+   * over `list`, so this needs no backend change of its own.
+   */
+  asiakas?: number;
   vehicle?: number;
   worksite?: number;
   /** How far back from today to search, in days. Default 365, capped at 3650. */
@@ -157,6 +164,7 @@ export async function runKeikkaLatest(
   const base = {
     status: opts.status,
     customer: opts.customer,
+    asiakas: opts.asiakas,
     vehicle: opts.vehicle,
     worksite: opts.worksite,
     limit: 500,
@@ -636,6 +644,7 @@ export function registerKeikkaCommands(
   k.command("latest")
     .option("--status <s>")
     .option("--customer <id>", "", intFlag("--customer", 1))
+    .option("--asiakas <id>", "", intFlag("--asiakas", 1))
     .option("--vehicle <id>", "", intFlag("--vehicle", 1))
     .option("--worksite <id>", "", intFlag("--worksite", 1))
     .option(

@@ -28,7 +28,7 @@ import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDom
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence, type CommandSpec } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setActiveSpecWriteFlags, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
@@ -489,6 +489,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
 export function applySpecErrors(actionCommand: Command): void {
   const spec = specFor(actionCommand);
   setActiveCommandErrors(spec?.errors ?? null);
+  setActiveSpecWriteFlags(spec?.writeFlags ?? false);
   setListColumns(spec?.prettyColumns ?? null);
 }
 
@@ -829,7 +830,13 @@ export function handleParseRejection(
     // runtime (feedback #385). Errors only: re-seeding prettyColumns here would
     // clobber an explicit `--columns` on the rare CliError that escapes an action.
     const cmd = dispatchedCommand?.();
-    if (cmd) setActiveCommandErrors(specFor(cmd)?.errors ?? null);
+    if (cmd) {
+      // Both halves of the spec context, re-seeded together so the pair can
+      // never disagree about which command is running (fb#1585).
+      const spec = specFor(cmd);
+      setActiveCommandErrors(spec?.errors ?? null);
+      setActiveSpecWriteFlags(spec?.writeFlags ?? false);
+    }
     exitWithError(err);
     return;
   }

@@ -725,6 +725,10 @@ ib jerry stats --weeks <n>
   ! --weeks must be an integer >= 1
   > pass a positive integer number of weeks
 
+ib keikka latest --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > pass a positive asiakasId (a tenant), or omit it for the active company
+
 ib keikka latest --customer <id>
   ! --customer must be an integer >= 1
   > pass a positive asiakasId

@@ -101,8 +101,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka latest",
     description:
-      "The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today.",
-    permissions: ["auth.page.grid.tilaus.read"],
+      "The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today. --asiakas searches ANOTHER company's orders (cross-tenant; see PERMISSIONS).",
+    permissions: ["auth.page.grid.tilaus.read", KEIKKA_ASIAKAS_PERMISSION],
     flags: [
       {
         name: "status",
@@ -110,7 +110,18 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         description:
           "Filter by status (keikkaTilaId — e.g. 9 = Toimitettu; see the `tila` GLOSSARY legend)",
       },
-      { name: "customer", type: "number", description: "Filter by asiakasId" },
+      {
+        name: "customer",
+        type: "number",
+        description:
+          "Filter by the ORDER's customer (keikka.asiakasId) inside the tenant being searched — NOT the tenant itself; use --asiakas for that",
+      },
+      {
+        name: "asiakas",
+        type: "number",
+        description:
+          "Search another company's orders (cross-tenant). Sysadmin/developer or global viewer; default = active company.",
+      },
       { name: "vehicle", type: "number", description: "Filter by vehicleId" },
       { name: "worksite", type: "number", description: "Filter by worksite (tyomaaId)" },
       {
@@ -124,13 +135,15 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "{ item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }",
     errors: [
       intParseErr("--customer", "pass a positive asiakasId"),
+      intParseErr("--asiakas", "pass a positive asiakasId (a tenant), or omit it for the active company"),
       intParseErr("--vehicle", "pass a positive vehicleId"),
       intParseErr("--worksite", "pass a positive tyomaaId"),
       intParseErr("--lookback", "pass a non-negative integer number of days (max 3650)", 0),
+      KEIKKA_ASIAKAS_403,
       ...permErrors("auth.page.grid.tilaus.read"),
     ],
     notes: [
-      "Client-side windowed search over `keikka list`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most). `item: null` + the `searched` range echo = genuinely nothing within --lookback.",
+      "Client-side windowed search over `keikka list`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most), so every filter — --asiakas included — applies to each window. `item: null` + the `searched` range echo = genuinely nothing within --lookback.",
       "Windows truncated at the 500-row server cap are halved toward their newest end, so the true latest row cannot be hidden by truncation.",
       "Statuses 9/12/13 are all 'Toimitettu' — query the one you mean (no multi-status filter in v1).",
     ],
@@ -139,6 +152,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka latest",
       "ib keikka latest --status 9",
       "ib keikka latest --customer 1349 --lookback 730",
+      "ib keikka latest --asiakas 27 --lookback 365",
     ],
   },
   {

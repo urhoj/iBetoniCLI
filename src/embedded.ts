@@ -8,6 +8,13 @@ export interface EmbeddedCtx {
   readOnly: boolean;
   outputMode: "json" | "pretty";
   activeCommandErrors: CommandError[] | null;
+  /**
+   * Whether the command currently executing declares the write-safety trio
+   * (`--dry-run`/`--idempotency-key`/`--reason`), seeded from its CommandSpec's
+   * `writeFlags` alongside `activeCommandErrors`. Lets the generic network-error
+   * remedy offer `--idempotency-key` only where the command accepts it (fb#1585).
+   */
+  activeSpecWriteFlags: boolean;
   listColumns: readonly string[] | null;
   /** Explicit global `--columns` output projection (fb#451) — see `output/json.ts`. */
   projectionColumns: readonly string[] | null;
@@ -68,6 +75,7 @@ export function makeEmbeddedCtx(seed: EmbeddedCtxSeed): EmbeddedCtx {
     readOnly: seed.readOnly ?? false,
     outputMode: seed.outputMode ?? "json",
     activeCommandErrors: seed.activeCommandErrors ?? null,
+    activeSpecWriteFlags: seed.activeSpecWriteFlags ?? false,
     listColumns: seed.listColumns ?? null,
     projectionColumns: seed.projectionColumns ?? null,
     commandPath: seed.commandPath ?? null,
