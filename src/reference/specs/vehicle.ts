@@ -236,6 +236,8 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Owning asiakasId" },
       { name: "show-in-grid", type: "boolean", description: "Whether the vehicle appears in the grid (true/false)" },
       { name: "sort-no", type: "number", description: "Grid order within the tenant (sortNo; lower sorts first — `ib vehicle list` rows arrive in vehicleNo order, sort client-side by sortNo to reproduce the grid)" },
+      { name: "show-in-reports", type: "boolean", description: "Whether the vehicle appears in reports (true/false)" },
+      { name: "use-no-driver-bar", type: "boolean", description: "Whether the vehicle uses the 'Ei kuljettajaa' (no-driver) bar (true/false)" },
       { name: "first-date", type: "date", description: 'Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow; "" clears' },
       { name: "last-date", type: "date", description: 'End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow; "" clears, i.e. un-retires a vehicle' },
       { name: "grid-style", type: "string", description: 'Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; shown to every viewer of the vehicle, so the save route allowlists cosmetic properties only (background-color, color, border*, border-radius, outline*, box-shadow, opacity, font-*, text-*, padding*; no braces, comments, @-rules or url()) — a rejected declaration is a 400 naming it; "" clears' },
@@ -260,6 +262,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       "ib vehicle update 70 --last-date 2026-12-31 --reason 'retiring'",
       "ib vehicle update 70 --last-date '' --sort-no 20 --reason 'back in service, second in the grid'",
       "ib vehicle update 70 --grid-style 'background-color: red; border: 2px solid black;' --reason 'highlight in grid'",
+      "ib vehicle update 70 --use-no-driver-bar true --reason 'Betomik owner rule 2026-09-14 (fb#1717)'",
     ],
   },
   {

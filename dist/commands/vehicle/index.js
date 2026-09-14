@@ -168,6 +168,9 @@ export async function runVehicleDatesExpiring(client, days) {
  * excluded — they are carried through unchanged and are not settable from the
  * CLI. `sortNo` joined the writable set on 2026-09-14 (`--sort-no`) so the
  * Betomik fleet validator can put the grid in the order-book sheet's order.
+ * `showInReports`/`useNoDriverBar` joined the same day (fb#1717) so the
+ * Betomik owner rule ("Ei kuljettajaa -palkki" on every truck but Jemma) can
+ * be applied from the CLI instead of only read back.
  */
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
@@ -215,6 +218,8 @@ const VEHICLE_FIELDS = [
     },
     { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
     { flag: "--sort-no <n>", description: "Grid order within the tenant (sortNo; lower sorts first)", optKey: "sortNo", field: "sortNo", parse: intFlag("--sort-no"), modes: ["update"] },
+    { flag: "--show-in-reports <bool>", description: "Whether the vehicle appears in reports (true/false)", optKey: "showInReports", field: "showInReports", parse: parseBoolFlag, modes: ["update"] },
+    { flag: "--use-no-driver-bar <bool>", description: "Whether the vehicle uses the 'Ei kuljettajaa' (no-driver) bar (true/false)", optKey: "useNoDriverBar", field: "useNoDriverBar", parse: parseBoolFlag, modes: ["update"] },
     { flag: "--first-date <date>", description: 'Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow; "" clears)', optKey: "firstDate", field: "firstDate", modes: ["update"] },
     { flag: "--last-date <date>", description: 'End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow; "" clears, i.e. un-retires)', optKey: "lastDate", field: "lastDate", modes: ["update"] },
     {
@@ -267,6 +272,8 @@ const VEHICLE_DIFF_FIELDS = [
     "memo",
     "sortNo",
     "showInGrid",
+    "showInReports",
+    "useNoDriverBar",
     "defaultKuski_personId",
     "vehicleM3",
     "vehiclePuomi",
@@ -373,8 +380,8 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         sortNo: changes.sortNo ?? current.sortNo,
         showInGrid: changes.showInGrid ?? current.showInGrid,
         defaultKuski_personId: changes.defaultKuski_personId ?? current.defaultKuski_personId,
-        useNoDriverBar: current.useNoDriverBar,
-        showInReports: current.showInReports,
+        useNoDriverBar: changes.useNoDriverBar ?? current.useNoDriverBar,
+        showInReports: changes.showInReports ?? current.showInReports,
         tuoteId: current.tuoteId,
         isRestricted: current.isRestricted,
         multiTenantVisibility: current.multiTenantVisibility,

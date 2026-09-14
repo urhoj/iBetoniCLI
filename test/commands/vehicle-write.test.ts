@@ -379,6 +379,38 @@ describe("runVehicleUpdate", () => {
     expect(keep).toEqual({ dryRun: true, vehicleId: 53, wouldChange: { vehicleM3: { from: 8, to: 9 } } });
   });
 
+  test("showInReports/useNoDriverBar are writable (fb#1717)", async () => {
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    const out = await runVehicleUpdate(
+      c,
+      53,
+      { useNoDriverBar: true },
+      { dryRun: true }
+    );
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: { useNoDriverBar: { from: false, to: true } },
+    });
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(
+      c,
+      53,
+      { useNoDriverBar: true, showInReports: false },
+      { reason: "Betomik owner rule" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({ vehicleId: 53, useNoDriverBar: true, showInReports: false }),
+      { headers: { "X-Action-Reason": "Betomik owner rule" } }
+    );
+    // undefined still keeps the current values
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    const keep = await runVehicleUpdate(c, 53, { vehicleM3: 9 }, { dryRun: true });
+    expect(keep).toEqual({ dryRun: true, vehicleId: 53, wouldChange: { vehicleM3: { from: 8, to: 9 } } });
+  });
+
   test("--puomi updates vehiclePuomi (merge + dry-run diff)", async () => {
     c.get.mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(
