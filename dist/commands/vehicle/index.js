@@ -339,8 +339,9 @@ export async function runVehicleCreate(client, fields, flags, opts = {}) {
  * absent) when the vehicle is missing, so the caller surfaces "not found"
  * rather than a malformed save.
  *
- * `--dry-run` is resolved entirely client-side (the save route ignores
- * `X-Dry-Run`): it returns `{ dryRun: true, vehicleId, wouldChange:{ field:{
+ * `--dry-run` is resolved entirely client-side (the route does honour
+ * `X-Dry-Run` too, but a local diff needs no round-trip and cannot persist
+ * against any backend): it returns `{ dryRun: true, vehicleId, wouldChange:{ field:{
  * from, to } } }` — the field-level diff of what would change — and never
  * POSTs. Because no write leaves the process the preview cannot persist; the
  * trade-off is it skips backend-side validation (the real save still validates).
@@ -376,10 +377,9 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         hasGpsTracking: current.hasGpsTracking,
         vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
         // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
-        gridStyle: changes.gridStyle ?? current.gridStyle ?? null,
+        gridStyle: changes.gridStyle ?? current.gridStyle,
     };
-    // The /api/vehicle/save route does not honour X-Dry-Run server-side, so the
-    // preview is computed entirely client-side — it cannot persist. Report the
+    // Preview computed entirely client-side — it cannot persist. Report the
     // field-level diff (what would actually change) rather than the whole body.
     if (flags.dryRun) {
         return {

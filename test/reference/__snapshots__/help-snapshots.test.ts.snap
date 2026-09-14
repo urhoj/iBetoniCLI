@@ -15476,7 +15476,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).
+  On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing, so the preview cannot persist.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach

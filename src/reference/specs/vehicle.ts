@@ -241,7 +241,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "client",
-    outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
+    outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing, so the preview cannot persist.",
     errors: [
       ASIAKAS_FLAG_ERR,
       intParseErr("--no", "pass the fleet number as an integer", 0),
