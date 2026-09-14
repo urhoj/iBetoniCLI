@@ -15464,7 +15464,7 @@ FLAGS
   --show-in-grid    Whether the vehicle appears in the grid (true/false)
   --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow
   --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow
-  --grid-style STRING    Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; no syntax validation; "" clears
+  --grid-style STRING    Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; shown to every viewer of the vehicle, so the save route allowlists cosmetic properties only (background-color, color, border*, border-radius, outline*, box-shadow, opacity, font-*, text-*, padding*; no braces, comments, @-rules or url()) — a rejected declaration is a 400 naming it; "" clears
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -15484,6 +15484,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a vehicleTypeId — \`ib vehicle types\` lists them
   exit 4 (client-side)  --capacity is not a number, rejected locally before any request → pass the capacity in m3 as a number (e.g. 7.5)
   exit 4 (client-side)  --puomi is not a number, rejected locally before any request → pass the boom length in metres as a number
+  exit 4 (HTTP 400)  Grid CSS-tyyli: …      → --grid-style used a non-cosmetic property or a brace/comment/@-rule/url(); the message names the declaration — keep to background-color, color, border*, outline*, box-shadow, opacity, font-*, text-*, padding*
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
