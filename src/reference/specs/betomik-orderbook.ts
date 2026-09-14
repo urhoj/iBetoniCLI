@@ -154,7 +154,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "--dry-run short-circuits BEFORE the upsert, ledger writes, AI extraction, and --digest — it validates and returns only { wouldSync }, never touching the DB. Unlike `resync`'s dry run, no ledger state is written and no extraction runs.",
       "--digest only fires on a REAL (non-dry-run) sync — a dry run's wouldSync response never reaches it.",
     ],
-    outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
+    outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, unmatched: [{ plate, cell, days }], errors } }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
       { http: 400, exit: 4, meaning: "Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider", remedy: "Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local" },
@@ -181,7 +181,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "--dry-run STILL WRITES LEDGER STATE (syncStatus/plannedAction/blockReason) for every row — only the keikka/palkki writes and the auto-creates are suppressed.",
       "A dry run WITH --provider still performs (and pays for) the AI cell extractions and stores extractedJson.",
     ],
-    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors } } — --dry-run returns { dryRun: true, summary }",
+    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, unmatched: [{ plate, cell, days }], errors } } } — --dry-run returns { dryRun: true, summary }",
     errors: [
       { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
@@ -224,7 +224,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
-    outputShape: "{ vehicles: [{ plate, betomikNo, rudusNo, maker, boom, table: 'large'|'small', days, rows, vehicleId, name, findings: [{ code: 'missing'|'duplicate'|'retired'|'vehicleNo'|'rudusNo'|'boom'|'maker'|'type'|'name'|'sortNo'|'ambiguous', message }], expected: { vehicleNo, vehiclePuomi, vehicleTypeName, typeLetter, name, memo, sortNo } }], pseudo: [{ label, kind: 'extra'|'mixer'|'loan'|'note', days, rows }], notInSheet: [{ vehicleId, name, plate, vehicleNo, vehiclePuomi, lastDate }], summary: { sheetVehicles, withFindings, notInSheet, pseudo } }",
+    outputShape: "{ vehicles: [{ plate, betomikNo, rudusNo, maker, boom, table: 'large'|'small', days, rows, vehicleId, name, findings: [{ code: 'missing'|'duplicate'|'retired'|'vehicleNo'|'rudusNo'|'boom'|'maker'|'type'|'name'|'sortNo'|'ambiguous', message }], expected: { vehicleNo, vehiclePuomi, vehicleTypeName, typeLetter, name, memo, sortNo } }], pseudo: [{ label, kind: 'extra'|'mixer'|'loan'|'note', days, rows }], notInSheet: [{ vehicleId, name, plate, vehicleNo, vehiclePuomi, lastDate }], summary: { sheetVehicles, withFindings, notInSheet, pseudo }, dayDrivers: [{ plate, cell, days }] }",
     notes: [
       "`expected` is what betoni.online should hold per the sheet (type by boom: <= 33 m Pumi/B, above Pumppu/P, the 0 m mixer exempt; memo `<MAKER>, Rudus NRO <n>`; sortNo = position in sheet order x10, large table first) — vehicles come back in that order, so `ib vehicle update <id> --sort-no <expected.sortNo>` per row reproduces the sheet in the grid. Plate-less pseudo blocks (EXTRA* → Jemma, Betoniauto/Betonirekka → the 0 m boom mixer, laina kone) are classified, never flagged. Jemma, an already-retired vehicle, and the mixer when a Betoniauto block exists are excluded from notInSheet.",
     ],
