@@ -215,6 +215,13 @@ const VEHICLE_FIELDS = [
     { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
     { flag: "--first-date <date>", description: "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)", optKey: "firstDate", field: "firstDate", modes: ["update"] },
     { flag: "--last-date <date>", description: "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)", optKey: "lastDate", field: "lastDate", modes: ["update"] },
+    {
+        flag: "--grid-style <css>",
+        description: 'Grid cell CSS, free text, e.g. "background-color: red; border: solid;" (gridStyle; "" clears)',
+        optKey: "gridStyle",
+        field: "gridStyle",
+        modes: ["update"],
+    },
 ];
 /** Attach the field flags this mode exposes, in table order. */
 function addVehicleFieldFlags(cmd, mode) {
@@ -259,6 +266,7 @@ const VEHICLE_DIFF_FIELDS = [
     "defaultKuski_personId",
     "vehicleM3",
     "vehiclePuomi",
+    "gridStyle",
 ];
 /**
  * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
@@ -367,6 +375,8 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         defaultVisibilityAsiakasIds: current.defaultVisibilityAsiakasIds,
         hasGpsTracking: current.hasGpsTracking,
         vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
+        // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
+        gridStyle: changes.gridStyle ?? current.gridStyle ?? null,
     };
     // The /api/vehicle/save route does not honour X-Dry-Run server-side, so the
     // preview is computed entirely client-side — it cannot persist. Report the

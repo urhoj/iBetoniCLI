@@ -378,6 +378,37 @@ describe("runVehicleUpdate", () => {
       { headers: { "X-Action-Reason": "boom fix" } }
     );
   });
+
+  test("--grid-style writes gridStyle; an unrelated update preserves it; '' clears it", async () => {
+    const css = "background-color: red; border: solid;";
+    // Write.
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(c, 53, { gridStyle: css }, {});
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({ vehicleId: 53, gridStyle: css }),
+      expect.anything()
+    );
+    // The fb#456 guard: a save that does not mention gridStyle must carry the current value,
+    // otherwise the full-body proc NULLs it.
+    c.get.mockResolvedValueOnce([{ ...CURRENT_53, gridStyle: css }]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(c, 53, { vehicleNimi: "Renamed" }, {});
+    expect(c.post).toHaveBeenLastCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({ vehicleNimi: "Renamed", gridStyle: css }),
+      expect.anything()
+    );
+    // "" is a deliberate clear, not "keep current" — it reaches the route (which NULLs it).
+    c.get.mockResolvedValueOnce([{ ...CURRENT_53, gridStyle: css }]);
+    const out = await runVehicleUpdate(c, 53, { gridStyle: "" }, { dryRun: true });
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: { gridStyle: { from: css, to: "" } },
+    });
+  });
 });
 
 describe("ib vehicle dates", () => {

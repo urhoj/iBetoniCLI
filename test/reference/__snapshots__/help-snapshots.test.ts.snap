@@ -15112,7 +15112,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
+  { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean, gridStyle:string|null }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -15464,6 +15464,7 @@ FLAGS
   --show-in-grid    Whether the vehicle appears in the grid (true/false)
   --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow
   --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow
+  --grid-style STRING    Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; no syntax validation; "" clears
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -15492,6 +15493,7 @@ EXAMPLES
   ib vehicle update 70 --capacity 8 --reason 'remeasured'
   ib vehicle update 70 --show-in-grid false --dry-run
   ib vehicle update 70 --last-date 2026-12-31 --reason 'retiring'
+  ib vehicle update 70 --grid-style 'background-color: red; border: 2px solid black;' --reason 'highlight in grid'
 "
 `;
 

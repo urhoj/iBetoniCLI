@@ -88,7 +88,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
+      "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean, gridStyle:string|null }",
     errors: [
       ASIAKAS_FLAG_ERR,
       apiErr(404, "Vehicle not found", "verify vehicleId (and --asiakas if it belongs to another company)"),
@@ -237,6 +237,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       { name: "show-in-grid", type: "boolean", description: "Whether the vehicle appears in the grid (true/false)" },
       { name: "first-date", type: "date", description: "Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow" },
       { name: "last-date", type: "date", description: "End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow" },
+      { name: "grid-style", type: "string", description: 'Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; no syntax validation; "" clears' },
     ],
     writeFlags: true,
     dryRunKind: "client",
@@ -254,6 +255,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       "ib vehicle update 70 --capacity 8 --reason 'remeasured'",
       "ib vehicle update 70 --show-in-grid false --dry-run",
       "ib vehicle update 70 --last-date 2026-12-31 --reason 'retiring'",
+      "ib vehicle update 70 --grid-style 'background-color: red; border: 2px solid black;' --reason 'highlight in grid'",
     ],
   },
   {
