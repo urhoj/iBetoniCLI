@@ -164,9 +164,10 @@ export async function runVehicleDatesExpiring(client, days) {
 }
 /**
  * Writable columns compared for the `vehicle update --dry-run` field-level diff.
- * Read-only / system columns (sortNo, isRestricted, visibility, etc.) are
- * intentionally excluded — they are carried through unchanged and are not
- * settable from the CLI.
+ * System columns (isRestricted, visibility, tuoteId, etc.) are intentionally
+ * excluded — they are carried through unchanged and are not settable from the
+ * CLI. `sortNo` joined the writable set on 2026-09-14 (`--sort-no`) so the
+ * Betomik fleet validator can put the grid in the order-book sheet's order.
  */
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
@@ -213,8 +214,9 @@ const VEHICLE_FIELDS = [
         modes: ["create", "update"],
     },
     { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
-    { flag: "--first-date <date>", description: "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)", optKey: "firstDate", field: "firstDate", modes: ["update"] },
-    { flag: "--last-date <date>", description: "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)", optKey: "lastDate", field: "lastDate", modes: ["update"] },
+    { flag: "--sort-no <n>", description: "Grid order within the tenant (sortNo; lower sorts first)", optKey: "sortNo", field: "sortNo", parse: intFlag("--sort-no"), modes: ["update"] },
+    { flag: "--first-date <date>", description: 'Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow; "" clears)', optKey: "firstDate", field: "firstDate", modes: ["update"] },
+    { flag: "--last-date <date>", description: 'End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow; "" clears, i.e. un-retires)', optKey: "lastDate", field: "lastDate", modes: ["update"] },
     {
         flag: "--grid-style <css>",
         description: 'Grid cell CSS, free text, e.g. "background-color: red; border: solid;" (gridStyle; "" clears)',
@@ -248,7 +250,8 @@ function vehicleFieldsFromOpts(opts) {
         const value = opts[f.optKey];
         fields[f.field] =
             f.field === "firstDate" || f.field === "lastDate"
-                ? resolveDate(value)
+                // "" is a deliberate clear → null; undefined keeps the current value.
+                ? value === "" ? null : resolveDate(value)
                 : value;
     }
     return fields;
@@ -262,6 +265,7 @@ const VEHICLE_DIFF_FIELDS = [
     "lastDate",
     "vehicleTypeId",
     "memo",
+    "sortNo",
     "showInGrid",
     "defaultKuski_personId",
     "vehicleM3",
@@ -361,11 +365,12 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
         vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
         vehiclePuomi: changes.vehiclePuomi ?? current.vehiclePuomi,
-        firstDate: changes.firstDate ?? current.firstDate,
-        lastDate: changes.lastDate ?? current.lastDate,
+        // null is an explicit clear (`--first-date ""` / `--last-date ""`); only undefined keeps the current value.
+        firstDate: changes.firstDate === null ? null : changes.firstDate ?? current.firstDate,
+        lastDate: changes.lastDate === null ? null : changes.lastDate ?? current.lastDate,
         vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
         memo: changes.memo ?? current.memo,
-        sortNo: current.sortNo,
+        sortNo: changes.sortNo ?? current.sortNo,
         showInGrid: changes.showInGrid ?? current.showInGrid,
         defaultKuski_personId: changes.defaultKuski_personId ?? current.defaultKuski_personId,
         useNoDriverBar: current.useNoDriverBar,

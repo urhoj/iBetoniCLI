@@ -295,17 +295,21 @@ export interface VehicleWriteFields {
   vehiclePuomi?: number;
   asiakasId?: number;
   showInGrid?: boolean;
-  firstDate?: string;
-  lastDate?: string;
+  /** Grid order within the tenant (fb-free, Betomik fleet validator 2026-09-14). */
+  sortNo?: number;
+  /** Validity window; `null` clears (the CLI maps `--first-date ""` / `--last-date ""` to null). */
+  firstDate?: string | null;
+  lastDate?: string | null;
   /** Free-text CSS for the grid vehicle cell (raw CSS string, applied via sx). "" clears. */
   gridStyle?: string;
 }
 
 /**
  * Writable columns compared for the `vehicle update --dry-run` field-level diff.
- * Read-only / system columns (sortNo, isRestricted, visibility, etc.) are
- * intentionally excluded — they are carried through unchanged and are not
- * settable from the CLI.
+ * System columns (isRestricted, visibility, tuoteId, etc.) are intentionally
+ * excluded — they are carried through unchanged and are not settable from the
+ * CLI. `sortNo` joined the writable set on 2026-09-14 (`--sort-no`) so the
+ * Betomik fleet validator can put the grid in the order-book sheet's order.
  */
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
@@ -362,8 +366,9 @@ const VEHICLE_FIELDS: ReadonlyArray<{
     modes: ["create", "update"],
   },
   { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
-  { flag: "--first-date <date>", description: "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)", optKey: "firstDate", field: "firstDate", modes: ["update"] },
-  { flag: "--last-date <date>", description: "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)", optKey: "lastDate", field: "lastDate", modes: ["update"] },
+  { flag: "--sort-no <n>", description: "Grid order within the tenant (sortNo; lower sorts first)", optKey: "sortNo", field: "sortNo", parse: intFlag("--sort-no"), modes: ["update"] },
+  { flag: "--first-date <date>", description: 'Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow; "" clears)', optKey: "firstDate", field: "firstDate", modes: ["update"] },
+  { flag: "--last-date <date>", description: 'End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow; "" clears, i.e. un-retires)', optKey: "lastDate", field: "lastDate", modes: ["update"] },
   {
     flag: "--grid-style <css>",
     description: 'Grid cell CSS, free text, e.g. "background-color: red; border: solid;" (gridStyle; "" clears)',
@@ -399,7 +404,8 @@ function vehicleFieldsFromOpts(opts: VehicleFieldOpts): VehicleWriteFields {
     const value = opts[f.optKey];
     fields[f.field] =
       f.field === "firstDate" || f.field === "lastDate"
-        ? resolveDate(value as string | undefined)
+        // "" is a deliberate clear → null; undefined keeps the current value.
+        ? value === "" ? null : resolveDate(value as string | undefined)
         : value;
   }
   return fields as VehicleWriteFields;
@@ -414,6 +420,7 @@ const VEHICLE_DIFF_FIELDS = [
   "lastDate",
   "vehicleTypeId",
   "memo",
+  "sortNo",
   "showInGrid",
   "defaultKuski_personId",
   "vehicleM3",
@@ -541,11 +548,12 @@ export async function runVehicleUpdate(
     vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
     vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
     vehiclePuomi: changes.vehiclePuomi ?? current.vehiclePuomi,
-    firstDate: changes.firstDate ?? current.firstDate,
-    lastDate: changes.lastDate ?? current.lastDate,
+    // null is an explicit clear (`--first-date ""` / `--last-date ""`); only undefined keeps the current value.
+    firstDate: changes.firstDate === null ? null : changes.firstDate ?? current.firstDate,
+    lastDate: changes.lastDate === null ? null : changes.lastDate ?? current.lastDate,
     vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
     memo: changes.memo ?? current.memo,
-    sortNo: current.sortNo,
+    sortNo: changes.sortNo ?? current.sortNo,
     showInGrid: changes.showInGrid ?? current.showInGrid,
     defaultKuski_personId:
       changes.defaultKuski_personId ?? current.defaultKuski_personId,

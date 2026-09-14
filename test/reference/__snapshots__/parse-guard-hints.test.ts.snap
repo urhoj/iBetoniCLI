@@ -1577,6 +1577,10 @@ ib vehicle update --puomi <m>
   ! --puomi must be a number
   > pass the boom length in metres as a number
 
+ib vehicle update --sort-no <n>
+  ! --sort-no must be an integer >= 1
+  > pass the grid position as an integer
+
 ib vehicle update --type <n>
   ! --type must be an integer >= 1
   > pass a vehicleTypeId — \`ib vehicle types\` lists them

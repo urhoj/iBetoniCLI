@@ -356,6 +356,29 @@ describe("runVehicleUpdate", () => {
     );
   });
 
+  test("lastDate null is an explicit clear (un-retire), not 'keep current'; sortNo is writable", async () => {
+    const retired = { ...CURRENT_53, lastDate: "2026-09-10", sortNo: 7 };
+    c.get.mockResolvedValueOnce([retired]);
+    const out = await runVehicleUpdate(c, 53, { lastDate: null, sortNo: 20 }, { dryRun: true });
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: { lastDate: { from: "2026-09-10", to: null }, sortNo: { from: 7, to: 20 } },
+    });
+    c.get.mockResolvedValueOnce([retired]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(c, 53, { lastDate: null, sortNo: 20 }, { reason: "back in service" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({ vehicleId: 53, lastDate: null, sortNo: 20 }),
+      { headers: { "X-Action-Reason": "back in service" } }
+    );
+    // undefined still keeps the current values
+    c.get.mockResolvedValueOnce([retired]);
+    const keep = await runVehicleUpdate(c, 53, { vehicleM3: 9 }, { dryRun: true });
+    expect(keep).toEqual({ dryRun: true, vehicleId: 53, wouldChange: { vehicleM3: { from: 8, to: 9 } } });
+  });
+
   test("--puomi updates vehiclePuomi (merge + dry-run diff)", async () => {
     c.get.mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(

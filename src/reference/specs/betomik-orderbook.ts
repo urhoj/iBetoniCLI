@@ -207,6 +207,24 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     examples: ["ib dev betomik-orderbook exceptions 5"],
   },
   {
+    command: "ib dev betomik-orderbook fleet",
+    description: "Fleet drift for one import run (GET /api/betomik-orderbook/runs/:runId/fleet): every vehicle the sheet ran that week (plate, BETOMIK NRO, RUDUS NRO, maker, boom, PUMPUT/PUMIT table, days) matched to betoni.online, with findings a per-row match cannot see — retired-but-running, changed fleet/Rudus number, boom, maker, type off the boom rule (<= 33 m Pumi, above Pumppu), name off the `<vehicleNo> B|P<boom> <plate>` convention, grid order (sortNo) off the sheet order — plus active vehicles the sheet never runs. The sheet is the fleet truth, so each finding is a change to make in betoni.online (`ib vehicle update`).",
+    tier: "developer",
+    auth: "any",
+    flags: [],
+    args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
+    outputShape: "{ vehicles: [{ plate, betomikNo, rudusNo, maker, boom, table: 'large'|'small', days, rows, vehicleId, name, findings: [{ code: 'missing'|'duplicate'|'retired'|'vehicleNo'|'rudusNo'|'boom'|'maker'|'type'|'name'|'sortNo'|'ambiguous', message }], expected: { vehicleNo, vehiclePuomi, vehicleTypeName, typeLetter, name, memo, sortNo } }], pseudo: [{ label, kind: 'extra'|'mixer'|'loan'|'note', days, rows }], notInSheet: [{ vehicleId, name, plate, vehicleNo, vehiclePuomi, lastDate }], summary: { sheetVehicles, withFindings, notInSheet, pseudo } }",
+    notes: [
+      "`expected` is what betoni.online should hold per the sheet (type by boom: <= 33 m Pumi/B, above Pumppu/P, the 0 m mixer exempt; memo `<MAKER>, Rudus NRO <n>`; sortNo = position in sheet order x10, large table first) — vehicles come back in that order, so `ib vehicle update <id> --sort-no <expected.sortNo>` per row reproduces the sheet in the grid. Plate-less pseudo blocks (EXTRA* → Jemma, Betoniauto/Betonirekka → the 0 m boom mixer, laina kone) are classified, never flagged. Jemma, an already-retired vehicle, and the mixer when a Betoniauto block exists are excluded from notInSheet.",
+    ],
+    errors: [
+      { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
+      { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
+    ],
+    seeAlso: ["ib dev betomik-orderbook rows", "ib vehicle update"],
+    examples: ["ib dev betomik-orderbook fleet 2"],
+  },
+  {
     command: "ib dev betomik-orderbook audit",
     description: "Entities the sync AUTO-CREATED (customers, worksites, contact persons) — one row each; `digestedAt` = already included in a sent digest (GET /api/betomik-orderbook/audit), newest first; --since narrows to entities created at/after that ISO timestamp.",
     tier: "developer",

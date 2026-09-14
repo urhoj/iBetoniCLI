@@ -120,6 +120,11 @@ export async function runBetomikOrderbookExceptions(
   return listEnvelope(itemsOf<Record<string, unknown>>(raw));
 }
 
+/** Sheet fleet vs vehicle table for one run (GET /api/betomik-orderbook/runs/:runId/fleet). */
+export async function runBetomikOrderbookFleet(client: ApiClient, runId: number): Promise<unknown> {
+  return client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/fleet`);
+}
+
 export interface BetomikAuditRow {
   auditId: number;
   /** The ledger row whose sync created this entity — the join back to `rows`/`exceptions`. */
@@ -271,6 +276,15 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runBetomikOrderbookExceptions(client, parseId(idStr, "runId"))
+      )
+    );
+
+  group
+    .command("fleet <runId>")
+    .description("Sheet fleet vs betoni.online vehicles for one import run (drift per vehicle, trucks not in the sheet)")
+    .action(
+      jsonAction(getClient, (client, idStr: string) =>
+        runBetomikOrderbookFleet(client, parseId(idStr, "runId"))
       )
     );
 

@@ -60,6 +60,10 @@ export async function runBetomikOrderbookExceptions(client, runId) {
     const raw = await client.get(`/api/betomik-orderbook/runs/${runId}/exceptions`);
     return listEnvelope(itemsOf(raw));
 }
+/** Sheet fleet vs vehicle table for one run (GET /api/betomik-orderbook/runs/:runId/fleet). */
+export async function runBetomikOrderbookFleet(client, runId) {
+    return client.get(`/api/betomik-orderbook/runs/${runId}/fleet`);
+}
 /** Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit). */
 export async function runBetomikOrderbookAudit(client, { since }) {
     const qs = since ? `?since=${encodeURIComponent(since)}` : "";
@@ -158,6 +162,10 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .command("exceptions <runId>")
         .description("Blocked/exception rows from one sync run")
         .action(jsonAction(getClient, (client, idStr) => runBetomikOrderbookExceptions(client, parseId(idStr, "runId"))));
+    group
+        .command("fleet <runId>")
+        .description("Sheet fleet vs betoni.online vehicles for one import run (drift per vehicle, trucks not in the sheet)")
+        .action(jsonAction(getClient, (client, idStr) => runBetomikOrderbookFleet(client, parseId(idStr, "runId"))));
     group
         .command("audit")
         .description("Sync audit trail (entities written/digested), optionally since a given ISO timestamp")

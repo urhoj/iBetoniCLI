@@ -2513,6 +2513,42 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook fleet matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook fleet <runId> [flags]
+
+DESCRIPTION
+  Fleet drift for one import run (GET /api/betomik-orderbook/runs/:runId/fleet): every vehicle the sheet ran that week (plate, BETOMIK NRO, RUDUS NRO, maker, boom, PUMPUT/PUMIT table, days) matched to betoni.online, with findings a per-row match cannot see — retired-but-running, changed fleet/Rudus number, boom, maker, type off the boom rule (<= 33 m Pumi, above Pumppu), name off the \`<vehicleNo> B|P<boom> <plate>\` convention, grid order (sortNo) off the sheet order — plus active vehicles the sheet never runs. The sheet is the fleet truth, so each finding is a change to make in betoni.online (\`ib vehicle update\`).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <runId> NUMBER    importRunId from \`runs\` (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { vehicles: [{ plate, betomikNo, rudusNo, maker, boom, table: 'large'|'small', days, rows, vehicleId, name, findings: [{ code: 'missing'|'duplicate'|'retired'|'vehicleNo'|'rudusNo'|'boom'|'maker'|'type'|'name'|'sortNo'|'ambiguous', message }], expected: { vehicleNo, vehiclePuomi, vehicleTypeName, typeLetter, name, memo, sortNo } }], pseudo: [{ label, kind: 'extra'|'mixer'|'loan'|'note', days, rows }], notInSheet: [{ vehicleId, name, plate, vehicleNo, vehiclePuomi, lastDate }], summary: { sheetVehicles, withFindings, notInSheet, pseudo } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+NOTES
+  - \`expected\` is what betoni.online should hold per the sheet (type by boom: <= 33 m Pumi/B, above Pumppu/P, the 0 m mixer exempt; memo \`<MAKER>, Rudus NRO <n>\`; sortNo = position in sheet order x10, large table first) — vehicles come back in that order, so \`ib vehicle update <id> --sort-no <expected.sortNo>\` per row reproduces the sheet in the grid. Plate-less pseudo blocks (EXTRA* → Jemma, Betoniauto/Betonirekka → the 0 m boom mixer, laina kone) are classified, never flagged. Jemma, an already-retired vehicle, and the mixer when a Betoniauto block exists are excluded from notInSheet.
+
+SEE ALSO
+  ib dev betomik-orderbook rows, ib vehicle update
+
+EXAMPLES
+  ib dev betomik-orderbook fleet 2
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook import matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook import --body <body> [flags]
@@ -15463,8 +15499,9 @@ FLAGS
   --puomi NUMBER    Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)
   --asiakas NUMBER    Owning asiakasId
   --show-in-grid    Whether the vehicle appears in the grid (true/false)
-  --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow
-  --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow
+  --sort-no NUMBER    Grid order within the tenant (sortNo; lower sorts first — \`ib vehicle list\` rows arrive in vehicleNo order, sort client-side by sortNo to reproduce the grid)
+  --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow; "" clears
+  --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow; "" clears, i.e. un-retires a vehicle
   --grid-style STRING    Free-text CSS for the vehicle cell in the grid (gridStyle), e.g. "background-color: red; border: solid;" — same raw-CSS mechanism as ib palkki color --style; shown to every viewer of the vehicle, so the save route allowlists cosmetic properties only (background-color, color, border*, border-radius, outline*, box-shadow, opacity, font-*, text-*, padding*; no braces, comments, @-rules or url()) — a rejected declaration is a 400 naming it; "" clears
 
 WRITE-SAFETY FLAGS
@@ -15485,6 +15522,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a vehicleTypeId — \`ib vehicle types\` lists them
   exit 4 (client-side)  --capacity is not a number, rejected locally before any request → pass the capacity in m3 as a number (e.g. 7.5)
   exit 4 (client-side)  --puomi is not a number, rejected locally before any request → pass the boom length in metres as a number
+  exit 4 (client-side)  --sort-no is not an integer >= 1, rejected locally before any request → pass the grid position as an integer
   exit 4 (HTTP 400)  Grid CSS-tyyli: …      → --grid-style used a non-cosmetic property or a brace/comment/@-rule/url(); the message names the declaration — keep to background-color, color, border*, outline*, box-shadow, opacity, font-*, text-*, padding*
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -15495,6 +15533,7 @@ EXAMPLES
   ib vehicle update 70 --capacity 8 --reason 'remeasured'
   ib vehicle update 70 --show-in-grid false --dry-run
   ib vehicle update 70 --last-date 2026-12-31 --reason 'retiring'
+  ib vehicle update 70 --last-date '' --sort-no 20 --reason 'back in service, second in the grid'
   ib vehicle update 70 --grid-style 'background-color: red; border: 2px solid black;' --reason 'highlight in grid'
 "
 `;

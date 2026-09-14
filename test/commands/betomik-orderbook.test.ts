@@ -11,6 +11,7 @@ import {
   runBetomikOrderbookResync,
   runBetomikOrderbookExtractPrompt,
   runBetomikOrderbookExceptions,
+  runBetomikOrderbookFleet,
   runBetomikOrderbookAudit,
 } from "../../src/commands/betomikOrderbook/index.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
@@ -171,6 +172,14 @@ describe("ib dev betomik-orderbook sync / resync / extract-prompt / exceptions /
     const result = await runBetomikOrderbookExceptions(mockClient, 5);
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/5/exceptions");
     expect(result).toEqual({ items: [{ auditId: 1 }], nextCursor: null, count: 1 });
+  });
+
+  test("fleet: GET /api/betomik-orderbook/runs/:runId/fleet, passes the diff document through unchanged", async () => {
+    const doc = { vehicles: [], pseudo: [], notInSheet: [], summary: { sheetVehicles: 0, withFindings: 0, notInSheet: 0, pseudo: 0 } };
+    mockClient.get.mockResolvedValueOnce(doc);
+    const result = await runBetomikOrderbookFleet(mockClient, 2);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/2/fleet");
+    expect(result).toBe(doc);
   });
 
   test("audit: GET /api/betomik-orderbook/audit?since=<iso>, unwraps {items} into a ListEnvelope", async () => {
