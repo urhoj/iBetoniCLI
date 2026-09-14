@@ -448,5 +448,5 @@ export const FROM_JSON_FLAGS_FLAG: CommandFlag = {
   name: "from-json",
   type: "string",
   description:
-    "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.",
+    "Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.",
 };

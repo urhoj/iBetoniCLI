@@ -1082,6 +1082,26 @@ describe("changelog add/update --from-json (fb#300)", () => {
     expect(normalizeChangelogJson({ feedback: 357 }, addKeyMap())).toEqual({ feedback: "357" });
   });
 
+  // fb#1627: [1621, 1622] is the natural JSON spelling of several ids — the
+  // scalar path already tolerated a bare number (fb#576 above); the array path
+  // had not caught up and rejected the whole array as "must contain only strings".
+  test("an array of JSON numbers on --feedback is accepted (fb#1627)", () => {
+    expect(normalizeChangelogJson({ feedback: [1621, 1622, 1623] }, addKeyMap()))
+      .toEqual({ feedback: "1621,1622,1623" });
+  });
+
+  test("a mixed string/number array on --feedback is accepted (fb#1627)", () => {
+    expect(normalizeChangelogJson({ feedback: ["1621", 1622] }, addKeyMap()))
+      .toEqual({ feedback: "1621,1622" });
+  });
+
+  test("an array of numbers on repo/sha/files/commit still exits 4 (numeric tolerance stays scoped to --feedback)", () => {
+    const err = captureThrow(() => normalizeChangelogJson({ files: [1, 2] }, addKeyMap()));
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/"files" array must contain only strings/);
+    expect((err as unknown as Error).message).not.toMatch(/or numbers/);
+  });
+
   test("a quote-bearing entry round-trips, and JSON supplies the required trio", async () => {
     asPost().mockResolvedValue({ changelogId: 300 });
     const description =

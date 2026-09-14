@@ -19,9 +19,14 @@ export const AUTH_SPECS: CommandSpec[] = [
         default: "https://api.ibetoni.fi",
         description: "API endpoint to authorize against",
       },
+      {
+        name: "print-token",
+        type: "boolean",
+        description: "Also print the minted JWT as { token } (curl/browser use)",
+      },
     ],
     outputShape:
-      "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written",
+      "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written; stdout: nothing, or { token } with --print-token",
     errors: [
       {
         origin: "client",
@@ -46,7 +51,7 @@ export const AUTH_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib auth login",
-      "ib auth login --endpoint https://api-staging.ibetoni.fi",
+      "ib auth login --endpoint https://api-staging.ibetoni.fi --print-token",
     ],
   },
   {

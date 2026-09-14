@@ -49,6 +49,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     flags: [],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>",
+    prettyColumns: ["importRunId", "jobDate", "plate", "vehicleLabel", "driverName", "driverMatchStatus", "sourceType", "m3", "reviewStatus"],
     notes: [
       "rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via `review`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see `propose`/`ai-stats`.",
     ],

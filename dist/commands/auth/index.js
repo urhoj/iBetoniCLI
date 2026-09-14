@@ -36,12 +36,15 @@ export function registerAuthCommands(parent, isReadOnly) {
         // during parse (Commander recognises root options anywhere), so a local
         // duplicate silently fell back to its default — `auth login --endpoint
         // <staging>` authorized against PROD. Read the global instead.
-        .action(guarded(async () => {
+        .option("--print-token", "Print the minted JWT on stdout as JSON ({ token }) for use outside the CLI (curl, browser testing) — e.g. scripting a second endpoint's session without a second interactive login")
+        .action(guarded(async (opts) => {
         try {
-            await performLogin({
+            const { token } = await performLogin({
                 endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
                 credentialsPath: defaultCredentialsPath(),
             });
+            if (opts.printToken)
+                writeJson({ token });
         }
         catch (e) {
             // Anything that goes wrong in the OAuth flow is an auth failure —

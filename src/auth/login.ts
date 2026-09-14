@@ -31,8 +31,12 @@ interface TokenResponse {
  *   6. Decode the JWT to extract personId / ownerAsiakasId / email / tenant name.
  *   7. Persist the credentials profile to disk.
  *   8. Print a Finnish-style confirmation to stderr (stdout stays parseable).
+ *
+ * Returns the minted access token so a caller can print it (`--print-token`,
+ * fb#1513) — the JWT itself is never written to stderr/disk logs, only handed
+ * back for the caller to decide whether to surface it.
  */
-export async function performLogin(opts: LoginOptions): Promise<void> {
+export async function performLogin(opts: LoginOptions): Promise<{ token: string }> {
   const clientId = opts.clientId ?? "ib-cli";
   const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
   const { verifier, challenge, method } = generatePkcePair();
@@ -167,4 +171,6 @@ export async function performLogin(opts: LoginOptions): Promise<void> {
   const who = payload.email ?? "user";
   const where = payload.ownerAsiakasName ?? `tenant ${payload.ownerAsiakasId}`;
   process.stderr.write(`Logged in as ${who} at ${where}.\n`);
+
+  return { token: tokenBody.access_token };
 }

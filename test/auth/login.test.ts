@@ -81,11 +81,14 @@ describe("performLogin", () => {
     });
 
     const credentialsPath = join(dir, "credentials.json");
-    await performLogin({
+    const result = await performLogin({
       endpoint: "https://api.example.com",
       credentialsPath,
       timeoutMs: 5000,
     });
+
+    // fb#1513: the resolved token is what `--print-token` surfaces.
+    expect(result.token).toBe(fakeJwt);
 
     // Verify the browser was launched with a valid authorize URL.
     expect(mockOpen).toHaveBeenCalledTimes(1);

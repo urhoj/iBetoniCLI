@@ -657,13 +657,14 @@ DESCRIPTION
 
 FLAGS
   --endpoint URL    API endpoint to authorize against (default: https://api.ibetoni.fi)
+  --print-token    Also print the minted JWT as { token } (curl/browser use)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written
+  stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written; stdout: nothing, or { token } with --print-token
 
 ERRORS (stderr, exit non-zero)
   exit 2 (client-side)  OAuth flow failed      → retry; check network / browser
@@ -676,7 +677,7 @@ NOTES
 
 EXAMPLES
   ib auth login
-  ib auth login --endpoint https://api-staging.ibetoni.fi
+  ib auth login --endpoint https://api-staging.ibetoni.fi --print-token
 "
 `;
 
@@ -8726,7 +8727,7 @@ FLAGS
   --thread NUMBER    Thread id the message belongs to
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --body STRING    New message text (max 4000 chars) (required)
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -8955,7 +8956,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --body STRING    Message text (max 4000 chars) (required)
   --source STRING    Provenance: web|cli|ai (default: IB_SOURCE env or cli)
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -9515,7 +9516,7 @@ FLAGS
   --keikka NUMBER    keikkaId this escalation is about
   --body STRING    The message to support (required)
   --dry-run    Print the payload without sending (client-side)
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -9923,7 +9924,7 @@ FLAGS
   --html STRING    Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)
   --html-body STRING    Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)
   --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -9977,7 +9978,7 @@ FLAGS
   --title STRING    Notification title (required)
   --body STRING    Notification body (required)
   --data STRING    Extra FCM data payload as a JSON object (e.g. '{"url":"/grid"}')
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -12360,7 +12361,7 @@ FLAGS
   --title STRING    Notification title (required)
   --body STRING    Notification body (required)
   --data STRING    Extra FCM data payload as a JSON object
-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.

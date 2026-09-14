@@ -71,14 +71,21 @@ export function normalizeFromJson(json, keys, cfg = {}) {
             continue;
         }
         if (csv.has(key) && Array.isArray(value)) {
-            if (!value.every((v) => typeof v === "string"))
-                problems.push(`"${rawKey}" array must contain only strings`);
+            // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) also
+            // tolerates numbers INSIDE the array (fb#1627) — [1621, 1622] is the
+            // natural JSON spelling of several ids when the file is templated off a
+            // read row whose column is itself a number, and the scalar path already
+            // accepted a bare number since fb#576; the array path had not caught up.
+            const tolerant = numericTolerant.has(key);
+            const isAcceptable = (v) => typeof v === "string" || (tolerant && typeof v === "number" && Number.isFinite(v));
+            if (!value.every(isAcceptable))
+                problems.push(`"${rawKey}" array must contain only strings${tolerant ? " or numbers" : ""}`);
             else
-                out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
+                out[key] = value.map((v) => String(v).trim()).filter(Boolean).join(",");
             continue;
         }
         // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) round-trips
-        // a JSON number too — the natural shape when the JSON was templated off a
+        // a bare JSON number too — the natural shape when the JSON was templated off a
         // read row whose column is itself a number (changelog list's feedbackId).
         // Deliberately NOT every csvFields entry: see numericTolerantCsvFields' doc
         // for why a bare number is a real error for files/repo/sha/commit.
