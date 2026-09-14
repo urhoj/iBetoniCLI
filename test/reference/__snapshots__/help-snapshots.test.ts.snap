@@ -10693,7 +10693,7 @@ exports[`Help snapshots — contract stability > help for ib palkki color delete
   ib palkki color delete <barColorId> [flags]
 
 DESCRIPTION
-  Delete a bar-coloring rule. DELETE /api/grid/barColors/delete/:id (hard delete — unlike \`ib palkki delete\`, there is no soft-delete/deletedTime column here). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).
+  Delete a bar-coloring rule (soft delete — sets isDeleted; DELETE /api/grid/barColors/delete/:id, same shape as \`ib palkki delete\`'s deletedTime). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).
   Permissions: requires member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694.
 
 ARGUMENTS
@@ -10723,7 +10723,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - This is a HARD delete — there is no soft-delete/undo for bar-coloring rules (contrast \`ib palkki delete\`, which sets deletedTime).
+  - Soft delete: sets isDeleted, filtered out of \`ib palkki color list\`/\`get\` thereafter — not a hard delete.
 
 EXAMPLES
   ib palkki color delete 12 --reason "duplicate"

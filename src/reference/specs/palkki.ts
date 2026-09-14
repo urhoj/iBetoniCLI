@@ -115,7 +115,7 @@ const PALKKI_COLOR_CLIENT_NOT_FOUND: CommandError = {
   meaning: "No such barColorId in the resolved owner's list (client-side lookup — used by get and every --dry-run preview)",
   remedy: "check the id with `ib palkki color list`, or pass --owner",
 };
-const palkkiColorNotFoundErrors = (): CommandError[] => [
+const PALKKI_COLOR_NOT_FOUND_ERRORS: CommandError[] = [
   PALKKI_COLOR_CLIENT_NOT_FOUND,
   apiErr(404, "No such bar-coloring rule (live write only — the client-side lookup above catches this earlier for get/--dry-run)", "verify the id with `ib palkki color list`"),
 ];
@@ -391,7 +391,7 @@ export const PALKKI_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "Nothing to update", meaning: "No field flags and no --body", remedy: "pass at least one field flag" },
       SORT_NO_PARSE_ERR,
       palkkiColorPairErr,
-      ...palkkiColorNotFoundErrors(),
+      ...PALKKI_COLOR_NOT_FOUND_ERRORS,
       ...PALKKI_COLOR_OWNER_ERRORS,
       ...authErrors(),
     ],
@@ -401,15 +401,15 @@ export const PALKKI_SPECS: CommandSpec[] = [
   },
   {
     command: "ib palkki color delete",
-    description: "Delete a bar-coloring rule. DELETE /api/grid/barColors/delete/:id (hard delete — unlike `ib palkki delete`, there is no soft-delete/deletedTime column here). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).",
+    description: "Delete a bar-coloring rule (soft delete — sets isDeleted; DELETE /api/grid/barColors/delete/:id, same shape as `ib palkki delete`'s deletedTime). --dry-run resolves CLIENT-SIDE (a local lookup under --owner, default active company; no DELETE is issued).",
     permissions: ["member of the row's owning company (sysadmin/developer bypass; owner 0 requires sysadmin/developer) — fb#1694"],
     args: [{ name: "barColorId", type: "number", description: "grid_barColors.barColorId" }],
     flags: [{ name: "owner", type: "number", description: "Company to look the row up under for --dry-run (default: active company); ignored on a live delete" }],
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ success: true } — --dry-run returns { dryRun:true, wouldDelete:{ barColorId } } without sending any request",
-    errors: [OWNER_PARSE_ERR, ...palkkiColorNotFoundErrors(), apiErr(403, "Not a member of the row's owning company", "check `ib company`"), ...authErrors()],
-    notes: ["This is a HARD delete — there is no soft-delete/undo for bar-coloring rules (contrast `ib palkki delete`, which sets deletedTime)."],
+    errors: [OWNER_PARSE_ERR, ...PALKKI_COLOR_NOT_FOUND_ERRORS, apiErr(403, "Not a member of the row's owning company", "check `ib company`"), ...authErrors()],
+    notes: ["Soft delete: sets isDeleted, filtered out of `ib palkki color list`/`get` thereafter — not a hard delete."],
     examples: ['ib palkki color delete 12 --reason "duplicate"', "ib palkki color delete 12 --dry-run"],
   },
   {
