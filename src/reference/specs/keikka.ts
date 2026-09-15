@@ -159,18 +159,19 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     command: "ib keikka get",
     aliases: ["ib keikka show"],
     description:
-      "Get a single keikka by id with related customer / worksite / vehicle / driver projections.",
+      "Get a single keikka by id with related customer / worksite / vehicle / driver projections and the concrete side (source, betoniSupplier, plant).",
     permissions: ["auth.page.grid.tilaus.read"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
     flags: [],
     outputShape:
-      "{ keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, m3, status }",
+      "{ keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }",
     errors: [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.read"),
     ],
     notes: [
       "A 404 answers 'can I see it', not 'does it exist' — every command mirrors the caller's permissions, so a keikka owned by another tenant is indistinguishable from a keikkaId that was never issued. Do NOT read it as a typo. To settle existence you need a caller whose scope could see it: `ib company switch` to the owning tenant, or a system-admin/developer token (feedback #427).",
+      "Concrete side (fb#1742): `source` = lähdeasiakas, the concrete maker that took the order; `betoniSupplier` = betonitoimittaja; `plant` = the betoniSijainti. Each is null when the order carries none (the DB stores 0). Deploy-gated on puminet5api — an older backend omits the three keys.",
     ],
     examples: ["ib keikka get 9001"],
   },
