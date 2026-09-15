@@ -12240,7 +12240,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { personId, name, email, phone, roles:number[] }
+  { personId, name, email, phone, asiakasId:number|null (owner tenant, same key as \`person search\`; null/0 = global person — fb#1393), roles:number[] }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach

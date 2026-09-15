@@ -67,7 +67,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ personId, name, email, phone, roles:number[] }",
+      "{ personId, name, email, phone, asiakasId:number|null (owner tenant, same key as `person search`; null/0 = global person — fb#1393), roles:number[] }",
     errors: [
       ASIAKAS_FLAG_ERR,
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),

@@ -19,6 +19,7 @@ import {
   descendantsOwningVerb,
   descendantsOwningCompoundVerb,
   descendantsOwningPositional,
+  nestedGroupTwins,
   topLevelDomainRedirect,
   OPTION_REDIRECTS,
   OPTION_DID_YOU_MEAN_OVERRIDES,
@@ -481,6 +482,34 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
     const company = program.commands.find((c) => c.name() === "company")!;
     const env = buildUnknownCommandEnvelope(company, "get", "developer");
     expect(env.availableElsewhere).toEqual(["ib customer get"]);
+  });
+});
+
+describe("same-named group under a sibling subgroup (fb#1640)", () => {
+  test("`ib jerry request resend` is routed to `ib jerry admin request resend`", () => {
+    expect(nestedGroupTwins("ib jerry request", "resend", "developer")).toEqual([
+      { path: "ib jerry admin request resend", why: expect.stringContaining("`ib jerry admin request`") },
+    ]);
+    // and the other direction — the admin group lacks the customer-side verbs
+    expect(nestedGroupTwins("ib jerry admin request", "decline", "developer").map((m) => m.path)).toEqual([
+      "ib jerry request decline",
+    ]);
+  });
+
+  test("silent for a verb the twin does not own, for depth-2 groups, and at a tier that hides the twin", () => {
+    expect(nestedGroupTwins("ib jerry request", "nosuch", "developer")).toEqual([]);
+    expect(nestedGroupTwins("ib jerry", "resend", "developer")).toEqual([]);
+    // admin request commands are hidden from a standard caller — never name them
+    expect(nestedGroupTwins("ib jerry request", "resend", "standard")).toEqual([]);
+  });
+
+  test("envelope carries the redirect, copy-paste runnable with the caller's args", () => {
+    const req = leafByPath("jerry", "request");
+    req.args = ["resend", "42"];
+    const env = buildUnknownCommandEnvelope(req, "resend", "developer");
+    req.args = [];
+    expect(env.availableElsewhere).toEqual(["ib jerry admin request resend"]);
+    expect(env.hint).toContain("`ib jerry admin request resend 42` does");
   });
 });
 

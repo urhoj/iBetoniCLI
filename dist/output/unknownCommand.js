@@ -58,6 +58,31 @@ export function siblingGroupsWithCommand(group, token, tier) {
     return [{ path, why: sibling.why }];
 }
 /**
+ * The same-named GROUP under a sibling subgroup of the caller's domain, when it
+ * owns the verb (fb#1640): `ib jerry request resend` dead-ended although
+ * `ib jerry admin request resend` exists — the customer-side and admin-side
+ * views of one entity share a group name but not a verb set, and the in-group
+ * list cannot say so. DERIVED, not curated: measured over the catalogue the
+ * `request` pair is the ONLY same-named nested twin, so there is no noise to
+ * curate against. Needs a NESTED group (`parts.length >= 3`); depth-2 groups are
+ * {@link siblingGroupsWithCommand}'s curated territory. Tier-gated like every
+ * other redirect — naming a hidden admin command would leak its existence.
+ */
+export function nestedGroupTwins(group, token, tier) {
+    const parts = canonicalPath(group).split(" ");
+    if (parts.length < 3 || !token)
+        return [];
+    const domain = parts.slice(0, 2).join(" ");
+    const tail = ` ${parts[parts.length - 1]} ${token.toLowerCase()}`;
+    return COMMAND_SPECS.filter((s) => s.command.startsWith(`${domain} `) &&
+        !s.command.startsWith(`${group} `) &&
+        s.command.toLowerCase().endsWith(tail) &&
+        !isHiddenAtTier(s, tier)).map((s) => {
+        const twin = s.command.slice(0, -token.length - 1);
+        return { path: s.command, why: `\`${twin}\` is the same \`${parts[parts.length - 1]}\` group seen from its sibling subgroup, and it owns this verb` };
+    });
+}
+/**
  * How many owners a verb may have before the ROOT-level scan stays silent.
  *
  * At the root every domain is in scope, so the scan must separate a SPECIFIC
@@ -362,7 +387,12 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     // in-group list is only context. Rendered with the caller's remaining args
     // (`ib customer get 8`, not `ib customer get`) so it is copy-paste runnable;
     // cmd.args holds the bad token followed by whatever came after it.
-    const curated = siblingGroupsWithCommand(group, unknownToken, tier);
+    // The two are disjoint by depth (curated pairs are depth-2 domains, twins
+    // need a nested group), so a plain concat never double-answers.
+    const curated = [
+        ...siblingGroupsWithCommand(group, unknownToken, tier),
+        ...nestedGroupTwins(group, unknownToken, tier),
+    ];
     // Only when no curated pair answered: the verb may live in a CHILD subgroup
     // of this very group (fb#379) — same copy-paste rendering. When exact equality
     // finds nothing, retry treating the token as COMPOUND (fb#1020).
