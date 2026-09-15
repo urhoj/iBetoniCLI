@@ -39,6 +39,10 @@ export async function runBetomikOrderbookPropose(client, runId, body, flags) {
 export async function runBetomikOrderbookAiStats(client, runId) {
     return client.get(`/api/betomik-orderbook/runs/${runId}/ai-stats`);
 }
+/** Progress of a running sync (GET /api/betomik-orderbook/runs/:runId/sync-progress). */
+export async function runBetomikOrderbookSyncProgress(client, runId) {
+    return client.get(`/api/betomik-orderbook/runs/${runId}/sync-progress`);
+}
 /** Sync a Betomik order-book payload to keikka/palkki rows (POST /api/betomik-orderbook/sync). */
 export async function runBetomikOrderbookSync(client, body, flags) {
     return client.post("/api/betomik-orderbook/sync", body, {
@@ -125,6 +129,10 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .command("ai-stats <runId>")
         .description("AI-vs-human agreement for one run's approved rows")
         .action(jsonAction(getClient, (client, idStr) => runBetomikOrderbookAiStats(client, parseId(idStr, "runId"))));
+    group
+        .command("sync-progress <runId>")
+        .description("Where a running sync of one run is (rows done/total, then day drivers)")
+        .action(jsonAction(getClient, (client, idStr) => runBetomikOrderbookSyncProgress(client, parseId(idStr, "runId"))));
     const syncCmd = addJsonBodyOptions(group.command("sync"))
         .option("--mode <mode>", "shadow (default) | create | full")
         .option("--provider <name>", "bedrock (default) | local")

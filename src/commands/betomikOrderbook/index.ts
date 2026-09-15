@@ -83,6 +83,11 @@ export async function runBetomikOrderbookAiStats(client: ApiClient, runId: numbe
   return client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/ai-stats`);
 }
 
+/** Progress of a running sync (GET /api/betomik-orderbook/runs/:runId/sync-progress). */
+export async function runBetomikOrderbookSyncProgress(client: ApiClient, runId: number): Promise<unknown> {
+  return client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/sync-progress`);
+}
+
 /** Sync a Betomik order-book payload to keikka/palkki rows (POST /api/betomik-orderbook/sync). */
 export async function runBetomikOrderbookSync(
   client: ApiClient,
@@ -222,6 +227,15 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, idStr: string) =>
         runBetomikOrderbookAiStats(client, parseId(idStr, "runId"))
+      )
+    );
+
+  group
+    .command("sync-progress <runId>")
+    .description("Where a running sync of one run is (rows done/total, then day drivers)")
+    .action(
+      jsonAction(getClient, (client, idStr: string) =>
+        runBetomikOrderbookSyncProgress(client, parseId(idStr, "runId"))
       )
     );
 

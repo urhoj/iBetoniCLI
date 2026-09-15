@@ -7,6 +7,7 @@ import {
   runBetomikOrderbookReview,
   runBetomikOrderbookPropose,
   runBetomikOrderbookAiStats,
+  runBetomikOrderbookSyncProgress,
   runBetomikOrderbookSync,
   runBetomikOrderbookResync,
   runBetomikOrderbookExtractPrompt,
@@ -122,6 +123,13 @@ describe("ib dev betomik-orderbook review / propose / ai-stats", () => {
     const result = await runBetomikOrderbookAiStats(mockClient, 1);
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/1/ai-stats");
     expect((result as { scored: number }).scored).toBe(3);
+  });
+
+  test("sync-progress: GET /runs/:runId/sync-progress, body returned as-is", async () => {
+    mockClient.get.mockResolvedValueOnce({ running: true, phase: "rows", done: 3, total: 10 });
+    const result = await runBetomikOrderbookSyncProgress(mockClient, 1);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/1/sync-progress");
+    expect((result as { done: number }).done).toBe(3);
   });
 });
 

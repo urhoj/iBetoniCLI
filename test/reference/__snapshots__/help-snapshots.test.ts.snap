@@ -2815,6 +2815,36 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook sync-progress matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook sync-progress <runId> [flags]
+
+DESCRIPTION
+  Where a RUNNING sync of one run is (GET /api/betomik-orderbook/runs/:runId/sync-progress): phase rows (done/total) then dayDrivers, with the planned/blocked counters so far. { running: false } when no sync is in flight on the answering instance.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <runId> NUMBER    importRunId from \`runs\` (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { running, phase?: 'rows'|'dayDrivers', done?, total?, planned?, blocked?, mode?, startedAt? }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+
+EXAMPLES
+  ib dev betomik-orderbook sync-progress 1
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
 "USAGE
   ib dev cache clear [flags]

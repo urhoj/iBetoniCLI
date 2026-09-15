@@ -136,6 +136,20 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     examples: ["ib dev betomik-orderbook ai-stats 1"],
   },
   {
+    command: "ib dev betomik-orderbook sync-progress",
+    description: "Where a RUNNING sync of one run is (GET /api/betomik-orderbook/runs/:runId/sync-progress): phase rows (done/total) then dayDrivers, with the planned/blocked counters so far. { running: false } when no sync is in flight on the answering instance.",
+    tier: "developer",
+    auth: "any",
+    flags: [],
+    args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
+    outputShape: "{ running, phase?: 'rows'|'dayDrivers', done?, total?, planned?, blocked?, mode?, startedAt? }",
+    errors: [
+      { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
+      { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
+    ],
+    examples: ["ib dev betomik-orderbook sync-progress 1"],
+  },
+  {
     command: "ib dev betomik-orderbook sync",
     description: "Sync a Betomik order-book payload straight into keikka/palkki rows (POST /api/betomik-orderbook/sync): shadow (default) computes without writing, create only inserts new rows, full also updates/closes existing ones. Body is --body/--from-json (the same {sheetLabel, isoYear, isoWeek, rows} shape `import` takes) with --mode/--provider/--digest merged in.",
     tier: "developer",
