@@ -92,7 +92,15 @@ import { buildReference } from "../../src/reference/dump.js";
 // sync-row` — the per-row export whose dry-run-first pass is the Betomik import
 // method (three notes encode it; prose trimmed once before this bump).
 // 798061 B measured; headroom ~439 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 799_000;
+// 799_000 (fb#1750/fb#1722 spec notes, 2026-09-16).
+// 802_500 since the fb#1736/1723/1732/1743/1712/1607/1733 cluster (2026-09-16):
+// four flags + three error rows on `betomik-orderbook rows` (paging/filter),
+// the --asiakas alias note on four person fk leaves, the palkki get/color get
+// asymmetry pair, the from-json merge-key spellings on glossary set, and ten
+// other-tenant 403 remedies that now name `--company <ownerId>` (the shared
+// constant is longer than the switch-only wording it replaced).
+// 801959 B measured; headroom ~541 B, thin per this file's convention.
+const DUMP_LIMIT_BYTES = 802_500;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

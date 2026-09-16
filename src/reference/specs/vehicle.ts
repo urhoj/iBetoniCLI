@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, PERSON_PARSE_ERR } from "./shared.js";
+import { apiErr, limitErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, intParseErr, numParseErr, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, VEHICLE_ASIAKAS_PERMISSION, VEHICLE_ASIAKAS_403, VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE, VEHICLE_LIST_PRETTY_COLUMNS, DRIVER_DATE_ARG, DRIVER_DATE_FLAG, DRIVER_DATE_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, PERSON_PARSE_ERR, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 /** The `--type` parse-guard row every vehicle list/create/update leaf shares (fb#949). */
 const TYPE_PARSE_ERR = intParseErr("--type", "pass a vehicleTypeId — `ib vehicle types` lists them");
@@ -390,7 +390,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
-      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
+      apiErr(403, "Not a member of that company (and not admin)", OTHER_TENANT_403_REMEDY)
     ),
     seeAlso: ["ib log entity", "ib vehicle driver history"],
     examples: ["ib vehicle log 53"],
@@ -405,7 +405,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     outputShape:
       "{ date, generatedAt, tenant:{ownerAsiakasId,name}, depots:[{sijaintiId,nimi,lat,lng,radiusM,isMain,mainRule}], factories:[{sijaintiId,nimi,lat,lng,radiusM,ownerName,ordersToday}], huolto:[{sijaintiId,nimi,lat,lng,radiusM}], orders:[{keikkaId,tyomaaId,tyomaaNimi,lat,lng,radiusM,klo,pumppuKesto,m3,tila,tilaClass,vehicleId,factorySijaintiId,factoryDistanceM,factoryDistanceSource,presence,weather}], vehicles:[{vehicleId,vehicleNo,plate,vehicleTypeId,hasGps,homeSijaintiId,drivers:[{personId,initials,name}]}], crew:[{personId,initials,name,vehicleId,status}], transitions:[{vehicleId,at,kind,sijaintiId,sijaintiTypeId,tyomaaId,engineOn}], fleetFeed:{newestSnapshotAt,gpsEnabled,transitionsTruncated} }",
     errors: authErrors(
-      apiErr(403, "Not a company admin of the active tenant", "switch to a company where you are asiakasAdmin (`ib company switch`) or ask an admin"),
+      apiErr(403, "Not a company admin of the active tenant", "`--company <ownerId>` where you are asiakasAdmin for one command, or `ib company switch` to persist, or ask an admin"),
       apiErr(400, "date is not a real YYYY-MM-DD calendar date", "pass --date YYYY-MM-DD, or today/tomorrow/yesterday")
     ),
     notes: [

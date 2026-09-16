@@ -87,3 +87,25 @@ describe("every ERRORS remedy names only flags that exist (fb#697 follow-up)", (
     expect(unknown.map((f) => `--${f}`)).toEqual([]);
   });
 });
+
+// fb#1733: a 403 on a tenant-scoped command whose --owner/--asiakas is not the
+// active company used to be answered with "ib company switch to that owner" —
+// a PERSISTENT switch for a one-shot call — while the global `--company <id>`
+// built for exactly that case went unmentioned. Nine hand-copied rows carried
+// the wording; this pins the shared constant so a new copy of the old wording
+// cannot creep back in.
+describe("other-tenant 403 remedies name the one-shot --company global (fb#1733)", () => {
+  const rows = COMMAND_SPECS.flatMap((spec) =>
+    (spec.errors ?? [])
+      .filter((r) => "http" in r && r.http === 403 && /company switch/.test(r.remedy ?? ""))
+      .map((r) => [spec.command, r.remedy!] as const)
+  );
+
+  test("every such remedy exists and names --company before the persistent switch", () => {
+    expect(rows.length).toBeGreaterThanOrEqual(9);
+    for (const [command, remedy] of rows) {
+      expect(remedy, command).toMatch(/--company <ownerId>/);
+      expect(remedy.indexOf("--company"), command).toBeLessThan(remedy.indexOf("company switch"));
+    }
+  });
+});

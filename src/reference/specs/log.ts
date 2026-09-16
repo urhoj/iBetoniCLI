@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG } from "./shared.js";
+import { apiErr, limitErr, authErrors, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 export const LOG_SPECS: CommandSpec[] = [
 
@@ -27,7 +27,7 @@ export const LOG_SPECS: CommandSpec[] = [
       LOG_CAPPED_NOTE +
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
-      apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"),
+      apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", OTHER_TENANT_403_REMEDY),
       { origin: "client", exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" }
     ),
     notes: [

@@ -351,6 +351,88 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  // fb#1712: the merge flags have JSON twins, so a grooming batch driven
+  // through --from-json (the argv-safe path for Finnish prose) can append a
+  // clause without resending the whole definition. Same exclusion rules as
+  // the flags. fb#1607: the accepted-key set is now DERIVED from the command's
+  // own options via payloadKeyMap — the flag spelling is therefore accepted too.
+  describe("merge keys in --from-json (fb#1712) and the derived key set (fb#1607)", () => {
+    test("mergeSetInput carries appendDefinition/addSynonyms/removeSynonyms (arrays → csv); flags win", () => {
+      expect(mergeSetInput({ appendDefinition: " Lisäys.", addSynonyms: ["a", "b"], removeSynonyms: "c" }, {}))
+        .toMatchObject({ appendDefinition: " Lisäys.", addSynonyms: "a,b", removeSynonyms: "c" });
+      expect(mergeSetInput({ addSynonyms: ["a"] }, { addSynonyms: "z" }).addSynonyms).toBe("z");
+    });
+
+    test("set --from-json PUTs appendDefinition + addSynonyms as lists, no definition/synonyms key", async () => {
+      const put = vi.fn().mockResolvedValue({ term: "x" });
+      await withJsonFile({ appendDefinition: " Lisäys.", addSynonyms: ["eräpvm", "due"] }, async (p) => {
+        const program = new Command();
+        registerGlossaryCommands(program, async () => mkClient({ put }));
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p, "--update-only"], { from: "user" });
+      });
+      expect(put.mock.calls[0][1]).toEqual({ appendDefinition: " Lisäys.", addSynonyms: ["eräpvm", "due"] });
+    });
+
+    test("the flag spelling (append-definition) is accepted as a JSON key too", async () => {
+      const put = vi.fn().mockResolvedValue({ term: "x" });
+      await withJsonFile({ "append-definition": " Lisäys." }, async (p) => {
+        const program = new Command();
+        registerGlossaryCommands(program, async () => mkClient({ put }));
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+      });
+      expect(put.mock.calls[0][1]).toEqual({ appendDefinition: " Lisäys." });
+    });
+
+    test("definition + appendDefinition in one JSON object exits 4 (same rule as the flags), no PUT", async () => {
+      const put = vi.fn().mockResolvedValue({ term: "x" });
+      await withJsonFile({ definition: "d", appendDefinition: " e" }, async (p) => {
+        const program = new Command();
+        registerGlossaryCommands(program, async () => mkClient({ put }));
+        const prevExit = process.exitCode;
+        process.exitCode = undefined;
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+          await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+          expect(process.exitCode).toBe(4);
+          expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("mutually exclusive");
+        } finally {
+          stderr.mockRestore();
+          process.exitCode = prevExit;
+        }
+      });
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    test("the unknown-key message lists the merge keys among the accepted ones", async () => {
+      const put = vi.fn().mockResolvedValue({ term: "x" });
+      await withJsonFile({ nope: 1 }, async (p) => {
+        const program = new Command();
+        registerGlossaryCommands(program, async () => mkClient({ put }));
+        const prevExit = process.exitCode;
+        process.exitCode = undefined;
+        const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+          await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+          const written = stderr.mock.calls.map((c) => String(c[0])).join("");
+          for (const k of ["appendDefinition", "addSynonyms", "removeSynonyms", "relatedCommands", "relatedEntity", "needsHumanReview"]) {
+            expect(written).toContain(k);
+          }
+          // Non-payload flags never leak into the accepted set.
+          for (const k of ["fromJson", "updateOnly", "dryRun", "reason"]) expect(written).not.toContain(k);
+        } finally {
+          stderr.mockRestore();
+          process.exitCode = prevExit;
+        }
+      });
+    });
+
+    test("import entries carry the merge keys too", async () => {
+      const put = vi.fn().mockResolvedValue({ term: "x" });
+      await runGlossaryImport(mkClient({ put }), [{ term: "x", addSynonyms: ["a"] }], {});
+      expect(put.mock.calls[0][1]).toEqual({ addSynonyms: ["a"] });
+    });
+  });
+
   // The reporter's own repro (fb#1533): the required `term` positional put
   // inside the JSON body instead — previously silently dropped, then failed
   // downstream with a confusing "missing required argument term". It must now

@@ -5,7 +5,7 @@ import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_sha
 import { guarded, jsonAction } from "../_shared/action.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { parseId } from "../../targets.js";
+import { parseId, intFlag } from "../../targets.js";
 
 export async function runBetomikOrderbookImport(
   client: ApiClient,
@@ -38,13 +38,52 @@ export async function runBetomikOrderbookRuns(client: ApiClient): Promise<ListEn
   return listEnvelope(itemsOf<BetomikRunRow>(raw));
 }
 
-/** Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows). */
+export interface BetomikRowsFilter {
+  /** CSV of syncStatus values to keep (pending|blocked|synced|gone|frozen). */
+  status?: string;
+  limit?: number;
+  offset?: number;
+  /** false (`--no-raw`) drops rawJson from every row. */
+  raw?: boolean;
+}
+
+/** Every syncStatus the ledger can hold; `removed` is server-excluded (fb#1722). */
+const ROW_SYNC_STATUSES = ["pending", "blocked", "synced", "gone", "frozen"];
+
+/**
+ * Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows).
+ * The route has no paging and returns every non-removed row of the run (a
+ * re-imported week carries its frozen rows beside the live ones — 415 for
+ * week 37), so --status / --limit / --offset / --no-raw are applied HERE, on the
+ * fetched set (fb#1736/fb#1723). The status predicate is the one sync-row
+ * --run uses.
+ */
 export async function runBetomikOrderbookRows(
   client: ApiClient,
-  runId: number
+  runId: number,
+  filter: BetomikRowsFilter = {}
 ): Promise<ListEnvelope<Record<string, unknown>>> {
+  const wanted = (filter.status ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const bad = wanted.filter((s) => !ROW_SYNC_STATUSES.includes(s));
+  if (bad.length) {
+    failWith(
+      `--status: unknown value${bad.length > 1 ? "s" : ""} ${bad.join(", ")} — accepted: ${ROW_SYNC_STATUSES.join(", ")}`,
+      4,
+      bad.includes("removed") ? "removed rows are excluded by the route itself (fb#1722) and cannot be listed" : undefined
+    );
+  }
   const raw = await client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/rows`);
-  return listEnvelope(itemsOf<Record<string, unknown>>(raw));
+  let items = itemsOf<Record<string, unknown>>(raw);
+  if (wanted.length) items = items.filter((r) => wanted.includes(String(r.syncStatus)));
+  if (filter.raw === false) items = items.map(({ rawJson: _raw, ...rest }) => rest);
+  if (filter.limit === undefined && filter.offset === undefined) return listEnvelope(items);
+  const offset = filter.offset ?? 0;
+  const end = filter.limit === undefined ? items.length : offset + filter.limit;
+  const truncated = end < items.length;
+  return listEnvelope(items.slice(offset, end), {
+    truncated,
+    ...(truncated ? { hint: `${items.length - end} more row(s) — re-run with --offset ${end}` } : {}),
+  });
 }
 
 export interface BetomikReviewBody {
@@ -257,9 +296,13 @@ export function registerBetomikOrderbookCommands(
   group
     .command("rows <runId>")
     .description("Staging rows of one import run (plate, driver, source type, m3, review status)")
+    .option("--status <csv>", `Only rows whose syncStatus is one of: ${ROW_SYNC_STATUSES.join(", ")}`)
+    .option("--limit <n>", "Rows to return after --status (client-side; the route is unpaged)", intFlag("--limit"))
+    .option("--offset <n>", "Rows to skip after --status", intFlag("--offset", 0))
+    .option("--no-raw", "Drop rawJson (the sheet cells) from every row — fits a context window")
     .action(
-      jsonAction(getClient, (client, idStr: string) =>
-        runBetomikOrderbookRows(client, parseId(idStr, "runId"))
+      jsonAction(getClient, (client, idStr: string, opts: BetomikRowsFilter) =>
+        runBetomikOrderbookRows(client, parseId(idStr, "runId"), opts)
       )
     );
 

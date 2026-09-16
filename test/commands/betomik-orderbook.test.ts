@@ -86,6 +86,53 @@ describe("ib dev betomik-orderbook runs / rows", () => {
     expect(result.count).toBe(1);
     expect(result.items[0]).toMatchObject({ plate: "GNG-544", m3: 12.5 });
   });
+
+  // fb#1736/fb#1723: the route returns every non-removed ledger row of a run
+  // (415 rows for week 37 after two re-imports, ~300 KB with rawJson), so the
+  // CLI pages and filters client-side — the same predicate sync-row --run uses.
+  describe("rows: --status / --limit / --offset / --no-raw are applied client-side", () => {
+    const ledger = [
+      { betomikOrderbookImportRowId: 1, syncStatus: "synced", rawJson: "{}" },
+      { betomikOrderbookImportRowId: 2, syncStatus: "frozen", rawJson: "{}" },
+      { betomikOrderbookImportRowId: 3, syncStatus: "pending", rawJson: "{}" },
+      { betomikOrderbookImportRowId: 4, syncStatus: "blocked", rawJson: "{}" },
+      { betomikOrderbookImportRowId: 5, syncStatus: null, rawJson: "{}" },
+    ];
+    beforeEach(() => mockClient.get.mockResolvedValueOnce({ items: ledger }));
+
+    test("--status is a CSV of syncStatus values; a NULL syncStatus is never matched", async () => {
+      const result = await runBetomikOrderbookRows(mockClient, 7, { status: "pending, blocked" });
+      expect(result.items.map((r) => r.betomikOrderbookImportRowId)).toEqual([3, 4]);
+      expect(result.count).toBe(2);
+      expect(result.truncated).toBeUndefined();
+    });
+
+    test("--limit/--offset slice AFTER the status filter and flag truncation", async () => {
+      const result = await runBetomikOrderbookRows(mockClient, 7, { limit: 2, offset: 1 });
+      expect(result.items.map((r) => r.betomikOrderbookImportRowId)).toEqual([2, 3]);
+      expect(result.count).toBe(2);
+      expect(result.truncated).toBe(true);
+      expect(result.hint).toContain("--offset 3");
+    });
+
+    test("--limit that covers the rest is not truncated", async () => {
+      const result = await runBetomikOrderbookRows(mockClient, 7, { limit: 10, offset: 3 });
+      expect(result.items.map((r) => r.betomikOrderbookImportRowId)).toEqual([4, 5]);
+      expect(result.truncated).toBe(false);
+    });
+
+    test("--no-raw strips rawJson from every row; default keeps it", async () => {
+      const stripped = await runBetomikOrderbookRows(mockClient, 7, { raw: false });
+      expect(stripped.items.every((r) => !("rawJson" in r))).toBe(true);
+      mockClient.get.mockResolvedValueOnce({ items: ledger });
+      const kept = await runBetomikOrderbookRows(mockClient, 7, {});
+      expect(kept.items[0]).toHaveProperty("rawJson");
+    });
+
+    test("--status removed is refused: the route excludes removed rows (fb#1722), so it can never match", async () => {
+      await expect(runBetomikOrderbookRows(mockClient, 7, { status: "removed" })).rejects.toMatchObject({ exitCode: 4 });
+    });
+  });
 });
 
 describe("ib dev betomik-orderbook review / propose / ai-stats", () => {

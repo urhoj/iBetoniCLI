@@ -9,14 +9,14 @@
  * before it writes, and `remove` refuses an id that is not on the person.
  * Neither route honours X-Dry-Run, so --dry-run resolves client-side.
  */
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import { errorMessage } from "../../api/errors.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import { failWith, writeJson } from "../../output/json.js";
-import { addOwnerOption, parseId } from "../../targets.js";
+import { addOwnerOption, intFlag, parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import {
   dryRunOr,
@@ -311,17 +311,41 @@ export async function runPersonFkImport(
   };
 }
 
+/**
+ * Fold the hidden `--asiakas` alias into `--owner` (fb#1732). Every other
+ * person subcommand spells the tenant scope `--asiakas`, so a caller who
+ * learned the domain from `person list/get/search` reached for it here and got
+ * exit 4. Commander has no true option aliasing — `--asiakas` lands on its own
+ * key — so the fold runs before the action reads `opts.owner`. Hidden: the
+ * spec documents only `--owner` (the fb#429 attachment shape).
+ */
+export function foldOwnerAlias(opts: { owner?: number; asiakas?: number }): void {
+  if (opts.asiakas === undefined) return;
+  if (opts.owner !== undefined && opts.owner !== opts.asiakas) {
+    failWith(`--asiakas is an alias for --owner — they disagree (${opts.asiakas} vs ${opts.owner}); pass only one`, 4);
+  }
+  opts.owner = opts.asiakas;
+  delete opts.asiakas;
+}
+
+function addOwnerWithAlias(cmd: Command): Command {
+  return addOwnerOption(cmd).addOption(new Option("--asiakas <id>").argParser(intFlag("--asiakas")).hideHelp());
+}
+
 export function registerPersonFkCommands(person: Command, getClient: () => Promise<ApiClient>): void {
   const fk = person.command("fk").description("Manage a person's foreign keys (external ids / nicknames per source)");
 
   registerFkSourcesLeaf(fk, getClient);
 
-  addOwnerOption(fk.command("list <person>")).action(
-    jsonAction(getClient, (client, personRef: string, opts: { owner?: number }) => runPersonFkList(client, personRef, opts.owner))
+  addOwnerWithAlias(fk.command("list <person>")).action(
+    jsonAction(getClient, (client, personRef: string, opts: { owner?: number }) => {
+      foldOwnerAlias(opts);
+      return runPersonFkList(client, personRef, opts.owner);
+    })
   );
 
   addWriteFlagsToCommand(
-    addOwnerOption(
+    addOwnerWithAlias(
       fk.command("set <person>")
         .requiredOption("--source <ref>")
         .requiredOption("--key <text>")
@@ -330,18 +354,21 @@ export function registerPersonFkCommands(person: Command, getClient: () => Promi
     )
   ).action(
     guarded(async (personRef: string, opts: WriteFlags & PersonFkSetInput) => {
+      foldOwnerAlias(opts);
       writeJson(await runPersonFkSet(await getClient(), personRef, opts, opts));
     })
   );
 
-  addWriteFlagsToCommand(addOwnerOption(fk.command("remove <person> <personForeignKeyId>"))).action(
+  addWriteFlagsToCommand(addOwnerWithAlias(fk.command("remove <person> <personForeignKeyId>"))).action(
     guarded(async (personRef: string, idStr: string, opts: WriteFlags & { owner?: number }) => {
+      foldOwnerAlias(opts);
       writeJson(await runPersonFkRemove(await getClient(), personRef, idStr, opts, opts));
     })
   );
 
-  addWriteFlagsToCommand(addOwnerOption(fk.command("import <file>").option("--source <ref>"))).action(
+  addWriteFlagsToCommand(addOwnerWithAlias(fk.command("import <file>").option("--source <ref>"))).action(
     guarded(async (file: string, opts: WriteFlags & { source?: string; owner?: number }) => {
+      foldOwnerAlias(opts);
       let arr: unknown;
       try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }
       if (!Array.isArray(arr)) failWith("import: JSON root must be an array of { personId, key, source?, text?, disabled? }", 4);

@@ -317,6 +317,15 @@ export const GEOCODE_NO_ADDRESS_ERR: CommandError = {
 // it. Naming both dimensions costs one line and removes that failure.
 export const PERSON_SCOPE_404_REMEDY =
   "the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with `--asiakas <id>` (on `person get`), find them with `ib customer person list --asiakas <id>` or `ib person search --my-companies`, or switch lens with `ib company switch <id>`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.";
+/**
+ * 403 remedy for a tenant-scoped command whose --owner/--asiakas names a
+ * company OTHER than the active one (fb#1733). The one-shot fix is the global
+ * `--company <id>` (ephemeral, not persisted) — a persistent `ib company
+ * switch` is the heavier alternative, and an admin token bypasses the gate.
+ * One constant, because the nine hand-copied rows named only the switch.
+ */
+export const OTHER_TENANT_403_REMEDY =
+  "add the global `--company <ownerId>` to run this ONE command as that company (ephemeral), or `ib company switch <id>` to persist it; an admin token bypasses";
 export const PERSON_SCOPE_NOTE =
   "Person reads are TENANT-SCOPED to your active company (plus global persons, ownerAsiakasId=null, and always yourself). A 404 therefore means 'not in this scope', not 'not in the database'.";
 

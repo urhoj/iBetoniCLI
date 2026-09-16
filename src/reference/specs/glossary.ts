@@ -95,7 +95,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId. Omit to keep." },
       { name: "domain", type: "string", description: "Domain grouping (e.g. vacation). Omit to keep." },
       { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
-      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes)." },
+      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling `append-definition` is accepted too). The accepted set is derived from this command's own flags, and an unknown key exits 4 before any request. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes)." },
       { name: "add-synonyms", type: "string", description: "Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms." },
       { name: "remove-synonyms", type: "string", description: "Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms." },
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
@@ -120,7 +120,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
       AI_CONFIDENCE_PARSE_ERR,
     ],
-    examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"'],
+    examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"', "echo '{\"appendDefinition\":\" Eräpäivä = laskun viimeinen maksupäivä.\",\"addSynonyms\":[\"eräpvm\"]}' | ib glossary set eräpäivä --from-json - --update-only --reason groom"],
   },
   {
     command: "ib glossary import",

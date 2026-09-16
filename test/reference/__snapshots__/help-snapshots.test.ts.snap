@@ -2730,7 +2730,10 @@ ARGUMENTS
   <runId> NUMBER    importRunId from \`runs\` (required)
 
 FLAGS
-  (none)
+  --status STRING    CSV of syncStatus values to keep: pending | blocked | synced | gone | frozen. \`removed\` is rejected — the route already excludes those rows (fb#1722)
+  --limit NUMBER    Rows to return after --status (applied client-side — the route is unpaged and returns the whole run); truncated:true + a hint naming the next --offset when more remain
+  --offset NUMBER    Rows to skip after --status (default 0)
+  --no-raw    Drop rawJson (the raw sheet cells) from every row — a 352-row run is ~300 KB with it
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2741,6 +2744,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
+  exit 4 (client-side)  --status names a value outside pending|blocked|synced|gone|frozen (incl. removed) → Use the listed syncStatus values; removed rows are never returned by the route
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; it slices the fetched run client-side, so any size works
+  exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass an integer >= 0 — the hint on a truncated page names the next one
   exit 4 (HTTP 400)  Backend rejected runId → Pass a numeric importRunId
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
 
@@ -2749,6 +2755,8 @@ NOTES
 
 EXAMPLES
   ib dev betomik-orderbook rows 1
+  ib dev betomik-orderbook rows 3 --status pending,blocked --no-raw
+  ib dev betomik-orderbook rows 3 --limit 100 --offset 100
 "
 `;
 
@@ -5458,7 +5466,7 @@ FLAGS
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling \`append-definition\` is accepted too). The accepted set is derived from this command's own flags, and an unknown key exits 4 before any request. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
@@ -5501,6 +5509,7 @@ EXAMPLES
   ib glossary set loma --from-json loma.json --reason "groom"
   ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"
   ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"
+  echo '{"appendDefinition":" Eräpäivä = laskun viimeinen maksupäivä.","addSynonyms":["eräpvm"]}' | ib glossary set eräpäivä --from-json - --update-only --reason groom
 "
 `;
 
@@ -6658,7 +6667,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400) → pass --price-cents as an integer 1..99999900 (cents, not euros)
   exit 4 (client-side)  --vat-percent is not a number, rejected locally before any request → pass a VAT percent between 0 and 100 (e.g. 25.5)
-  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 3 (HTTP 403)  Not a provider         → run it as a provider company: \`--company <ownerId>\` for one command, or \`ib company switch\` to persist
   exit 5 (HTTP 404)  Request not found      → verify requestId
   exit 4 (HTTP 409)  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6741,7 +6750,7 @@ OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 3 (HTTP 403)  Not a provider         → run it as a provider company: \`--company <ownerId>\` for one command, or \`ib company switch\` to persist
   exit 4 (HTTP 409)  Offer not in draft / not owned → only a draft offer you own can be sent
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6999,7 +7008,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Request not found / not a recipient → verify the requestId and that it was sent to your company
   exit 4 (HTTP 409)  You already have an offer → withdraw the offer instead (ib jerry offer withdraw)
-  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 3 (HTTP 403)  Not a provider         → run it as a provider company: \`--company <ownerId>\` for one command, or \`ib company switch\` to persist
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -7144,7 +7153,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Request not found / not a recipient → verify the requestId and that it was sent to your company
-  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 3 (HTTP 403)  Not a provider         → run it as a provider company: \`--company <ownerId>\` for one command, or \`ib company switch\` to persist
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -7514,7 +7523,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
@@ -7552,7 +7561,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  No personnel-tier role (asiakasAdmin/owner/editor/keikkaHandler/hrAdmin) on the keikka's owner company and no delegated authEdit/authListPersons grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers; a viewer/pumppari role or worksite/customer membership alone is NOT enough (fb#1146) → verify the keikkaId; \`ib company switch\` to the keikka's owner (with an admin/HR role there), or use a sysadmin/developer token
+  exit 3 (HTTP 403)  No personnel-tier role (asiakasAdmin/owner/editor/keikkaHandler/hrAdmin) on the keikka's owner company and no delegated authEdit/authListPersons grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers; a viewer/pumppari role or worksite/customer membership alone is NOT enough (fb#1146) → verify the keikkaId; then \`--company <ownerId>\` (the keikka's owner, where you hold an admin/HR role) for this one command, or \`ib company switch\` to persist it, or use a sysadmin/developer token
   exit 5 (HTTP 404)  The route itself never 404s — a 404 here means GET /api/cli/keikka/persons is not deployed yet (deploy-gated) → deploy the backend (npm run deploy + swap), then retry
   exit 4 (client-side)  Both collapse modes passed together → pass exactly one of --by-person or --count
   exit 4 (client-side)  No keikkaId given (or not a positive integer) → pass <keikkaId> positionally or via --keikka <id>
@@ -8407,7 +8416,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company — or entityType personAvailability without an admin role → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not a member of that company — or entityType personAvailability without an admin role → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 4 (client-side)  Unknown entityType (client-side validation) → ib log types
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10071,7 +10080,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, recipient has no email on file, or both/neither of personId+email → supply --subject, one of --body/--html/--html-body, and a valid --from-brand
-  exit 3 (HTTP 403)  Not Admin/HR/developer → switch to a company where you are admin/HR (ib company switch), or use a developer/sysadmin token
+  exit 3 (HTTP 403)  Not Admin/HR/developer → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist, or use a developer/sysadmin token
   exit 5 (HTTP 404)  Recipient personId not found in your company → check the personId / name belongs to your company
   exit 4 (HTTP 422)  Email provider (SendGrid) rejected the send — e.g. the From address/domain is not a verified Sender Identity (notably --from-brand betonijerry until betonijerry.fi is authenticated in SendGrid) → a provider/config issue, not your request — authenticate the sending domain in SendGrid (Sender Authentication); the exact SendGrid reason is in the error message
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10125,7 +10134,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid request: missing --title/--body, bad --person, ambiguous name, or non-object --data (NOT 'no devices' — that is a 200, see notes) → supply --title/--body and an unambiguous --person
-  exit 3 (HTTP 403)  Not Admin/HR on the active company → switch to a company where you are admin/HR (ib company switch)
+  exit 3 (HTTP 403)  Not Admin/HR on the active company → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist
   exit 5 (HTTP 404)  Recipient not found in your company → check the personId / name belongs to your company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10892,6 +10901,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - The one \`get\` in this domain that needs --owner: \`ib palkki get\` resolves by id across your companies, but bar colors are only listed per owner, so a row of another company is invisible until --owner names it (fb#1743).
+
 EXAMPLES
   ib palkki color get 12
   ib palkki color get 12 --owner 27
@@ -11165,6 +11177,9 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Palkki not found OR outside your companies → verify the id — a foreign tenant's bar 404s identically
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Takes NO --owner: the id is globally unique and the route resolves it against every company you belong to, so the active company does not matter. \`ib palkki color get\` is the exception — it has no by-id route and needs --owner for a row outside the active company (fb#1743).
 
 EXAMPLES
   ib palkki get 4821
@@ -11881,7 +11896,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  ownerAsiakasId missing/invalid → pass --owner <id>, or set an active company
-  exit 3 (HTTP 403)  Not permitted on this tenant → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not permitted on this tenant → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -12096,6 +12111,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
   - Per-row source errors are reported in \`results\`, not thrown; an unknown --source DEFAULT exits 4 before any request.
 
 SEE ALSO
@@ -12138,6 +12154,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
 
 SEE ALSO
   ib person fk set, ib person fk sources
@@ -12184,6 +12201,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
 
 SEE ALSO
   ib person fk list
@@ -12237,6 +12257,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
   - Write results carry \`action\`: inserted | updated | unchanged (no request sent) | removed.
   - Betomik nicknames: matching is case-insensitive and only \`isDisabled:false\` rows count, so \`--disabled\` parks a nickname without deleting it.
 
@@ -12391,7 +12412,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -12458,7 +12479,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed (missing/equal ids, or safety check) → check --main/--secondary; run --dry-run first
   exit 4 (HTTP 400)  Day-row vehicle conflict (errorNumber 50203): both persons drive DIFFERENT vehicles on the same day; conflictingFields lists each day as personPvm@YYYY-MM-DD with both vehicleIds → fix those day rows first (ib person day clear / ib vehicle driver assign), then re-run --dry-run
-  exit 3 (HTTP 403)  Not permitted on this tenant → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not permitted on this tenant → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 5 (HTTP 404)  One or both persons not found or access denied → verify --main/--secondary and --owner
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -15206,7 +15227,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a company admin of the active tenant → switch to a company where you are asiakasAdmin (\`ib company switch\`) or ask an admin
+  exit 3 (HTTP 403)  Not a company admin of the active tenant → \`--company <ownerId>\` where you are asiakasAdmin for one command, or \`ib company switch\` to persist, or ask an admin
   exit 4 (HTTP 400)  date is not a real YYYY-MM-DD calendar date → pass --date YYYY-MM-DD, or today/tomorrow/yesterday
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -15380,7 +15401,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
@@ -15909,7 +15930,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  ownerAsiakasId missing/invalid → pass --owner <id>, or set an active company
-  exit 3 (HTTP 403)  Not permitted on this tenant → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not permitted on this tenant → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -16059,7 +16080,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (\`--field\` only narrows the page you already fetched)
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
@@ -16097,7 +16118,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed (missing/equal ids, or safety check) → check --main/--secondary; run --dry-run first
-  exit 3 (HTTP 403)  Not permitted on this tenant → ib company switch to that owner, or use an admin token
+  exit 3 (HTTP 403)  Not permitted on this tenant → add the global \`--company <ownerId>\` to run this ONE command as that company (ephemeral), or \`ib company switch <id>\` to persist it; an admin token bypasses
   exit 5 (HTTP 404)  One or both worksites not found or access denied → verify --main/--secondary and --owner
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

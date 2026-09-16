@@ -53,6 +53,9 @@ const EDIT_403 = apiErr(403, "No edit role on the owner tenant", "requires an ed
 const OWNER_NOTE =
   "`--owner` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on `--owner 27 --source betomik-orderbook`.";
 const ACTIONS_NOTE = "Write results carry `action`: inserted | updated | unchanged (no request sent) | removed.";
+/** person fk only (fb#1732): the rest of `ib person` spells the tenant scope --asiakas. */
+const PERSON_OWNER_ALIAS_NOTE =
+  "`--asiakas <id>` is accepted as a hidden alias of `--owner` (the rest of `ib person` spells the tenant scope that way); passing both with different values exits 4.";
 
 const sourcesSpec = (group: "person" | "customer" | "vehicle"): CommandSpec => ({
   command: `ib ${group} fk sources`,
@@ -82,7 +85,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       READ_403,
       ...COMMON_AUTH_ERRORS,
     ],
-    notes: [OWNER_NOTE],
+    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE],
     seeAlso: ["ib person fk set", "ib person fk sources"],
     examples: ["ib person fk list 6354 --owner 27", "ib person fk list 'Matti Virtanen'"],
   },
@@ -113,7 +116,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       apiErr(409, "The row to update vanished between read and write", "re-run — the next pass inserts"),
       ...COMMON_AUTH_ERRORS,
     ],
-    notes: [OWNER_NOTE, ACTIONS_NOTE, "Betomik nicknames: matching is case-insensitive and only `isDisabled:false` rows count, so `--disabled` parks a nickname without deleting it."],
+    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE, ACTIONS_NOTE, "Betomik nicknames: matching is case-insensitive and only `isDisabled:false` rows count, so `--disabled` parks a nickname without deleting it."],
     seeAlso: ["ib person fk import", "ib person fk list", "ib person fk remove"],
     examples: [
       "ib person fk set 6354 --source betomik-orderbook --key Tomppa --owner 27 --reason 'T5 nicknames'",
@@ -143,6 +146,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       EDIT_403,
       ...COMMON_AUTH_ERRORS,
     ],
+    notes: [PERSON_OWNER_ALIAS_NOTE],
     seeAlso: ["ib person fk list"],
     examples: ["ib person fk remove 6354 900 --owner 27 --reason 'typo'", "ib person fk remove 6354 900 --owner 27 --dry-run"],
   },
@@ -167,7 +171,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       EDIT_403,
       ...COMMON_AUTH_ERRORS,
     ],
-    notes: [OWNER_NOTE, "Per-row source errors are reported in `results`, not thrown; an unknown --source DEFAULT exits 4 before any request."],
+    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE, "Per-row source errors are reported in `results`, not thrown; an unknown --source DEFAULT exits 4 before any request."],
     seeAlso: ["ib person fk set", "ib dev betomik-orderbook sync"],
     examples: [
       "ib person fk import nicknames.json --source betomik-orderbook --owner 27 --reason 'T5 list'",

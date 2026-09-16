@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, PERSON_PARSE_ERR } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, PERSON_PARSE_ERR, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 export const PERSON_SPECS: CommandSpec[] = [
 
@@ -335,7 +335,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
-      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
+      apiErr(403, "Not a member of that company (and not admin)", OTHER_TENANT_403_REMEDY)
     ),
     examples: ["ib person log 63", "ib person log 63 --field asiakasPersonSetting", "ib person log 63 --owner 27 --limit 50"],
   },
@@ -352,7 +352,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       "{ items: [{ id1, name1, id2, name2, matchCode: 'phone'|'email'|'full_name', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
     errors: [
       apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
-      apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+      apiErr(403, "Not permitted on this tenant", OTHER_TENANT_403_REMEDY),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -382,7 +382,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Validation failed (missing/equal ids, or safety check)", "check --main/--secondary; run --dry-run first"),
       apiErr(400, "Day-row vehicle conflict (errorNumber 50203): both persons drive DIFFERENT vehicles on the same day; conflictingFields lists each day as personPvm@YYYY-MM-DD with both vehicleIds", "fix those day rows first (ib person day clear / ib vehicle driver assign), then re-run --dry-run", "eri ajoneuvo"),
-      apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+      apiErr(403, "Not permitted on this tenant", OTHER_TENANT_403_REMEDY),
       apiErr(404, "One or both persons not found or access denied", "verify --main/--secondary and --owner"),
       ...COMMON_AUTH_ERRORS,
     ],

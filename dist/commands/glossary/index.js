@@ -17,6 +17,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlag
 import { listEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
 import { readJsonInput } from "../../api/parseBody.js";
+import { payloadKeyMap } from "../_shared/fromJson.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { qs } from "../../api/query.js";
@@ -25,14 +26,28 @@ import { qs } from "../../api/query.js";
 import { projectGlossaryForPrimer } from "../../reference/dump.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
+/** `set` options that are not payload: the input channel and the write-safety block. */
+const GLOSSARY_SET_NON_PAYLOAD = new Set(["fromJson", "updateOnly", "dryRun", "idempotencyKey", "reason"]);
 /**
- * Keys `set --from-json` actually reads (via {@link mergeSetInput}), including
- * the read-shape aliases (`relatedCommands`/`relatedEntity`).
+ * JSON key → field name for `set --from-json`, DERIVED from the command's own
+ * registered options (fb#1607) so a renamed/added flag cannot drift from a
+ * hand-kept list. Accepts the camelCase field, the flag spelling
+ * (`append-definition`) and the read-shape aliases the lookup/list rows carry
+ * (`relatedCommands`/`relatedEntity`). Commander's `--no-needs-human-review`
+ * registers a `no-…` long whose attribute is the positive field — dropped,
+ * because a JSON author writing it would mean the OPPOSITE of what the
+ * attribute would read.
  */
-const GLOSSARY_SET_JSON_KEYS = [
-    "definition", "synonyms", "related", "relatedCommands", "entity", "relatedEntity",
-    "domain", "aiConfidence", "needsHumanReview",
-];
+function glossarySetJsonKeys(set) {
+    const keys = payloadKeyMap(set, {
+        nonPayload: GLOSSARY_SET_NON_PAYLOAD,
+        readShapeAliases: { relatedCommands: "related", relatedEntity: "entity" },
+    });
+    for (const k of [...keys.keys()])
+        if (k.startsWith("no-"))
+            keys.delete(k);
+    return keys;
+}
 /**
  * Reject an unknown key in a `set --from-json` object instead of silently
  * dropping it (fb#1533) — mirroring `ib dev changelog add --from-json`'s
@@ -42,13 +57,19 @@ const GLOSSARY_SET_JSON_KEYS = [
  * — the write still succeeded, just without the change the caller intended.
  * That matters most for the machine writer (`groom-ib-glossary`, which uses
  * --from-json to stay argv-safe with Finnish ä/ö): a typo there produced a
- * green run that groomed nothing.
+ * green run that groomed nothing. Returns the object re-keyed to the field
+ * names {@link mergeSetInput} reads (`append-definition` → `appendDefinition`).
  */
-function assertKnownGlossarySetKeys(json) {
-    const unknown = Object.keys(json).filter((k) => !GLOSSARY_SET_JSON_KEYS.includes(k));
+function canonicalGlossarySetJson(json, keys) {
+    const unknown = Object.keys(json).filter((k) => !keys.has(k));
     if (unknown.length) {
-        failWith(`--from-json: unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${GLOSSARY_SET_JSON_KEYS.join(", ")}`, 4);
+        const accepted = [...new Set(keys.keys())].filter((k) => !k.includes("-"));
+        failWith(`--from-json: unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${accepted.join(", ")}`, 4);
     }
+    const out = {};
+    for (const [k, v] of Object.entries(json))
+        out[keys.get(k)] = v;
+    return out;
 }
 /**
  * Merge fields from a parsed JSON object with explicit CLI flags.
@@ -74,6 +95,9 @@ export function mergeSetInput(json, flags) {
         domain: flags.domain ?? json.domain,
         aiConfidence: flags.aiConfidence ?? json.aiConfidence,
         needsHumanReview: flags.needsHumanReview ?? json.needsHumanReview,
+        addSynonyms: flags.addSynonyms ?? arrToCsv(json.addSynonyms),
+        removeSynonyms: flags.removeSynonyms ?? arrToCsv(json.removeSynonyms),
+        appendDefinition: flags.appendDefinition ?? json.appendDefinition,
     };
 }
 /** Concurrent PUTs during `glossary import` — bounded so a 500-entry grooming
@@ -102,8 +126,7 @@ export async function runGlossaryImport(client, entries, flags) {
             }
             const inp = mergeSetInput(e, {});
             try {
-                await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain,
-                    aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, flags);
+                await runGlossarySet(client, term, { ...inp, updateOnly: flags.updateOnly }, flags);
                 results[i] = { term, ok: true };
             }
             catch (err) {
@@ -341,6 +364,7 @@ export function registerGlossaryCommands(program, getClient) {
         const flagFields = {
             definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain,
             aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview,
+            addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
         };
         let merged = flagFields;
         if (opts.fromJson) {
@@ -351,16 +375,13 @@ export function registerGlossaryCommands(program, getClient) {
             catch {
                 failWith("--from-json: not valid JSON", 4);
             }
-            assertKnownGlossarySetKeys(json);
-            merged = mergeSetInput(json, flagFields);
+            merged = mergeSetInput(canonicalGlossarySetJson(json, glossarySetJsonKeys(set)), flagFields);
         }
         // Validate the MERGED score, not just the flag — a --from-json object can
         // now supply aiConfidence, and an out-of-range value there deserves the
         // same client-side exit 4 as a bad flag (fb#298).
         assertAiConfidence(merged.aiConfidence);
-        writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
-            addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-            updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, opts));
+        writeJson(await runGlossarySet(await getClient(), term, { ...merged, updateOnly: opts.updateOnly }, opts));
     }));
     const imp = glossary
         .command("import")

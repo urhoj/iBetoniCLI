@@ -1,5 +1,5 @@
 import type { CommandSpec } from "../../output/help.js";
-import { FROM_JSON_BODY_FLAG } from "./shared.js";
+import { FROM_JSON_BODY_FLAG, intParseErr } from "./shared.js";
 
 /**
  * The `canView()` gate in puminet5api routes/betomikOrderbookRoutes.js —
@@ -57,7 +57,12 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     description: "Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of `import`; the weekly tenant report sums m3 and groups by plate from these rows. Terminal `removed` rows (a sheet row that vanished and whose keikka/palkki is gone) are excluded, so the count matches `runs`.rowCount; `gone` rows still show until sync reconciles them (fb#1722).",
     tier: "developer",
     permissions: [BETOMIK_VIEW_PERMISSION],
-    flags: [],
+    flags: [
+      { name: "status", type: "string", description: "CSV of syncStatus values to keep: pending | blocked | synced | gone | frozen. `removed` is rejected — the route already excludes those rows (fb#1722)" },
+      { name: "limit", type: "number", description: "Rows to return after --status (applied client-side — the route is unpaged and returns the whole run); truncated:true + a hint naming the next --offset when more remain" },
+      { name: "offset", type: "number", description: "Rows to skip after --status (default 0)" },
+      { name: "no-raw", type: "boolean", description: "Drop rawJson (the raw sheet cells) from every row — a 352-row run is ~300 KB with it" },
+    ],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>",
     prettyColumns: ["importRunId", "jobDate", "plate", "vehicleLabel", "driverName", "driverMatchStatus", "sourceType", "m3", "reviewStatus"],
@@ -65,11 +70,14 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via `review`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see `propose`/`ai-stats`.",
     ],
     errors: [
-      { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
+      { origin: "client", exit: 4, match: "invalid runId", meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
+      { origin: "client", exit: 4, match: "--status: unknown value", meaning: "--status names a value outside pending|blocked|synced|gone|frozen (incl. removed)", remedy: "Use the listed syncStatus values; removed rows are never returned by the route" },
+      intParseErr("--limit", "pass a positive integer; it slices the fetched run client-side, so any size works"),
+      intParseErr("--offset", "pass an integer >= 0 — the hint on a truncated page names the next one", 0),
       { http: 400, exit: 4, meaning: "Backend rejected runId", remedy: "Pass a numeric importRunId" },
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
     ],
-    examples: ["ib dev betomik-orderbook rows 1"],
+    examples: ["ib dev betomik-orderbook rows 1", "ib dev betomik-orderbook rows 3 --status pending,blocked --no-raw", "ib dev betomik-orderbook rows 3 --limit 100 --offset 100"],
   },
   {
     command: "ib dev betomik-orderbook review",

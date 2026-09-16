@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, TRUNCATED_NOTE, WORKSITE_EDIT_PERMISSION, apiErr, authErrors, clearHint, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, TRUNCATED_NOTE, WORKSITE_EDIT_PERMISSION, apiErr, authErrors, clearHint, clearNote, intParseErr, limitErr, permErrors, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 export const WORKSITE_SPECS: CommandSpec[] = [
 
@@ -270,7 +270,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
-      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
+      apiErr(403, "Not a member of that company (and not admin)", OTHER_TENANT_403_REMEDY)
     ),
     seeAlso: ["ib log entity"],
     examples: ["ib worksite log 7"],
@@ -288,7 +288,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       "{ items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
     errors: [
       apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
-      apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+      apiErr(403, "Not permitted on this tenant", OTHER_TENANT_403_REMEDY),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -317,7 +317,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
     errors: [
       apiErr(400, "Validation failed (missing/equal ids, or safety check)", "check --main/--secondary; run --dry-run first"),
-      apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+      apiErr(403, "Not permitted on this tenant", OTHER_TENANT_403_REMEDY),
       apiErr(404, "One or both worksites not found or access denied", "verify --main/--secondary and --owner"),
       ...COMMON_AUTH_ERRORS,
     ],

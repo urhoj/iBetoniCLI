@@ -457,6 +457,14 @@ ib dev apikey verify --source <id>
   ! --source must be an integer >= 1
   > pass a positive apiKeySourceId
 
+ib dev betomik-orderbook rows --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; it slices the fetched run client-side, so any size works
+
+ib dev betomik-orderbook rows --offset <n>
+  ! --offset must be an integer >= 0
+  > pass an integer >= 0 — the hint on a truncated page names the next one
+
 ib dev cache invalidate --asiakas <n>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId
@@ -1205,17 +1213,33 @@ ib person duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib person fk import --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
 ib person fk import --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
 
 ib person fk list --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib person fk remove --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
 ib person fk remove --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person fk set --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
 
 ib person fk set --owner <id>
   ! --owner must be an integer >= 1

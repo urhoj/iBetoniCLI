@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, authErrors, intParseErr, limitErr, permErrors } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, authErrors, intParseErr, limitErr, permErrors, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 // ─── keikka cross-tenant (--asiakas) fragments (fb#1512) ─────────────────────
 // Mirrors VEHICLE_ASIAKAS_PERMISSION/_403 but the keikka read gate is narrower:
@@ -193,7 +193,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       apiErr(
         403,
         "No personnel-tier role (asiakasAdmin/owner/editor/keikkaHandler/hrAdmin) on the keikka's owner company and no delegated authEdit/authListPersons grant on the keikka — the gate fails CLOSED, so a nonexistent keikkaId denies identically for non-sysadmin callers; a viewer/pumppari role or worksite/customer membership alone is NOT enough (fb#1146)",
-        "verify the keikkaId; `ib company switch` to the keikka's owner (with an admin/HR role there), or use a sysadmin/developer token"
+        "verify the keikkaId; then `--company <ownerId>` (the keikka's owner, where you hold an admin/HR role) for this one command, or `ib company switch` to persist it, or use a sysadmin/developer token"
       ),
       apiErr(
         404,
@@ -385,7 +385,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       limitErr("pass a positive integer; this cursor-less route caps at 500 — raise --limit to reach older rows (`--field` only narrows the page you already fetched)"),
-      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
+      apiErr(403, "Not a member of that company (and not admin)", OTHER_TENANT_403_REMEDY)
     ),
     seeAlso: ["ib log entity", "ib log by-entity-date"],
     examples: ["ib keikka log 12345", "ib keikka log 12345 --field kuskit"],

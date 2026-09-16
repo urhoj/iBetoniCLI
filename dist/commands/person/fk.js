@@ -1,9 +1,21 @@
+/**
+ * `ib person fk` — person foreign keys (dbo.personForeignKeys), fb#1683.
+ *
+ * Many keys per (person, source): the Betomik order-book sync resolves sheet
+ * driver names through rows on source `betomik-orderbook`, owner 27, one row
+ * per nickname. The backend upsert (`person_saveForeignKey`) is BY ID and
+ * never dedupes an INSERT, and its DELETE is owner-blind — so `set` matches
+ * the existing rows client-side (trim + case-insensitive, the matcher's rule)
+ * before it writes, and `remove` refuses an id that is not on the person.
+ * Neither route honours X-Dry-Run, so --dry-run resolves client-side.
+ */
+import { Option } from "commander";
 import { listEnvelope, unwrapRows } from "../../api/envelopes.js";
 import { errorMessage } from "../../api/errors.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { failWith, writeJson } from "../../output/json.js";
-import { addOwnerOption, parseId } from "../../targets.js";
+import { addOwnerOption, intFlag, parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { dryRunOr, fetchFkSources, normKey, pickFkSource, registerFkSourcesLeaf, resolveOwner, sourceNameOf, } from "../_shared/foreignKeys.js";
 import { resolvePersonRef } from "../notification/index.js";
@@ -175,21 +187,47 @@ export async function runPersonFkImport(client, entries, opts, flags) {
         unchanged: count("unchanged"),
     };
 }
+/**
+ * Fold the hidden `--asiakas` alias into `--owner` (fb#1732). Every other
+ * person subcommand spells the tenant scope `--asiakas`, so a caller who
+ * learned the domain from `person list/get/search` reached for it here and got
+ * exit 4. Commander has no true option aliasing — `--asiakas` lands on its own
+ * key — so the fold runs before the action reads `opts.owner`. Hidden: the
+ * spec documents only `--owner` (the fb#429 attachment shape).
+ */
+export function foldOwnerAlias(opts) {
+    if (opts.asiakas === undefined)
+        return;
+    if (opts.owner !== undefined && opts.owner !== opts.asiakas) {
+        failWith(`--asiakas is an alias for --owner — they disagree (${opts.asiakas} vs ${opts.owner}); pass only one`, 4);
+    }
+    opts.owner = opts.asiakas;
+    delete opts.asiakas;
+}
+function addOwnerWithAlias(cmd) {
+    return addOwnerOption(cmd).addOption(new Option("--asiakas <id>").argParser(intFlag("--asiakas")).hideHelp());
+}
 export function registerPersonFkCommands(person, getClient) {
     const fk = person.command("fk").description("Manage a person's foreign keys (external ids / nicknames per source)");
     registerFkSourcesLeaf(fk, getClient);
-    addOwnerOption(fk.command("list <person>")).action(jsonAction(getClient, (client, personRef, opts) => runPersonFkList(client, personRef, opts.owner)));
-    addWriteFlagsToCommand(addOwnerOption(fk.command("set <person>")
+    addOwnerWithAlias(fk.command("list <person>")).action(jsonAction(getClient, (client, personRef, opts) => {
+        foldOwnerAlias(opts);
+        return runPersonFkList(client, personRef, opts.owner);
+    }));
+    addWriteFlagsToCommand(addOwnerWithAlias(fk.command("set <person>")
         .requiredOption("--source <ref>")
         .requiredOption("--key <text>")
         .option("--text <label>")
         .option("--disabled"))).action(guarded(async (personRef, opts) => {
+        foldOwnerAlias(opts);
         writeJson(await runPersonFkSet(await getClient(), personRef, opts, opts));
     }));
-    addWriteFlagsToCommand(addOwnerOption(fk.command("remove <person> <personForeignKeyId>"))).action(guarded(async (personRef, idStr, opts) => {
+    addWriteFlagsToCommand(addOwnerWithAlias(fk.command("remove <person> <personForeignKeyId>"))).action(guarded(async (personRef, idStr, opts) => {
+        foldOwnerAlias(opts);
         writeJson(await runPersonFkRemove(await getClient(), personRef, idStr, opts, opts));
     }));
-    addWriteFlagsToCommand(addOwnerOption(fk.command("import <file>").option("--source <ref>"))).action(guarded(async (file, opts) => {
+    addWriteFlagsToCommand(addOwnerWithAlias(fk.command("import <file>").option("--source <ref>"))).action(guarded(async (file, opts) => {
+        foldOwnerAlias(opts);
         let arr;
         try {
             arr = readJsonInput(file);

@@ -182,6 +182,9 @@ export const PALKKI_SPECS: CommandSpec[] = [
       apiErr(404, "Palkki not found OR outside your companies", "verify the id — a foreign tenant's bar 404s identically"),
       ...authErrors(),
     ],
+    notes: [
+      "Takes NO --owner: the id is globally unique and the route resolves it against every company you belong to, so the active company does not matter. `ib palkki color get` is the exception — it has no by-id route and needs --owner for a row outside the active company (fb#1743).",
+    ],
     examples: ["ib palkki get 4821"],
   },
   {
@@ -351,6 +354,9 @@ export const PALKKI_SPECS: CommandSpec[] = [
     flags: [{ name: "owner", type: "number", description: "Company to look the row up under (default: active company)" }],
     outputShape: PALKKI_COLOR_ROW_SHAPE,
     errors: [OWNER_PARSE_ERR, PALKKI_COLOR_CLIENT_NOT_FOUND, apiErr(403, "--owner is not a company you belong to", "check `ib company`"), ...authErrors()],
+    notes: [
+      "The one `get` in this domain that needs --owner: `ib palkki get` resolves by id across your companies, but bar colors are only listed per owner, so a row of another company is invisible until --owner names it (fb#1743).",
+    ],
     examples: ["ib palkki color get 12", "ib palkki color get 12 --owner 27"],
   },
   {

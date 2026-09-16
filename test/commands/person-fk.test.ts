@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import { CliError } from "../../src/api/errors.js";
 import {
+  foldOwnerAlias,
   planPersonFkSet,
   runPersonFkImport,
   runPersonFkList,
@@ -173,5 +174,30 @@ describe("person fk import", () => {
     const out = await runPersonFkImport(c, [{ personId: 1, key: "a" }], { source: "42", owner: 27 }, { dryRun: true });
     expect(c.post).not.toHaveBeenCalled();
     expect(out).toMatchObject({ dryRun: true, inserted: 1, results: [{ personId: 1, key: "a", ok: true, action: "inserted" }] });
+  });
+});
+
+// fb#1732: the rest of the person domain spells the tenant scope --asiakas;
+// fk's canonical flag is --owner. The alias is hidden (spec documents --owner)
+// and folded before the action reads opts.owner — the fb#429 attachment shape.
+describe("person fk --asiakas alias (fb#1732)", () => {
+  test("--asiakas alone lands on owner", () => {
+    const opts: { owner?: number; asiakas?: number } = { asiakas: 27 };
+    foldOwnerAlias(opts);
+    expect(opts).toEqual({ owner: 27 });
+  });
+
+  test("both given and equal is tolerated; both given and different exits 4", () => {
+    const same: { owner?: number; asiakas?: number } = { asiakas: 27, owner: 27 };
+    foldOwnerAlias(same);
+    expect(same).toEqual({ owner: 27 });
+    expect(() => foldOwnerAlias({ asiakas: 27, owner: 8 })).toThrow(CliError);
+    try { foldOwnerAlias({ asiakas: 27, owner: 8 }); } catch (e) { expect((e as CliError).exitCode).toBe(4); }
+  });
+
+  test("neither given is a no-op", () => {
+    const opts: { owner?: number; asiakas?: number; source: string } = { source: "x" };
+    foldOwnerAlias(opts);
+    expect(opts).toEqual({ source: "x" });
   });
 });

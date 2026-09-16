@@ -164,6 +164,12 @@ describe("Rich --help wiring — real command tree", () => {
     "ib person search --query": "--search",
     "ib vehicle search --query": "--search",
     "ib worksite search --query": "--search",
+    // fb#1732: person fk scopes by --owner while the rest of `ib person` spells
+    // the tenant scope --asiakas — accept the domain's spelling on the fk leaf.
+    "ib person fk list --asiakas": "--owner",
+    "ib person fk set --asiakas": "--owner",
+    "ib person fk remove --asiakas": "--owner",
+    "ib person fk import --asiakas": "--owner",
   };
 
   const isHidden = (opt: { hidden?: boolean }): boolean => !!opt.hidden;

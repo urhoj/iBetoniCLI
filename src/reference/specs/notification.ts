@@ -29,7 +29,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       "{ success, reason:'SENT'|'NO_DEVICES'|'DELIVERY_FAILED', personId, name, devicesTargeted, messageUuid?, successCount?, failureCount?, hint? } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)",
     errors: [
       apiErr(400, "Invalid request: missing --title/--body, bad --person, ambiguous name, or non-object --data (NOT 'no devices' — that is a 200, see notes)", "supply --title/--body and an unambiguous --person"),
-      apiErr(403, "Not Admin/HR on the active company", "switch to a company where you are admin/HR (ib company switch)"),
+      apiErr(403, "Not Admin/HR on the active company", "`--company <ownerId>` where you are admin/HR for one command, or `ib company switch` to persist"),
       apiErr(404, "Recipient not found in your company", "check the personId / name belongs to your company"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -95,7 +95,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       apiErr(
         403,
         "Not Admin/HR/developer",
-        "switch to a company where you are admin/HR (ib company switch), or use a developer/sysadmin token"
+        "`--company <ownerId>` where you are admin/HR for one command, or `ib company switch` to persist, or use a developer/sysadmin token"
       ),
       apiErr(
         404,

@@ -158,7 +158,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     errors: [
       apiErr(404, "Request not found / not a recipient", "verify the requestId and that it was sent to your company"),
       apiErr(409, "You already have an offer", "withdraw the offer instead (ib jerry offer withdraw)"),
-      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(403, "Not a provider", "run it as a provider company: `--company <ownerId>` for one command, or `ib company switch` to persist"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry request decline 88 --reason "kalusto varattu kyseiselle päivälle"'],
@@ -177,7 +177,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       "{ success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run",
     errors: [
       apiErr(404, "Request not found / not a recipient", "verify the requestId and that it was sent to your company"),
-      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(403, "Not a provider", "run it as a provider company: `--company <ownerId>` for one command, or `ib company switch` to persist"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry request undecline 88 --reason "kalusto vapautui"'],
@@ -207,7 +207,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     errors: [
       { origin: "client", exit: 4, match: "--price-cents", meaning: "--price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400)", remedy: "pass --price-cents as an integer 1..99999900 (cents, not euros)" },
       numParseErr("--vat-percent", "pass a VAT percent between 0 and 100 (e.g. 25.5)"),
-      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(403, "Not a provider", "run it as a provider company: `--company <ownerId>` for one command, or `ib company switch` to persist"),
       apiErr(404, "Request not found", "verify requestId"),
       apiErr(409, "Request not open / expired, or offer no longer editable", "the request was closed, or your offer is already accepted/rejected"),
       ...COMMON_AUTH_ERRORS,
@@ -237,7 +237,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
     errors: [
-      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(403, "Not a provider", "run it as a provider company: `--company <ownerId>` for one command, or `ib company switch` to persist"),
       apiErr(409, "Offer not in draft / not owned", "only a draft offer you own can be sent"),
       ...COMMON_AUTH_ERRORS,
     ],
