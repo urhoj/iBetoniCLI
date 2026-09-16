@@ -100,7 +100,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // other-tenant 403 remedies that now name `--company <ownerId>` (the shared
 // constant is longer than the switch-only wording it replaced).
 // 801959 B measured; headroom ~541 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 802_500;
+// 803_000 (fb#1606 from-json value-type contract in the glossary set/import
+// spec rows, 2026-09-16). ~802.7 KB measured.
+const DUMP_LIMIT_BYTES = 803_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

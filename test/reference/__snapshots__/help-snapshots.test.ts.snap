@@ -5300,7 +5300,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
-  - Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.
+  - synonyms/relatedCommands: an array of strings or a comma list. Entries are validated like \`set --from-json\` — an unknown key or wrong-typed value fails that entry by name; the batch continues.
   - Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.
   - There is no --ai-confidence flag here, so a per-entry \`aiConfidence\` key is the ONLY way a bulk groom can carry its score. Since fb#1707 an entry WITHOUT the key keeps the stored score (deploy-gated: an older backend resets it to null and re-queues the term). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.
 
@@ -5466,7 +5466,7 @@ FLAGS
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling \`append-definition\` is accepted too). The accepted set is derived from this command's own flags, and an unknown key exits 4 before any request. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling \`append-definition\` is accepted too). The accepted set is derived from this command's own flags; an unknown key OR a wrong-typed value exits 4 by name before any request (CSV keys: string or array of strings; aiConfidence: number, JSON null clears; needsHumanReview: true/false). Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
@@ -5492,7 +5492,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Term not found (with --update-only) → Omit --update-only to create the entry
   exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
   exit 4 (HTTP 400)  definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length) → Shorten the definition
-  exit 4 (client-side)  --from-json file is not valid JSON or not readable → Check the file path and contents
+  exit 4 (client-side)  --from-json file is not valid JSON/readable, or the object has an unknown key or a wrong-typed value (e.g. \`"synonyms": 123\`) → The message names the key; fix it in the file — nothing is silently dropped
   exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
 
 NOTES

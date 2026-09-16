@@ -68,6 +68,8 @@ export interface FromJsonConfig {
    * Passed through untouched; anything non-object is rejected by name.
    */
   objectFields?: Set<string>;
+  /** Payload fields whose flag is a boolean switch — a JSON `true`/`false` is accepted, anything else rejected by name. */
+  booleanFields?: Set<string>;
   /** Flag name used as the error prefix (default `--from-json`). */
   flagName?: string;
 }
@@ -113,12 +115,13 @@ export function payloadKeyMap(
 export function normalizeFromJson(
   json: Record<string, unknown>,
   keys: Map<string, string>,
-  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "objectFields" | "flagName"> = {}
+  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "objectFields" | "booleanFields" | "flagName"> = {}
 ): Record<string, unknown> {
   const numeric = cfg.numericFields ?? new Set<string>();
   const csv = cfg.csvFields ?? new Set<string>();
   const numericTolerant = cfg.numericTolerantCsvFields ?? new Set<string>();
   const objects = cfg.objectFields ?? new Set<string>();
+  const booleans = cfg.booleanFields ?? new Set<string>();
   const flagName = cfg.flagName ?? "--from-json";
   const out: Record<string, unknown> = {};
   const unknown: string[] = [];
@@ -134,6 +137,11 @@ export function normalizeFromJson(
       if (typeof value !== "object" || Array.isArray(value)) {
         problems.push(`"${rawKey}" must be a JSON object (got ${Array.isArray(value) ? "array" : typeof value})`);
       } else out[key] = value;
+      continue;
+    }
+    if (booleans.has(key)) {
+      if (typeof value !== "boolean") problems.push(`"${rawKey}" must be true or false (got ${typeof value})`);
+      else out[key] = value;
       continue;
     }
     if (numeric.has(key)) {

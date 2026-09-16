@@ -95,7 +95,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId. Omit to keep." },
       { name: "domain", type: "string", description: "Domain grouping (e.g. vacation). Omit to keep." },
       { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
-      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling `append-definition` is accepted too). The accepted set is derived from this command's own flags, and an unknown key exits 4 before any request. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes)." },
+      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling `append-definition` is accepted too). The accepted set is derived from this command's own flags; an unknown key OR a wrong-typed value exits 4 by name before any request (CSV keys: string or array of strings; aiConfidence: number, JSON null clears; needsHumanReview: true/false). Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes)." },
       { name: "add-synonyms", type: "string", description: "Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms." },
       { name: "remove-synonyms", type: "string", description: "Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms." },
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
@@ -117,7 +117,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       // catch-all (fb#668).
       { http: 404, exit: 5, match: "append/add/remove requires an existing term", meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
       { http: 400, exit: 4, meaning: "definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length)", remedy: "Shorten the definition" },
-      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
+      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is not valid JSON/readable, or the object has an unknown key or a wrong-typed value (e.g. `\"synonyms\": 123`)", remedy: "The message names the key; fix it in the file — nothing is silently dropped" },
       AI_CONFIDENCE_PARSE_ERR,
     ],
     examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"', "echo '{\"appendDefinition\":\" Eräpäivä = laskun viimeinen maksupäivä.\",\"addSynonyms\":[\"eräpvm\"]}' | ib glossary set eräpäivä --from-json - --update-only --reason groom"],
@@ -136,7 +136,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     outputShape: "{ results: [{term, ok, error?}], ok, failed }",
     notes: [
       "Each entry must have a `term` field; entries missing it are counted as failed.",
-      "Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.",
+      "synonyms/relatedCommands: an array of strings or a comma list. Entries are validated like `set --from-json` — an unknown key or wrong-typed value fails that entry by name; the batch continues.",
       "Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.",
       "There is no --ai-confidence flag here, so a per-entry `aiConfidence` key is the ONLY way a bulk groom can carry its score. Since fb#1707 an entry WITHOUT the key keeps the stored score (deploy-gated: an older backend resets it to null and re-queues the term). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.",
     ],

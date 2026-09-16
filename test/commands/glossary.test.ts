@@ -6,11 +6,21 @@ import { join } from "node:path";
 import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
   mergeSetInput, runGlossaryImport, runGlossaryDelete, runGlossaryDismiss, registerGlossaryCommands,
+  glossarySetJsonKeys, canonicalGlossarySetJson,
 } from "../../src/commands/glossary/index.js";
+import { normalizeFromJson } from "../../src/commands/_shared/fromJson.js";
 import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import { CliError } from "../../src/api/errors.js";
 
 const mkClient = (over: MockApiClientOverrides = {}): MockApiClient => mockApiClient(over);
+
+/** The `set` command's derived --from-json key map — what `import` validates entries against. */
+const KEYS = (() => {
+  const program = new Command();
+  registerGlossaryCommands(program, async () => mkClient());
+  const glossary = program.commands.find((c) => c.name() === "glossary")!;
+  return glossarySetJsonKeys(glossary.commands.find((c) => c.name() === "set")!);
+})();
 
 describe("ib glossary", () => {
   test("lookup hits /api/cli/glossary/lookup/<term> (URL-encoded)", async () => {
@@ -175,7 +185,8 @@ describe("glossary set/import JSON input", () => {
     const res = await runGlossaryImport(
       mkClient({ put }),
       [{ term: "loma", definition: "d1", synonyms: ["lomat"] }, { definition: "no term" }],
-      { reason: "r" }
+      { reason: "r" },
+      KEYS
     );
     expect(res.ok).toBe(1);
     expect(res.failed).toBe(1);
@@ -196,7 +207,7 @@ describe("glossary set/import JSON input", () => {
       if (p.endsWith("/t3")) throw new Error("boom");
       return { term: p.split("/").pop() };
     });
-    const res = await runGlossaryImport(mkClient({ put }), entries, { reason: "r" });
+    const res = await runGlossaryImport(mkClient({ put }), entries, { reason: "r" }, KEYS);
     expect(res.results.map((r) => r.term)).toEqual(entries.map((e) => e.term));
     expect(res.results[3]).toMatchObject({ term: "t3", ok: false });
     expect(res.ok).toBe(11);
@@ -428,7 +439,7 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
 
     test("import entries carry the merge keys too", async () => {
       const put = vi.fn().mockResolvedValue({ term: "x" });
-      await runGlossaryImport(mkClient({ put }), [{ term: "x", addSynonyms: ["a"] }], {});
+      await runGlossaryImport(mkClient({ put }), [{ term: "x", addSynonyms: ["a"] }], {}, KEYS);
       expect(put.mock.calls[0][1]).toEqual({ addSynonyms: ["a"] });
     });
   });
@@ -465,9 +476,99 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
     await runGlossaryImport(
       mkClient({ put }),
       [{ term: "loma", definition: "d", aiConfidence: 85, needsHumanReview: true }],
-      { reason: "groom" }
+      { reason: "groom" },
+      KEYS
     );
     expect(put.mock.calls[0][1]).toMatchObject({ aiConfidence: 85, needsHumanReview: true });
+  });
+});
+
+// fb#1606: the fb#1533 unknown-key guard checked NAMES only. A known key with
+// a wrong-typed value (`{"synonyms": 123}`) passed it, then arrToCsv read the
+// number as "absent" — the silent keep-current-value no-op the guard was built
+// to eliminate, one layer down. The shared normalizeFromJson pass now owns the
+// types, for `set --from-json` and per `import` entry alike.
+describe("glossary --from-json value types (fb#1606)", () => {
+  const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+    const p = join(tmpdir(), `ib-glossary-types-${process.pid}.json`);
+    writeFileSync(p, JSON.stringify(payload), "utf8");
+    try { await fn(p); } finally { unlinkSync(p); }
+  };
+  const runSet = async (payload: unknown, put = vi.fn().mockResolvedValue({ term: "x" })) => {
+    let written = "";
+    let exit: number | undefined;
+    await withJsonFile(payload, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      const prevExit = process.exitCode;
+      process.exitCode = undefined;
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+        exit = process.exitCode as number | undefined;
+        written = stderr.mock.calls.map((c) => String(c[0])).join("");
+      } finally {
+        stderr.mockRestore();
+        process.exitCode = prevExit;
+      }
+    });
+    return { put, exit, written };
+  };
+
+  test("canonicalGlossarySetJson: a wrong-typed known key is rejected BY NAME (before: a silent keep-current no-op)", () => {
+    expect(() => canonicalGlossarySetJson({ synonyms: 123 }, KEYS)).toThrow(/synonyms/);
+    expect(() => canonicalGlossarySetJson({ relatedCommands: [{ command: "ib keikka" }] }, KEYS)).toThrow(/relatedCommands/);
+    expect(() => canonicalGlossarySetJson({ definition: ["a"] }, KEYS)).toThrow(/definition/);
+    expect(() => canonicalGlossarySetJson({ needsHumanReview: "yes" }, KEYS)).toThrow(/needsHumanReview.*true or false/);
+    expect(() => canonicalGlossarySetJson({ aiConfidence: "high" }, KEYS)).toThrow(/aiConfidence/);
+  });
+
+  test("valid shapes still pass: arrays → csv, flag spelling re-keyed, numeric string coerced", () => {
+    expect(canonicalGlossarySetJson(
+      { synonyms: ["a", "b"], "append-definition": "x", relatedEntity: "keikka", aiConfidence: "80", needsHumanReview: false }, KEYS
+    )).toEqual({ synonyms: "a,b", appendDefinition: "x", entity: "keikka", aiConfidence: 80, needsHumanReview: false });
+  });
+
+  test("a JSON null on the assessment pair is still the documented CLEAR (fb#1707), not an omission", () => {
+    expect(canonicalGlossarySetJson({ aiConfidence: null, needsHumanReview: null }, KEYS))
+      .toEqual({ aiConfidence: null, needsHumanReview: null });
+    // …while null elsewhere stays "omitted → keep current"
+    expect(canonicalGlossarySetJson({ synonyms: null }, KEYS)).toEqual({});
+  });
+
+  test("set --from-json {synonyms: 123} exits 4 naming the key, no PUT", async () => {
+    const { put, exit, written } = await runSet({ synonyms: 123 });
+    expect(exit).toBe(4);
+    expect(written).toContain("synonyms");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("set --from-json with a valid array still PUTs it as a list", async () => {
+    const { put } = await runSet({ synonyms: ["a", "b"] });
+    expect(put.mock.calls[0][1]).toEqual({ synonyms: ["a", "b"] });
+  });
+
+  test("import: a wrong-typed entry fails by name and the batch continues", async () => {
+    const put = vi.fn(async (p: string, _body?: unknown) => ({ term: p.split("/").pop() }));
+    const res = await runGlossaryImport(
+      mkClient({ put }),
+      [{ term: "bad", synonyms: 123 }, { term: "stray", definition: "d", lastReviewed: "2026-01-01" }, { term: "good", synonyms: ["a"] }],
+      {},
+      KEYS
+    );
+    expect(res.results[0]).toMatchObject({ term: "bad", ok: false, error: expect.stringContaining("synonyms") });
+    expect(res.results[1]).toMatchObject({ term: "stray", ok: false, error: expect.stringContaining("unknown key lastReviewed") });
+    expect(res.results[2]).toEqual({ term: "good", ok: true });
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][1]).toEqual({ synonyms: ["a"] });
+  });
+
+  test("normalizeFromJson booleanFields: true/false pass, anything else is rejected by name", () => {
+    const keys = new Map([["flag", "flag"]]);
+    const cfg = { booleanFields: new Set(["flag"]) };
+    expect(normalizeFromJson({ flag: true }, keys, cfg)).toEqual({ flag: true });
+    expect(normalizeFromJson({ flag: false }, keys, cfg)).toEqual({ flag: false });
+    expect(() => normalizeFromJson({ flag: "true" }, keys, cfg)).toThrow(/"flag" must be true or false \(got string\)/);
   });
 });
 

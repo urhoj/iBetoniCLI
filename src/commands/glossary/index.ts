@@ -18,7 +18,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "..
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
 import { readJsonInput } from "../../api/parseBody.js";
-import { payloadKeyMap } from "../_shared/fromJson.js";
+import { payloadKeyMap, normalizeFromJson } from "../_shared/fromJson.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { qs } from "../../api/query.js";
@@ -71,7 +71,7 @@ const GLOSSARY_SET_NON_PAYLOAD = new Set(["fromJson", "updateOnly", "dryRun", "i
  * because a JSON author writing it would mean the OPPOSITE of what the
  * attribute would read.
  */
-function glossarySetJsonKeys(set: Command): Map<string, string> {
+export function glossarySetJsonKeys(set: Command): Map<string, string> {
   const keys = payloadKeyMap(set, {
     nonPayload: GLOSSARY_SET_NON_PAYLOAD,
     readShapeAliases: { relatedCommands: "related", relatedEntity: "entity" },
@@ -81,18 +81,40 @@ function glossarySetJsonKeys(set: Command): Map<string, string> {
 }
 
 /**
- * Reject an unknown key in a `set --from-json` object instead of silently
- * dropping it (fb#1533) — mirroring `ib dev changelog add --from-json`'s
- * contract ("an unknown or wrong-typed key exits 4, never silently dropped").
- * `set` is a PARTIAL update where an omitted field KEEPS its current value, so
- * a typo'd key was previously indistinguishable from "leave this field alone"
- * — the write still succeeded, just without the change the caller intended.
- * That matters most for the machine writer (`groom-ib-glossary`, which uses
- * --from-json to stay argv-safe with Finnish ä/ö): a typo there produced a
- * green run that groomed nothing. Returns the object re-keyed to the field
- * names {@link mergeSetInput} reads (`append-definition` → `appendDefinition`).
+ * Value types of the `set` payload fields, keyed by canonical field name, for
+ * the shared {@link normalizeFromJson} pass. The CSV fields are deliberately
+ * NOT numeric-tolerant: synonyms and command paths are never ids, so a bare
+ * number there is a caller's mistake, not a one-element list.
  */
-function canonicalGlossarySetJson(json: Record<string, unknown>, keys: Map<string, string>): Record<string, unknown> {
+const GLOSSARY_JSON_CFG = {
+  csvFields: new Set(["synonyms", "related", "addSynonyms", "removeSynonyms"]),
+  numericFields: new Set(["aiConfidence"]),
+  booleanFields: new Set(["needsHumanReview"]),
+};
+
+/** The pair where a JSON `null` is a documented CLEAR (fb#1707), not an omission. */
+const NULL_CLEARS = new Set(["aiConfidence", "needsHumanReview"]);
+
+/**
+ * Reject an unknown key OR a wrong-typed value in a `set --from-json` object /
+ * an `import` entry instead of silently dropping it (fb#1533, fb#1606) —
+ * mirroring `ib dev changelog add --from-json`'s contract ("an unknown or
+ * wrong-typed key exits 4, never silently dropped"). `set` is a PARTIAL update
+ * where an omitted field KEEPS its current value, so a typo'd key — or a
+ * `{"synonyms": 123}` that the old array-or-string coercion read as "absent" —
+ * was indistinguishable from "leave this field alone": the write succeeded,
+ * just without the change the caller intended. That matters most for the
+ * machine writer (`groom-ib-glossary`, which uses --from-json to stay
+ * argv-safe with Finnish ä/ö): a typo there produced a green run that groomed
+ * nothing. Returns the object re-keyed to the field names {@link mergeSetInput}
+ * reads (`append-definition` → `appendDefinition`), arrays joined to CSV.
+ *
+ * The unknown-key check stays local (ahead of the shared pass) because its
+ * accepted list names the read-shape aliases too; the shared pass then owns
+ * the types. It drops JSON nulls, so the assessment pair's documented
+ * null-clears are re-added after it.
+ */
+export function canonicalGlossarySetJson(json: Record<string, unknown>, keys: Map<string, string>): Record<string, unknown> {
   const unknown = Object.keys(json).filter((k) => !keys.has(k));
   if (unknown.length) {
     const accepted = [...new Set(keys.keys())].filter((k) => !k.includes("-"));
@@ -101,8 +123,8 @@ function canonicalGlossarySetJson(json: Record<string, unknown>, keys: Map<strin
       4
     );
   }
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(json)) out[keys.get(k)!] = v;
+  const out = normalizeFromJson(json, keys, GLOSSARY_JSON_CFG);
+  for (const [k, v] of Object.entries(json)) if (v === null && NULL_CLEARS.has(keys.get(k)!)) out[keys.get(k)!] = null;
   return out;
 }
 
@@ -150,12 +172,15 @@ const IMPORT_CONCURRENCY = 5;
  * message, in the entries' input order. The summary counts are returned;
  * callers can check `failed > 0` to decide whether to exit non-zero. Entries
  * missing `term` are recorded as `{ term: null, ok: false }` without a network
- * round-trip.
+ * round-trip, and one with an unknown key or wrong-typed value as
+ * `{ term, ok: false, error }` — the same contract as `set --from-json`, so
+ * `keys` is the `set` command's derived key map ({@link glossarySetJsonKeys}).
  */
 export async function runGlossaryImport(
   client: ApiClient,
   entries: Array<Record<string, unknown>>,
-  flags: WriteFlags & { updateOnly?: boolean }
+  flags: WriteFlags & { updateOnly?: boolean },
+  keys: Map<string, string>
 ): Promise<{ results: Array<{ term: string | null; ok: boolean; error?: string }>; ok: number; failed: number }> {
   const results = new Array<{ term: string | null; ok: boolean; error?: string }>(entries.length);
   let next = 0;
@@ -164,10 +189,13 @@ export async function runGlossaryImport(
       while (next < entries.length) {
         const i = next++;
         const e = entries[i];
-        const term = (e.term as string) ?? null;
+        const { term: rawTerm, ...rest } = e;
+        const term = (rawTerm as string) ?? null;
         if (!term) { results[i] = { term: null, ok: false, error: "missing term" }; continue; }
-        const inp = mergeSetInput(e, {});
         try {
+          // Same key + type contract as `set --from-json` (fb#1606); a bad
+          // entry fails HERE, by name, and the batch goes on.
+          const inp = mergeSetInput(canonicalGlossarySetJson(rest, keys), {});
           await runGlossarySet(client, term,
             { ...inp, updateOnly: flags.updateOnly },
             flags);
@@ -466,7 +494,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       let arr: unknown;
       try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }
       if (!Array.isArray(arr)) { failWith("import: JSON root must be an array", 4); }
-      writeJson(await runGlossaryImport(await getClient(), arr as Array<Record<string, unknown>>, opts));
+      writeJson(await runGlossaryImport(await getClient(), arr as Array<Record<string, unknown>>, opts, glossarySetJsonKeys(set)));
     }));
 
   const del = glossary

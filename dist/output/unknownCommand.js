@@ -520,8 +520,12 @@ function specPositionals(spec) {
  * Capped at 3, and a leaf NAMED after the flag (`--search` → `person search`)
  * wins over catalogue order, since that is the strongest signal of which
  * sibling actually owns the capability.
+ *
+ * `alsoOwning` narrows the scan to siblings that own THAT flag too (fb#1731):
+ * a sibling accepting the rejected flag verbatim AND the flag it was guessed to
+ * mean is proof the domain treats the two as different concepts.
  */
-export function siblingsAcceptingOption(command, unknownOption, tier) {
+export function siblingsAcceptingOption(command, unknownOption, tier, alsoOwning) {
     const domain = command.split(" ")[1];
     if (!domain)
         return [];
@@ -529,7 +533,8 @@ export function siblingsAcceptingOption(command, unknownOption, tier) {
     const hits = COMMAND_SPECS.filter((s) => s.command !== command &&
         s.command.split(" ")[1] === domain &&
         !isHiddenAtTier(s, tier) &&
-        specOptionLongs(s).includes(flag)).map((s) => s.command);
+        specOptionLongs(s).includes(flag) &&
+        (!alsoOwning || specOptionLongs(s).includes(alsoOwning))).map((s) => s.command);
     const named = hits.filter((c) => c.endsWith(` ${flag.slice(2)}`));
     return (named.length ? named : hits).slice(0, 3);
 }
@@ -932,10 +937,26 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     const bare = unknownOption.replace(/^-+/, "");
     const bareNames = availableOptions.map((o) => o.replace(/^-+/, ""));
     const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${canonical} ${unknownOption}`];
-    const guess = overrideTarget && bareNames.includes(overrideTarget)
+    // Spelling-based guess first (prefix/contains/edit distance, or the curated
+    // override), then the FLAG_SYNONYMS table — split so the guess's ORIGIN is
+    // known below without changing `closestName`.
+    const fuzzy = overrideTarget && bareNames.includes(overrideTarget)
         ? overrideTarget
-        : closestName(bare, bareNames, FLAG_SYNONYMS);
+        : closestName(bare, bareNames, {});
+    const guess = fuzzy ?? closestName(bare, bareNames, FLAG_SYNONYMS);
     const didYouMean = guess ? `--${guess}` : null;
+    // A SYNONYM guess is semantic, not a spelling correction, and one domain can
+    // spell two DIFFERENT concepts with a synonym pair — on `ib keikka`,
+    // `--customer` is the order's customer and `--asiakas` the tenant, so the
+    // pre-fb#1641 `keikka latest --asiakas` → "did you mean --customer" sent the
+    // caller to the wrong scope with no error (fb#1731). The proof that the pair
+    // is distinct HERE is a sibling that accepts the typed flag verbatim AND owns
+    // the guessed one too (`keikka list` had both). Only that shape is reported
+    // alongside the guess: a plain verbatim sibling is NOT stronger evidence — of
+    // the 22 catalogue pairs where a synonym guess coexists with one, all 22 have
+    // the sibling's flag meaning something else (`person day set --text` is a
+    // note body, not `person search`'s `--search`), so naming it would be noise.
+    const distinctConceptSiblings = !fuzzy && guess ? siblingsAcceptingOption(canonical, unknownOption, tier, `--${guess}`) : [];
     const redirect = OPTION_REDIRECTS[`${canonical} ${unknownOption}`];
     // A rejected write-safety flag is answered by THIS command's own idiom, never
     // by a sibling list — ~125 commands declare each of the trio, so any three
@@ -962,9 +983,13 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     // are intercepted upstream by fb#856's argv normalization), which beats
     // redirecting the caller to a sibling — same principle as the `viaSynonym`
     // guard below.
-    const acceptedLiteral = redirect || didYouMean || idiomHint
+    const acceptedLiteral = redirect || idiomHint
         ? []
-        : siblingsAcceptingOption(canonical, unknownOption, tier);
+        : distinctConceptSiblings.length
+            ? distinctConceptSiblings
+            : didYouMean
+                ? []
+                : siblingsAcceptingOption(canonical, unknownOption, tier);
     // Nothing accepts it verbatim — a synonym spelling still might (fb#388).
     // Suppressed when `didYouMean` fired: the flag exists on THIS command under
     // another name, which beats redirecting the caller to a sibling.

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import type { Command } from "commander";
+import { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import {
@@ -351,6 +351,47 @@ describe("flag synonyms (fb#388)", () => {
     );
     expect(searches.availableOptions).toContain("--search");
     expect(searches.availableOptions).not.toContain("--q");
+  });
+});
+
+// feedback #1731 — a FLAG_SYNONYMS guess suppressed the verbatim-sibling answer.
+// On `ib keikka`, --customer (the order's customer) and --asiakas (the tenant)
+// are DIFFERENT concepts, and `keikka list` owns both; before fb#1641 added the
+// flag, `keikka latest --asiakas` answered "did you mean --customer" with
+// acceptedBy [] — following it silently returned the wrong scope's rows.
+describe("synonym guess vs a distinct-concept sibling (fb#1731)", () => {
+  // The pre-fb#1641 shape, rebuilt without mocks: a keikka leaf with no spec
+  // (so its options come from Commander) that owns --customer but not
+  // --asiakas, while the REAL keikka siblings are scanned.
+  const probe = (): Command => {
+    const root = new Command("ib");
+    return root.command("keikka").command("probe").option("--customer <id>");
+  };
+
+  test("a sibling owning BOTH flags is reported alongside the synonym guess", () => {
+    const env = buildUnknownOptionEnvelope(probe(), "--asiakas");
+    expect(env.didYouMean).toBe("--customer");
+    expect(env.acceptedBy).toContain("ib keikka list");
+    expect(env.acceptedAs).toBeUndefined();
+    // the sibling answer leads; the guess follows
+    expect(env.hint.indexOf("ib keikka list")).toBeLessThan(env.hint.indexOf("Did you mean"));
+  });
+
+  test("a synonym guess with no both-owning sibling still suppresses the sibling scan", () => {
+    // `person day set` / `person fk set` accept --text verbatim, but as a note
+    // body — naming them for a search-text typo would be noise. --search is the
+    // right answer here and stays the only one.
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "search"), "--text");
+    expect(env.didYouMean).toBe("--search");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).not.toContain("sibling");
+  });
+
+  test("a spelling guess never triggers it, even when a both-owning sibling exists", () => {
+    // --customr is one edit from --customer: a typo, answered locally only.
+    const env = buildUnknownOptionEnvelope(probe(), "--customr");
+    expect(env.didYouMean).toBe("--customer");
+    expect(env.acceptedBy).toEqual([]);
   });
 });
 

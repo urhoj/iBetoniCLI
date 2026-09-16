@@ -42,6 +42,7 @@ export function normalizeFromJson(json, keys, cfg = {}) {
     const csv = cfg.csvFields ?? new Set();
     const numericTolerant = cfg.numericTolerantCsvFields ?? new Set();
     const objects = cfg.objectFields ?? new Set();
+    const booleans = cfg.booleanFields ?? new Set();
     const flagName = cfg.flagName ?? "--from-json";
     const out = {};
     const unknown = [];
@@ -58,6 +59,13 @@ export function normalizeFromJson(json, keys, cfg = {}) {
             if (typeof value !== "object" || Array.isArray(value)) {
                 problems.push(`"${rawKey}" must be a JSON object (got ${Array.isArray(value) ? "array" : typeof value})`);
             }
+            else
+                out[key] = value;
+            continue;
+        }
+        if (booleans.has(key)) {
+            if (typeof value !== "boolean")
+                problems.push(`"${rawKey}" must be true or false (got ${typeof value})`);
             else
                 out[key] = value;
             continue;
