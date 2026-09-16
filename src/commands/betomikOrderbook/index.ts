@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { writeJson, failUsage } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { parseId } from "../../targets.js";
 
@@ -368,9 +368,9 @@ export function registerBetomikOrderbookCommands(
   addWriteFlagsToCommand(syncRowCmd).action(
     guarded(
       async (idStrs: string[], opts: WriteFlags & { run?: number; status?: string; provider?: string }) => {
-        if (idStrs.length && opts.run != null) failUsage("Pass row ids or --run <runId>, not both");
-        if (!idStrs.length && opts.run == null) failUsage("Pass row ids or --run <runId>, not neither");
-        if (opts.run != null && (!Number.isInteger(opts.run) || opts.run < 1)) failUsage("--run must be a positive integer");
+        if (idStrs.length && opts.run != null) failWith("Pass row ids or --run <runId>, not both", 4);
+        if (!idStrs.length && opts.run == null) failWith("Pass row ids or --run <runId>, not neither", 4);
+        if (opts.run != null && (!Number.isInteger(opts.run) || opts.run < 1)) failWith("--run must be a positive integer", 4);
         const client = await getClient();
         const rowIds = opts.run != null ? await selectRowsToSync(client, opts.run, opts.status) : idStrs.map((s) => parseId(s, "rowId"));
         const body: { provider?: string } = {};

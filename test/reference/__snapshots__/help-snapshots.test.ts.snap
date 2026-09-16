@@ -2887,8 +2887,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Unknown --provider, or the provider is not configured on the backend → Use --provider bedrock|local; the backend needs AI_BEDROCK_* / AI_LOCAL_* for it
 
 NOTES
-  - Run --dry-run FIRST: the server still extracts (Bedrock; stored for the real pass) and plans, and each blockReason lists what it WOULD create (customer:new "…", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow reports customer:missing where the real pass writes on the placeholder customer.
-  - One request per row: a week never hits the edge request timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — \`resync <runId> --mode full\` afterwards.
+  - Run --dry-run FIRST: the server still extracts (Bedrock, stored for the real pass) and plans, and each blockReason names what it WOULD create (customer:new "…", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow says customer:missing where the real pass writes on the placeholder customer. Like resync, a dry run still writes LEDGER state: a synced row you dry-run reads pending until the next real pass.
+  - One request per row: a week never hits the edge timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — resync <runId> --mode full afterwards.
   - --idempotency-key is suffixed per row (<key>:<rowId>), so a batch never replays one row's answer for another.
 
 SEE ALSO

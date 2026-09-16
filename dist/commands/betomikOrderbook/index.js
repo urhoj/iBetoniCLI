@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { writeJson, failUsage } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { parseId } from "../../targets.js";
 export async function runBetomikOrderbookImport(client, body, flags) {
@@ -223,11 +223,11 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .option("--provider <name>", "bedrock (default) | local — for rows with no stored extraction");
     addWriteFlagsToCommand(syncRowCmd).action(guarded(async (idStrs, opts) => {
         if (idStrs.length && opts.run != null)
-            failUsage("Pass row ids or --run <runId>, not both");
+            failWith("Pass row ids or --run <runId>, not both", 4);
         if (!idStrs.length && opts.run == null)
-            failUsage("Pass row ids or --run <runId>, not neither");
+            failWith("Pass row ids or --run <runId>, not neither", 4);
         if (opts.run != null && (!Number.isInteger(opts.run) || opts.run < 1))
-            failUsage("--run must be a positive integer");
+            failWith("--run must be a positive integer", 4);
         const client = await getClient();
         const rowIds = opts.run != null ? await selectRowsToSync(client, opts.run, opts.status) : idStrs.map((s) => parseId(s, "rowId"));
         const body = {};

@@ -217,8 +217,8 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "provider", type: "string", description: "bedrock (default) | local — used only for a row with no stored extraction" },
     ],
     notes: [
-      "Run --dry-run FIRST: the server still extracts (Bedrock; stored for the real pass) and plans, and each blockReason lists what it WOULD create (customer:new \"…\", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow reports customer:missing where the real pass writes on the placeholder customer.",
-      "One request per row: a week never hits the edge request timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — `resync <runId> --mode full` afterwards.",
+      "Run --dry-run FIRST: the server still extracts (Bedrock, stored for the real pass) and plans, and each blockReason names what it WOULD create (customer:new \"…\", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow says customer:missing where the real pass writes on the placeholder customer. Like resync, a dry run still writes LEDGER state: a synced row you dry-run reads pending until the next real pass.",
+      "One request per row: a week never hits the edge timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — resync <runId> --mode full afterwards.",
       "--idempotency-key is suffixed per row (<key>:<rowId>), so a batch never replays one row's answer for another.",
     ],
     outputShape: "ListEnvelope<{ rowId, ok, syncStatus, plannedAction, rowKind, palkkiType, keikkaId, palkkiId, blockReason, written: { create, update, delete }, errors }> + summary: { rows, synced, blocked, removed, pending, failed }; a failed row is { rowId, ok:false, error, statusCode }. --dry-run adds a top-level dryRun: true.",
