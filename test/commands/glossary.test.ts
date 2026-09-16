@@ -216,6 +216,24 @@ describe("glossary list terms-only", () => {
     expect(r.items).toEqual([{ term: "tila", synonyms: ["status"] }]);
   });
 
+  // fb#1709: --limit is a client-side cut, flagged by truncated + hint.
+  test("list --limit cuts client-side and flags truncated", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [{ term: "a" }, { term: "b" }, { term: "c" }], count: 3 });
+    const r = await runGlossaryList(mkClient({ get }), { needsReview: true, limit: 2 });
+    expect(get.mock.calls[0][0]).not.toContain("limit");
+    expect(r.items).toEqual([{ term: "a" }, { term: "b" }]);
+    expect(r.truncated).toBe(true);
+    expect((r as { hint?: string }).hint).toMatch(/raise --limit/);
+  });
+
+  test("list --limit above the row count is a no-op (not truncated)", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [{ term: "a" }, { term: "b" }], count: 2 });
+    const r = await runGlossaryList(mkClient({ get }), { limit: 5 });
+    expect(r.items).toHaveLength(2);
+    expect(r.truncated).toBe(false);
+    expect(r).not.toHaveProperty("hint");
+  });
+
   test("list without --terms-only returns items unchanged", async () => {
     const get = vi.fn().mockResolvedValue({
       items: [{ term: "tila", synonyms: ["status"], definition: "d" }],

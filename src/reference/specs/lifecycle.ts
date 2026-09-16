@@ -97,10 +97,17 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     seeAlso: ["ib person role list", "ib person get"],
     examples: ["ib customer person list 26", "ib customer person list --asiakas 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
   },
+  // `auth.page.tyomaa.edit` is a FRONTEND-only shape, never evaluated server-side
+  // (fb#1525 fixed `create`; fb#1605 the rest). delete / person add / person
+  // remove (and `update` in worksite.ts) are gated by `requireCompanyRole({
+  // tier: "edit", resolveTenant: tyomaaOwner(...) })`; refresh-location /
+  // set-geofence / helsinki-fetch are jwt-only routes whose handler fences on
+  // `tyomaa.ownerAsiakasId === req.user.ownerAsiakasId` — any member of the
+  // owner tenant, no role required.
   {
     command: "ib worksite delete",
     description: "Delete a worksite (tyomaa). Requires --reason.",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["edit role in the worksite's owner company (requireCompanyRole tier edit)"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
     flags: [
       REASON_REQUIRED_FLAG,
@@ -111,29 +118,29 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("edit role in the worksite's owner company (requireCompanyRole tier edit)"),
     ],
     examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
   },
   {
     command: "ib worksite refresh-location",
     description: "Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["any member of the worksite's owner company (inline tenant fence, not role-gated)"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ success: true, tyomaa, message } (raw backend response)",
     errors: [
-      apiErr(404, "Worksite not found", "verify tyomaaId"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      apiErr(404, "Worksite not found — or owned by another tenant (the fence answers 404, not 403)", "verify tyomaaId and that it belongs to your active company (ib worksite get)"),
+      ...permErrors("any member of the worksite's owner company (inline tenant fence, not role-gated)"),
     ],
     examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
   },
   {
     command: "ib worksite set-geofence",
     description: "Set a worksite geofence radius in metres (1-10000).",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["any member of the worksite's owner company (inline tenant fence, not role-gated)"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [
       { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
@@ -143,14 +150,15 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     outputShape: "{ success: true }",
     errors: [
       apiErr(400, "Radius out of range", "use 1-10000"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("any member of the worksite's owner company (inline tenant fence, not role-gated)"),
     ],
+    notes: ["The UPDATE is scoped to your active company's ownerAsiakasId and answers { success: true } even when it matched 0 rows — a foreign or unknown tyomaaId is a SILENT no-op. Confirm with `ib worksite get <id>` afterwards."],
     examples: ["ib worksite set-geofence 99 --radius 300"],
   },
   {
     command: "ib worksite helsinki-fetch",
     description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["any member of the worksite's owner company (inline tenant fence, not role-gated)"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [],
     writeFlags: true,
@@ -158,14 +166,15 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     outputShape: "{ success, ... } (raw backend response)",
     errors: [
       apiErr(400, "Missing coordinates", "run refresh-location first"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      apiErr(404, "Worksite not found — or owned by another tenant (the fence answers 404, not 403)", "verify tyomaaId and that it belongs to your active company (ib worksite get)"),
+      ...permErrors("any member of the worksite's owner company (inline tenant fence, not role-gated)"),
     ],
     examples: ["ib worksite helsinki-fetch 99"],
   },
   {
     command: "ib worksite person add",
     description: "Attach a person to a worksite (tyomaaPerson). Requires --reason.",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["edit role in the worksite's owner company (requireCompanyRole tier edit)"],
     flags: [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
@@ -180,14 +189,14 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       intParseErr("--worksite", "pass a positive tyomaaId"),
       PERSON_PARSE_ERR,
       CONTACT_TYPE_PARSE_ERR,
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("edit role in the worksite's owner company (requireCompanyRole tier edit)"),
     ],
     examples: ['ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"'],
   },
   {
     command: "ib worksite person remove",
     description: "Detach a person from a worksite. Requires --reason.",
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["edit role in the worksite's owner company (requireCompanyRole tier edit)"],
     flags: [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
@@ -203,7 +212,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       PERSON_PARSE_ERR,
       CONTACT_TYPE_PARSE_ERR,
       apiErr(404, "Link not found", "verify tyomaaId+personId combination"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("edit role in the worksite's owner company (requireCompanyRole tier edit)"),
     ],
     examples: ['ib worksite person remove --worksite 99 --person 5351 --reason "rotation"'],
   },

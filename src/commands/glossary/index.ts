@@ -13,7 +13,7 @@ import { Option, type Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, cappedInt } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
@@ -90,14 +90,13 @@ function assertKnownGlossarySetKeys(json: Record<string, unknown>): void {
  * and flags are left `undefined` (omitted from the PATCH body, so the backend
  * COALESCE preserves the current DB value).
  *
- * The two ASSESSMENT fields are the exception to that last sentence, and the
- * reason they must be merged here (fb#298): the backend does NOT COALESCE them,
- * it direct-assigns (`aiConfidence == null ? null : …`, `needsHumanReview ? 1 : 0`
- * in glossaryCliRoutes.js) so that omitting them RESETS the row and re-opens it
- * for grooming. Dropping a JSON-supplied aiConfidence therefore does not merely
- * fail to write it — it silently wipes the stored score. That bit `import`
- * hardest: it has no --ai-confidence flag at all, so a bulk groom could only
- * ever carry the score per-entry in the JSON.
+ * The two ASSESSMENT fields are merged here for a historical reason (fb#298):
+ * the save proc direct-assigns them, and until fb#1707 the route did too, so
+ * an omitted aiConfidence RESET the stored score to null. Since fb#1707 the
+ * route read-merges an omitted field from the stored row (a JSON `null` still
+ * clears) — against an OLDER backend an omitted pair still resets. Either way a
+ * JSON-supplied score must reach the body: `import` has no --ai-confidence
+ * flag, so the per-entry key is the only way a bulk groom carries it.
  */
 export function mergeSetInput(
   json: Record<string, unknown>,
@@ -229,7 +228,7 @@ export async function runGlossaryLookupBatch(
 
 export async function runGlossaryList(
   client: ApiClient,
-  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }
+  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number; limit?: number }
 ): Promise<ListEnvelope<unknown>> {
   const res = await client.get<{ items: unknown[]; count: number }>(
     `/api/cli/glossary${qs({
@@ -241,10 +240,18 @@ export async function runGlossaryList(
       maxConfidence: opts.needsReview && opts.maxConfidence != null ? opts.maxConfidence : undefined,
     })}`
   );
-  const items = opts.termsOnly
+  let items = opts.termsOnly
     ? projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>)
     : res.items;
-  return { items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
+  // --limit is CLIENT-side (the route has no page size; fb#1709 wanted a bounded
+  // --needs-review grooming batch, parity with `glossary misses --limit`). It
+  // applies AFTER the server filters, so --stalest N --limit M returns min(N, M).
+  const cut = opts.limit !== undefined && items.length > opts.limit;
+  if (cut) items = items.slice(0, opts.limit);
+  return {
+    items, nextCursor: null, count: res.count, truncated: cut || opts.stalest != null,
+    ...(cut ? { hint: "raise --limit or drop it — the uncapped list is the whole filtered set" } : {}),
+  };
 }
 
 export async function runGlossarySet(
@@ -355,7 +362,8 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       .option("--domain <d>")
       .option("--related <substr>")
       .option("--terms-only")
-  ).action(jsonAction(getClient, (client, opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }) =>
+      .option("--limit <n>", "", cappedInt(500))
+  ).action(jsonAction(getClient, (client, opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number; limit?: number }) =>
     runGlossaryList(client, opts)
   ));
 

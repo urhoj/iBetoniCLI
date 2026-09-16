@@ -33,6 +33,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "related", type: "string", description: "Filter to terms whose relatedCommands contain this substring" },
       { name: "terms-only", type: "boolean", description: "Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist." },
       ...needsReviewFlags("term"),
+      { name: "limit", type: "number", description: "Return at most N rows (client-side cut AFTER the server filters, max 500; truncated:true when it cut). Combine with --needs-review for a bounded grooming batch. --stalest N already caps server-side; --limit applies on top of it." },
     ],
     outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }",
     notes: [
@@ -40,10 +41,11 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     ],
     errors: [
       intParseErr("--stalest", "pass a positive integer"),
+      intParseErr("--limit", "pass a positive integer"),
       MAX_CONFIDENCE_PARSE_ERR,
       { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
     ],
-    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only", "ib glossary list --needs-review"],
+    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only", "ib glossary list --needs-review", "ib glossary list --needs-review --limit 15"],
   },
   {
     command: "ib glossary misses",
@@ -93,7 +95,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId. Omit to keep." },
       { name: "domain", type: "string", description: "Domain grouping (e.g. vacation). Omit to keep." },
       { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
-      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept, EXCEPT the two assessment fields — see notes)." },
+      { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes)." },
       { name: "add-synonyms", type: "string", description: "Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms." },
       { name: "remove-synonyms", type: "string", description: "Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms." },
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
@@ -103,7 +105,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     notes: [
       "PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: `--synonyms \"\"` empties the list, `--entity \"\"` blanks it. " + clearNote("--synonyms") + " To OVERWRITE, pass the new value.",
       "Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.",
-      "--ai-confidence / --needs-human-review are NOT partial: the backend direct-assigns them, so any write that omits them RESETS the score to null and clears the parked flag (by design — a human edit re-opens the row for grooming). A grooming write must therefore carry aiConfidence EVERY time, via the flag or the --from-json key. Both are read from --from-json since fb#298; before that fix the JSON key was silently dropped and the score wiped.",
+      "--ai-confidence / --needs-human-review are partial too since fb#1707: an omitted one keeps the stored value (a JSON null in --from-json clears the score). DEPLOY-GATED — against a backend older than fb#1707 an omitted pair still RESETS to null/false (the fb#298 design), so a grooming write is safest carrying --ai-confidence every time. --dry-run echoes the EFFECTIVE pair either way.",
       "Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).",
       "An append flag COMPOSES with plain overwrite flags for OTHER fields in the same call: `--definition \"new\" --add-synonyms \"x\"` overwrites the definition AND merges the synonym in one request. Only the same-field twin is rejected (exit 4): --definition⊥--append-definition and --synonyms⊥--add/remove-synonyms. Deploy-gated: an un-updated backend drops the plain field instead of composing — until it deploys, set OTHER fields in a separate call.",
     ],
@@ -136,7 +138,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       "Each entry must have a `term` field; entries missing it are counted as failed.",
       "Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.",
       "Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.",
-      "There is no --ai-confidence flag here, so a per-entry `aiConfidence` key is the ONLY way a bulk groom can carry its score. The backend resets that field on any write that omits it, so an entry without the key is stored unscored (and re-queued for grooming). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.",
+      "There is no --ai-confidence flag here, so a per-entry `aiConfidence` key is the ONLY way a bulk groom can carry its score. Since fb#1707 an entry WITHOUT the key keeps the stored score (deploy-gated: an older backend resets it to null and re-queues the term). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.",
     ],
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },

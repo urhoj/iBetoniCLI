@@ -5238,7 +5238,7 @@ NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
   - Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.
   - Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.
-  - There is no --ai-confidence flag here, so a per-entry \`aiConfidence\` key is the ONLY way a bulk groom can carry its score. The backend resets that field on any write that omits it, so an entry without the key is stored unscored (and re-queued for grooming). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.
+  - There is no --ai-confidence flag here, so a per-entry \`aiConfidence\` key is the ONLY way a bulk groom can carry its score. Since fb#1707 an entry WITHOUT the key keeps the stored score (deploy-gated: an older backend resets it to null and re-queues the term). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.
 
 EXAMPLES
   ib glossary import terms.json --reason "bulk groom"
@@ -5293,6 +5293,7 @@ FLAGS
   --terms-only    Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist.
   --needs-review    Only terms still needing grooming: aiConfidence below the threshold (or never assessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
+  --limit NUMBER    Return at most N rows (client-side cut AFTER the server filters, max 500; truncated:true when it cut). Combine with --needs-review for a bounded grooming batch. --stalest N already caps server-side; --limit applies on top of it.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -5303,6 +5304,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --stalest is not an integer >= 1, rejected locally before any request → pass a positive integer
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
   exit 4 (client-side)  --max-confidence is not an integer >= 0, rejected locally before any request → pass an integer >= 0 (default 90)
   exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
 
@@ -5316,6 +5318,7 @@ EXAMPLES
   ib glossary list --domain vacation
   ib glossary list --terms-only
   ib glossary list --needs-review
+  ib glossary list --needs-review --limit 15
 "
 `;
 
@@ -5399,7 +5402,7 @@ FLAGS
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept, EXCEPT the two assessment fields — see notes).
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
@@ -5431,7 +5434,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`--synonyms=\` there, which means the same thing in bash (\`ib help shell-quoting\`). To OVERWRITE, pass the new value.
   - Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.
-  - --ai-confidence / --needs-human-review are NOT partial: the backend direct-assigns them, so any write that omits them RESETS the score to null and clears the parked flag (by design — a human edit re-opens the row for grooming). A grooming write must therefore carry aiConfidence EVERY time, via the flag or the --from-json key. Both are read from --from-json since fb#298; before that fix the JSON key was silently dropped and the score wiped.
+  - --ai-confidence / --needs-human-review are partial too since fb#1707: an omitted one keeps the stored value (a JSON null in --from-json clears the score). DEPLOY-GATED — against a backend older than fb#1707 an omitted pair still RESETS to null/false (the fb#298 design), so a grooming write is safest carrying --ai-confidence every time. --dry-run echoes the EFFECTIVE pair either way.
   - Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).
   - An append flag COMPOSES with plain overwrite flags for OTHER fields in the same call: \`--definition "new" --add-synonyms "x"\` overwrites the definition AND merges the synonym in one request. Only the same-field twin is rejected (exit 4): --definition⊥--append-definition and --synonyms⊥--add/remove-synonyms. Deploy-gated: an un-updated backend drops the plain field instead of composing — until it deploys, set OTHER fields in a separate call.
 
@@ -15794,7 +15797,7 @@ exports[`Help snapshots — contract stability > help for ib worksite delete mat
 
 DESCRIPTION
   Delete a worksite (tyomaa). Requires --reason.
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to delete (required)
@@ -15818,7 +15821,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -15904,7 +15907,7 @@ exports[`Help snapshots — contract stability > help for ib worksite helsinki-f
 
 DESCRIPTION
   Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires any member of the worksite's owner company (inline tenant fence, not role-gated).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -15927,8 +15930,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Missing coordinates    → run refresh-location first
+  exit 5 (HTTP 404)  Worksite not found — or owned by another tenant (the fence answers 404, not 403) → verify tyomaaId and that it belongs to your active company (ib worksite get)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check any member of the worksite's owner company (inline tenant fence, not role-gated)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -16090,7 +16094,7 @@ exports[`Help snapshots — contract stability > help for ib worksite person add
 
 DESCRIPTION
   Attach a person to a worksite (tyomaaPerson). Requires --reason.
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
@@ -16116,7 +16120,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -16162,7 +16166,7 @@ exports[`Help snapshots — contract stability > help for ib worksite person rem
 
 DESCRIPTION
   Detach a person from a worksite. Requires --reason.
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
@@ -16189,7 +16193,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --contact-type is not an integer >= 1, rejected locally before any request → pass a valid contactPersonTypeId (1, 2, 3, or 5)
   exit 5 (HTTP 404)  Link not found         → verify tyomaaId+personId combination
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -16203,7 +16207,7 @@ exports[`Help snapshots — contract stability > help for ib worksite refresh-lo
 
 DESCRIPTION
   Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires any member of the worksite's owner company (inline tenant fence, not role-gated).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -16225,9 +16229,9 @@ OUTPUT (JSON, stdout)
   { success: true, tyomaa, message } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 5 (HTTP 404)  Worksite not found — or owned by another tenant (the fence answers 404, not 403) → verify tyomaaId and that it belongs to your active company (ib worksite get)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check any member of the worksite's owner company (inline tenant fence, not role-gated)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -16276,7 +16280,7 @@ exports[`Help snapshots — contract stability > help for ib worksite set-geofen
 
 DESCRIPTION
   Set a worksite geofence radius in metres (1-10000).
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires any member of the worksite's owner company (inline tenant fence, not role-gated).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -16300,8 +16304,11 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Radius out of range    → use 1-10000
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check any member of the worksite's owner company (inline tenant fence, not role-gated)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The UPDATE is scoped to your active company's ownerAsiakasId and answers { success: true } even when it matched 0 rows — a foreign or unknown tyomaaId is a SILENT no-op. Confirm with \`ib worksite get <id>\` afterwards.
 
 EXAMPLES
   ib worksite set-geofence 99 --radius 300
@@ -16314,7 +16321,7 @@ exports[`Help snapshots — contract stability > help for ib worksite update mat
 
 DESCRIPTION
   Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment ""). On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`--comment=\` there, which means the same thing in bash (\`ib help shell-quoting\`).
-  Permissions: requires auth.page.tyomaa.edit.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
@@ -16354,7 +16361,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES

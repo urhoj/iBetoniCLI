@@ -605,6 +605,10 @@ ib fennoa purchases --months <n>
   ! --months must be an integer >= 1
   > pass a positive number of months (default 6, max 12)
 
+ib glossary list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer
+
 ib glossary list --max-confidence <n>
   ! --max-confidence must be an integer >= 0
   > pass an integer >= 0 (default 90)

@@ -132,7 +132,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     command: "ib worksite update",
     description:
       "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment \"\"). " + clearNote("--comment"),
-    permissions: ["auth.page.tyomaa.edit"],
+    permissions: ["edit role in the worksite's owner company (requireCompanyRole tier edit)"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to update" }],
     flags: [
       { name: "name", type: "string", description: "Worksite name (tyomaaNimi)" },
@@ -175,7 +175,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
-      ...permErrors("auth.page.tyomaa.edit"),
+      ...permErrors("edit role in the worksite's owner company (requireCompanyRole tier edit)"),
     ],
     notes: [
       "Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).",

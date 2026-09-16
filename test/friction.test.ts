@@ -287,10 +287,24 @@ describe("recordFriction", () => {
     });
   });
 
+  // fb#1730/fb#1662: 350 recordFriction calls each re-read and rewrote the whole
+  // file (O(n²) parses + 350 writes) and breached the 5 s budget under full-suite
+  // disk contention. Seeding a full buffer once and pushing TWO rows over it
+  // proves the same trim with two rewrites.
   test("caps the ring buffer at 300 entries", () => {
-    for (let i = 0; i < 350; i++) recordFriction(new Error("e" + i), 1);
+    const ts = new Date().toISOString();
+    const seed = Array.from({ length: 300 }, (_, i) =>
+      JSON.stringify({ ts, argv: "seed", exitCode: 1, message: "seed" + i, sid: "seed" })
+    );
+    writeFileSync(frictionPath(), seed.join("\n") + "\n");
+    recordFriction(new Error("over0"), 1);
+    recordFriction(new Error("over1"), 1);
     const lines = readFileSync(frictionPath(), "utf8").trim().split("\n");
-    expect(lines.length).toBeLessThanOrEqual(300);
+    expect(lines.length).toBe(300);
+    const messages = lines.map((l) => JSON.parse(l).message);
+    expect(messages).not.toContain("seed0");
+    expect(messages).not.toContain("seed1");
+    expect(messages.slice(-2)).toEqual(["over0", "over1"]);
   });
 
   test("a `displayed` override replaces the raw err.message", () => {
