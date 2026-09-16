@@ -144,6 +144,7 @@ export interface PalkkiColorFields {
   owner?: number;
   active?: boolean;
   iconName?: string;
+  iconText?: string;
   iconColor?: string;
   iconBackgroundColor?: string;
 }
@@ -162,6 +163,7 @@ export function buildPalkkiColorBody(
   if (typed.owner !== undefined) body.ownerAsiakasId = typed.owner;
   if (typed.active !== undefined) body.isActive = typed.active;
   if (typed.iconName !== undefined) body.iconName = typed.iconName;
+  if (typed.iconText !== undefined) body.iconText = typed.iconText;
   if (typed.iconColor !== undefined) body.iconColor = typed.iconColor;
   if (typed.iconBackgroundColor !== undefined) body.iconBackgroundColor = typed.iconBackgroundColor;
   return body;
@@ -195,6 +197,7 @@ export interface PalkkiColorRow {
   ownerAsiakasId: number;
   isActive: boolean;
   iconName: string | null;
+  iconText?: string | null;
   iconColor: string | null;
   iconBackgroundColor: string | null;
   [k: string]: unknown;
@@ -542,6 +545,7 @@ type PalkkiColorOpts = WriteFlags & {
   active?: boolean;
   inactive?: boolean;
   iconName?: string;
+  iconText?: string;
   iconColor?: string;
   iconBackgroundColor?: string;
 };
@@ -571,6 +575,10 @@ function addPalkkiColorFlags(cmd: Command, isUpdate: boolean): Command {
       intFlag("--owner", 0)
     )
     .option("--icon-name <name>", "iconName — icon shown on the bar when this rule matches")
+    .option(
+      "--icon-text <letters>",
+      "iconText — 1-2 letters (e.g. BV) shown in the bar's circle INSTEAD of the icon when set; empty string clears"
+    )
     .option("--icon-color <css>", "iconColor")
     .option("--icon-background-color <css>", "iconBackgroundColor");
   if (isUpdate) c.option("--active", "isActive = true");
@@ -590,6 +598,7 @@ function palkkiColorFieldsFromOpts(opts: PalkkiColorOpts): PalkkiColorFields {
     owner: opts.owner,
     active: tri(opts.active, opts.inactive),
     iconName: opts.iconName,
+    iconText: opts.iconText,
     iconColor: opts.iconColor,
     iconBackgroundColor: opts.iconBackgroundColor,
   };

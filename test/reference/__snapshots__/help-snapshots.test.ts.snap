@@ -10731,6 +10731,7 @@ FLAGS
   --sort-no NUMBER    sortNo — evaluation order (first matching active rule wins); default: the row's own id
   --owner NUMBER    ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)
   --icon-name STRING    iconName — icon shown on the bar when this rule matches
+  --icon-text STRING    iconText — 1-2 letters (e.g. BV) shown in the bar's circle INSTEAD of the icon when set; empty string clears
   --icon-color STRING    iconColor
   --icon-background-color STRING    iconBackgroundColor
   --inactive    isActive=false (default: active)
@@ -10832,7 +10833,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }
+  { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconText, iconColor, iconBackgroundColor }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
@@ -10863,7 +10864,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }[], count, nextCursor: null }
+  { items: { barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconText, iconColor, iconBackgroundColor }[], count, nextCursor: null }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 0, rejected locally before any request → pass a non-negative ownerAsiakasId
@@ -10946,6 +10947,7 @@ FLAGS
   --sort-no NUMBER    sortNo — evaluation order (first matching active rule wins); default: the row's own id
   --owner NUMBER    Move to ownerAsiakasId (a company you belong to)
   --icon-name STRING    iconName — icon shown on the bar when this rule matches
+  --icon-text STRING    iconText — 1-2 letters (e.g. BV) shown in the bar's circle INSTEAD of the icon when set; empty string clears
   --icon-color STRING    iconColor
   --icon-background-color STRING    iconBackgroundColor
   --active    isActive=true

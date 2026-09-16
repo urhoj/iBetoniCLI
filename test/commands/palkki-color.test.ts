@@ -48,6 +48,7 @@ describe("buildPalkkiColorBody / resolvePalkkiColorCreateBody", () => {
         owner: 27,
         active: false,
         iconName: "warning",
+        iconText: "BV",
         iconColor: "#000",
         iconBackgroundColor: "#ccc",
       }
@@ -62,9 +63,14 @@ describe("buildPalkkiColorBody / resolvePalkkiColorCreateBody", () => {
       ownerAsiakasId: 27,
       isActive: false,
       iconName: "warning",
+      iconText: "BV",
       iconColor: "#000",
       iconBackgroundColor: "#ccc",
     });
+  });
+
+  test("buildPalkkiColorBody: --icon-text '' clears the letters (sent as empty, backend stores NULL)", () => {
+    expect(buildPalkkiColorBody({}, { iconText: "" })).toEqual({ iconText: "" });
   });
 
   test("buildPalkkiColorBody: an absent typed field leaves the --body value untouched", () => {

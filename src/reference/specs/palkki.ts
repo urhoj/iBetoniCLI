@@ -82,6 +82,7 @@ function palkkiColorFlags(isUpdate: boolean): CommandFlag[] {
     { name: "sort-no", type: "number", description: "sortNo — evaluation order (first matching active rule wins); default: the row's own id" },
     { name: "owner", type: "number", description: isUpdate ? "Move to ownerAsiakasId (a company you belong to)" : "ownerAsiakasId (default: active company; 0 = shared catalog, sysadmin/developer only)" },
     { name: "icon-name", type: "string", description: "iconName — icon shown on the bar when this rule matches" },
+    { name: "icon-text", type: "string", description: "iconText — 1-2 letters (e.g. BV) shown in the bar's circle INSTEAD of the icon when set; empty string clears" },
     { name: "icon-color", type: "string", description: "iconColor" },
     { name: "icon-background-color", type: "string", description: "iconBackgroundColor" },
     ...(isUpdate ? [{ name: "active", type: "boolean", description: "isActive=true" } as CommandFlag] : []),
@@ -99,7 +100,7 @@ const palkkiColorPairErr: CommandError = {
 };
 
 const PALKKI_COLOR_ROW_SHAPE =
-  "{ barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconColor, iconBackgroundColor }";
+  "{ barColorId, title, ehto, style, comment, sortNo, ownerAsiakasId, isActive, iconName, iconText, iconColor, iconBackgroundColor }";
 
 /**
  * Not-found on a bar-coloring rule has TWO origins on create/update/delete:
