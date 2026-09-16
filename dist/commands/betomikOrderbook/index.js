@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { writeJson } from "../../output/json.js";
+import { writeJson, failUsage } from "../../output/json.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { parseId } from "../../targets.js";
 export async function runBetomikOrderbookImport(client, body, flags) {
@@ -54,6 +54,59 @@ export async function runBetomikOrderbookResync(client, runId, body, flags) {
     return client.post(`/api/betomik-orderbook/runs/${runId}/sync`, body, {
         headers: writeFlagsToHeaders(flags),
     });
+}
+const DEFAULT_SYNC_ROW_STATUSES = "pending,blocked,gone";
+/** The ledger rows of one run in the given statuses (default: the ones a sync would still act on), by id. */
+export async function selectRowsToSync(client, runId, statuses) {
+    const wanted = new Set((statuses || DEFAULT_SYNC_ROW_STATUSES).split(",").map((s) => s.trim()).filter(Boolean));
+    const { items } = await runBetomikOrderbookRows(client, runId);
+    return items
+        .filter((r) => wanted.has(String(r.syncStatus)))
+        .map((r) => Number(r.betomikOrderbookImportRowId))
+        .sort((a, b) => a - b);
+}
+/**
+ * The validator's "Vie betoni.onlineen" button, row by row (POST
+ * /api/betomik-orderbook/rows/:rowId/sync): each row is its own request, so a
+ * week never hits the edge's request timeout and a failing row never aborts the
+ * rest. With --dry-run the server extracts, plans and reports what it WOULD
+ * create (customer:new "…", worksite:new "…") without writing — the safe pass
+ * to read before the real one. One Idempotency-Key per row when one is given.
+ */
+export async function runBetomikOrderbookSyncRows(client, rowIds, body, flags) {
+    const items = [];
+    const summary = { rows: rowIds.length, synced: 0, blocked: 0, removed: 0, pending: 0, failed: 0 };
+    for (const rowId of rowIds) {
+        const perRow = flags.idempotencyKey ? { ...flags, idempotencyKey: `${flags.idempotencyKey}:${rowId}` } : flags;
+        try {
+            const res = (await client.post(`/api/betomik-orderbook/rows/${rowId}/sync`, body, {
+                headers: writeFlagsToHeaders(perRow),
+            }));
+            const row = res.row || {};
+            const status = String(row.syncStatus ?? "");
+            items.push({
+                rowId,
+                ok: true,
+                syncStatus: status,
+                plannedAction: row.plannedAction,
+                rowKind: row.rowKind,
+                palkkiType: row.palkkiType ?? null,
+                keikkaId: row.keikkaId ?? null,
+                palkkiId: row.palkkiId ?? null,
+                blockReason: row.blockReason ?? null,
+                written: res.summary?.written,
+                errors: res.summary?.errors ?? [],
+            });
+            if (status === "synced" || status === "blocked" || status === "removed" || status === "pending")
+                summary[status] += 1;
+        }
+        catch (e) {
+            const err = e;
+            items.push({ rowId, ok: false, error: err.message || String(e), statusCode: err.statusCode });
+            summary.failed += 1;
+        }
+    }
+    return { ...(flags.dryRun && { dryRun: true }), ...listEnvelope(items), summary };
 }
 /** Extraction prompt template used by the AI cell extractor (GET /api/betomik-orderbook/extract-prompt). */
 export async function runBetomikOrderbookExtractPrompt(client) {
@@ -161,6 +214,26 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         if (opts.provider)
             body.provider = opts.provider;
         writeJson(await runBetomikOrderbookResync(client, parseId(idStr, "runId"), body, opts));
+    }));
+    const syncRowCmd = group
+        .command("sync-row [rowId...]")
+        .description("Write one or more ledger rows into betoni.online as keikka/palkki, one request per row (the validator's Vie betoni.onlineen)")
+        .option("--run <runId>", "Instead of ids: every row of this run in --status", Number)
+        .option("--status <csv>", `With --run: syncStatus values to take (default: ${DEFAULT_SYNC_ROW_STATUSES})`)
+        .option("--provider <name>", "bedrock (default) | local — for rows with no stored extraction");
+    addWriteFlagsToCommand(syncRowCmd).action(guarded(async (idStrs, opts) => {
+        if (idStrs.length && opts.run != null)
+            failUsage("Pass row ids or --run <runId>, not both");
+        if (!idStrs.length && opts.run == null)
+            failUsage("Pass row ids or --run <runId>, not neither");
+        if (opts.run != null && (!Number.isInteger(opts.run) || opts.run < 1))
+            failUsage("--run must be a positive integer");
+        const client = await getClient();
+        const rowIds = opts.run != null ? await selectRowsToSync(client, opts.run, opts.status) : idStrs.map((s) => parseId(s, "rowId"));
+        const body = {};
+        if (opts.provider)
+            body.provider = opts.provider;
+        writeJson(await runBetomikOrderbookSyncRows(client, rowIds, body, opts));
     }));
     group
         .command("extract-prompt")

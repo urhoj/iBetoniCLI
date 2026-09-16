@@ -2851,6 +2851,56 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook sync-row matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook sync-row <rowId> [flags]
+
+DESCRIPTION
+  Write one or more ledger rows into betoni.online as a keikka/palkki (or update the one each already has), ONE request per row — the validator's Vie betoni.onlineen button (POST /api/betomik-orderbook/rows/:rowId/sync): always full mode, the date floor lifted, the run's shadow/create setting ignored. Give ids, or --run <runId> to take every row of a run still in --status (default pending,blocked,gone).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <rowId> NUMBER    betomikOrderbookImportRowId(s) from \`rows\` — one or more; omit with --run (required)
+
+FLAGS
+  --run NUMBER    Instead of ids: every row of this importRunId whose syncStatus is in --status
+  --status STRING    With --run: comma-separated syncStatus values to take (default pending,blocked,gone; pass synced to re-click written rows)
+  --provider STRING    bedrock (default) | local — used only for a row with no stored extraction
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ rowId, ok, syncStatus, plannedAction, rowKind, palkkiType, keikkaId, palkkiId, blockReason, written: { create, update, delete }, errors }> + summary: { rows, synced, blocked, removed, pending, failed }; a failed row is { rowId, ok:false, error, statusCode }. --dry-run adds a top-level dryRun: true.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No row ids and no --run, or both at once, or --run/rowId not a positive integer → Pass one or more betomikOrderbookImportRowIds, OR --run <importRunId> (optionally --status <csv>) — not both
+  exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can write rows
+  exit 5 (HTTP 404)  A row id does not exist under the Betomik tenant — reported per row as ok:false, the batch continues → Take the ids from \`ib dev betomik-orderbook rows <runId>\`
+  exit 4 (HTTP 400)  Unknown --provider, or the provider is not configured on the backend → Use --provider bedrock|local; the backend needs AI_BEDROCK_* / AI_LOCAL_* for it
+
+NOTES
+  - Run --dry-run FIRST: the server still extracts (Bedrock; stored for the real pass) and plans, and each blockReason lists what it WOULD create (customer:new "…", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow reports customer:missing where the real pass writes on the placeholder customer.
+  - One request per row: a week never hits the edge request timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — \`resync <runId> --mode full\` afterwards.
+  - --idempotency-key is suffixed per row (<key>:<rowId>), so a batch never replays one row's answer for another.
+
+SEE ALSO
+  ib dev betomik-orderbook resync, ib dev betomik-orderbook review, ib dev betomik-orderbook rows
+
+EXAMPLES
+  ib dev betomik-orderbook sync-row --run 5 --dry-run
+  ib dev betomik-orderbook sync-row --run 5 --reason "week 39 export"
+  ib dev betomik-orderbook sync-row 1101 1108 --reason "re-export after the spec fix"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
 "USAGE
   ib dev cache clear [flags]

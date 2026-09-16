@@ -204,6 +204,38 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     examples: ["ib dev betomik-orderbook resync 5 --mode full --dry-run"],
   },
   {
+    command: "ib dev betomik-orderbook sync-row",
+    description: "Write one or more ledger rows into betoni.online as a keikka/palkki (or update the one each already has), ONE request per row — the validator's Vie betoni.onlineen button (POST /api/betomik-orderbook/rows/:rowId/sync): always full mode, the date floor lifted, the run's shadow/create setting ignored. Give ids, or --run <runId> to take every row of a run still in --status (default pending,blocked,gone).",
+    tier: "developer",
+    auth: "any",
+    writeFlags: true,
+    dryRunKind: "server",
+    args: [{ name: "rowId", type: "number", description: "betomikOrderbookImportRowId(s) from `rows` — one or more; omit with --run" }],
+    flags: [
+      { name: "run", type: "number", description: "Instead of ids: every row of this importRunId whose syncStatus is in --status" },
+      { name: "status", type: "string", description: "With --run: comma-separated syncStatus values to take (default pending,blocked,gone; pass synced to re-click written rows)" },
+      { name: "provider", type: "string", description: "bedrock (default) | local — used only for a row with no stored extraction" },
+    ],
+    notes: [
+      "Run --dry-run FIRST: the server still extracts (Bedrock; stored for the real pass) and plans, and each blockReason lists what it WOULD create (customer:new \"…\", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow reports customer:missing where the real pass writes on the placeholder customer.",
+      "One request per row: a week never hits the edge request timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — `resync <runId> --mode full` afterwards.",
+      "--idempotency-key is suffixed per row (<key>:<rowId>), so a batch never replays one row's answer for another.",
+    ],
+    outputShape: "ListEnvelope<{ rowId, ok, syncStatus, plannedAction, rowKind, palkkiType, keikkaId, palkkiId, blockReason, written: { create, update, delete }, errors }> + summary: { rows, synced, blocked, removed, pending, failed }; a failed row is { rowId, ok:false, error, statusCode }. --dry-run adds a top-level dryRun: true.",
+    errors: [
+      { origin: "client", exit: 4, meaning: "No row ids and no --run, or both at once, or --run/rowId not a positive integer", remedy: "Pass one or more betomikOrderbookImportRowIds, OR --run <importRunId> (optionally --status <csv>) — not both" },
+      { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can write rows" },
+      { http: 404, exit: 5, meaning: "A row id does not exist under the Betomik tenant — reported per row as ok:false, the batch continues", remedy: "Take the ids from `ib dev betomik-orderbook rows <runId>`" },
+      { http: 400, exit: 4, meaning: "Unknown --provider, or the provider is not configured on the backend", remedy: "Use --provider bedrock|local; the backend needs AI_BEDROCK_* / AI_LOCAL_* for it" },
+    ],
+    seeAlso: ["ib dev betomik-orderbook resync", "ib dev betomik-orderbook review", "ib dev betomik-orderbook rows"],
+    examples: [
+      "ib dev betomik-orderbook sync-row --run 5 --dry-run",
+      "ib dev betomik-orderbook sync-row --run 5 --reason \"week 39 export\"",
+      "ib dev betomik-orderbook sync-row 1101 1108 --reason \"re-export after the spec fix\"",
+    ],
+  },
+  {
     command: "ib dev betomik-orderbook extract-prompt",
     description: "The AI cell-extraction prompt template (GET /api/betomik-orderbook/extract-prompt) — the system prompt, schema and tool name a sync run's provider uses to pull structured fields out of raw sheet cells. Read-only; mainly for debugging what the extractor is actually asked to do.",
     tier: "developer",

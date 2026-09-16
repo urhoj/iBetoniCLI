@@ -14,6 +14,8 @@ import {
   runBetomikOrderbookExceptions,
   runBetomikOrderbookFleet,
   runBetomikOrderbookAudit,
+  runBetomikOrderbookSyncRows,
+  selectRowsToSync,
 } from "../../src/commands/betomikOrderbook/index.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { CliError, hintDetailForError } from "../../src/api/errors.js";
@@ -235,5 +237,72 @@ describe("ib dev betomik-orderbook sync — 400 remedy disambiguation (fb#1681)"
   test("a real missing-fields 400 still falls to the general payload remedy", () => {
     const err = new CliError("sheetLabel, isoYear, isoWeek ja vähintään yksi rows-alkio vaaditaan", 400, null, 4);
     expect(hintDetailForError(err, syncErrors()).hint).toMatch(/--mode shadow\|create\|full/);
+  });
+});
+
+describe("ib dev betomik-orderbook sync-row (the validator's Vie betoni.onlineen, per row)", () => {
+  beforeEach(() => {
+    mockClient.get.mockReset();
+    mockClient.post.mockReset();
+  });
+
+  test("POSTs /rows/:rowId/sync once per id, in order, with the provider body and the write headers; one Idempotency-Key per row", async () => {
+    mockClient.post
+      .mockResolvedValueOnce({ summary: { written: { create: 1, update: 0, delete: 0 }, errors: [] }, row: { betomikOrderbookImportRowId: 7, syncStatus: "synced", plannedAction: "create", keikkaId: 123, palkkiId: null, rowKind: "keikka", palkkiType: null, blockReason: null } })
+      .mockResolvedValueOnce({ summary: { written: { create: 0, update: 0, delete: 0 }, errors: [] }, row: { betomikOrderbookImportRowId: 8, syncStatus: "blocked", plannedAction: "create", keikkaId: null, palkkiId: null, rowKind: "keikka", palkkiType: null, blockReason: 'customer:missing; unresolved:customer' } });
+    const result = await runBetomikOrderbookSyncRows(mockClient, [7, 8], { provider: "local" }, { reason: "week 40", idempotencyKey: "wk40" });
+    expect(mockClient.post).toHaveBeenNthCalledWith(1, "/api/betomik-orderbook/rows/7/sync", { provider: "local" }, { headers: { "Idempotency-Key": "wk40:7", "X-Action-Reason": "week 40" } });
+    expect(mockClient.post).toHaveBeenNthCalledWith(2, "/api/betomik-orderbook/rows/8/sync", { provider: "local" }, { headers: { "Idempotency-Key": "wk40:8", "X-Action-Reason": "week 40" } });
+    expect(result.items).toEqual([
+      { rowId: 7, ok: true, syncStatus: "synced", plannedAction: "create", rowKind: "keikka", palkkiType: null, keikkaId: 123, palkkiId: null, blockReason: null, written: { create: 1, update: 0, delete: 0 }, errors: [] },
+      { rowId: 8, ok: true, syncStatus: "blocked", plannedAction: "create", rowKind: "keikka", palkkiType: null, keikkaId: null, palkkiId: null, blockReason: "customer:missing; unresolved:customer", written: { create: 0, update: 0, delete: 0 }, errors: [] },
+    ]);
+    expect(result.summary).toEqual({ rows: 2, synced: 1, blocked: 1, removed: 0, pending: 0, failed: 0 });
+    expect(result.count).toBe(2);
+    expect("dryRun" in result).toBe(false);
+  });
+
+  test("--dry-run: X-Dry-Run on every request, and the envelope carries the top-level dryRun marker", async () => {
+    mockClient.post.mockResolvedValue({ dryRun: true, summary: { written: { create: 0, update: 0, delete: 0 }, errors: [] }, row: { betomikOrderbookImportRowId: 7, syncStatus: "blocked", plannedAction: "create", blockReason: 'customer:new "Peab Oy"' } });
+    const result = await runBetomikOrderbookSyncRows(mockClient, [7], {}, { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/betomik-orderbook/rows/7/sync", {}, { headers: { "X-Dry-Run": "1" } });
+    expect(result.dryRun).toBe(true);
+    expect(result.items[0].blockReason).toBe('customer:new "Peab Oy"');
+  });
+
+  test("a row that fails does not abort the batch: it is reported with ok:false and counted as failed", async () => {
+    mockClient.post
+      .mockRejectedValueOnce(new CliError("row 9 not found", 404, null, 5))
+      .mockResolvedValueOnce({ summary: { written: { create: 1, update: 0, delete: 0 }, errors: [] }, row: { betomikOrderbookImportRowId: 10, syncStatus: "synced", plannedAction: "create", keikkaId: 124 } });
+    const result = await runBetomikOrderbookSyncRows(mockClient, [9, 10], {}, {});
+    expect(result.items[0]).toEqual({ rowId: 9, ok: false, error: "row 9 not found", statusCode: 404 });
+    expect(result.items[1].keikkaId).toBe(124);
+    expect(result.summary).toEqual({ rows: 2, synced: 1, blocked: 0, removed: 0, pending: 0, failed: 1 });
+  });
+
+  test("selectRowsToSync: --run picks the run's rows in the given statuses (default pending, blocked, gone), by id", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [
+      { betomikOrderbookImportRowId: 30, syncStatus: "synced" },
+      { betomikOrderbookImportRowId: 12, syncStatus: "blocked" },
+      { betomikOrderbookImportRowId: 11, syncStatus: "pending" },
+      { betomikOrderbookImportRowId: 13, syncStatus: "removed" },
+      { betomikOrderbookImportRowId: 14, syncStatus: "gone" },
+    ] });
+    expect(await selectRowsToSync(mockClient, 4, undefined)).toEqual([11, 12, 14]);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/runs/4/rows");
+    mockClient.get.mockResolvedValueOnce({ items: [{ betomikOrderbookImportRowId: 30, syncStatus: "synced" }, { betomikOrderbookImportRowId: 12, syncStatus: "blocked" }] });
+    expect(await selectRowsToSync(mockClient, 4, "synced")).toEqual([30]);
+  });
+
+  test("the spec exists, is developer-only, accepts write flags with a server dry run, and hints the client-side usage errors", () => {
+    const spec = COMMAND_SPECS.find((s) => s.command === "ib dev betomik-orderbook sync-row");
+    expect(spec).toBeDefined();
+    expect(spec?.tier).toBe("developer");
+    expect(spec?.writeFlags).toBe(true);
+    expect(spec?.dryRunKind).toBe("server");
+    expect(spec?.args?.[0]?.name).toBe("rowId");
+    expect(spec?.flags?.map((f) => f.name)).toEqual(expect.arrayContaining(["run", "status", "provider"]));
+    const usage = new CliError("Pass row ids or --run <runId>, not neither", 0, null, 4);
+    expect(hintDetailForError(usage, spec?.errors).hint).toMatch(/--run/);
   });
 });

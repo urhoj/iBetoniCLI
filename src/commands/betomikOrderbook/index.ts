@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { writeJson } from "../../output/json.js";
+import { writeJson, failUsage } from "../../output/json.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { parseId } from "../../targets.js";
 
@@ -109,6 +109,86 @@ export async function runBetomikOrderbookResync(
   return client.post<unknown>(`/api/betomik-orderbook/runs/${runId}/sync`, body, {
     headers: writeFlagsToHeaders(flags),
   });
+}
+
+export interface BetomikSyncRowResult {
+  rowId: number;
+  ok: boolean;
+  syncStatus?: string;
+  plannedAction?: string;
+  rowKind?: string;
+  palkkiType?: string | null;
+  keikkaId?: number | null;
+  palkkiId?: number | null;
+  blockReason?: string | null;
+  written?: { create: number; update: number; delete: number };
+  errors?: unknown[];
+  error?: string;
+  statusCode?: number;
+}
+
+export interface BetomikSyncRowsEnvelope extends ListEnvelope<BetomikSyncRowResult> {
+  dryRun?: true;
+  summary: { rows: number; synced: number; blocked: number; removed: number; pending: number; failed: number };
+}
+
+const DEFAULT_SYNC_ROW_STATUSES = "pending,blocked,gone";
+
+/** The ledger rows of one run in the given statuses (default: the ones a sync would still act on), by id. */
+export async function selectRowsToSync(client: ApiClient, runId: number, statuses?: string): Promise<number[]> {
+  const wanted = new Set((statuses || DEFAULT_SYNC_ROW_STATUSES).split(",").map((s) => s.trim()).filter(Boolean));
+  const { items } = await runBetomikOrderbookRows(client, runId);
+  return items
+    .filter((r) => wanted.has(String(r.syncStatus)))
+    .map((r) => Number(r.betomikOrderbookImportRowId))
+    .sort((a, b) => a - b);
+}
+
+/**
+ * The validator's "Vie betoni.onlineen" button, row by row (POST
+ * /api/betomik-orderbook/rows/:rowId/sync): each row is its own request, so a
+ * week never hits the edge's request timeout and a failing row never aborts the
+ * rest. With --dry-run the server extracts, plans and reports what it WOULD
+ * create (customer:new "…", worksite:new "…") without writing — the safe pass
+ * to read before the real one. One Idempotency-Key per row when one is given.
+ */
+export async function runBetomikOrderbookSyncRows(
+  client: ApiClient,
+  rowIds: number[],
+  body: { provider?: string },
+  flags: WriteFlags
+): Promise<BetomikSyncRowsEnvelope> {
+  const items: BetomikSyncRowResult[] = [];
+  const summary = { rows: rowIds.length, synced: 0, blocked: 0, removed: 0, pending: 0, failed: 0 };
+  for (const rowId of rowIds) {
+    const perRow = flags.idempotencyKey ? { ...flags, idempotencyKey: `${flags.idempotencyKey}:${rowId}` } : flags;
+    try {
+      const res = (await client.post<unknown>(`/api/betomik-orderbook/rows/${rowId}/sync`, body, {
+        headers: writeFlagsToHeaders(perRow),
+      })) as { summary?: { written?: BetomikSyncRowResult["written"]; errors?: unknown[] }; row?: Record<string, unknown> };
+      const row = res.row || {};
+      const status = String(row.syncStatus ?? "");
+      items.push({
+        rowId,
+        ok: true,
+        syncStatus: status,
+        plannedAction: row.plannedAction as string | undefined,
+        rowKind: row.rowKind as string | undefined,
+        palkkiType: (row.palkkiType as string | null | undefined) ?? null,
+        keikkaId: (row.keikkaId as number | null | undefined) ?? null,
+        palkkiId: (row.palkkiId as number | null | undefined) ?? null,
+        blockReason: (row.blockReason as string | null | undefined) ?? null,
+        written: res.summary?.written,
+        errors: res.summary?.errors ?? [],
+      });
+      if (status === "synced" || status === "blocked" || status === "removed" || status === "pending") summary[status] += 1;
+    } catch (e) {
+      const err = e as { message?: string; statusCode?: number };
+      items.push({ rowId, ok: false, error: err.message || String(e), statusCode: err.statusCode });
+      summary.failed += 1;
+    }
+  }
+  return { ...(flags.dryRun && { dryRun: true as const }), ...listEnvelope(items), summary };
 }
 
 /** Extraction prompt template used by the AI cell extractor (GET /api/betomik-orderbook/extract-prompt). */
@@ -277,6 +357,27 @@ export function registerBetomikOrderbookCommands(
       if (opts.provider) body.provider = opts.provider;
       writeJson(await runBetomikOrderbookResync(client, parseId(idStr, "runId"), body, opts));
     })
+  );
+
+  const syncRowCmd = group
+    .command("sync-row [rowId...]")
+    .description("Write one or more ledger rows into betoni.online as keikka/palkki, one request per row (the validator's Vie betoni.onlineen)")
+    .option("--run <runId>", "Instead of ids: every row of this run in --status", Number)
+    .option("--status <csv>", `With --run: syncStatus values to take (default: ${DEFAULT_SYNC_ROW_STATUSES})`)
+    .option("--provider <name>", "bedrock (default) | local — for rows with no stored extraction");
+  addWriteFlagsToCommand(syncRowCmd).action(
+    guarded(
+      async (idStrs: string[], opts: WriteFlags & { run?: number; status?: string; provider?: string }) => {
+        if (idStrs.length && opts.run != null) failUsage("Pass row ids or --run <runId>, not both");
+        if (!idStrs.length && opts.run == null) failUsage("Pass row ids or --run <runId>, not neither");
+        if (opts.run != null && (!Number.isInteger(opts.run) || opts.run < 1)) failUsage("--run must be a positive integer");
+        const client = await getClient();
+        const rowIds = opts.run != null ? await selectRowsToSync(client, opts.run, opts.status) : idStrs.map((s) => parseId(s, "rowId"));
+        const body: { provider?: string } = {};
+        if (opts.provider) body.provider = opts.provider;
+        writeJson(await runBetomikOrderbookSyncRows(client, rowIds, body, opts));
+      }
+    )
   );
 
   group
