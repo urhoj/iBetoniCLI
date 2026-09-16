@@ -394,28 +394,34 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
   {
     command: "ib customer settings",
     description:
-      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu, for any TENANT you administer — your own company included (there is no `ib company settings`). Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of `customer modules`.",
+      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu, for any TENANT you administer — your own company included (there is no `ib company settings`). Without --set/--unset/--gps-provider it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. --gps-provider picks the fleet-tracking vendor behind HAS_ECOFLEET, the GPS on/off switch for either. Superset of `customer modules`.",
     permissions: ["company admin on the target tenant (system admin = any tenant)"],
     args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId (or pass --asiakas)" }],
     flags: [
       ASIAKAS_TARGET_FLAG,
       { name: "set", type: "string", description: "Comma-separated setting names to turn ON" },
       { name: "unset", type: "string", description: "Comma-separated setting names to turn OFF" },
+      { name: "gps-provider", type: "string", description: "Fleet-tracking vendor: ecofleet | mapon, stored on the HAS_ECOFLEET row. Does not turn GPS on by itself — combine with --set HAS_ECOFLEET. Credentials are provisioned separately by a system admin." },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }",
+      "report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting }, gpsProvider:'ecofleet'|'mapon' } | write: { asiakasId, applied:{set,unset,dryRun,gpsProvider?}, state }",
     errors: [
       apiErr(400, "Unknown setting name, or name in both --set/--unset", "use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu"),
+      { exit: 4, origin: "client", meaning: "unknown --gps-provider: <value>", remedy: "pass ecofleet or mapon" },
       apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    seeAlso: ["ib customer modules", "ib company current"],
+    notes: [
+      "A toggle sends only the bool column; the backend read-merges the rest of the row (fb#1765), so --unset HAS_ECOFLEET keeps the provider token. gpsProvider is absent against a backend older than 2026-09-16.",
+    ],
+    seeAlso: ["ib customer modules", "ib company current", "ib vehicle locations"],
     examples: [
       "ib customer settings 1349",
       "ib customer settings --asiakas 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'",
+      "ib customer settings 27 --set HAS_ECOFLEET --gps-provider mapon --reason 'Mapon onboarding'",
     ],
   },
 ];

@@ -464,11 +464,27 @@ export function parseSettingChanges(
   return parseChanges(setCsv, unsetCsv, valid, () => [...valid].sort().join(", "));
 }
 
-/** Full settings report (roolit + all setting types by canonical name). */
+/** Fleet-tracking provider tokens carried in the HAS_ECOFLEET row's asiakasSettingString (NULL = ecofleet). */
+export const GPS_PROVIDERS = ["ecofleet", "mapon"] as const;
+export type GpsProvider = (typeof GPS_PROVIDERS)[number];
+
+/** Validate --gps-provider; throws (caller exits 4) on anything but the two tokens. */
+export function parseGpsProvider(raw: string | undefined): GpsProvider | undefined {
+  if (raw === undefined) return undefined;
+  const v = raw.trim().toLowerCase();
+  if (!(GPS_PROVIDERS as readonly string[]).includes(v)) {
+    throw new Error(`unknown --gps-provider: ${raw}. Valid: ${GPS_PROVIDERS.join(", ")}`);
+  }
+  return v as GpsProvider;
+}
+
+/** Full settings report (roolit + all setting types by canonical name + gpsProvider). */
 export interface CustomerSettingsState {
   asiakasId: number;
   roolit: AsiakasRoolit;
   settings: Record<string, boolean>;
+  /** Absent against a backend older than 2026-09-16. */
+  gpsProvider?: GpsProvider;
 }
 
 /** GET /api/cli/customer/settings/:asiakasId — admin-gated; returns the raw report. */
@@ -482,7 +498,7 @@ export async function runCustomerSettingsReport(
 /** What an apply requested + the resulting state. `S` = the report shape re-fetched after the write. */
 export interface ApplyResult<S> {
   asiakasId: number;
-  applied: { set: string[]; unset: string[]; dryRun: boolean };
+  applied: { set: string[]; unset: string[]; dryRun: boolean; gpsProvider?: GpsProvider };
   state: S;
 }
 
@@ -494,12 +510,19 @@ export type ModulesApplyResult = ApplyResult<CustomerModulesState>;
  * (echoing the other three roolit booleans from the modules report), the rest
  * → one settings/save batch (self laskuttaja, upsert). Resolves typeIds via the
  * full settingTypeIdMap so it accepts canonical names AND the 8 aliases.
+ *
+ * Rows carry ONLY the columns being changed: the backend read-merges the rest
+ * (asiakasSql.saveSetting, fb#1765), so a bool toggle no longer NULLs the
+ * provider token or a keikkaEval rule. `gpsProvider` folds into the same
+ * HAS_ECOFLEET row as its bool, so `--set HAS_ECOFLEET --gps-provider mapon`
+ * is one upsert.
  */
 async function applySettingWrites(
   client: ApiClient,
   asiakasId: number,
   changes: Map<string, boolean>,
-  flags: WriteFlags
+  flags: WriteFlags,
+  gpsProvider?: GpsProvider
 ): Promise<void> {
   const headers = writeFlagsToHeaders(flags);
   if (changes.has("pumppu")) {
@@ -518,17 +541,21 @@ async function applySettingWrites(
     );
   }
   const typeIds = settingTypeIdMap();
-  const settings = [...changes.entries()]
-    .filter(([key]) => key !== "pumppu")
-    .map(([key, value]) => ({
-      asiakasSettingId: null,
-      asiakasId,
-      laskuttajaAsiakasId: asiakasId,
-      asiakasSettingTypeId: typeIds[key],
-      asiakasSettingBool: value,
-    }));
-  if (settings.length > 0) {
-    await client.post("/api/asiakas/settings/save", settings, { headers });
+  const rows = new Map<number, Record<string, unknown>>();
+  const row = (typeId: number): Record<string, unknown> => {
+    let r = rows.get(typeId);
+    if (!r) {
+      r = { asiakasSettingId: null, asiakasId, laskuttajaAsiakasId: asiakasId, asiakasSettingTypeId: typeId };
+      rows.set(typeId, r);
+    }
+    return r;
+  };
+  for (const [key, value] of changes) {
+    if (key !== "pumppu") row(typeIds[key]).asiakasSettingBool = value;
+  }
+  if (gpsProvider) row(typeIds.has_ecofleet).asiakasSettingString = gpsProvider;
+  if (rows.size > 0) {
+    await client.post("/api/asiakas/settings/save", [...rows.values()], { headers });
   }
 }
 
@@ -538,12 +565,14 @@ async function applySettingWrites(
  */
 function appliedFromChanges(
   changes: Map<string, boolean>,
-  flags: WriteFlags
-): { set: string[]; unset: string[]; dryRun: boolean } {
+  flags: WriteFlags,
+  gpsProvider?: GpsProvider
+): ApplyResult<unknown>["applied"] {
   return {
     set: [...changes].filter(([, v]) => v).map(([k]) => k),
     unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
     dryRun: !!flags.dryRun,
+    ...(gpsProvider ? { gpsProvider } : {}),
   };
 }
 
@@ -558,11 +587,12 @@ export async function runCustomerSettingsApply(
   client: ApiClient,
   asiakasId: number,
   changes: Map<string, boolean>,
-  flags: WriteFlags
+  flags: WriteFlags,
+  gpsProvider?: GpsProvider
 ): Promise<ApplyResult<CustomerSettingsState>> {
-  await applySettingWrites(client, asiakasId, changes, flags);
+  await applySettingWrites(client, asiakasId, changes, flags, gpsProvider);
   const state = await runCustomerSettingsReport(client, asiakasId);
-  return { asiakasId, applied: appliedFromChanges(changes, flags), state };
+  return { asiakasId, applied: appliedFromChanges(changes, flags, gpsProvider), state };
 }
 
 /**
@@ -1138,9 +1168,9 @@ export function registerCustomerCommands(
       )
     );
 
-  // `modules` and `settings` share one registration shape: report when neither
-  // --set nor --unset is given, else parse the CSVs and apply. Only the three
-  // callee functions differ.
+  // `modules` and `settings` share one registration shape: report when no
+  // write flag is given, else parse the CSVs and apply. Only the three callee
+  // functions differ; `settings` additionally takes --gps-provider.
   const registerSetUnsetCommand = (
     name: "modules" | "settings",
     fns: {
@@ -1150,31 +1180,35 @@ export function registerCustomerCommands(
         client: ApiClient,
         asiakasId: number,
         changes: Map<string, boolean>,
-        flags: WriteFlags
+        flags: WriteFlags,
+        gpsProvider?: GpsProvider
       ) => Promise<unknown>;
     }
   ): void => {
     const cmd = addAsiakasTargetOption(c.command(`${name} [asiakasId]`))
       .option("--set <keys>")
       .option("--unset <keys>");
+    if (name === "settings") cmd.option("--gps-provider <provider>");
     addWriteFlagsToCommand(cmd).action(
       guarded(async (
         idStr: string | undefined,
-        opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
+        opts: WriteFlags & { set?: string; unset?: string; gpsProvider?: string; asiakas?: number }
       ) => {
         const client = await getClient();
         const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-        if (!opts.set && !opts.unset) {
+        if (!opts.set && !opts.unset && opts.gpsProvider === undefined) {
           writeJson(await fns.report(client, asiakasId));
           return;
         }
         let changes: Map<string, boolean>;
+        let gpsProvider: GpsProvider | undefined;
         try {
-          changes = fns.parse(opts.set, opts.unset);
+          gpsProvider = parseGpsProvider(opts.gpsProvider);
+          changes = opts.set || opts.unset ? fns.parse(opts.set, opts.unset) : new Map();
         } catch (validationErr) {
           failWith(errorMessage(validationErr), 4);
         }
-        writeJson(await fns.apply(client, asiakasId, changes, opts));
+        writeJson(await fns.apply(client, asiakasId, changes, opts, gpsProvider));
       })
     );
   };
