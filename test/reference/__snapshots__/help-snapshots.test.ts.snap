@@ -2322,6 +2322,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 4 (client-side)  --source is not an integer >= 1, rejected locally before any request → pass a positive apiKeySourceId
   exit 3 (HTTP 403)  System-admin only (server-enforced) → this write requires isSystemAdmin, not merely isDeveloper — the ticket is explicit that admin-tier access is not enough
+  exit 5 (HTTP 404)  --source names an apiKeySourceId that does not exist in dbo.apiKeySources (fb#1784; was a raw FK-violation 500) → run \`ib dev apikey sources\` and pass one of the listed ids
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

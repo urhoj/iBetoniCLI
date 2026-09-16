@@ -337,6 +337,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
       intParseErr("--asiakas", "pass a positive ownerAsiakasId"),
       intParseErr("--source", "pass a positive apiKeySourceId"),
       apiErr(403, "System-admin only (server-enforced)", "this write requires isSystemAdmin, not merely isDeveloper — the ticket is explicit that admin-tier access is not enough"),
+      apiErr(404, "--source names an apiKeySourceId that does not exist in dbo.apiKeySources (fb#1784; was a raw FK-violation 500)", "run `ib dev apikey sources` and pass one of the listed ids"),
       ...authErrors(),
     ],
     notes: [
