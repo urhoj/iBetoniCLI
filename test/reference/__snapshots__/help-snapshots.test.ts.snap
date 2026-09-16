@@ -12405,6 +12405,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed (missing/equal ids, or safety check) → check --main/--secondary; run --dry-run first
+  exit 4 (HTTP 400)  Day-row vehicle conflict (errorNumber 50203): both persons drive DIFFERENT vehicles on the same day; conflictingFields lists each day as personPvm@YYYY-MM-DD with both vehicleIds → fix those day rows first (ib person day clear / ib vehicle driver assign), then re-run --dry-run
   exit 3 (HTTP 403)  Not permitted on this tenant → ib company switch to that owner, or use an admin token
   exit 5 (HTTP 404)  One or both persons not found or access denied → verify --main/--secondary and --owner
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -12414,6 +12415,7 @@ NOTES
   - ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.
   - --dry-run issues a read-only POST to /validate (tagged \`read\`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.
   - Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.
+  - personPvm collision: the data-carrying row wins, the empty filler is dropped, main wins ties; vehicle defaultKuski is re-pointed.
   - Both persons must share one owner class: a tenant id, or (--unowned) the unowned class where owner 0 and NULL count as equal. Deploy-gated: an older backend 400s on --unowned.
 
 SEE ALSO

@@ -378,6 +378,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
     errors: [
       apiErr(400, "Validation failed (missing/equal ids, or safety check)", "check --main/--secondary; run --dry-run first"),
+      apiErr(400, "Day-row vehicle conflict (errorNumber 50203): both persons drive DIFFERENT vehicles on the same day; conflictingFields lists each day as personPvm@YYYY-MM-DD with both vehicleIds", "fix those day rows first (ib person day clear / ib vehicle driver assign), then re-run --dry-run", "eri ajoneuvo"),
       apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
       apiErr(404, "One or both persons not found or access denied", "verify --main/--secondary and --owner"),
       ...COMMON_AUTH_ERRORS,
@@ -386,6 +387,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       MERGE_DRY_RUN_FIRST_NOTE,
       MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.",
+      "personPvm collision: the data-carrying row wins, the empty filler is dropped, main wins ties; vehicle defaultKuski is re-pointed.",
       "Both persons must share one owner class: a tenant id, or (--unowned) the unowned class where owner 0 and NULL count as equal. Deploy-gated: an older backend 400s on --unowned.",
     ],
     seeAlso: ["ib person duplicates", "ib person delete"],
