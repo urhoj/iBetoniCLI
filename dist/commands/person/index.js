@@ -140,6 +140,10 @@ export function projectPersonHit(row) {
  * the active company. The backend gates it with `canAccessOwnerAsiakas`, which
  * allows a company you belong to — or ANY company for a sysadmin/developer, the
  * cross-tenant lever this flag exists for (feedback #310). Unauthorized → 403.
+ *
+ * A company scope covers the tenant's OWN persons and its STAFF — anyone
+ * attached via asiakasPerson, even when owned elsewhere (fb#1750, proc
+ * person_search_usingFullText). 0 hits therefore means "not at this tenant".
  */
 export async function runPersonSearch(client, query, limit, ownerAsiakasId) {
     const body = { searchString: query };

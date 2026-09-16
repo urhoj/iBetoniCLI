@@ -2723,7 +2723,7 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
   ib dev betomik-orderbook rows <runId> [flags]
 
 DESCRIPTION
-  Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of \`import\`; the weekly tenant report sums m3 and groups by plate from these rows.
+  Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of \`import\`; the weekly tenant report sums m3 and groups by plate from these rows. Terminal \`removed\` rows (a sheet row that vanished and whose keikka/palkki is gone) are excluded, so the count matches \`runs\`.rowCount; \`gone\` rows still show until sync reconciles them (fb#1722).
   Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 ARGUMENTS
@@ -12731,7 +12731,7 @@ exports[`Help snapshots — contract stability > help for ib person search match
   ib person search [<query>] [flags]
 
 DESCRIPTION
-  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. Four mutually exclusive scopes: (default) the active company; --asiakas <id> one OTHER company; --my-companies every company you belong to, in one server-side call (with a per-company client-sweep fallback if that endpoint isn't deployed yet); --all-companies EVERY tenant (developer/sysadmin only). --my-companies and --all-companies return one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
+  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. Four mutually exclusive scopes: (default) the active company; --asiakas <id> one OTHER company; --my-companies every company you belong to, in one server-side call (with a per-company client-sweep fallback if that endpoint isn't deployed yet); --all-companies EVERY tenant (developer/sysadmin only). --my-companies and --all-companies return one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results. A company scope matches the tenant's OWN persons and its STAFF: anyone attached via asiakasPerson, even when owned by another company (fb#1750) — the same membership the driver board and \`ib person role list\` use, so 0 hits means not at this tenant.
   Permissions: requires auth.page.person.read, --asiakas: a company you belong to, or sysadmin/developer for any tenant, --all-companies: sysadmin/developer (server-enforced).
 
 ARGUMENTS

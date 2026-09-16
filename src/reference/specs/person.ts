@@ -97,7 +97,10 @@ export const PERSON_SPECS: CommandSpec[] = [
       "if that endpoint isn't deployed yet); --all-companies EVERY tenant " +
       "(developer/sysadmin only). --my-companies and --all-companies return one flat " +
       "list tagged with the asiakasId/name of each hit. " +
-      "Global persons (ownerAsiakasId=null) are included in every company's results.",
+      "Global persons (ownerAsiakasId=null) are included in every company's results. " +
+      "A company scope matches the tenant's OWN persons and its STAFF: anyone attached via " +
+      "asiakasPerson, even when owned by another company (fb#1750) — the same membership " +
+      "the driver board and `ib person role list` use, so 0 hits means not at this tenant.",
     permissions: [
       "auth.page.person.read",
       "--asiakas: a company you belong to, or sysadmin/developer for any tenant",

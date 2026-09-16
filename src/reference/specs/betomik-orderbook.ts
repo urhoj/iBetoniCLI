@@ -54,7 +54,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
   },
   {
     command: "ib dev betomik-orderbook rows",
-    description: "Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of `import`; the weekly tenant report sums m3 and groups by plate from these rows.",
+    description: "Staging rows of one import run (GET /api/betomik-orderbook/runs/:runId/rows) — jobDate, plate, vehicleLabel, driverName, driverMatchStatus, sourceType (betomik_self|third_party_plant|unspecified), plantOrNote, m3 (null when the sheet value was unparseable), reviewStatus. The read side of `import`; the weekly tenant report sums m3 and groups by plate from these rows. Terminal `removed` rows (a sheet row that vanished and whose keikka/palkki is gone) are excluded, so the count matches `runs`.rowCount; `gone` rows still show until sync reconciles them (fb#1722).",
     tier: "developer",
     permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [],

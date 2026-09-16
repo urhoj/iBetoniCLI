@@ -92,7 +92,7 @@ import { buildReference } from "../../src/reference/dump.js";
 // sync-row` — the per-row export whose dry-run-first pass is the Betomik import
 // method (three notes encode it; prose trimmed once before this bump).
 // 798061 B measured; headroom ~439 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 798_500;
+const DUMP_LIMIT_BYTES = 799_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
