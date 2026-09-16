@@ -87,7 +87,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // trio exclusion). Prose trimmed twice first (from +212 B to +84 B over the
 // prior limit) before reaching for this bump; 785,084 B measured. Headroom
 // ~116 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 794_000;
+// 795_000 since fb#1763 (ib person merge gained a 50203 day-row conflict error row).
+const DUMP_LIMIT_BYTES = 795_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
