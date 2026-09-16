@@ -349,7 +349,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: ["--type is required", "must be one of", "invalid feedbackid"], meaning: "Validation", remedy: "--type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers ('invalid feedbackId' fires for EITHER positional — parseRefId names the ref field, not the argument)" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check both ids via `ib dev feedback list`/`get` — either row is missing"),
-      apiErr(409, "Already linked", "unlink first (`ib dev feedback unlink <id> <relatedId>`) to change the relation type"),
+      apiErr(409, "Already linked with a DIFFERENT type (the message names both)", "unlink first (`ib dev feedback unlink <id> <relatedId>`) to relink as the new type; re-asserting the SAME type is not a conflict — it answers 200 with alreadyLinked:true (fb#1630; an older backend still 409s)"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib dev feedback unlink", "ib dev feedback cluster", "ib dev feedback get"],

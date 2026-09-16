@@ -98,20 +98,23 @@ describe("parser errors → JSON envelope", () => {
 
   // fb#1179 — see `firstUnknownOption` in src/output/unknownCommand.ts.
   describe("unknown flag alongside a missing required flag (fb#1179)", () => {
+    // Fixture: `attachment upload-url` is a no-positional command with one
+    // Commander-required flag. (`company switch --to` was the fixture until
+    // fb#1751 made its target a positional-or-flag pair resolved in the action.)
     test("leads with the unknown-option envelope and folds the missing flag into its hint", async () => {
-      await run(["company", "switch", "--bogus", "1"]);
+      await run(["attachment", "upload-url", "--bogus", "1"]);
       const parsed = lastStderrJson();
       expect(parsed.code).toBe("USAGE");
       expect(parsed.unknownOption).toBe("--bogus");
-      expect(String(parsed.hint)).toMatch(/missing required flag.*--to/);
+      expect(String(parsed.hint)).toMatch(/missing required flag.*--name/);
       expect(process.exitCode).toBe(4);
     });
 
     test("a dash token after the `--` terminator is an operand, not an unknown flag", async () => {
-      await run(["company", "switch", "--", "-x"]);
+      await run(["attachment", "upload-url", "--", "-x"]);
       const parsed = lastStderrJson();
       expect(parsed.unknownOption).toBeUndefined();
-      expect(String(parsed.error)).toMatch(/missing required flag: --to/);
+      expect(String(parsed.error)).toMatch(/missing required flag: --name/);
     });
 
     test("an unknown flag BEFORE the `--` terminator is still detected", async () => {

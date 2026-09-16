@@ -5,7 +5,7 @@ import { runPersistedSwitch } from "../../auth/switch.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, resolveTarget } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 
 interface AvailableCompany {
@@ -127,11 +127,14 @@ export function registerCompanyCommands(
     .action(jsonAction(getClient, runCompanyCurrent));
 
   company
-    .command("switch")
-    .requiredOption("--to <asiakasId>", "", intFlag("--to"))
+    // Dual-target (fb#1751), mirrors `ib auth switch`.
+    .command("switch [asiakasId]")
+    .option("--to <asiakasId>", "Target asiakasId (alias for the positional)", intFlag("--to"))
     .action(
-      guarded(async (opts: { to: number }) => {
-        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
+      guarded(async (idStr: string | undefined, opts: { to?: number }) => {
+        writeJson(
+          await runPersistedSwitch(resolveTarget(idStr, opts.to, "asiakasId", "to"), isReadOnly())
+        );
       })
     );
 

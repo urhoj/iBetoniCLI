@@ -3,7 +3,7 @@ import { runPersistedSwitch } from "../../auth/switch.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, resolveTarget } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
@@ -71,10 +71,11 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .command("current")
         .action(jsonAction(getClient, runCompanyCurrent));
     company
-        .command("switch")
-        .requiredOption("--to <asiakasId>", "", intFlag("--to"))
-        .action(guarded(async (opts) => {
-        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
+        // Dual-target (fb#1751), mirrors `ib auth switch`.
+        .command("switch [asiakasId]")
+        .option("--to <asiakasId>", "Target asiakasId (alias for the positional)", intFlag("--to"))
+        .action(guarded(async (idStr, opts) => {
+        writeJson(await runPersistedSwitch(resolveTarget(idStr, opts.to, "asiakasId", "to"), isReadOnly()));
     }));
     // `ib company validate` was renamed to the top-level `ib validate` (clean
     // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.

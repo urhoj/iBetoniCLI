@@ -13,7 +13,7 @@ import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage, warnNote } from "../../output/json.js";
-import { intFlag, parseId } from "../../targets.js";
+import { intFlag, parseId, resolveTarget } from "../../targets.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
  *   - login    OAuth 2.1 + PKCE flow with local 127.0.0.1 callback
@@ -160,11 +160,13 @@ export function registerAuthCommands(parent, isReadOnly) {
         }
         writeJson(out);
     }));
+    // Dual-target (fb#1751): `ib company list` prints asiakasIds a caller passes
+    // straight through, so the positional is accepted alongside --to.
     auth
-        .command("switch")
-        .requiredOption("--to <asiakasId>", "", intFlag("--to"))
-        .action(guarded(async (opts) => {
-        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
+        .command("switch [asiakasId]")
+        .option("--to <asiakasId>", "Target asiakasId (alias for the positional)", intFlag("--to"))
+        .action(guarded(async (idStr, opts) => {
+        writeJson(await runPersistedSwitch(resolveTarget(idStr, opts.to, "asiakasId", "to"), isReadOnly()));
     }));
     auth
         .command("refresh")

@@ -102,7 +102,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // 801959 B measured; headroom ~541 B, thin per this file's convention.
 // 803_000 (fb#1606 from-json value-type contract in the glossary set/import
 // spec rows, 2026-09-16). ~802.7 KB measured.
-const DUMP_LIMIT_BYTES = 803_000;
+// 803_000 → 805_000 (fb#1751): `auth switch`/`company switch` gained a
+// positional arg, two USAGE rows and an example each (+~1.1 KB, measured 804 099 B).
+const DUMP_LIMIT_BYTES = 805_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

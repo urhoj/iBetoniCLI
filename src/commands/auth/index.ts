@@ -23,7 +23,7 @@ import {
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage, warnNote } from "../../output/json.js";
-import { intFlag, parseId } from "../../targets.js";
+import { intFlag, parseId, resolveTarget } from "../../targets.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -202,12 +202,16 @@ export function registerAuthCommands(
       })
     );
 
+  // Dual-target (fb#1751): `ib company list` prints asiakasIds a caller passes
+  // straight through, so the positional is accepted alongside --to.
   auth
-    .command("switch")
-    .requiredOption("--to <asiakasId>", "", intFlag("--to"))
+    .command("switch [asiakasId]")
+    .option("--to <asiakasId>", "Target asiakasId (alias for the positional)", intFlag("--to"))
     .action(
-      guarded(async (opts: { to: number }) => {
-        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
+      guarded(async (idStr: string | undefined, opts: { to?: number }) => {
+        writeJson(
+          await runPersistedSwitch(resolveTarget(idStr, opts.to, "asiakasId", "to"), isReadOnly())
+        );
       })
     );
 

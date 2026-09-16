@@ -741,14 +741,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib auth switch matches snapshot 1`] = `
 "USAGE
-  ib auth switch [flags]
+  ib auth switch [<asiakasId>] [flags]
 
 DESCRIPTION
   Switch the active company. Issues a new JWT bound to the target ownerAsiakasId and persists it.
   Auth: requires login (any authenticated user).
 
+ARGUMENTS
+  <asiakasId> NUMBER    Target asiakasId to switch to (or pass --to) (optional)
+
 FLAGS
-  --to NUMBER    Target asiakasId to switch to
+  --to NUMBER    Target asiakasId (alias for the positional)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -758,6 +761,8 @@ OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --to <id> (fb#1751)
+  exit 4 (client-side)  Positional asiakasId and --to disagree → pass only one, or make them equal
   exit 2 (client-side)  Not logged in          → ib auth login
   exit 3 (HTTP 403)  No access to target    → verify ownership via \`ib company list\`
   exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
@@ -767,6 +772,7 @@ NOTES
   - For a one-command company context that does NOT persist, use the global \`--company <id>\` flag instead.
 
 EXAMPLES
+  ib auth switch 1349
   ib auth switch --to 1349
 "
 `;
@@ -1112,14 +1118,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib company switch matches snapshot 1`] = `
 "USAGE
-  ib company switch [flags]
+  ib company switch [<asiakasId>] [flags]
 
 DESCRIPTION
   Switch the active company. Alias of \`ib auth switch\`. Persists the rotated JWT.
   Auth: requires login (any authenticated user).
 
+ARGUMENTS
+  <asiakasId> NUMBER    Target asiakasId to switch to (or pass --to) (optional)
+
 FLAGS
-  --to NUMBER    Target asiakasId to switch to
+  --to NUMBER    Target asiakasId (alias for the positional)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -1129,6 +1138,8 @@ OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --to <id> (fb#1751)
+  exit 4 (client-side)  Positional asiakasId and --to disagree → pass only one, or make them equal
   exit 3 (HTTP 403)  No access to target    → verify via \`ib company list\`
   exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -1139,6 +1150,7 @@ NOTES
   - For a one-command company context that does NOT persist, use the global \`--company <id>\` flag instead.
 
 EXAMPLES
+  ib company switch 1349
   ib company switch --to 1349
 "
 `;
@@ -4052,7 +4064,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → --type is required and must be duplicate|same-root-cause|related|blocks; both ids must be positive integers ('invalid feedbackId' fires for EITHER positional — parseRefId names the ref field, not the argument)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check both ids via \`ib dev feedback list\`/\`get\` — either row is missing
-  exit 4 (HTTP 409)  Already linked         → unlink first (\`ib dev feedback unlink <id> <relatedId>\`) to change the relation type
+  exit 4 (HTTP 409)  Already linked with a DIFFERENT type (the message names both) → unlink first (\`ib dev feedback unlink <id> <relatedId>\`) to relink as the new type; re-asserting the SAME type is not a conflict — it answers 200 with alreadyLinked:true (fb#1630; an older backend still 409s)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

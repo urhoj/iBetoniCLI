@@ -124,15 +124,18 @@ export const AUTH_SPECS: CommandSpec[] = [
     // No tenant-data write, but persists local auth state (rotated JWT) and is
     // blocked under read-only — classify as a write so isWrite agrees with the gate.
     mutates: true,
+    args: [{ name: "asiakasId", type: "number", required: false, description: "Target asiakasId to switch to (or pass --to)" }],
     flags: [
       {
         name: "to",
         type: "number",
-        description: "Target asiakasId to switch to",
+        description: "Target asiakasId (alias for the positional)",
       },
     ],
     outputShape: "{ ok: true, activeCompany: { asiakasId, name } }",
     errors: [
+      { origin: "client", exit: 4, match: "missing or invalid target", meaning: "No asiakasId given (or not a positive integer)", remedy: "pass <asiakasId> positionally or via --to <id> (fb#1751)" },
+      { origin: "client", exit: 4, match: "differ", meaning: "Positional asiakasId and --to disagree", remedy: "pass only one, or make them equal" },
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
       apiErr(403, "No access to target", "verify ownership via `ib company list`"),
       {
@@ -147,7 +150,7 @@ export const AUTH_SPECS: CommandSpec[] = [
       "Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).",
       "For a one-command company context that does NOT persist, use the global `--company <id>` flag instead.",
     ],
-    examples: ["ib auth switch --to 1349"],
+    examples: ["ib auth switch 1349", "ib auth switch --to 1349"],
   },
   {
     command: "ib auth refresh",

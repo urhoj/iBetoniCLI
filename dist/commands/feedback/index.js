@@ -969,7 +969,9 @@ export async function runFeedbackGet(client, id) {
 /**
  * POST /api/feedback/:id/relations — link two feedback rows. A REAL write
  * (blocked under --read-only); --dry-run resolves client-side. One link per
- * pair (either direction) — a 409 means unlink first to change the type.
+ * pair (either direction) — a 409 means the pair is linked with a DIFFERENT
+ * type (unlink first); re-asserting the same type is an idempotent 200 carrying
+ * `alreadyLinked: true` (fb#1630, deploy-gated).
  */
 export async function runFeedbackLink(client, id, relatedId, input) {
     // Client-side, ahead of the round trip: the server's own 400 for this stays
