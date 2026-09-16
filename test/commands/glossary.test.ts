@@ -222,8 +222,9 @@ describe("glossary list terms-only", () => {
     const r = await runGlossaryList(mkClient({ get }), { needsReview: true, limit: 2 });
     expect(get.mock.calls[0][0]).not.toContain("limit");
     expect(r.items).toEqual([{ term: "a" }, { term: "b" }]);
+    expect(r.count).toBe(2); // fb#1756: count follows the cut, never the server total
     expect(r.truncated).toBe(true);
-    expect((r as { hint?: string }).hint).toMatch(/raise --limit/);
+    expect(r.hint).toMatch(/raise --limit/);
   });
 
   test("list --limit above the row count is a no-op (not truncated)", async () => {

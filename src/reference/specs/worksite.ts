@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, TRUNCATED_NOTE, apiErr, authErrors, clearHint, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LIMIT_500_FLAG, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, TRUNCATED_NOTE, WORKSITE_EDIT_PERMISSION, apiErr, authErrors, clearHint, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
 
 export const WORKSITE_SPECS: CommandSpec[] = [
 
@@ -132,7 +132,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     command: "ib worksite update",
     description:
       "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment \"\"). " + clearNote("--comment"),
-    permissions: ["edit role in the worksite's owner company (requireCompanyRole tier edit)"],
+    permissions: [WORKSITE_EDIT_PERMISSION],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to update" }],
     flags: [
       { name: "name", type: "string", description: "Worksite name (tyomaaNimi)" },
@@ -175,7 +175,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
-      ...permErrors("edit role in the worksite's owner company (requireCompanyRole tier edit)"),
+      ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     notes: [
       "Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).",

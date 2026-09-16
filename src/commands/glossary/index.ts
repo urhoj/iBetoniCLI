@@ -226,9 +226,11 @@ export async function runGlossaryLookupBatch(
   return listEnvelope(items);
 }
 
+type GlossaryListOpts = { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number; limit?: number };
+
 export async function runGlossaryList(
   client: ApiClient,
-  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number; limit?: number }
+  opts: GlossaryListOpts
 ): Promise<ListEnvelope<unknown>> {
   const res = await client.get<{ items: unknown[]; count: number }>(
     `/api/cli/glossary${qs({
@@ -248,10 +250,10 @@ export async function runGlossaryList(
   // applies AFTER the server filters, so --stalest N --limit M returns min(N, M).
   const cut = opts.limit !== undefined && items.length > opts.limit;
   if (cut) items = items.slice(0, opts.limit);
-  return {
-    items, nextCursor: null, count: res.count, truncated: cut || opts.stalest != null,
+  return listEnvelope(items, {
+    truncated: cut || opts.stalest != null,
     ...(cut ? { hint: "raise --limit or drop it — the uncapped list is the whole filtered set" } : {}),
-  };
+  });
 }
 
 export async function runGlossarySet(
@@ -363,7 +365,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       .option("--related <substr>")
       .option("--terms-only")
       .option("--limit <n>", "", cappedInt(500))
-  ).action(jsonAction(getClient, (client, opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number; limit?: number }) =>
+  ).action(jsonAction(getClient, (client, opts: GlossaryListOpts) =>
     runGlossaryList(client, opts)
   ));
 

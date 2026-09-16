@@ -191,10 +191,10 @@ export async function runGlossaryList(client, opts) {
     const cut = opts.limit !== undefined && items.length > opts.limit;
     if (cut)
         items = items.slice(0, opts.limit);
-    return {
-        items, nextCursor: null, count: res.count, truncated: cut || opts.stalest != null,
+    return listEnvelope(items, {
+        truncated: cut || opts.stalest != null,
         ...(cut ? { hint: "raise --limit or drop it — the uncapped list is the whole filtered set" } : {}),
-    };
+    });
 }
 export async function runGlossarySet(client, term, opts, flags = {}) {
     // Append flags edit in place; they cannot combine with their overwrite twin.

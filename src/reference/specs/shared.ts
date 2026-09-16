@@ -195,6 +195,23 @@ export const LEGAL_DEV_ERRORS: CommandError[] = [
   apiErr(500, "Backend error", "retry with --verbose"),
 ];
 
+// ─── worksite write gates (fb#1525 / fb#1605) ────────────────────────────────
+// `auth.page.tyomaa.edit` is a FRONTEND-only shape, never evaluated server-side.
+// The ib worksite writes are gated two ways in puminet5api routes/tyomaaRoutes.js:
+// delete / update / person add / person remove by `requireCompanyRole({ tier:
+// "edit", resolveTenant: tyomaaOwner(...) })`; refresh-location / set-geofence /
+// helsinki-fetch are jwt-only routes fenced on the caller's own ownerAsiakasId —
+// any member of the owner tenant, no role. refresh-location / helsinki-fetch read
+// the row and answer 404 (not 403) for a foreign worksite; set-geofence scopes its
+// UPDATE by owner and answers 200 on 0 rows (its spec carries the silent-no-op note).
+export const WORKSITE_EDIT_PERMISSION = "edit role in the worksite's owner company (requireCompanyRole tier edit)";
+export const WORKSITE_FENCE_PERMISSION = "any member of the worksite's owner company (inline tenant fence, not role-gated)";
+export const WORKSITE_FENCE_404: CommandError = apiErr(
+  404,
+  "Worksite not found — or owned by another tenant (the fence answers 404, not 403)",
+  "verify tyomaaId and that it belongs to your active company (ib worksite get)"
+);
+
 // ─── vehicle cross-tenant (--asiakas) shared fragments ───────────────────────
 // The --asiakas override on vehicle list/get/search reads another company's
 // fleet; the extra permission line and 403 row are identical across all three
