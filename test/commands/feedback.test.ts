@@ -3486,4 +3486,29 @@ describe("ib feedback reopen", () => {
     await program.parseAsync(["feedback", "reopen", "7", "--note", "n", "--dry-run"], { from: "user" });
     expect(put).not.toHaveBeenCalled();
   });
+
+  // fb#1816: the note is prose, so the shell-quoting hatch resolve has must
+  // exist here too; a `status` key is refused because the status IS the verb.
+  test("--from-json supplies the note; a status key in the file exits 4", async () => {
+    const p = join(tmpdir(), `ib-reopen-fromjson-${process.pid}.json`);
+    try {
+      writeFileSync(p, JSON.stringify({ note: "from `file`" }), "utf8");
+      put.mockResolvedValueOnce({ feedbackId: 9, status: "open" });
+      const program = new Command();
+      registerFeedbackCommands(program, async () => mockClient);
+      await program.parseAsync(["feedback", "reopen", "9", "--from-json", p], { from: "user" });
+      expect(put).toHaveBeenCalledWith("/api/feedback/9", { status: "open", resolution: "from `file`" }, expect.anything());
+
+      writeFileSync(p, JSON.stringify({ note: "n", status: "applied" }), "utf8");
+      put.mockReset();
+      const { exitCode, envelope } = await captureActionError(() =>
+        program.parseAsync(["feedback", "reopen", "9", "--from-json", p], { from: "user" })
+      );
+      expect(exitCode).toBe(4);
+      expect(String(envelope.error)).toMatch(/status/);
+      expect(put).not.toHaveBeenCalled();
+    } finally {
+      unlinkSync(p);
+    }
+  });
 });

@@ -1942,7 +1942,7 @@ describe("warnFeedbackUnlinkEffects (fb#585)", () => {
     );
     expect(msgs).toHaveLength(1);
     expect(msgs[0]).toContain("unlinking never changes a status");
-    expect(msgs[0]).toContain("ib dev feedback resolve 541 --status open");
+    expect(msgs[0]).toContain("ib dev feedback reopen 541");
   });
 
   it("says nothing extra when the row was already open — there is no decision to make", () => {

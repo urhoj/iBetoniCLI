@@ -1251,15 +1251,10 @@ describe("root feature-name redirect (fb#1708)", () => {
 
   test("the caller's remaining args ride along, so the remedy is copy-paste runnable", () => {
     // Simulate what Commander hands the root on `ib grid list`: bad token + rest.
-    const root = program;
-    const saved = root.args;
-    (root as unknown as { args: string[] }).args = ["grid", "list"];
-    try {
-      const env = buildUnknownCommandEnvelope(root, "grid", "developer");
-      expect(env.hint).toContain("`ib palkki list` does");
-    } finally {
-      (root as unknown as { args: string[] }).args = saved;
-    }
+    program.args = ["grid", "list"];
+    const env = buildUnknownCommandEnvelope(program, "grid", "developer");
+    program.args = [];
+    expect(env.hint).toContain("`ib palkki list` does");
   });
 
   test("only at the ROOT — under a group the token stays a verb guess", () => {

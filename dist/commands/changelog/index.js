@@ -814,7 +814,7 @@ export function warnFeedbackUnlinkEffects(result, requestedIds, warn = warnNote)
                 `Check which entry actually holds it with \`ib dev feedback get <id>\`.`);
         else if (typeof feedbackStatus === "string")
             warn(`[ib] note: ${at}the link is gone, but the row is still \`${feedbackStatus}\` — unlinking never changes a status. ` +
-                `If it was closed by the link you just removed, reopen it with \`ib dev feedback resolve ${typeof feedbackId === "number" ? feedbackId : "<id>"} --status open\`.`);
+                `If it was closed by the link you just removed, reopen it with \`ib dev feedback reopen ${typeof feedbackId === "number" ? feedbackId : "<id>"}\`.`);
     }
 }
 export function registerChangelogCommands(parent, getClient, opts = {}) {
@@ -1545,7 +1545,7 @@ export const CHANGELOG_SPECS = [
             {
                 name: "unlink",
                 type: "string",
-                description: "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback (fb#585), which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback resolve <id> --status open`).",
+                description: "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback (fb#585), which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback reopen <id>`).",
             },
             {
                 name: "no-resolve",

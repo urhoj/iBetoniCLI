@@ -284,7 +284,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "note", type: "string", required: false, description: "The resolution note, positionally — the same field as --note, so `resolve 42 --status applied -- \"…\"` works exactly like `--note \"…\"`. Mirrors its sibling `ib dev feedback create <description>`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once." },
     ],
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). To put a CLOSED row back in the queue, `ib dev feedback reopen <id>` is the readable spelling of --status open (fb#1363)", allowed: [...FEEDBACK_STATUSES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). Reopen a closed row with `ib dev feedback reopen <id>` (fb#1363)", allowed: [...FEEDBACK_STATUSES] },
       { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
@@ -339,7 +339,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "relatedId", type: "number", description: "The OTHER feedbackId to link to" },
     ],
     flags: [
-      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. There is NO follow-up/successor type (fb#1638): a row filed against another's shipped fix, split out of it, or found while verifying it is `related`, with the direction and the predecessor named in --note — `duplicate`/`same-root-cause` would pull it into the wrong fix-together cluster", allowed: [...FEEDBACK_RELATION_TYPES] },
+      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. No follow-up/successor type (fb#1638): a row filed against another's shipped fix is `related`, predecessor named in --note — not duplicate/same-root-cause, which would cluster it into the wrong fix", allowed: [...FEEDBACK_RELATION_TYPES] },
       { name: "note", type: "string", description: "Optional free-text note stored on the relation" },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
     ],
@@ -384,7 +384,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback reopen",
     description:
-      "Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of `resolve --status open` (developer-only). Exists because the verb that sets status is `resolve`, so 'reopen' reads as its opposite and was guessed as `update --status open` / a `reopen` verb, neither of which existed (fb#1363). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.",
+      "Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of `resolve --status open`, which reads as the opposite of the intent (fb#1363; developer-only). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
@@ -395,6 +395,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
     flags: [
       { name: "note", type: "string", description: "Same as the positional" },
+      { name: "from-json", type: "string", description: "Read the note from a JSON object file (or - for stdin): { note }. Shell-safe for prose with quotes/backticks (`ib help shell-quoting`); a `status` key is rejected — the status IS this command" },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
@@ -504,7 +505,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       intParseErr("--ttl-hours", "pass an integer 1-24"),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
-      apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback resolve <id> --status open` first if it should not be", "already closed"),
+      apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback reopen <id>` first if it should not be", "already closed"),
       apiErr(409, "Already claimed by another session", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway", "claimed by"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],

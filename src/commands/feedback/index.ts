@@ -1621,6 +1621,11 @@ const RESOLVE_FROM_JSON: FromJsonConfig = {
   nonPayload: new Set(["fromJson", "dryRun", "full", "also", "help"]),
 };
 
+/** `reopen`'s payload is the note alone — the status is the command. */
+const REOPEN_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
+};
+
 /**
  * --note / --reason / --resolution are aliases for the same stored note. When a
  * caller passes more than one with DIFFERENT values — natural for an AI, since
@@ -2365,15 +2370,22 @@ export function registerFeedbackCommands(
   // when it cannot find the path is to leave a half-fixed row marked applied.
   f.command("reopen <id> [note]")
     .option("--note <text>")
+    .option("--from-json <file>")
     .option("--dry-run")
     .option("--full")
     .action(
       guarded(async (
         idStr: string,
         notePositional: string | undefined,
-        opts: { note?: string; dryRun?: boolean; full?: boolean }
+        opts: { note?: string; fromJson?: string; dryRun?: boolean; full?: boolean },
+        cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "reopen");
+        // The note is prose — the shell-quoting hazard resolve's --from-json
+        // exists for applies here verbatim (fb#1816). Same pipeline as resolve;
+        // a `status` key in the file is rejected like any other unknown key,
+        // because this command's whole point is that the status is fixed.
+        applyFromJson(cmd, opts as Record<string, unknown>, REOPEN_FROM_JSON);
         warnIfShellMangled({ note: notePositional ?? opts.note });
         const client = await getClient();
         writeJson(

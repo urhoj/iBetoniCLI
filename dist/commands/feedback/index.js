@@ -1334,6 +1334,10 @@ const RESOLVE_FROM_JSON = {
     // the accepted-key list alongside the other invocation flags.
     nonPayload: new Set(["fromJson", "dryRun", "full", "also", "help"]),
 };
+/** `reopen`'s payload is the note alone — the status is the command. */
+const REOPEN_FROM_JSON = {
+    nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
+};
 /**
  * --note / --reason / --resolution are aliases for the same stored note. When a
  * caller passes more than one with DIFFERENT values — natural for an AI, since
@@ -1934,10 +1938,16 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     // when it cannot find the path is to leave a half-fixed row marked applied.
     f.command("reopen <id> [note]")
         .option("--note <text>")
+        .option("--from-json <file>")
         .option("--dry-run")
         .option("--full")
-        .action(guarded(async (idStr, notePositional, opts) => {
+        .action(guarded(async (idStr, notePositional, opts, cmd) => {
         const id = parseRefId(idStr, "feedback", "reopen");
+        // The note is prose — the shell-quoting hazard resolve's --from-json
+        // exists for applies here verbatim (fb#1816). Same pipeline as resolve;
+        // a `status` key in the file is rejected like any other unknown key,
+        // because this command's whole point is that the status is fixed.
+        applyFromJson(cmd, opts, REOPEN_FROM_JSON);
         warnIfShellMangled({ note: notePositional ?? opts.note });
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackResolve(client, id, {

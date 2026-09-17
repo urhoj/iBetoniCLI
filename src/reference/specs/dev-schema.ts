@@ -207,7 +207,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       {
         command: "ib dev schema query",
         description:
-          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY — its login sees only a fraction of the ROWS in the routine-bearing catalog views, and OBJECT_DEFINITION() returns NULL (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
+          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],

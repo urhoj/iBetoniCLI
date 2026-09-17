@@ -16,17 +16,13 @@ export const GROUP_SIBLING_DOMAINS = {
     customer: { domain: "company", why: ASIAKAS_PAIR_WHY },
 };
 /**
- * ROOT tokens that name a FEATURE rather than a domain, mapped to the domain
- * group that owns most of it (fb#1708). `grid` is what the day-driver
- * schedule is called everywhere — GridKeikkaEditor, gridStyle, gridScope, the
- * glossary — so it is the natural first guess for `ib grid`, and a cron hit
- * it verbatim; but the functionality is split across `palkki` (the schedule
- * blocks the grid renders), `schedule` and `keikka`, none named grid.
- * Curated, not derived: no spec path contains the token, so every derived
- * layer is silent and the caller gets the bare 32-domain list. The `why` names
- * the split so the caller can pick the OTHER domain when palkki is not it.
+ * ROOT tokens that name a FEATURE rather than a domain, mapped to the group
+ * that owns most of it (fb#1708). `grid` is the codebase's name for the
+ * day-driver schedule, so `ib grid` is the natural first guess (a cron hit it
+ * verbatim) — but no spec path contains the token, so every derived layer is
+ * silent. Curated; the `why` names the split so the caller can pick another.
  */
-export const ROOT_FEATURE_DOMAINS = {
+const ROOT_FEATURE_DOMAINS = {
     grid: {
         domain: "palkki",
         why: "there is no `grid` domain — the Grid (day-driver schedule) is split across `ib palkki` (the schedule blocks/bars it renders), `ib schedule` and `ib keikka`",
@@ -37,7 +33,7 @@ export const ROOT_FEATURE_DOMAINS = {
  * at `tier`. Only the root: under any group the token is a verb guess, not a
  * feature name, and the in-group layers own it.
  */
-export function rootFeatureRedirect(group, token, tier) {
+function rootFeatureRedirect(group, token, tier) {
     if (group !== "ib")
         return [];
     const feature = ROOT_FEATURE_DOMAINS[token.toLowerCase()];
@@ -417,8 +413,9 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     // in-group list is only context. Rendered with the caller's remaining args
     // (`ib customer get 8`, not `ib customer get`) so it is copy-paste runnable;
     // cmd.args holds the bad token followed by whatever came after it.
-    // The two are disjoint by depth (curated pairs are depth-2 domains, twins
-    // need a nested group), so a plain concat never double-answers.
+    // The three are disjoint by depth (curated pairs are depth-2 domains, twins
+    // need a nested group, feature names fire only at the root), so a plain
+    // concat never double-answers.
     const curated = [
         ...siblingGroupsWithCommand(group, unknownToken, tier),
         ...nestedGroupTwins(group, unknownToken, tier),
