@@ -16,6 +16,36 @@ export const GROUP_SIBLING_DOMAINS = {
     customer: { domain: "company", why: ASIAKAS_PAIR_WHY },
 };
 /**
+ * ROOT tokens that name a FEATURE rather than a domain, mapped to the domain
+ * group that owns most of it (fb#1708). `grid` is what the day-driver
+ * schedule is called everywhere — GridKeikkaEditor, gridStyle, gridScope, the
+ * glossary — so it is the natural first guess for `ib grid`, and a cron hit
+ * it verbatim; but the functionality is split across `palkki` (the schedule
+ * blocks the grid renders), `schedule` and `keikka`, none named grid.
+ * Curated, not derived: no spec path contains the token, so every derived
+ * layer is silent and the caller gets the bare 32-domain list. The `why` names
+ * the split so the caller can pick the OTHER domain when palkki is not it.
+ */
+export const ROOT_FEATURE_DOMAINS = {
+    grid: {
+        domain: "palkki",
+        why: "there is no `grid` domain — the Grid (day-driver schedule) is split across `ib palkki` (the schedule blocks/bars it renders), `ib schedule` and `ib keikka`",
+    },
+};
+/**
+ * The domain group a ROOT-level feature token redirects to, when it is visible
+ * at `tier`. Only the root: under any group the token is a verb guess, not a
+ * feature name, and the in-group layers own it.
+ */
+export function rootFeatureRedirect(group, token, tier) {
+    if (group !== "ib")
+        return [];
+    const feature = ROOT_FEATURE_DOMAINS[token.toLowerCase()];
+    if (!feature || fullyHiddenDomains(tier).has(feature.domain))
+        return [];
+    return [{ path: `ib ${feature.domain}`, why: feature.why }];
+}
+/**
  * The spec whose command equals the CANONICAL form of `path` (pass the path as
  * invoked — a back-compat alias resolves to the command's own spec, so aliased
  * invocations still get their documented remedies/allowed values). One lookup
@@ -392,6 +422,7 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     const curated = [
         ...siblingGroupsWithCommand(group, unknownToken, tier),
         ...nestedGroupTwins(group, unknownToken, tier),
+        ...rootFeatureRedirect(group, unknownToken, tier),
     ];
     // Only when no curated pair answered: the verb may live in a CHILD subgroup
     // of this very group (fb#379) — same copy-paste rendering. When exact equality
@@ -463,6 +494,10 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
 export const OPTION_REDIRECTS = {
     "ib dev cache invalidate --pattern": "`cache invalidate` targets an entity FAMILY by its <entityType> positional (e.g. `ib dev cache invalidate keikka --id 123`). For a raw Redis key glob use `ib dev cache pattern <glob>` instead.",
     "ib person activity --asiakas": "`person activity` is developer-only and reads globally by personId; drop `--asiakas` and run `ib person activity <personId>`. It is not tenant-scoped like `person list`, `get`, and `search`.",
+    // fb#1363: `update` edits the row's FIELDS; status is set by `resolve`, and
+    // the reopen direction has its own verb because `resolve --status open`
+    // reads as the opposite of the intent.
+    "ib dev feedback update --status": "`update` edits the row's fields (scope/kind/severity/complexity/description/gate); status is set by `ib dev feedback resolve <id> --status <s>`. To put a closed row back in the queue run `ib dev feedback reopen <id> [note]`.",
 };
 /**
  * Curated same-command "did you mean" overrides for cases where closestName's

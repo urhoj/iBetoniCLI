@@ -2359,6 +2359,36 @@ export function registerFeedbackCommands(
       })
     );
 
+  // The readable spelling of `resolve --status open` (fb#1363): the verb that
+  // sets status is `resolve`, so "reopen" was guessed as `update --status`
+  // and as its own verb — both dead ends — and the alternative an agent takes
+  // when it cannot find the path is to leave a half-fixed row marked applied.
+  f.command("reopen <id> [note]")
+    .option("--note <text>")
+    .option("--dry-run")
+    .option("--full")
+    .action(
+      guarded(async (
+        idStr: string,
+        notePositional: string | undefined,
+        opts: { note?: string; dryRun?: boolean; full?: boolean }
+      ) => {
+        const id = parseRefId(idStr, "feedback", "reopen");
+        warnIfShellMangled({ note: notePositional ?? opts.note });
+        const client = await getClient();
+        writeJson(
+          await runWithSiblingHint(client, id, "changelog", () =>
+            runFeedbackResolve(client, id, {
+              status: "open",
+              note: mergeNoteFlags(notePositional, opts.note),
+              dryRun: opts.dryRun,
+              full: opts.full,
+            })
+          )
+        );
+      })
+    );
+
   f.command("update <id>")
     .option("--scope <scope>")
     .option("--kind <kind>")

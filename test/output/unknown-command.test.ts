@@ -1235,3 +1235,53 @@ describe("fb#1154 envelope wiring", () => {
     expect(env.availableElsewhere).toEqual([]);
   });
 });
+
+// fb#1708 — `grid` is what the day-driver schedule is called everywhere in the
+// codebase and glossary, so `ib grid` is the natural first guess (a cron hit it
+// verbatim), yet no spec path contains the token: every DERIVED layer was
+// silent and the caller got the bare domain list.
+describe("root feature-name redirect (fb#1708)", () => {
+  test("`ib grid` names `ib palkki` and explains the split", () => {
+    const env = buildUnknownCommandEnvelope(program, "grid", "developer");
+    expect(env.availableElsewhere).toEqual(["ib palkki"]);
+    expect(env.hint).toContain("`ib palkki` does");
+    expect(env.hint).toContain("`ib schedule`");
+    expect(env.hint).toContain("`ib keikka`");
+  });
+
+  test("the caller's remaining args ride along, so the remedy is copy-paste runnable", () => {
+    // Simulate what Commander hands the root on `ib grid list`: bad token + rest.
+    const root = program;
+    const saved = root.args;
+    (root as unknown as { args: string[] }).args = ["grid", "list"];
+    try {
+      const env = buildUnknownCommandEnvelope(root, "grid", "developer");
+      expect(env.hint).toContain("`ib palkki list` does");
+    } finally {
+      (root as unknown as { args: string[] }).args = saved;
+    }
+  });
+
+  test("only at the ROOT — under a group the token stays a verb guess", () => {
+    const keikka = program.commands.find((c) => c.name() === "keikka")!;
+    const env = buildUnknownCommandEnvelope(keikka, "grid", "developer");
+    expect(env.availableElsewhere).toEqual([]);
+  });
+});
+
+// fb#1363 — `update` owns the row's FIELDS, status lives on `resolve`, and the
+// derived sibling scan named list/resolve/count without saying which one puts
+// a closed row back in the queue.
+describe("curated redirect: dev feedback update --status (fb#1363)", () => {
+  test("names resolve for status and reopen for the reopen direction", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "feedback", "update"), "--status");
+    expect(env.hint).toContain("ib dev feedback resolve <id> --status <s>");
+    expect(env.hint).toContain("ib dev feedback reopen <id> [note]");
+  });
+  test("every OPTION_REDIRECTS key names a registered command path", () => {
+    for (const key of Object.keys(OPTION_REDIRECTS)) {
+      const command = key.slice(0, key.lastIndexOf(" "));
+      expect(COMMAND_SPECS.some((s) => s.command === command)).toBe(true);
+    }
+  });
+});

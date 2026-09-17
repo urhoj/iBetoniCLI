@@ -207,7 +207,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       {
         command: "ib dev schema query",
         description:
-          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists — its login sees only a fraction of the ROWS in the routine-bearing catalog views (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
+          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY — its login sees only a fraction of the ROWS in the routine-bearing catalog views, and OBJECT_DEFINITION() returns NULL (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],
@@ -308,7 +308,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         notes: [
           "Runs under the db_datareader-only `ib_readonly` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.",
           "dbo scope like the rest of `ib dev schema`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).",
-          "NOT a source of truth for whether an OBJECT exists. Catalog views are filtered by metadata permission, and db_datareader's SELECT does not count for procedure metadata — so sys.procedures returns only the few procs granted individually and sys.objects lists tables normally while showing just those same few, silently and with no error. Use `ib dev schema procs|proc|table|view` to settle existence; a `hint` on the result flags an affected query (fb#1326).",
+          "NOT a source of truth for whether an OBJECT exists, nor for its BODY: the login lacks VIEW DEFINITION, so sys.procedures/sys.objects silently list only the few procs granted individually (fb#1326) and OBJECT_DEFINITION()/OBJECTPROPERTY() return NULL — a CASE/LIKE body probe answers a confident 0, so a just-applied proc migration reads as NOT APPLIED (fb#1789). Settle existence with `ib dev schema procs|proc|table|view`, read a body with `ib dev schema proc <name>`.",
         ],
         examples: [
           "ib dev schema query \"SELECT COUNT(*) AS n FROM person\"",

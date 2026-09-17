@@ -266,9 +266,17 @@ export interface SchemaQueryResult {
  * whole-catalogue. A warning that is false on a correct query is one callers
  * learn to ignore. Matching is a regex over raw SQL text, so a CTE aliased `sys`
  * trips it; acceptable, because this only ever advises and never rejects.
+ *
+ * The scalar DEFINITION functions are matched too (fb#1789): OBJECT_DEFINITION()
+ * and OBJECTPROPERTY(EX)() need VIEW DEFINITION exactly as the views do, but
+ * they return NULL instead of an empty set — so `CASE WHEN OBJECT_DEFINITION(…)
+ * LIKE '%UPDLOCK%' THEN 1 ELSE 0 END` answers a confident 0, and a session
+ * verifying a just-applied proc migration read it as NOT APPLIED. A confident
+ * scalar is a worse shape than an oddly short list, which is why these earn
+ * the hint even though they are functions, not catalogs.
  */
 const METADATA_FILTERED_CATALOGS =
-  /\b(?:sys\.(?:procedures|objects|all_objects|sql_modules|parameters)|information_schema\.(?:routines|parameters))\b/i;
+  /\b(?:sys\.(?:procedures|objects|all_objects|sql_modules|parameters)|information_schema\.(?:routines|parameters)|(?:OBJECT_DEFINITION|OBJECTPROPERTY(?:EX)?)\s*\()/i;
 
 /**
  * The hint `sql` earns, or undefined when it reads no filtered catalog.
@@ -286,9 +294,12 @@ function catalogFilterHint(sql: string): string | undefined {
         "`ib dev schema query` runs under the db_datareader-only `ib_readonly` login, and SELECT " +
         "is not a permission SQL Server counts for procedure metadata — so sys.procedures returns " +
         "only the handful of procs granted individually, and sys.objects lists tables normally " +
-        "while showing just those same few. An empty or short result here is NOT evidence that an " +
-        "object is missing. Confirm existence with `ib dev schema procs|proc|table|view`, which " +
-        "run under the app login."
+        "while showing just those same few. The definition FUNCTIONS need the same VIEW DEFINITION " +
+        "permission and return NULL under this login — OBJECT_DEFINITION()/OBJECTPROPERTY() inside a " +
+        "CASE or LIKE lands on the ELSE/false branch with no error. An empty or short result here is " +
+        "NOT evidence that an object is missing, nor a 0/false that its body lacks something. Confirm " +
+        "existence with `ib dev schema procs|proc|table|view`, and read a body with " +
+        "`ib dev schema proc <name>` — both run under the app login."
     : undefined;
 }
 

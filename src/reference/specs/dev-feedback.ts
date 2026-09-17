@@ -284,7 +284,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "note", type: "string", required: false, description: "The resolution note, positionally — the same field as --note, so `resolve 42 --status applied -- \"…\"` works exactly like `--note \"…\"`. Mirrors its sibling `ib dev feedback create <description>`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once." },
     ],
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364)", allowed: [...FEEDBACK_STATUSES] },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). To put a CLOSED row back in the queue, `ib dev feedback reopen <id>` is the readable spelling of --status open (fb#1363)", allowed: [...FEEDBACK_STATUSES] },
       { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
@@ -316,7 +316,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see `ib help shell-quoting`.",
       "FIXED ONLY PART OF IT? Do not choose between closing the row and recording nothing — there is a third path (fb#647). `ib dev changelog add --feedback <id> --no-resolve` links the entry with role `references`, recording the shipped half WITHOUT touching the status; then `ib dev feedback update <id> --append-description \"shipped: X; remaining: Y\"` (and `--scope` if the residue belongs to another repo) narrows the row to what is left. The link is what makes it legible: `feedback list` and `claim` both name a linked row, so the next agent reads your entry instead of rediscovering it. Leaving a partial fix unrecorded is the failure this exists to prevent — it costs every later agent the same investigation.",
     ],
-    seeAlso: ["ib dev changelog add", "ib dev feedback list", "ib dev feedback update"],
+    seeAlso: ["ib dev changelog add", "ib dev feedback list", "ib dev feedback update", "ib dev feedback reopen"],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
       'ib dev feedback resolve 42 --status applied -- "the note works positionally too"',
@@ -339,7 +339,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "relatedId", type: "number", description: "The OTHER feedbackId to link to" },
     ],
     flags: [
-      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric", allowed: [...FEEDBACK_RELATION_TYPES] },
+      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. There is NO follow-up/successor type (fb#1638): a row filed against another's shipped fix, split out of it, or found while verifying it is `related`, with the direction and the predecessor named in --note — `duplicate`/`same-root-cause` would pull it into the wrong fix-together cluster", allowed: [...FEEDBACK_RELATION_TYPES] },
       { name: "note", type: "string", description: "Optional free-text note stored on the relation" },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
     ],
@@ -380,6 +380,40 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib dev feedback link", "ib dev feedback cluster"],
     examples: ["ib dev feedback unlink 10 20"],
+  },
+  {
+    command: "ib dev feedback reopen",
+    description:
+      "Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of `resolve --status open` (developer-only). Exists because the verb that sets status is `resolve`, so 'reopen' reads as its opposite and was guessed as `update --status open` / a `reopen` verb, neither of which existed (fb#1363). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    dryRunKind: "client",
+    args: [
+      { name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" },
+      { name: "note", type: "string", required: false, description: "Why it is being reopened — stored as the row's resolution note, replacing the closing one (same field as --note). Say what residue is still open: a row auto-closed by `changelog add --feedback` with only HALF the fix shipped is the case this exists for." },
+    ],
+    flags: [
+      { name: "note", type: "string", description: "Same as the positional" },
+      { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
+      { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
+    ],
+    outputShape:
+      "The resolve ack: { feedbackId, status:'open', updatedAt, resolution }. With --dry-run: { dryRun:true, wouldSend:{ method:'PUT', path, body:{ status:'open', resolution? } } }.",
+    errors: [
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list --all`"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Reopening does NOT unlink the changelog entry that closed the row — `list` then reports it as 'closed once and reopened deliberately' (fb#1553), which is the intended signal: the note you pass here is what the next agent reads to learn what is still outstanding.",
+      "A row that was never closed is accepted too (status open → open); the note still updates. To move a row to `reviewed` or close it, use `resolve --status …`.",
+    ],
+    seeAlso: ["ib dev feedback resolve", "ib dev feedback update", "ib dev changelog add"],
+    examples: [
+      'ib dev feedback reopen 1354 "docs half shipped in cl#2004; code half still pending"',
+      "ib dev feedback reopen fb#1354 --dry-run",
+    ],
   },
   {
     command: "ib dev feedback update",

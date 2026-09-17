@@ -108,7 +108,7 @@ import { buildReference } from "../../src/reference/dump.js";
 // (flag + note + example), the lookup-row round-trip clause on `glossary set
 // --from-json`, and the column-name did-you-mean on `dev schema query`'s SQL
 // error row. Measured 805 112 B after one trim pass; headroom ~888 B.
-const DUMP_LIMIT_BYTES = 806_000;
+const DUMP_LIMIT_BYTES = 812_000; // fb#1363: +`ib dev feedback reopen` spec, fb#1499/#1638 doc rows
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

@@ -300,10 +300,32 @@ describe("ib schema", () => {
         ["INFORMATION_SCHEMA.ROUTINES", "select * from information_schema.routines"],
         ["sys.parameters", "SELECT * FROM sys.parameters WHERE object_id = 1"],
         ["sys.sql_modules", "SELECT definition FROM sys.sql_modules"],
+        // fb#1789: the scalar definition FUNCTIONS need the same VIEW DEFINITION
+        // permission and return NULL — a CASE over them lands on ELSE.
+        ["OBJECT_DEFINITION()", "SELECT CASE WHEN OBJECT_DEFINITION(OBJECT_ID('dbo.apiKey_upsert')) LIKE '%UPDLOCK%' THEN 1 ELSE 0 END AS locked"],
+        ["OBJECTPROPERTY() with whitespace before the paren", "SELECT objectproperty (OBJECT_ID('dbo.apiKey_upsert'), 'ExecIsAnsiNullsOn') AS p"],
+        ["OBJECTPROPERTYEX()", "SELECT OBJECTPROPERTYEX(OBJECT_ID('dbo.keikka'), 'BaseType') AS t"],
       ])("%s is flagged", async (_label, sql) => {
         post().mockResolvedValueOnce(complete);
         const result = await runSchemaQuery(mockClient, sql);
         expect(result.hint).toBeDefined();
+      });
+
+      /**
+       * fb#1789 — the row that was misread: a confident `locked = 0` with no
+       * hint sent a session to conclude a COMMITTED proc migration had not
+       * applied. The hint must say the function returns NULL (not "empty") and
+       * name the body oracle, because "confirm existence" alone does not tell a
+       * caller their BODY probe was the lie.
+       */
+      test("a definition-function probe names the NULL mechanism and the body oracle", async () => {
+        post().mockResolvedValueOnce({ ...complete, rows: [{ locked: 0 }] });
+        const result = await runSchemaQuery(
+          mockClient,
+          "SELECT CASE WHEN OBJECT_DEFINITION(OBJECT_ID('dbo.apiKey_upsert')) LIKE '%UPDLOCK, HOLDLOCK%' THEN 1 ELSE 0 END AS locked"
+        );
+        expect(result.hint).toContain("return NULL");
+        expect(result.hint).toContain("ib dev schema proc <name>");
       });
 
       /**
@@ -317,6 +339,10 @@ describe("ib schema", () => {
         ["sys.columns", "SELECT name FROM sys.columns WHERE object_id = 1"],
         ["INFORMATION_SCHEMA.TABLES", "SELECT * FROM INFORMATION_SCHEMA.TABLES"],
         ["a plain user table", "SELECT COUNT(*) AS n FROM keikka"],
+        // OBJECT_ID() resolves a NAME, not a definition; a column merely NAMED
+        // object_definition is not a call either.
+        ["OBJECT_ID() alone", "SELECT OBJECT_ID('dbo.keikka') AS id"],
+        ["a column named object_definition", "SELECT object_definition FROM t"],
       ])("%s is NOT flagged", async (_label, sql) => {
         post().mockResolvedValueOnce(complete);
         const result = await runSchemaQuery(mockClient, sql);

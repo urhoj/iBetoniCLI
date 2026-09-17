@@ -3453,3 +3453,37 @@ describe("ib feedback list — hard-cap warning (fb#1439)", () => {
     expect(cap2.text()).not.toMatch(/maximum of 200/);
   });
 });
+
+// ─── reopen (fb#1363) ────────────────────────────────────────────────────────
+
+describe("ib feedback reopen", () => {
+  /**
+   * The verb that sets status is `resolve`, so "put it back to open" read as
+   * its opposite and was guessed as `update --status open` / `reopen` — both
+   * dead ends. An agent that cannot find the path leaves a half-fixed row
+   * marked applied, which silently drops real work out of the queue.
+   */
+  test("`reopen <id> [note]` is `resolve --status open` on the wire, note stored as the resolution", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 1354, status: "open" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(["feedback", "reopen", "fb#1354", "code half still pending"], { from: "user" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/1354",
+      { status: "open", resolution: "code half still pending" },
+      expect.anything()
+    );
+  });
+
+  test("without a note it sends status alone; --dry-run sends nothing", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 7, status: "open" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(["feedback", "reopen", "7"], { from: "user" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/7", { status: "open" }, expect.anything());
+
+    put.mockReset();
+    await program.parseAsync(["feedback", "reopen", "7", "--note", "n", "--dry-run"], { from: "user" });
+    expect(put).not.toHaveBeenCalled();
+  });
+});

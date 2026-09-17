@@ -4051,7 +4051,7 @@ ARGUMENTS
   <relatedId> NUMBER    The OTHER feedbackId to link to (required)
 
 FLAGS
-  --type STRING    duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric (required)
+  --type STRING    duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. There is NO follow-up/successor type (fb#1638): a row filed against another's shipped fix, split out of it, or found while verifying it is \`related\`, with the direction and the predecessor named in --note — \`duplicate\`/\`same-root-cause\` would pull it into the wrong fix-together cluster (required)
   --note STRING    Optional free-text note stored on the relation
   --dry-run    Print the payload without sending (client-side)
 
@@ -4245,6 +4245,48 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback reopen matches snapshot 1`] = `
+"USAGE
+  ib dev feedback reopen <id> [<note>] [flags]
+
+DESCRIPTION
+  Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of \`resolve --status open\` (developer-only). Exists because the verb that sets status is \`resolve\`, so 'reopen' reads as its opposite and was guessed as \`update --status open\` / a \`reopen\` verb, neither of which existed (fb#1363). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (required)
+  <note> STRING    Why it is being reopened — stored as the row's resolution note, replacing the closing one (same field as --note). Say what residue is still open: a row auto-closed by \`changelog add --feedback\` with only HALF the fix shipped is the case this exists for. (optional)
+
+FLAGS
+  --note STRING    Same as the positional
+  --dry-run    Print the update body without sending (client-side)
+  --full    Return the full updated row instead of the compact ack
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  The resolve ack: { feedbackId, status:'open', updatedAt, resolution }. With --dry-run: { dryRun:true, wouldSend:{ method:'PUT', path, body:{ status:'open', resolution? } } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list --all\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Reopening does NOT unlink the changelog entry that closed the row — \`list\` then reports it as 'closed once and reopened deliberately' (fb#1553), which is the intended signal: the note you pass here is what the next agent reads to learn what is still outstanding.
+  - A row that was never closed is accepted too (status open → open); the note still updates. To move a row to \`reviewed\` or close it, use \`resolve --status …\`.
+
+SEE ALSO
+  ib dev feedback resolve, ib dev feedback update, ib dev changelog add
+
+EXAMPLES
+  ib dev feedback reopen 1354 "docs half shipped in cl#2004; code half still pending"
+  ib dev feedback reopen fb#1354 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback resolve matches snapshot 1`] = `
 "USAGE
   ib dev feedback resolve <id> [<note>] [flags]
@@ -4258,7 +4300,7 @@ ARGUMENTS
   <note> STRING    The resolution note, positionally — the same field as --note, so \`resolve 42 --status applied -- "…"\` works exactly like \`--note "…"\`. Mirrors its sibling \`ib dev feedback create <description>\`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once. (optional)
 
 FLAGS
-  --status STRING    open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364)
+  --status STRING    open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). To put a CLOSED row back in the queue, \`ib dev feedback reopen <id>\` is the readable spelling of --status open (fb#1363)
   --note STRING    Resolution note stored on the row (same field as the positional)
   --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
   --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
@@ -4290,7 +4332,7 @@ NOTES
   - FIXED ONLY PART OF IT? Do not choose between closing the row and recording nothing — there is a third path (fb#647). \`ib dev changelog add --feedback <id> --no-resolve\` links the entry with role \`references\`, recording the shipped half WITHOUT touching the status; then \`ib dev feedback update <id> --append-description "shipped: X; remaining: Y"\` (and \`--scope\` if the residue belongs to another repo) narrows the row to what is left. The link is what makes it legible: \`feedback list\` and \`claim\` both name a linked row, so the next agent reads your entry instead of rediscovering it. Leaving a partial fix unrecorded is the failure this exists to prevent — it costs every later agent the same investigation.
 
 SEE ALSO
-  ib dev changelog add, ib dev feedback list, ib dev feedback update
+  ib dev changelog add, ib dev feedback list, ib dev feedback update, ib dev feedback reopen
 
 EXAMPLES
   ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
@@ -4803,7 +4845,7 @@ exports[`Help snapshots — contract stability > help for ib dev schema query ma
   ib dev schema query [<sql>] [flags]
 
 DESCRIPTION
-  Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that \`schema tables/table\` cannot answer. NOT authoritative for whether an OBJECT exists — its login sees only a fraction of the ROWS in the routine-bearing catalog views (see NOTES). Read-over-POST: works under --read-only. Developer-only.
+  Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that \`schema tables/table\` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY — its login sees only a fraction of the ROWS in the routine-bearing catalog views, and OBJECT_DEFINITION() returns NULL (see NOTES). Read-over-POST: works under --read-only. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
@@ -4841,7 +4883,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Runs under the db_datareader-only \`ib_readonly\` login — writes, EXEC and DDL are denied by PERMISSIONS, not just by the text guard. Query timeout 15s.
   - dbo scope like the rest of \`ib dev schema\`. Exists so a data-shape question never again forces a hand-written Node script against the production DB (fb#438).
-  - NOT a source of truth for whether an OBJECT exists. Catalog views are filtered by metadata permission, and db_datareader's SELECT does not count for procedure metadata — so sys.procedures returns only the few procs granted individually and sys.objects lists tables normally while showing just those same few, silently and with no error. Use \`ib dev schema procs|proc|table|view\` to settle existence; a \`hint\` on the result flags an affected query (fb#1326).
+  - NOT a source of truth for whether an OBJECT exists, nor for its BODY: the login lacks VIEW DEFINITION, so sys.procedures/sys.objects silently list only the few procs granted individually (fb#1326) and OBJECT_DEFINITION()/OBJECTPROPERTY() return NULL — a CASE/LIKE body probe answers a confident 0, so a just-applied proc migration reads as NOT APPLIED (fb#1789). Settle existence with \`ib dev schema procs|proc|table|view\`, read a body with \`ib dev schema proc <name>\`.
 
 EXAMPLES
   ib dev schema query "SELECT COUNT(*) AS n FROM person"
