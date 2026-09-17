@@ -448,7 +448,9 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
   // inside the JSON body instead — previously silently dropped, then failed
   // downstream with a confusing "missing required argument term". It must now
   // be rejected up front, by name, same as any other unknown key.
-  test("`term` inside the JSON is rejected as an unknown key, not silently dropped", async () => {
+  // fb#1776 relaxed this from "any `term` key is unknown" to "a `term` naming a
+  // DIFFERENT entry is rejected by name" — the lookup row carries the key.
+  test("`term` inside the JSON that names another entry is rejected by name, not silently dropped", async () => {
     const put = vi.fn().mockResolvedValue({ term: "x" });
     await withJsonFile({ term: "pumppumatka", definition: "d" }, async (p) => {
       const program = new Command();
@@ -459,7 +461,7 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
       try {
         await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
         expect(process.exitCode).toBe(4);
-        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("unknown key term");
+        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain('is \\"pumppumatka\\" but the positional is \\"x\\"');
       } finally {
         stderr.mockRestore();
         process.exitCode = prevExit;
@@ -517,7 +519,8 @@ describe("glossary --from-json value types (fb#1606)", () => {
 
   test("canonicalGlossarySetJson: a wrong-typed known key is rejected BY NAME (before: a silent keep-current no-op)", () => {
     expect(() => canonicalGlossarySetJson({ synonyms: 123 }, KEYS)).toThrow(/synonyms/);
-    expect(() => canonicalGlossarySetJson({ relatedCommands: [{ command: "ib keikka" }] }, KEYS)).toThrow(/relatedCommands/);
+    // An object WITHOUT `command` is still wrong-typed; the lookup shape `{command,…}` is accepted below (fb#1776).
+    expect(() => canonicalGlossarySetJson({ relatedCommands: [{ path: "ib keikka" }] }, KEYS)).toThrow(/relatedCommands/);
     expect(() => canonicalGlossarySetJson({ definition: ["a"] }, KEYS)).toThrow(/definition/);
     expect(() => canonicalGlossarySetJson({ needsHumanReview: "yes" }, KEYS)).toThrow(/needsHumanReview.*true or false/);
     expect(() => canonicalGlossarySetJson({ aiConfidence: "high" }, KEYS)).toThrow(/aiConfidence/);
@@ -527,6 +530,39 @@ describe("glossary --from-json value types (fb#1606)", () => {
     expect(canonicalGlossarySetJson(
       { synonyms: ["a", "b"], "append-definition": "x", relatedEntity: "keikka", aiConfidence: "80", needsHumanReview: false }, KEYS
     )).toEqual({ synonyms: "a,b", appendDefinition: "x", entity: "keikka", aiConfidence: 80, needsHumanReview: false });
+  });
+
+  // fb#1776: the lookup → edit → set loop. This is a real `ib glossary lookup`
+  // row, definition edited, fed back unchanged otherwise.
+  test("a `glossary lookup` row round-trips through set --from-json unchanged (fb#1776)", () => {
+    const row = {
+      term: "loma",
+      synonyms: ["lomat", "vacation"],
+      definition: "Edited definition.",
+      relatedCommands: [{ command: "ib person vacation list", summary: null }, { command: "ib person vacation add", summary: "…" }],
+      relatedEntity: "person",
+      domain: "vacation",
+      lastReviewed: "2026-09-01T00:00:00.000Z",
+      runs: 12,
+      aiConfidence: 90,
+      needsHumanReview: false,
+    };
+    expect(canonicalGlossarySetJson(row, KEYS, "loma")).toEqual({
+      synonyms: "lomat,vacation",
+      definition: "Edited definition.",
+      related: "ib person vacation list,ib person vacation add",
+      entity: "person",
+      domain: "vacation",
+      aiConfidence: 90,
+      needsHumanReview: false,
+    });
+    // Case/whitespace on `term` is not a mismatch; a DIFFERENT term is, by name.
+    expect(() => canonicalGlossarySetJson({ term: " Loma " }, KEYS, "loma")).not.toThrow();
+    expect(() => canonicalGlossarySetJson({ term: "puomi" }, KEYS, "loma")).toThrow(/"term" is "puomi" but the positional is "loma"/);
+    // `import` strips `term` itself and calls without a positional — the key is simply dropped.
+    expect(canonicalGlossarySetJson({ term: "anything", runs: 3 }, KEYS)).toEqual({});
+    // A genuinely unknown key still fails, now pointing at the help.
+    expect(() => canonicalGlossarySetJson({ definitoin: "x" }, KEYS, "loma")).toThrow(/unknown key definitoin.*ib glossary set --help/);
   });
 
   test("a JSON null on the assessment pair is still the documented CLEAR (fb#1707), not an omission", () => {
@@ -552,12 +588,12 @@ describe("glossary --from-json value types (fb#1606)", () => {
     const put = vi.fn(async (p: string, _body?: unknown) => ({ term: p.split("/").pop() }));
     const res = await runGlossaryImport(
       mkClient({ put }),
-      [{ term: "bad", synonyms: 123 }, { term: "stray", definition: "d", lastReviewed: "2026-01-01" }, { term: "good", synonyms: ["a"] }],
+      [{ term: "bad", synonyms: 123 }, { term: "stray", definition: "d", definitoin: "typo" }, { term: "good", synonyms: ["a"] }],
       {},
       KEYS
     );
     expect(res.results[0]).toMatchObject({ term: "bad", ok: false, error: expect.stringContaining("synonyms") });
-    expect(res.results[1]).toMatchObject({ term: "stray", ok: false, error: expect.stringContaining("unknown key lastReviewed") });
+    expect(res.results[1]).toMatchObject({ term: "stray", ok: false, error: expect.stringContaining("unknown key definitoin") });
     expect(res.results[2]).toEqual({ term: "good", ok: true });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0][1]).toEqual({ synonyms: ["a"] });

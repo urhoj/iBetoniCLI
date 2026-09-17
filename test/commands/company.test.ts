@@ -99,6 +99,32 @@ describe("ib company", () => {
     });
   });
 
+  // fb#1766: every sibling list takes --search; a caller reaching for it by
+  // analogy got exit 4. Client-side over the membership set — no new route.
+  test("runCompanyList --search: case-insensitive substring on name, client-side, count follows", async () => {
+    mockClient.get.mockResolvedValue({
+      companies: [
+        { asiakasId: 27, name: "Betomik Oy " },
+        { asiakasId: 8, name: "PumiNet Oy" },
+        { asiakasId: 30, asiakasNimi: "Kalle Urho Oy" },
+      ],
+      currentCompanyId: 8,
+    });
+    mockClient.getCurrentToken.mockReturnValue(jwt({}));
+
+    const hit = await runCompanyList(mockClient, { search: "betoMIK" });
+    expect(hit.items.map((c) => c.asiakasId)).toEqual([27]);
+    expect(hit.count).toBe(1);
+    expect(mockClient.get).toHaveBeenLastCalledWith("/api/company-selection/available");
+
+    const miss = await runCompanyList(mockClient, { search: "nope" });
+    expect(miss.items).toEqual([]);
+    expect(miss.count).toBe(0);
+
+    // Blank/whitespace search = no filter, same as omitting it.
+    expect((await runCompanyList(mockClient, { search: "  " })).count).toBe(3);
+  });
+
   test("runCompanyCurrent: returns the active company record", async () => {
     mockClient.get.mockResolvedValueOnce({
       companies: [

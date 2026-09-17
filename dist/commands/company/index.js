@@ -29,15 +29,22 @@ function rolesByAsiakasId(client) {
  * envelope, annotating each row with `current: boolean` and the `roles` held
  * there (from the JWT — see {@link CompanyListItem.roles}).
  */
-export async function runCompanyList(client) {
+export async function runCompanyList(client, opts = {}) {
     const res = await client.get("/api/company-selection/available");
     const roles = rolesByAsiakasId(client);
-    const items = res.companies.map((c) => ({
+    // --search is a CLIENT-SIDE substring filter over the caller's own membership
+    // set (fb#1766): the route takes no filter, and the set is small enough that
+    // narrowing it locally costs nothing — it exists so a caller reaching for
+    // `--search` by analogy with every sibling list command gets rows, not exit 4.
+    const needle = opts.search?.trim().toLowerCase();
+    const items = res.companies
+        .map((c) => ({
         asiakasId: c.asiakasId,
         name: companyName(c),
         current: c.asiakasId === res.currentCompanyId,
         roles: roles.get(c.asiakasId) ?? [],
-    }));
+    }))
+        .filter((c) => !needle || c.name.toLowerCase().includes(needle));
     return listEnvelope(items);
 }
 /**
@@ -66,6 +73,7 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
     const company = parent.command("company").description("Company commands");
     company
         .command("list")
+        .option("--search <substr>", "Case-insensitive substring filter on the company name (client-side)")
         .action(jsonAction(getClient, runCompanyList));
     company
         .command("current")

@@ -266,7 +266,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           apiErr(
             400,
             "SQL error (reached DB)",
-            "shape was fine; check names via `ib dev schema table <name>` (an Invalid object name gets an automatic did-you-mean)"
+            "shape was fine; check names via `ib dev schema table <name>` (an Invalid object name gets an automatic did-you-mean; an Invalid column name gets the nearest column — or the column list — of the tables in your FROM/JOIN)"
           ),
           // Client-side guards. This group had NO origin:"client" rows at all, so
           // every local `failWith` here answered with the generic per-exit hint

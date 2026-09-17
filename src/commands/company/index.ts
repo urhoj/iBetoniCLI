@@ -68,18 +68,26 @@ function rolesByAsiakasId(client: ApiClient): Map<number, string[]> {
  * there (from the JWT — see {@link CompanyListItem.roles}).
  */
 export async function runCompanyList(
-  client: ApiClient
+  client: ApiClient,
+  opts: { search?: string } = {}
 ): Promise<ListEnvelope<CompanyListItem>> {
   const res = await client.get<AvailableResponse>(
     "/api/company-selection/available"
   );
   const roles = rolesByAsiakasId(client);
-  const items = res.companies.map((c) => ({
-    asiakasId: c.asiakasId,
-    name: companyName(c),
-    current: c.asiakasId === res.currentCompanyId,
-    roles: roles.get(c.asiakasId) ?? [],
-  }));
+  // --search is a CLIENT-SIDE substring filter over the caller's own membership
+  // set (fb#1766): the route takes no filter, and the set is small enough that
+  // narrowing it locally costs nothing — it exists so a caller reaching for
+  // `--search` by analogy with every sibling list command gets rows, not exit 4.
+  const needle = opts.search?.trim().toLowerCase();
+  const items = res.companies
+    .map((c) => ({
+      asiakasId: c.asiakasId,
+      name: companyName(c),
+      current: c.asiakasId === res.currentCompanyId,
+      roles: roles.get(c.asiakasId) ?? [],
+    }))
+    .filter((c) => !needle || c.name.toLowerCase().includes(needle));
   return listEnvelope(items);
 }
 
@@ -120,6 +128,7 @@ export function registerCompanyCommands(
 
   company
     .command("list")
+    .option("--search <substr>", "Case-insensitive substring filter on the company name (client-side)")
     .action(jsonAction(getClient, runCompanyList));
 
   company

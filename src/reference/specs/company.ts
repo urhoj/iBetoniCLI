@@ -13,7 +13,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
     description:
       "List the companies the current user can act on — name, the roles held there, and the active one marked `current: true`. The one-call answer to 'where can I act, as what'.",
     auth: "any",
-    flags: [],
+    flags: [{ name: "search", type: "string", description: "Case-insensitive substring filter on the company name" }],
     outputShape:
       "ListEnvelope<{ asiakasId, name, current, roles }> = { items, nextCursor, count }",
     errors: [...COMMON_AUTH_ERRORS],
@@ -24,9 +24,10 @@ export const COMPANY_SPECS: CommandSpec[] = [
       // (fb#380).
       "`roles` are read from your own JWT, so they cost no extra round-trip. `[]` = membership with no roles (a real state), not an error.",
       "`ib auth whoami` reports the same memberships but names only the ACTIVE company — use this command when you need the names.",
+      "--search filters your own membership set CLIENT-SIDE (no deploy gate); companies you are not a member of are `ib customer search`.",
     ],
-    seeAlso: ["ib auth whoami", "ib company switch"],
-    examples: ["ib company list", "ib company list --pretty"],
+    seeAlso: ["ib auth whoami", "ib company switch", "ib customer search"],
+    examples: ["ib company list", "ib company list --search Betomik", "ib company list --pretty"],
   },
   {
     command: "ib company current",

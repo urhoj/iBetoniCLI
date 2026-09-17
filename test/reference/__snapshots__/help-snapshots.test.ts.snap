@@ -1090,7 +1090,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  (none)
+  --search STRING    Case-insensitive substring filter on the company name
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -1106,12 +1106,14 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - \`roles\` are read from your own JWT, so they cost no extra round-trip. \`[]\` = membership with no roles (a real state), not an error.
   - \`ib auth whoami\` reports the same memberships but names only the ACTIVE company — use this command when you need the names.
+  - --search filters your own membership set CLIENT-SIDE (no deploy gate); companies you are not a member of are \`ib customer search\`.
 
 SEE ALSO
-  ib auth whoami, ib company switch
+  ib auth whoami, ib company switch, ib customer search
 
 EXAMPLES
   ib company list
+  ib company list --search Betomik
   ib company list --pretty
 "
 `;
@@ -4828,7 +4830,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  SQL error: Must declare the scalar variable "@x" → the statement has an @parameter nothing bound — pass it with \`--param x=<value>\` (repeatable) or \`--params '{"x":<value>}'\`, which binds it exactly as the application code does. Do NOT hand-edit the @param into a literal: that is the edit that can change the predicate you are verifying (a NULL-scoped owner clause being the classic case). Rewriting the SQL will not help; the binding is the fix. If you DID pass the parameter and still see this, the binding half is not deployed to this --endpoint yet (fb#1177 ships in the CLI ahead of the backend) — check \`ib version\`
   exit 4 (HTTP 400)  Invalid param name / value → param names must be T-SQL identifiers (letters, digits, underscore; a leading @ is stripped) and values must be a string, number, boolean or null — max 64. An object or array value has no SQL scalar equivalent; pass a scalar, or a comma-joined string the query splits itself
   exit 4 (HTTP 400)  Guard rejection (shape) → rephrase to one SELECT (or WITH … SELECT); ';'/INTO also rejects inside a string literal (false positive)
-  exit 4 (HTTP 400)  SQL error (reached DB) → shape was fine; check names via \`ib dev schema table <name>\` (an Invalid object name gets an automatic did-you-mean)
+  exit 4 (HTTP 400)  SQL error (reached DB) → shape was fine; check names via \`ib dev schema table <name>\` (an Invalid object name gets an automatic did-you-mean; an Invalid column name gets the nearest column — or the column list — of the tables in your FROM/JOIN)
   exit 4 (client-side)  Malformed --param / --params → \`--param\` takes \`name=value\` and must name each parameter once; \`--params\` takes ONE JSON object. The two are mutually exclusive — pick the JSON form when a value's literal spelling and its intended type disagree
   exit 4 (client-side)  Numeric --param cannot be carried exactly → the value would reach the DB as a DIFFERENT number (or as NULL, if it overflows to Infinity — JSON has no Infinity), silently changing the predicate you are verifying. Pass it as a string via \`--params '{"name":"<digits>"}'\` and let SQL Server do the conversion
   exit 4 (client-side)  --sql-file could not be read, or held no SQL → the argument is a file path, or \`-\` to read stdin. Check the path exists and is readable; when piping, make sure something actually reaches stdin (\`Get-Content q.sql | ib dev schema query --sql-file -\`). An empty file is rejected rather than sent as a blank statement
@@ -5479,7 +5481,7 @@ FLAGS
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling \`append-definition\` is accepted too). The accepted set is derived from this command's own flags; an unknown key OR a wrong-typed value exits 4 by name before any request (CSV keys: string or array of strings; aiConfidence: number, JSON null clears; needsHumanReview: true/false). Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes).
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview, plus the merge twins appendDefinition, addSynonyms, removeSynonyms (same same-field exclusions as the flags; the flag spelling \`append-definition\` is accepted too). The accepted set is derived from this command's own flags; an unknown key OR a wrong-typed value exits 4 by name before any request (CSV keys: string or array of strings; aiConfidence: number, JSON null clears; needsHumanReview: true/false). Only keys present in the object are written (others kept — incl. aiConfidence/needsHumanReview since fb#1707; see notes). A \`glossary lookup\` row round-trips as is (\`term\` must match the positional; \`lastReviewed\`/\`runs\` ignored; \`relatedCommands\` objects accepted).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.

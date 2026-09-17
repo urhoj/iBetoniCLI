@@ -497,9 +497,9 @@ const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
  * `ib dev schema query` runs on a login with no catalogue metadata visibility
  * (see the command's NOTES), so a bad name otherwise reaches the caller as a
  * bare SQL Server message with none of the near-miss help `schema table`'s own
- * 404 gives. Column-name errors (SQL 207) are deliberately NOT handled the same
- * way: the message carries no table context to search against, and guessing
- * one would be worse than the honest "check `ib dev schema table`" remedy.
+ * 404 gives. Column-name errors (SQL 207) get their own help in
+ * {@link columnNameSuggestion} — the message carries no table context, but the
+ * query's FROM/JOIN clause does (fb#1788).
  *
  * Best-effort: any failure fetching the live table/view list is swallowed by
  * the caller (a failed near-miss lookup must never mask the original error).
@@ -522,6 +522,83 @@ async function nearestObjectNameSuggestion(client: ApiClient, badName: string): 
   // command-name did-you-mean use case (bug-review finding on fb#1483).
   const match = closestName(bare, names, {});
   return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
+}
+
+/** SQL Server 207, forwarded verbatim like 208 above — captures the quoted column name. */
+const INVALID_COLUMN_NAME_RE = /Invalid column name '([^']+)'/i;
+
+/** SQL words that can follow a table name and must not be read as its alias. */
+const NOT_AN_ALIAS = new Set(["on", "where", "join", "left", "right", "inner", "outer", "full", "cross", "group", "order", "with", "having", "union", "as"]);
+
+/**
+ * `FROM`/`JOIN` targets of a query with their aliases: `FROM dbo.keikka k JOIN
+ * vehicle AS v ON …` → [{ table: "keikka", alias: "k" }, { table: "vehicle",
+ * alias: "v" }]. A regex, not a parser — enough for the plain-join shape an
+ * ad-hoc read-only query takes, and a miss only costs the hint, never the
+ * result. Subqueries/CTEs contribute their inner tables, which is fine: the
+ * column may well live there.
+ */
+export function queryTables(sql: string): Array<{ table: string; alias: string | null }> {
+  const out: Array<{ table: string; alias: string | null }> = [];
+  const re = /\b(?:FROM|JOIN)\s+(?:\[?dbo\]?\.)?\[?([A-Za-z_]\w*)\]?(?:\s+(?:AS\s+)?([A-Za-z_]\w*))?/gi;
+  for (const m of sql.matchAll(re)) {
+    const alias = m[2] && !NOT_AN_ALIAS.has(m[2].toLowerCase()) ? m[2] : null;
+    if (!out.some((t) => t.table.toLowerCase() === m[1].toLowerCase())) out.push({ table: m[1], alias });
+  }
+  return out;
+}
+
+/** Most tables a single hint will fetch — an ad-hoc query rarely joins more, and each is a round-trip. */
+const COLUMN_HINT_MAX_TABLES = 6;
+/** Column names listed per table when nothing is near — the rest is one `schema table` away. */
+const COLUMN_HINT_MAX_COLUMNS = 40;
+
+/**
+ * Help for an `Invalid column name` failure (fb#1788): three consecutive
+ * exit-4s guessing `vehicle.plate` (real: `vehicleRegNo`) is the cost of a
+ * hint that only says "run `schema table` by hand". Reads the tables named in
+ * the query's FROM/JOIN clause and answers from their live columns:
+ *   - a near-miss (`tila` → `keikkaTilaId`) becomes "did you mean …?";
+ *   - otherwise the columns of the involved tables are LISTED, because a
+ *     wrong guess like `plate` is not near anything and the caller needs the
+ *     real names, not another guess.
+ * When the query wrote `v.plate` and `v` aliases one of the tables, only that
+ * table is searched — the common alias case the report asked for.
+ *
+ * Best-effort like the object-name variant: the caller swallows any lookup
+ * failure so the original error is never masked.
+ */
+async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: string): Promise<string | null> {
+  let tables = queryTables(sql).slice(0, COLUMN_HINT_MAX_TABLES);
+  if (tables.length === 0) return null;
+  // `v.plate` / `vehicle.plate` — the qualifier narrows the search to one table.
+  const escaped = badColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const qualified = new RegExp(`\\b([A-Za-z_]\\w*)\\.\\[?${escaped}\\]?\\b`, "i").exec(sql);
+  if (qualified) {
+    const scoped = tables.filter((t) => [t.alias, t.table].some((n) => n?.toLowerCase() === qualified[1].toLowerCase()));
+    if (scoped.length) tables = scoped;
+  }
+  const columnsByTable = await Promise.all(
+    tables.map(async ({ table }) => {
+      const rec = await runSchemaTable(client, table).catch(() => null);
+      const cols = Array.isArray(rec?.columns) ? (rec!.columns as Array<Record_>) : [];
+      return { table, columns: cols.map((c) => c.name).filter((n): n is string => typeof n === "string") };
+    })
+  );
+  const known = columnsByTable.filter((t) => t.columns.length);
+  if (!known.length) return null;
+  for (const { table, columns } of known) {
+    const match = closestName(badColumn, columns, {});
+    if (match) return `did you mean ${table}.${match}? (nearest column in ${known.map((t) => t.table).join(", ")})`;
+  }
+  const listing = known
+    .map(({ table, columns }) => {
+      const shown = columns.slice(0, COLUMN_HINT_MAX_COLUMNS).join(", ");
+      const more = columns.length - COLUMN_HINT_MAX_COLUMNS;
+      return `${table}: ${shown}${more > 0 ? `, … +${more} more (ib dev schema table ${table})` : ""}`;
+    })
+    .join("; ");
+  return `no column like '${badColumn}' in ${known.map((t) => t.table).join(", ")} — ${listing}`;
 }
 
 /**
@@ -550,10 +627,13 @@ export async function runSchemaQuery(
   } catch (e) {
     if (e instanceof CliError && e.statusCode === 400) {
       const objectMatch = e.message.match(INVALID_OBJECT_NAME_RE);
-      if (objectMatch) {
-        const suggestion = await nearestObjectNameSuggestion(client, objectMatch[1]).catch(() => null);
-        if (suggestion) throw new CliError(e.message, e.statusCode, e.body, e.exitCode, suggestion);
-      }
+      const columnMatch = e.message.match(INVALID_COLUMN_NAME_RE);
+      const suggestion = objectMatch
+        ? await nearestObjectNameSuggestion(client, objectMatch[1]).catch(() => null)
+        : columnMatch
+          ? await columnNameSuggestion(client, sql, columnMatch[1]).catch(() => null)
+          : null;
+      if (suggestion) throw new CliError(e.message, e.statusCode, e.body, e.exitCode, suggestion);
     }
     throw e;
   }

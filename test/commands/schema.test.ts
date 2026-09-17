@@ -21,6 +21,7 @@ import {
   declaredObjectName,
   parseParamLiteral,
   resolveQueryParams,
+  queryTables,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -376,12 +377,71 @@ describe("ib schema", () => {
       await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.totallyUnrelated")).rejects.toBe(original);
     });
 
-    test("a non-object-name 400 (e.g. Invalid column name) is left untouched and never triggers a lookup", async () => {
-      const original = new CliError("SQL error: Invalid column name 'foo'.", 400, null, 4);
-      post().mockRejectedValueOnce(original);
+    // fb#1788: three consecutive exit-4s guessing `vehicle.plate` (real:
+    // vehicleRegNo) — the message has no table context, but the query does.
+    describe("an Invalid column name failure (fb#1788)", () => {
+      const cols = (...names: string[]) => ({ columns: names.map((name) => ({ name })) });
 
-      await expect(runSchemaQuery(mockClient, "SELECT foo FROM keikka")).rejects.toBe(original);
-      expect(get()).not.toHaveBeenCalled();
+      test("a near-miss column of a FROM/JOIN table becomes a did-you-mean", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'keikkaTila'.", 400, null, 4));
+        get().mockResolvedValueOnce(cols("keikkaId", "keikkaTilaId", "pumppuAika"));
+
+        await expect(runSchemaQuery(mockClient, "SELECT keikkaTila FROM dbo.keikka k")).rejects.toMatchObject({
+          message: "SQL error: Invalid column name 'keikkaTila'.",
+          hint: expect.stringContaining("did you mean keikka.keikkaTilaId?"),
+        });
+        expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/keikka");
+      });
+
+      test("nothing near → the involved tables' columns are LISTED, so the caller needs no further round-trip", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'plate'.", 400, null, 4));
+        get().mockResolvedValueOnce(cols("vehicleId", "vehicleRegNo", "vehicleNimi"));
+
+        await expect(
+          runSchemaQuery(mockClient, "SELECT k.keikkaId, v.plate FROM keikka k JOIN vehicle v ON v.vehicleId = k.vehicleId")
+        ).rejects.toMatchObject({
+          hint: expect.stringMatching(/no column like 'plate' in vehicle — vehicle: vehicleId, vehicleRegNo, vehicleNimi/),
+        });
+        // `v.plate` narrowed the lookup to the aliased table — keikka was never fetched.
+        expect(get()).toHaveBeenCalledTimes(1);
+        expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/vehicle");
+      });
+
+      test("an unqualified column searches every FROM/JOIN table, nearest first", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'regNo'.", 400, null, 4));
+        get()
+          .mockResolvedValueOnce(cols("keikkaId", "vehicleId"))
+          .mockResolvedValueOnce(cols("vehicleId", "vehicleRegNo"));
+
+        await expect(
+          runSchemaQuery(mockClient, "SELECT regNo FROM keikka k JOIN vehicle v ON v.vehicleId = k.vehicleId")
+        ).rejects.toMatchObject({ hint: expect.stringContaining("did you mean vehicle.vehicleRegNo?") });
+        expect(get()).toHaveBeenCalledTimes(2);
+      });
+
+      test("a query naming no table, or tables the lookup cannot read, leaves the original error untouched", async () => {
+        const original = new CliError("SQL error: Invalid column name 'foo'.", 400, null, 4);
+        post().mockRejectedValueOnce(original);
+        await expect(runSchemaQuery(mockClient, "SELECT foo")).rejects.toBe(original);
+        expect(get()).not.toHaveBeenCalled();
+
+        post().mockRejectedValueOnce(original);
+        get().mockRejectedValue(new CliError("not found", 404, null, 5));
+        await expect(runSchemaQuery(mockClient, "SELECT foo FROM nope")).rejects.toBe(original);
+      });
+    });
+
+    test("queryTables: FROM/JOIN targets with their aliases, dbo./bracket-tolerant, SQL keywords never read as an alias", () => {
+      expect(
+        queryTables("SELECT * FROM dbo.keikka k LEFT JOIN [vehicle] AS v ON v.id = k.vehicleId JOIN asiakas ON asiakas.id = k.asiakasId WHERE 1=1")
+      ).toEqual([
+        { table: "keikka", alias: "k" },
+        { table: "vehicle", alias: "v" },
+        { table: "asiakas", alias: null },
+      ]);
+      // A table named twice (self-join) is listed once; `FROM` inside a word is not a clause.
+      expect(queryTables("SELECT * FROM person a JOIN person b ON a.x = b.y")).toEqual([{ table: "person", alias: "a" }]);
+      expect(queryTables("SELECT * FROM keikka WHERE isFrom = 1")).toEqual([{ table: "keikka", alias: null }]);
     });
 
     test("a failed near-miss lookup never masks the original error", async () => {

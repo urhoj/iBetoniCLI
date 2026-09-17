@@ -79,12 +79,33 @@ const NULL_CLEARS = new Set(["aiConfidence", "needsHumanReview"]);
  * accepted list names the read-shape aliases too; the shared pass then owns
  * the types. It drops JSON nulls, so the assessment pair's documented
  * null-clears are re-added after it.
+ *
+ * A `lookup`/`list` row ROUND-TRIPS unchanged (fb#1776): the natural edit
+ * loop is dump the entry → edit the definition → feed it back, and that payload
+ * carries three things no flag backs. `term` is accepted when it names the
+ * positional (`term` here) and rejected BY NAME when it differs — a mismatch
+ * is the one shape that would silently edit the wrong entry; the read-only
+ * echoes `lastReviewed`/`runs` are ignored; and `relatedCommands` may be the
+ * `{ command, summary }[]` objects the read emits, folded to their paths.
  */
-export function canonicalGlossarySetJson(json, keys) {
+const READ_ONLY_ECHO_KEYS = new Set(["lastReviewed", "runs"]);
+export function canonicalGlossarySetJson(json, keys, term) {
+    json = { ...json };
+    if ("term" in json) {
+        if (term !== undefined && String(json.term).trim().toLowerCase() !== term.trim().toLowerCase()) {
+            failWith(`--from-json: "term" is ${JSON.stringify(json.term)} but the positional is ${JSON.stringify(term)} — they must name the same entry (drop the key, or pass the file's term as the positional)`, 4);
+        }
+        delete json.term;
+    }
+    for (const k of READ_ONLY_ECHO_KEYS)
+        delete json[k];
+    if (Array.isArray(json.relatedCommands) && json.relatedCommands.every((r) => r && typeof r === "object" && typeof r.command === "string")) {
+        json.relatedCommands = json.relatedCommands.map((r) => r.command);
+    }
     const unknown = Object.keys(json).filter((k) => !keys.has(k));
     if (unknown.length) {
         const accepted = [...new Set(keys.keys())].filter((k) => !k.includes("-"));
-        failWith(`--from-json: unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${accepted.join(", ")}`, 4);
+        failWith(`--from-json: unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${accepted.join(", ")} (see \`ib glossary set --help\`; a \`glossary lookup\` row round-trips as is)`, 4);
     }
     const out = normalizeFromJson(json, keys, GLOSSARY_JSON_CFG);
     for (const [k, v] of Object.entries(json))
@@ -401,7 +422,7 @@ export function registerGlossaryCommands(program, getClient) {
             catch {
                 failWith("--from-json: not valid JSON", 4);
             }
-            merged = mergeSetInput(canonicalGlossarySetJson(json, glossarySetJsonKeys(set)), flagFields);
+            merged = mergeSetInput(canonicalGlossarySetJson(json, glossarySetJsonKeys(set), term), flagFields);
         }
         // Validate the MERGED score, not just the flag — a --from-json object can
         // now supply aiConfidence, and an out-of-range value there deserves the
