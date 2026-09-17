@@ -4,6 +4,12 @@ import { runPersonRoleList, runPersonRoleGrant, runPersonRoleRevoke } from "../.
 
 const mockClient = mockApiClient();
 
+/** Unsigned JWT whose payload carries only ownerAsiakasId — what resolveActiveOwnerAsiakasId reads. */
+function tokenFor(ownerAsiakasId: number): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "none" })}.${b64({ ownerAsiakasId })}.sig`;
+}
+
 describe("runPersonRoleList", () => {
   beforeEach(() => { mockClient.get.mockReset(); });
 
@@ -41,8 +47,7 @@ describe("runPersonRoleList", () => {
   // flag: --asiakas". The acting company (the switch JWT --company mints, else
   // the session's active company) is the default target; --asiakas overrides.
   test("defaults asiakasId to the acting company from the token when --asiakas is omitted", async () => {
-    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
-    mockClient.getCurrentToken.mockReturnValue(`${b64({ alg: "none" })}.${b64({ ownerAsiakasId: 27 })}.sig`);
+    mockClient.getCurrentToken.mockReturnValue(tokenFor(27));
     mockClient.get.mockResolvedValueOnce([{ asiakasPersonSettingId: 9, asiakasPersonSettingTypeId: 8 }]);
     const result = await runPersonRoleList(mockClient, 316);
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/27/316");
@@ -50,8 +55,7 @@ describe("runPersonRoleList", () => {
   });
 
   test("an explicit --asiakas still wins over the acting company", async () => {
-    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
-    mockClient.getCurrentToken.mockReturnValue(`${b64({ alg: "none" })}.${b64({ ownerAsiakasId: 27 })}.sig`);
+    mockClient.getCurrentToken.mockReturnValue(tokenFor(27));
     mockClient.get.mockResolvedValueOnce([]);
     await runPersonRoleList(mockClient, 316, 26);
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/26/316");

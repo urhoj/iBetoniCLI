@@ -180,7 +180,11 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
-    errors: [ASIAKAS_FLAG_ERR, ...permErrors("company role access on the tenant")],
+    errors: [
+      ASIAKAS_FLAG_ERR,
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "No --asiakas and the token has no active company to default to", remedy: "pass --asiakas <id> or --company <id>, or `ib auth switch <asiakasId>`" },
+      ...permErrors("company role access on the tenant"),
+    ],
     examples: ["ib person role list 5351 --asiakas 26", "ib person role list 316 --company 27"],
   },
   {

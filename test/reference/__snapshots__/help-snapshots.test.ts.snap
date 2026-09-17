@@ -12716,6 +12716,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (client-side)  No --asiakas and the token has no active company to default to → pass --asiakas <id> or --company <id>, or \`ib auth switch <asiakasId>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check company role access on the tenant
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
