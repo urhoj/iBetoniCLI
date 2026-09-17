@@ -270,6 +270,48 @@ export async function runBetomikOrderbookAudit(
   return listEnvelope(itemsOf<BetomikAuditRow>(raw));
 }
 
+/** One tick run's report, stored by the scheduled tick (POST /api/betomik-orderbook/tick-runs). */
+export async function runBetomikOrderbookTickReport(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/betomik-orderbook/tick-runs", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+export interface BetomikTickRun {
+  logCronJobId: number;
+  entryTime: string;
+  host?: string;
+  isoYear?: number;
+  isoWeek?: number;
+  mode?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  exitCode?: number;
+  failedStep?: string | null;
+  steps?: { name: string; durationMs: number }[];
+  sync?: Record<string, unknown> | null;
+  digestSent?: boolean;
+  stepLines?: string[];
+  errorTail?: string[] | null;
+  /** The stored data did not parse; only logCronJobId/entryTime are present. */
+  parseError?: true;
+}
+
+/** Recent tick runs, newest first (GET /api/betomik-orderbook/tick-runs). */
+export async function runBetomikOrderbookTickRuns(
+  client: ApiClient,
+  { limit }: { limit?: number }
+): Promise<ListEnvelope<BetomikTickRun>> {
+  const qs = limit ? `?limit=${limit}` : "";
+  const raw = await client.get<unknown>(`/api/betomik-orderbook/tick-runs${qs}`);
+  return listEnvelope(itemsOf<BetomikTickRun>(raw));
+}
+
 export function registerBetomikOrderbookCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
@@ -453,6 +495,27 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, opts: { since?: string }) =>
         runBetomikOrderbookAudit(client, { since: opts.since })
+      )
+    );
+
+  const tickReportCmd = addJsonBodyOptions(group.command("tick-report")).description(
+    "Store one scheduled-tick run report (the tick script calls this from its EXIT trap; developer only)"
+  );
+  addWriteFlagsToCommand(tickReportCmd).action(
+    guarded(async (opts: WriteFlags & JsonBodyFlags) => {
+      const body = resolveJsonBody(tickReportCmd, opts, { required: true });
+      const client = await getClient();
+      writeJson(await runBetomikOrderbookTickReport(client, body as Record<string, unknown>, opts));
+    })
+  );
+
+  group
+    .command("tick-runs")
+    .description("Recent scheduled-tick runs (start, duration, exit code, sync counts), newest first")
+    .option("--limit <n>", "Rows to return (default 50, max 200)", intFlag("--limit"))
+    .action(
+      jsonAction(getClient, (client, opts: { limit?: number }) =>
+        runBetomikOrderbookTickRuns(client, { limit: opts.limit })
       )
     );
 }

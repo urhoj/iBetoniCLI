@@ -465,6 +465,10 @@ ib dev betomik-orderbook rows --offset <n>
   ! --offset must be an integer >= 0
   > pass an integer >= 0 — the hint on a truncated page names the next one
 
+ib dev betomik-orderbook tick-runs --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer (default 50, max 200)
+
 ib dev cache invalidate --asiakas <n>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId

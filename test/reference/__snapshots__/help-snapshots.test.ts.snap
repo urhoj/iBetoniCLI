@@ -2928,6 +2928,73 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook tick-report matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook tick-report --body <body> [flags]
+
+DESCRIPTION
+  Store one run report of the SCHEDULED tick (POST /api/betomik-orderbook/tick-runs). Called by scripts/sales/betomik-sync-tick.sh from its EXIT trap through betomik-tick-report.py — success or failure — so the Tikki admin tab can show when the tick ran, how long it took and what broke. Stored in dbo.log_cronJobs (job betomikOrderbookTick, 30-day retention).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --body JSON    { host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps, sync, digestSent, stepLines, errorTail } — see the tick reporter (required)
+  --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { stored: true }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  startedAt/finishedAt not ISO, exitCode/isoYear/isoWeek not integers, mode not shadow|create|full, or the body is over 64 KB → Fix the report — the reporter builds it from tick.log and sync.out.json
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+
+SEE ALSO
+  ib dev betomik-orderbook tick-runs
+
+EXAMPLES
+  ib dev betomik-orderbook tick-report --from-json ~/.betomik-tick/2026-W38/tick-report.json
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook tick-runs matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook tick-runs [flags]
+
+DESCRIPTION
+  Recent runs of the SCHEDULED tick, newest first (GET /api/betomik-orderbook/tick-runs): start/finish, duration, exit code, failed step, per-step timing, the sync's counts (inserted/updated/unchanged/gone, planned, blocked) and the error tail of a failed run. History is 30 days (log_cronJobs retention).
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
+
+FLAGS
+  --limit NUMBER    Rows to return (default 50, max 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ logCronJobId, entryTime, host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps: [{ name, durationMs }], sync: { importRunId, inserted, updated, unchanged, gone, planned, written, blocked, extracted, dayDrivers } | null, digestSent, stepLines, errorTail | null, parseError? }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer (default 50, max 200)
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+SEE ALSO
+  ib dev betomik-orderbook tick-report, ib dev betomik-orderbook runs
+
+EXAMPLES
+  ib dev betomik-orderbook tick-runs --limit 10
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
 "USAGE
   ib dev cache clear [flags]

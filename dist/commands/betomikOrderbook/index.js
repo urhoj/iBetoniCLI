@@ -154,6 +154,18 @@ export async function runBetomikOrderbookAudit(client, { since }) {
     const raw = await client.get(`/api/betomik-orderbook/audit${qs}`);
     return listEnvelope(itemsOf(raw));
 }
+/** One tick run's report, stored by the scheduled tick (POST /api/betomik-orderbook/tick-runs). */
+export async function runBetomikOrderbookTickReport(client, body, flags) {
+    return client.post("/api/betomik-orderbook/tick-runs", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/** Recent tick runs, newest first (GET /api/betomik-orderbook/tick-runs). */
+export async function runBetomikOrderbookTickRuns(client, { limit }) {
+    const qs = limit ? `?limit=${limit}` : "";
+    const raw = await client.get(`/api/betomik-orderbook/tick-runs${qs}`);
+    return listEnvelope(itemsOf(raw));
+}
 export function registerBetomikOrderbookCommands(parent, getClient) {
     const group = parent
         .command("betomik-orderbook")
@@ -283,5 +295,16 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .description("Sync audit trail (entities written/digested), optionally since a given ISO timestamp")
         .option("--since <iso>", "Only rows created at/after this ISO timestamp")
         .action(jsonAction(getClient, (client, opts) => runBetomikOrderbookAudit(client, { since: opts.since })));
+    const tickReportCmd = addJsonBodyOptions(group.command("tick-report")).description("Store one scheduled-tick run report (the tick script calls this from its EXIT trap; developer only)");
+    addWriteFlagsToCommand(tickReportCmd).action(guarded(async (opts) => {
+        const body = resolveJsonBody(tickReportCmd, opts, { required: true });
+        const client = await getClient();
+        writeJson(await runBetomikOrderbookTickReport(client, body, opts));
+    }));
+    group
+        .command("tick-runs")
+        .description("Recent scheduled-tick runs (start, duration, exit code, sync counts), newest first")
+        .option("--limit <n>", "Rows to return (default 50, max 200)", intFlag("--limit"))
+        .action(jsonAction(getClient, (client, opts) => runBetomikOrderbookTickRuns(client, { limit: opts.limit })));
 }
 //# sourceMappingURL=index.js.map

@@ -16,6 +16,8 @@ import {
   runBetomikOrderbookAudit,
   runBetomikOrderbookSyncRows,
   selectRowsToSync,
+  runBetomikOrderbookTickReport,
+  runBetomikOrderbookTickRuns,
 } from "../../src/commands/betomikOrderbook/index.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { CliError, hintDetailForError } from "../../src/api/errors.js";
@@ -351,5 +353,42 @@ describe("ib dev betomik-orderbook sync-row (the validator's Vie betoni.onlineen
     expect(spec?.flags?.map((f) => f.name)).toEqual(expect.arrayContaining(["run", "status", "provider"]));
     const usage = new CliError("Pass row ids or --run <runId>, not neither", 0, null, 4);
     expect(hintDetailForError(usage, spec?.errors).hint).toMatch(/--run/);
+  });
+});
+
+describe("ib dev betomik-orderbook tick-report / tick-runs", () => {
+  beforeEach(() => {
+    mockClient.post.mockReset();
+    mockClient.get.mockReset();
+  });
+
+  test("tick-report posts the report verbatim with the write-flag headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ stored: true });
+    const report = { host: "iBetoni2", isoYear: 2026, isoWeek: 38, mode: "shadow", exitCode: 0 };
+    const result = await runBetomikOrderbookTickReport(mockClient, report, { reason: "tick" });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/betomik-orderbook/tick-runs", report, {
+      headers: { "X-Action-Reason": "tick" },
+    });
+    expect(result).toEqual({ stored: true });
+  });
+
+  test("tick-runs lists newest first as a ListEnvelope, passing --limit through", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [{ logCronJobId: 9, exitCode: 0 }] });
+    const result = await runBetomikOrderbookTickRuns(mockClient, { limit: 5 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/tick-runs?limit=5");
+    expect(result.items).toEqual([{ logCronJobId: 9, exitCode: 0 }]);
+    expect(result.count).toBe(1);
+  });
+
+  test("tick-runs without --limit sends no query string", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [] });
+    await runBetomikOrderbookTickRuns(mockClient, {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/tick-runs");
+  });
+
+  test("both commands have a CommandSpec row", () => {
+    const names = COMMAND_SPECS.map((s) => s.command);
+    expect(names).toContain("ib dev betomik-orderbook tick-report");
+    expect(names).toContain("ib dev betomik-orderbook tick-runs");
   });
 });

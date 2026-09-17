@@ -113,7 +113,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // `link --type`, the definition-function sentence on `dev schema query`. Measured
 // 810 006 B; after the fb#1816 trims + `reopen --from-json` 810 363 B, so the cap
 // sits at 811_000 — headroom ~637 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 811_000;
+// Bumped for the Betomik tick dashboard's two new specs (tick-report, tick-runs).
+const DUMP_LIMIT_BYTES = 814_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
