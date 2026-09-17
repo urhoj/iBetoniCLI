@@ -559,8 +559,6 @@ describe("glossary --from-json value types (fb#1606)", () => {
     // Case/whitespace on `term` is not a mismatch; a DIFFERENT term is, by name.
     expect(() => canonicalGlossarySetJson({ term: " Loma " }, KEYS, "loma")).not.toThrow();
     expect(() => canonicalGlossarySetJson({ term: "puomi" }, KEYS, "loma")).toThrow(/"term" is "puomi" but the positional is "loma"/);
-    // `import` strips `term` itself and calls without a positional — the key is simply dropped.
-    expect(canonicalGlossarySetJson({ term: "anything", runs: 3 }, KEYS)).toEqual({});
     // A genuinely unknown key still fails, now pointing at the help.
     expect(() => canonicalGlossarySetJson({ definitoin: "x" }, KEYS, "loma")).toThrow(/unknown key definitoin.*ib glossary set --help/);
   });

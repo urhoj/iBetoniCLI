@@ -61,6 +61,8 @@ const GLOSSARY_JSON_CFG = {
 };
 /** The pair where a JSON `null` is a documented CLEAR (fb#1707), not an omission. */
 const NULL_CLEARS = new Set(["aiConfidence", "needsHumanReview"]);
+/** Read-only echoes on a `lookup`/`list` row that `set --from-json` ignores (fb#1776). */
+const READ_ONLY_ECHO_KEYS = new Set(["lastReviewed", "runs"]);
 /**
  * Reject an unknown key OR a wrong-typed value in a `set --from-json` object /
  * an `import` entry instead of silently dropping it (fb#1533, fb#1606) —
@@ -88,7 +90,6 @@ const NULL_CLEARS = new Set(["aiConfidence", "needsHumanReview"]);
  * echoes `lastReviewed`/`runs` are ignored; and `relatedCommands` may be the
  * `{ command, summary }[]` objects the read emits, folded to their paths.
  */
-const READ_ONLY_ECHO_KEYS = new Set(["lastReviewed", "runs"]);
 export function canonicalGlossarySetJson(json, keys, term) {
     json = { ...json };
     if ("term" in json) {

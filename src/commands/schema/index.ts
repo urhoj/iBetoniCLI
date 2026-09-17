@@ -528,50 +528,46 @@ async function nearestObjectNameSuggestion(client: ApiClient, badName: string): 
 const INVALID_COLUMN_NAME_RE = /Invalid column name '([^']+)'/i;
 
 /** SQL words that can follow a table name and must not be read as its alias. */
-const NOT_AN_ALIAS = new Set(["on", "where", "join", "left", "right", "inner", "outer", "full", "cross", "group", "order", "with", "having", "union", "as"]);
+const NOT_AN_ALIAS = new Set(["on", "where", "join", "left", "right", "inner", "outer", "full", "cross", "group", "order", "with", "having", "union", "as", "for"]);
 
 /**
  * `FROM`/`JOIN` targets of a query with their aliases: `FROM dbo.keikka k JOIN
  * vehicle AS v ON …` → [{ table: "keikka", alias: "k" }, { table: "vehicle",
  * alias: "v" }]. A regex, not a parser — enough for the plain-join shape an
  * ad-hoc read-only query takes, and a miss only costs the hint, never the
- * result. Subqueries/CTEs contribute their inner tables, which is fine: the
- * column may well live there.
+ * result. String literals and comments are blanked first so a `'… FROM the
+ * top …'` in a WHERE clause is not read as a clause (fb#1813); subqueries/CTEs
+ * contribute their inner tables, which is fine: the column may well live there.
  */
 export function queryTables(sql: string): Array<{ table: string; alias: string | null }> {
   const out: Array<{ table: string; alias: string | null }> = [];
+  const code = sql.replace(/'(?:[^']|'')*'/g, "''").replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, " ");
   const re = /\b(?:FROM|JOIN)\s+(?:\[?dbo\]?\.)?\[?([A-Za-z_]\w*)\]?(?:\s+(?:AS\s+)?([A-Za-z_]\w*))?/gi;
-  for (const m of sql.matchAll(re)) {
+  for (const m of code.matchAll(re)) {
     const alias = m[2] && !NOT_AN_ALIAS.has(m[2].toLowerCase()) ? m[2] : null;
     if (!out.some((t) => t.table.toLowerCase() === m[1].toLowerCase())) out.push({ table: m[1], alias });
   }
   return out;
 }
 
-/** Most tables a single hint will fetch — an ad-hoc query rarely joins more, and each is a round-trip. */
-const COLUMN_HINT_MAX_TABLES = 6;
 /** Column names listed per table when nothing is near — the rest is one `schema table` away. */
 const COLUMN_HINT_MAX_COLUMNS = 40;
 
 /**
  * Help for an `Invalid column name` failure (fb#1788): three consecutive
- * exit-4s guessing `vehicle.plate` (real: `vehicleRegNo`) is the cost of a
- * hint that only says "run `schema table` by hand". Reads the tables named in
- * the query's FROM/JOIN clause and answers from their live columns:
- *   - a near-miss (`tila` → `keikkaTilaId`) becomes "did you mean …?";
- *   - otherwise the columns of the involved tables are LISTED, because a
- *     wrong guess like `plate` is not near anything and the caller needs the
- *     real names, not another guess.
- * When the query wrote `v.plate` and `v` aliases one of the tables, only that
- * table is searched — the common alias case the report asked for.
- *
- * Best-effort like the object-name variant: the caller swallows any lookup
- * failure so the original error is never masked.
+ * exit-4s guessing `vehicle.plate` (real: `vehicleRegNo`) was the cost of a
+ * hint that only said "run `schema table` by hand". The tables come from the
+ * query's FROM/JOIN clause, the columns from `schema table`; a wrong guess like
+ * `plate` is near nothing, so when no column is close the columns are listed —
+ * the caller needs the real names, not another guess. Best-effort like the
+ * object-name variant: the caller swallows any lookup failure so the original
+ * error is never masked.
  */
 async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: string): Promise<string | null> {
-  let tables = queryTables(sql).slice(0, COLUMN_HINT_MAX_TABLES);
+  let tables = queryTables(sql);
   if (tables.length === 0) return null;
   // `v.plate` / `vehicle.plate` — the qualifier narrows the search to one table.
+  // Scoped BEFORE the cap below, so an alias of the 7th join is still found (fb#1812).
   const escaped = badColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const qualified = new RegExp(`\\b([A-Za-z_]\\w*)\\.\\[?${escaped}\\]?\\b`, "i").exec(sql);
   if (qualified) {
@@ -579,7 +575,8 @@ async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: s
     if (scoped.length) tables = scoped;
   }
   const columnsByTable = await Promise.all(
-    tables.map(async ({ table }) => {
+    // Each table is a round-trip; an ad-hoc query rarely joins more than six.
+    tables.slice(0, 6).map(async ({ table }) => {
       const rec = await runSchemaTable(client, table).catch(() => null);
       const cols = Array.isArray(rec?.columns) ? (rec!.columns as Array<Record_>) : [];
       return { table, columns: cols.map((c) => c.name).filter((n): n is string => typeof n === "string") };

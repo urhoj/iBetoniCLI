@@ -407,7 +407,7 @@ describe("ib schema", () => {
         expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/vehicle");
       });
 
-      test("an unqualified column searches every FROM/JOIN table, nearest first", async () => {
+      test("an unqualified column searches every FROM/JOIN table; the first table (in query order) with a near column answers", async () => {
         post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'regNo'.", 400, null, 4));
         get()
           .mockResolvedValueOnce(cols("keikkaId", "vehicleId"))
@@ -429,6 +429,19 @@ describe("ib schema", () => {
         get().mockRejectedValue(new CliError("not found", 404, null, 5));
         await expect(runSchemaQuery(mockClient, "SELECT foo FROM nope")).rejects.toBe(original);
       });
+
+      // fb#1812: the table cap used to run BEFORE alias scoping, so a qualifier
+      // naming the 7th join fell through to the first six tables' columns.
+      test("an alias beyond the 6-table fetch cap is still scoped to, not silently replaced by the first six", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'plate'.", 400, null, 4));
+        get().mockResolvedValueOnce(cols("vehicleId", "vehicleRegNo"));
+        const joins = ["a", "b", "c", "d", "e", "f"].map((t) => `JOIN ${t} ON 1=1`).join(" ");
+        await expect(
+          runSchemaQuery(mockClient, `SELECT v.plate FROM keikka k ${joins} JOIN vehicle v ON 1=1`)
+        ).rejects.toMatchObject({ hint: expect.stringContaining("no column like 'plate' in vehicle") });
+        expect(get()).toHaveBeenCalledTimes(1);
+        expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/vehicle");
+      });
     });
 
     test("queryTables: FROM/JOIN targets with their aliases, dbo./bracket-tolerant, SQL keywords never read as an alias", () => {
@@ -442,6 +455,9 @@ describe("ib schema", () => {
       // A table named twice (self-join) is listed once; `FROM` inside a word is not a clause.
       expect(queryTables("SELECT * FROM person a JOIN person b ON a.x = b.y")).toEqual([{ table: "person", alias: "a" }]);
       expect(queryTables("SELECT * FROM keikka WHERE isFrom = 1")).toEqual([{ table: "keikka", alias: null }]);
+      // fb#1813: string literals and comments are not clauses; FOR (JSON/XML) is not an alias.
+      expect(queryTables("SELECT * FROM keikka WHERE note = 'taken FROM the top' -- FROM nowhere\n /* JOIN nothing */ FOR JSON PATH"))
+        .toEqual([{ table: "keikka", alias: null }]);
     });
 
     test("a failed near-miss lookup never masks the original error", async () => {
