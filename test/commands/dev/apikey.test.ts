@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { mockApiClient } from "../../helpers/mockClient.js";
 import {
   runApikeySources,
@@ -7,6 +8,8 @@ import {
   runApikeySet,
   runApikeyRevoke,
 } from "../../../src/commands/dev/apikey/index.js";
+
+vi.mock("node:fs", async (importOriginal) => ({ ...(await importOriginal<typeof import("node:fs")>()), readFileSync: vi.fn() }));
 
 describe("runApikeySources", () => {
   test("wraps the backend items array in a list envelope", async () => {
@@ -74,6 +77,31 @@ describe("runApikeySet", () => {
       "Provide the credential via --value"
     );
     await expect(runApikeySet(client, { ...base, valueStdin: true }, {})).rejects.toThrow("mutually exclusive");
+  });
+
+  // readFileSync(0) blocks until EOF. Piped, that is instant; on an interactive
+  // terminal it sits silently waiting for the operator to type the value and
+  // close stdin, which reads as a hang (2026-09-16, Mapon onboarding). The hint
+  // goes to stderr so stdout stays pure JSON.
+  test("--value-stdin on a TTY prints a stderr hint before the blocking read; piped stdin stays silent", async () => {
+    vi.mocked(readFileSync).mockReturnValue("piped-secret\n");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const isTTY = process.stdin.isTTY;
+    try {
+      process.stdin.isTTY = true;
+      const client = mockApiClient({ post: vi.fn(async () => ({ apiKeyId: 1 })) });
+      await runApikeySet(client, { ...base, value: undefined, valueStdin: true }, {});
+      expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/reading credential from stdin.*Ctrl\+Z/));
+      expect(client.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ apiKeyValue: "piped-secret" }), expect.anything());
+
+      stderr.mockClear();
+      process.stdin.isTTY = false;
+      await runApikeySet(client, { ...base, value: undefined, valueStdin: true }, {});
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      process.stdin.isTTY = isTTY;
+      stderr.mockRestore();
+    }
   });
 
   test("posts the body with the write-safety headers", async () => {

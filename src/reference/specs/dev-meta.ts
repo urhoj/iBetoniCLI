@@ -327,7 +327,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
       { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
       { name: "name", type: "string", required: true, description: "apiKeyName, e.g. MAPON_APIKEY" },
       { name: "value", type: "string", description: "The credential value (prefer --value-stdin on a shared shell)", requiredGroup: "value" },
-      { name: "value-stdin", type: "boolean", description: "Read the credential value from stdin instead of argv", requiredGroup: "value" },
+      { name: "value-stdin", type: "boolean", description: "Read the credential value from stdin instead of argv (pipe it in; on a terminal it waits for Ctrl+Z/Ctrl+D)", requiredGroup: "value" },
       { name: "description", type: "string", description: "Optional human-readable note" },
       { name: "expires", type: "date", description: "Optional expiry date (today|yesterday|tomorrow or YYYY-MM-DD)" },
     ],

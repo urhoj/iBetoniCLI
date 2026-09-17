@@ -45,8 +45,17 @@ export async function runApikeyVerify(client, input) {
         failWith("--source is required", 4);
     return client.get(`/api/cli/apikeys/verify${qs({ ownerAsiakasId: input.asiakas, apiKeySourceId: input.source, apiKeyName: input.name })}`);
 }
-/** Reads stdin synchronously, trimmed — a trailing newline from a shell pipe or heredoc is not part of the secret. */
+/**
+ * Reads stdin synchronously, trimmed — a trailing newline from a shell pipe or
+ * heredoc is not part of the secret. readFileSync(0) blocks until EOF, which on
+ * an interactive terminal means "until the operator types the value and closes
+ * stdin" — with no prompt that reads as a hang (2026-09-16), so a TTY gets a
+ * one-line stderr hint first. stderr, so stdout stays pure JSON.
+ */
 function readValueFromStdin() {
+    if (process.stdin.isTTY) {
+        process.stderr.write("[ib] reading credential from stdin — paste the value, press Enter, then Ctrl+Z Enter (Windows) / Ctrl+D (Unix); or pipe it in\n");
+    }
     try {
         return readFileSync(0, "utf8").trim();
     }
@@ -125,7 +134,7 @@ export function registerApikeyCommands(parent, getClient) {
         .option("--source <id>", "apiKeySourceId (see `ib dev apikey sources`)", intFlag("--source"))
         .option("--name <name>", "apiKeyName, e.g. MAPON_APIKEY")
         .option("--value <text>", "The credential value (prefer --value-stdin on a shared shell)")
-        .option("--value-stdin", "Read the credential value from stdin instead of argv")
+        .option("--value-stdin", "Read the credential value from stdin instead of argv (pipe it in; on a terminal it waits for Ctrl+Z/Ctrl+D)")
         .option("--description <text>", "Optional human-readable note")
         .option("--expires <date>", "Optional expiry date (today|yesterday|tomorrow or YYYY-MM-DD)")).action(jsonAction(getClient, (client, opts) => runApikeySet(client, opts, opts)));
     addWriteFlagsToCommand(cmd

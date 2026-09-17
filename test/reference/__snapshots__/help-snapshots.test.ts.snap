@@ -2315,7 +2315,7 @@ FLAGS
   --source NUMBER    apiKeySourceId (see \`ib dev apikey sources\`) (required)
   --name STRING    apiKeyName, e.g. MAPON_APIKEY (required)
   --value STRING    The credential value (prefer --value-stdin on a shared shell) (required: one value)
-  --value-stdin    Read the credential value from stdin instead of argv (required: one value)
+  --value-stdin    Read the credential value from stdin instead of argv (pipe it in; on a terminal it waits for Ctrl+Z/Ctrl+D) (required: one value)
   --description STRING    Optional human-readable note
   --expires DATE    Optional expiry date (today|yesterday|tomorrow or YYYY-MM-DD)
 
