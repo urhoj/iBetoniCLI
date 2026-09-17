@@ -85,6 +85,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     outputShape:
       "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, ownerAsiakasId, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }",
     errors: [
+      { origin: "client", exit: 4, match: "asiakasId 0 is the shared (yhteinen) sentinel row", meaning: "asiakasId 0 exists but is the shared/yhteinen sentinel (ownerAsiakasId NULL), not a customer — refused locally before any request (fb#1405)", remedy: "there is no customer to fetch; the sentinel's rows surface through their consumers, e.g. `ib betoni laatu list --shared-only`" },
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.read"),
     ],

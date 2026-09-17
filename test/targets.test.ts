@@ -52,6 +52,13 @@ describe("parseId", () => {
   test("error names the field and echoes the offending value", () => {
     expect(() => parseId("abc", "keikkaId")).toThrow(/invalid keikkaId: "abc"/);
   });
+
+  test("asiakasId 0 is refused as the shared sentinel, not as a typo (fb#1405)", () => {
+    expect(exitCodeOf(() => parseId("0", "asiakasId"))).toBe(4);
+    expect(() => parseId(" 0 ", "asiakasId")).toThrow(/asiakasId 0 is the shared \(yhteinen\) sentinel row/);
+    // Only asiakasId carries the sentinel meaning; every other id keeps the generic message.
+    expect(() => parseId("0", "keikkaId")).toThrow(/invalid keikkaId: "0" — expected a positive integer/);
+  });
 });
 
 describe("parseOptionalId", () => {

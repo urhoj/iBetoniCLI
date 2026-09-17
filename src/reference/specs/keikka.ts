@@ -284,6 +284,9 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       apiErr(400, "order missing, a batch was sent, or ambiguities remain", "send one `order`, and answer every ambiguity first"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
+    notes: [
+      "keikka.pumppuAika timezone: an offset-less value (\"2026-09-04T07:00:00\", the shape the examples and `intake resolve` emit) is read as Europe/Helsinki wall clock; a Z/±HH:mm value is stored as that instant. Same contract as every date flag (fb#1739, fb#1779).",
+    ],
     seeAlso: ["ib keikka intake resolve"],
     examples: [
       "ib keikka intake commit --body '{\"order\":{\"ref\":\"1\",\"ownerAsiakasId\":8,\"resolved\":{\"customer\":{\"id\":252},\"worksite\":{\"id\":324}},\"keikka\":{\"pumppuAika\":\"2026-09-04T07:00:00\"},\"betoni\":[{\"m3\":5,\"laatuId\":4}]}}' --reason 'AI intake from Swerock email'",

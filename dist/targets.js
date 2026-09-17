@@ -255,6 +255,14 @@ export function parseId(idStr, name) {
     const trimmed = idStr.trim();
     const n = Number(trimmed);
     if (!/^\d+$/.test(trimmed) || !Number.isInteger(n) || n <= 0) {
+        // asiakasId 0 is a REAL row (dbo.asiakas 0, ownerAsiakasId NULL): the shared
+        // (yhteinen) sentinel behind the `ownerAsiakasId = 0` arms in person search,
+        // foreign keys and reminders, and the shared betoni laatu pool. It is still
+        // not a customer record, but "expected a positive integer" reads as a typo
+        // rejection and sends the caller hunting for the right id (fb#1405).
+        if (name === "asiakasId" && trimmed === "0") {
+            failWith("asiakasId 0 is the shared (yhteinen) sentinel row, not a customer record — nothing to fetch; its rows surface through their consumers (e.g. `ib betoni laatu list --shared-only`)", 4);
+        }
         failWith(`invalid ${name}: "${idStr}" — expected a positive integer`, 4);
     }
     return n;

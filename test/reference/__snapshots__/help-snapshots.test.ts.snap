@@ -1599,6 +1599,7 @@ OUTPUT (JSON, stdout)
   { asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, ownerAsiakasId, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  asiakasId 0 exists but is the shared/yhteinen sentinel (ownerAsiakasId NULL), not a customer — refused locally before any request (fb#1405) → there is no customer to fetch; the sentinel's rows surface through their consumers, e.g. \`ib betoni laatu list --shared-only\`
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
@@ -7362,6 +7363,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - keikka.pumppuAika timezone: an offset-less value ("2026-09-04T07:00:00", the shape the examples and \`intake resolve\` emit) is read as Europe/Helsinki wall clock; a Z/±HH:mm value is stored as that instant. Same contract as every date flag (fb#1739, fb#1779).
 
 SEE ALSO
   ib keikka intake resolve
