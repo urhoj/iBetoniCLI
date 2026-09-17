@@ -247,7 +247,9 @@ export function addOwnerOption(cmd) {
  * interpolates into URLs/bodies as the literal `"NaN"`/`null`), and it silently
  * accepts non-integer forms — `"5.5"`→5.5, `"1e3"`→1000, `"0x10"`→16,
  * `" 7 "`→7 — so a fat-fingered value can hit a *valid wrong row*. Require a
- * canonical positive integer (digits only, > 0); anything else exits 4.
+ * canonical positive integer (digits only, > 0); anything else exits 4 — an
+ * `asiakasId` of exactly 0 with the shared-sentinel message instead of the
+ * generic one (fb#1405).
  *
  * @param name field name used in the error message (e.g. "keikkaId").
  */

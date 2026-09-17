@@ -94,6 +94,9 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     ],
     args: [{ name: "rowId", type: "number", description: "betomikOrderbookImportRowId from `rows`" }],
     outputShape: "{ updated: boolean } — updated:false means no row with that id under the Betomik tenant",
+    notes: [
+      "Classification FREEZE: a row whose reviewedBy is set keeps its rowKind/palkkiType across later sheet uploads for as long as its rowKey (date + Työmaa + parser kind) is stable — a sheet edit that re-keys the row inserts a fresh unfrozen row and ages the frozen one to gone (fb#1749). reviewedBy is stamped only by a CLASSIFYING call — --status approved (approving accepts the shown type), or an explicit --row-kind/--palkki-type — so a --note-only call, or pending/rejected without a type, does not arm the freeze and leaves the parser's guess live (fb#1780). There is no unfreeze; to change a frozen row, re-review it with the type you want.",
+    ],
     errors: [
       { origin: "client", exit: 4, meaning: "rowId is not a positive integer", remedy: "Pass the betomikOrderbookImportRowId from `ib dev betomik-orderbook rows <runId>`" },
       { http: 400, exit: 4, meaning: "Bad status / rowKind / palkkiType", remedy: "status: pending|approved|rejected; rowKind: keikka|palkki; palkkiType must be one of the names the 400 message lists" },
