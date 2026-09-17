@@ -172,16 +172,16 @@ export const PERSON_SPECS: CommandSpec[] = [
   {
     command: "ib person role list",
     description:
-      "List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.",
+      "List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, `--asiakas` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.",
     permissions: ["company role read on the target tenant"],
     args: [{ name: "personId", type: "number", description: "personId" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Target asiakasId — defaults to the acting company (the global --company <id>, else the session's active company); pass it to read another tenant's roles (fb#1783)" },
     ],
     outputShape:
       "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
     errors: [ASIAKAS_FLAG_ERR, ...permErrors("company role access on the tenant")],
-    examples: ["ib person role list 5351 --asiakas 26"],
+    examples: ["ib person role list 5351 --asiakas 26", "ib person role list 316 --company 27"],
   },
   {
     command: "ib person role grant",

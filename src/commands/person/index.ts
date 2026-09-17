@@ -359,12 +359,18 @@ interface AsiakasPersonSettingRow {
  * name (null for non-role/unknown typeIds). The backend may return a bare
  * array or an mssql wrapper ({ recordset } / { recordsets }) depending on cache
  * warmth — unwrap defensively. Wrapped in the universal ListEnvelope.
+ *
+ * asiakasId defaults to the acting company — the global `--company` lens or
+ * the session's active company — the same "target defaults to the lens" rule
+ * `sijainti create` follows (fb#1783/fb#1770: `--company 27` alone used to
+ * exit 4 "missing required flag: --asiakas").
  */
 export async function runPersonRoleList(
   client: ApiClient,
   personId: number,
-  asiakasId: number
+  asiakasId?: number
 ): Promise<ListEnvelope<PersonRoleListItem>> {
+  asiakasId ??= await resolveActiveOwnerAsiakasId(client, "pass --asiakas <id> or the global --company <id>");
   const raw = await client.get<
     AsiakasPersonSettingRow[] | { recordset?: AsiakasPersonSettingRow[]; recordsets?: AsiakasPersonSettingRow[][] }
   >(`/api/asiakasPersonSettings/get/${asiakasId}/${personId}`);
@@ -1011,9 +1017,9 @@ export function registerPersonCommands(
 
   personRole
     .command("list <personId>")
-    .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
-      jsonAction(getClient, (client, personIdStr: string, opts: { asiakas: number }) =>
+      jsonAction(getClient, (client, personIdStr: string, opts: { asiakas?: number }) =>
         runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)
       )
     );

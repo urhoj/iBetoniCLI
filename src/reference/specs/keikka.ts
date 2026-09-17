@@ -73,7 +73,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "cursor", type: "string", description: "Pagination cursor" },
     ],
     outputShape:
-      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a `hint` explaining the count:0 (permitted-but-empty vs how to widen).",
+      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (pvm/time = Europe/Helsinki wall clock of pumppuAika, HH:mm, and --from/--to bound Helsinki days, fb#1761; range = the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a `hint` explaining the count:0 (permitted-but-empty vs how to widen).",
     errors: [
       limitErr("pass a positive integer; this command caps at 500 — page past it with `--cursor` from the previous response's `nextCursor`, or narrow with `--from` / `--to`"),
       intParseErr("--customer", "pass a positive asiakasId"),
@@ -164,7 +164,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
     flags: [],
     outputShape:
-      "{ keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }",
+      "{ keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }",
     errors: [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.read"),

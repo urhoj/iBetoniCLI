@@ -7313,7 +7313,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }
+  { keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
@@ -7479,7 +7479,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (permitted-but-empty vs how to widen).
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (pvm/time = Europe/Helsinki wall clock of pumppuAika, HH:mm, and --from/--to bound Helsinki days, fb#1761; range = the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (permitted-but-empty vs how to widen).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
@@ -12692,14 +12692,14 @@ exports[`Help snapshots — contract stability > help for ib person role list ma
   ib person role list <personId> [flags]
 
 DESCRIPTION
-  List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.
+  List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, \`--asiakas\` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.
   Permissions: requires company role read on the target tenant.
 
 ARGUMENTS
   <personId> NUMBER    personId (required)
 
 FLAGS
-  --asiakas NUMBER    Target asiakasId (REQUIRED)
+  --asiakas NUMBER    Target asiakasId — defaults to the acting company (the global --company <id>, else the session's active company); pass it to read another tenant's roles (fb#1783)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12716,6 +12716,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person role list 5351 --asiakas 26
+  ib person role list 316 --company 27
 "
 `;
 

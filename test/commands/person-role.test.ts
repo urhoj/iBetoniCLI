@@ -36,6 +36,26 @@ describe("runPersonRoleList", () => {
     expect(result.items).toEqual([]);
     expect(result.count).toBe(0);
   });
+
+  // fb#1783 / fb#1770: `--company 27` alone used to exit 4 "missing required
+  // flag: --asiakas". The acting company (the switch JWT --company mints, else
+  // the session's active company) is the default target; --asiakas overrides.
+  test("defaults asiakasId to the acting company from the token when --asiakas is omitted", async () => {
+    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    mockClient.getCurrentToken.mockReturnValue(`${b64({ alg: "none" })}.${b64({ ownerAsiakasId: 27 })}.sig`);
+    mockClient.get.mockResolvedValueOnce([{ asiakasPersonSettingId: 9, asiakasPersonSettingTypeId: 8 }]);
+    const result = await runPersonRoleList(mockClient, 316);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/27/316");
+    expect(result.items[0]).toEqual({ asiakasPersonSettingId: 9, roleTypeId: 8, role: "pumppari" });
+  });
+
+  test("an explicit --asiakas still wins over the acting company", async () => {
+    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    mockClient.getCurrentToken.mockReturnValue(`${b64({ alg: "none" })}.${b64({ ownerAsiakasId: 27 })}.sig`);
+    mockClient.get.mockResolvedValueOnce([]);
+    await runPersonRoleList(mockClient, 316, 26);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/26/316");
+  });
 });
 
 describe("runPersonRoleGrant", () => {
