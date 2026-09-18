@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { CliError } from "../../src/api/errors.js";
 import {
   runWorksiteDuplicates,
   runWorksiteMerge,
@@ -86,5 +87,39 @@ describe("runWorksiteMerge", () => {
     // Tagged `read` so it runs under --read-only and skips the acting-as write diagnostic.
     expect(asPost().mock.calls[0][2]).toEqual({ read: true });
     expect(result).toEqual({ dryRun: true, validation: { success: true, referencesToMove: 5 } });
+  });
+
+  test("fb#1822: a field-conflict 400 on --dry-run surfaces conflictingFields + a worksite-update hint instead of only the generic message", async () => {
+    const conflictBody = {
+      success: false,
+      error: {
+        message: "Kenttäkonfliktit estävät yhdistämisen. Korjaa ristiriidassa olevat kentät ennen yhdistämistä.",
+        code: 50203,
+        type: "VALIDATION_ERROR",
+        conflictingFields: [
+          { field: "tyomaaOsoite1", mainValue: "Pekanraitti 14", secondaryValue: "Pekanraitti 14 Hki" },
+        ],
+      },
+    };
+    asPost().mockRejectedValueOnce(
+      new CliError("Kenttäkonfliktit estävät yhdistämisen. Korjaa ristiriidassa olevat kentät ennen yhdistämistä.", 400, conflictBody, 4)
+    );
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("tyomaaOsoite1 ('Pekanraitti 14' vs 'Pekanraitti 14 Hki')"),
+      hint: expect.stringContaining("ib worksite update <secondaryId>"),
+    });
+  });
+
+  test("--dry-run 400 WITHOUT conflictingFields drops the noisy 'run --dry-run first' spec hint (this call IS the dry run)", async () => {
+    asPost().mockRejectedValueOnce(
+      new CliError("Validation failed", 400, { success: false, error: { message: "Validation failed" } }, 4)
+    );
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toMatchObject({
+      hint: "check --main/--secondary",
+    });
   });
 });

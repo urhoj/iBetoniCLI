@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { CliError } from "../../api/errors.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -10,6 +11,28 @@ import { writeJson, failWith } from "../../output/json.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "./action.js";
 import { addOwnerOption } from "../../targets.js";
+
+/** One {field, mainValue, secondaryValue} entry from a combinator validate 400's error.conflictingFields. */
+interface ConflictingField {
+  field: string;
+  mainValue: unknown;
+  secondaryValue: unknown;
+}
+
+/** Pulls `error.conflictingFields` out of a combinator validate 400's parsed body, if present and non-empty. */
+function extractConflictingFields(body: unknown): ConflictingField[] | null {
+  if (!body || typeof body !== "object") return null;
+  const err = (body as Record<string, unknown>).error;
+  if (!err || typeof err !== "object") return null;
+  const fields = (err as Record<string, unknown>).conflictingFields;
+  return Array.isArray(fields) && fields.length > 0 ? (fields as ConflictingField[]) : null;
+}
+
+function formatConflictingFields(fields: ConflictingField[]): string {
+  return fields
+    .map((f) => `${f.field} ('${String(f.mainValue)}' vs '${String(f.secondaryValue)}')`)
+    .join(", ");
+}
 
 /**
  * One likely-duplicate entity pair from a combinator's /duplicates endpoint.
@@ -92,10 +115,36 @@ export async function runCombinatorMerge(
     // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
     // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
     // diagnostic both skip it (it never mutates).
-    const validation = await client.post<unknown>(`/api/admin/${base}/validate`, body, {
-      read: true,
-    });
-    return { dryRun: true, validation };
+    try {
+      const validation = await client.post<unknown>(`/api/admin/${base}/validate`, body, {
+        read: true,
+      });
+      return { dryRun: true, validation };
+    } catch (err) {
+      // fb#1822: a field conflict (validationStatus ERROR) answers 400 with the
+      // Finnish message AND error.conflictingFields [{field, mainValue,
+      // secondaryValue}] — the caller's actual remedy — but that detail was
+      // visible only under --verbose. Fold it into the compact error, with a
+      // hint naming `ib worksite update` for the entity that supports it. Also
+      // drops the generic "run --dry-run first" hint on THIS call, since it IS
+      // the dry run.
+      if (err instanceof CliError) {
+        const conflicts = extractConflictingFields(err.body);
+        if (conflicts) {
+          throw new CliError(
+            `${err.message} — conflicting field(s): ${formatConflictingFields(conflicts)}`,
+            err.statusCode,
+            err.body,
+            err.exitCode,
+            base === "tyomaa-combinator"
+              ? "align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
+              : "align the conflicting field(s) onto the secondary, then re-run --dry-run"
+          );
+        }
+        throw new CliError(err.message, err.statusCode, err.body, err.exitCode, "check --main/--secondary");
+      }
+      throw err;
+    }
   }
   return client.post<unknown>(`/api/admin/${base}/merge`, body, {
     headers: writeFlagsToHeaders(flags),
