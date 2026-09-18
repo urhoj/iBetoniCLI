@@ -26,6 +26,7 @@ export function makeEmbeddedCtx(seed) {
         outputMode: seed.outputMode ?? "json",
         activeCommandErrors: seed.activeCommandErrors ?? null,
         activeSpecWriteFlags: seed.activeSpecWriteFlags ?? false,
+        activeSpecIsWrite: seed.activeSpecIsWrite ?? false,
         listColumns: seed.listColumns ?? null,
         projectionColumns: seed.projectionColumns ?? null,
         commandPath: seed.commandPath ?? null,

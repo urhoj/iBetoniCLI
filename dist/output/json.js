@@ -36,6 +36,7 @@ const moduleState = {
     outputMode: "json",
     activeCommandErrors: null,
     activeSpecWriteFlags: false,
+    activeSpecIsWrite: false,
     listColumns: null,
     projectionColumns: null,
 };
@@ -60,6 +61,10 @@ export function setActiveCommandErrors(rows) {
 /** Seeded beside {@link setActiveCommandErrors} from the same CommandSpec. */
 export function setActiveSpecWriteFlags(accepts) {
     state().activeSpecWriteFlags = accepts;
+}
+/** Seeded beside {@link setActiveCommandErrors} from `isWriteSpec(spec)` (fb#1823). */
+export function setActiveSpecIsWrite(isWrite) {
+    state().activeSpecIsWrite = isWrite;
 }
 export function setListColumns(cols) {
     state().listColumns = cols;
@@ -142,6 +147,12 @@ function describeUnknownColumn(col, available) {
  * projected at all, the command exits 4 naming what IS available instead of
  * returning the unprojected payload as if the flag had been applied.
  *
+ * One exception (fb#1823): on a WRITE command, a zero-match projection warns
+ * and returns the unprojected payload instead of exiting 4 — the mutation
+ * already happened, so a thin outputShape (`{ updated }`, raw mssql) turning
+ * that into a non-zero exit misreports a successful write as a failure. See
+ * {@link setActiveSpecIsWrite}.
+ *
  * TOP-LEVEL ONLY beyond that one `item` exception — it never reaches into a
  * nested LIST. A record whose payload lives in one warns instead (fb#596);
  * see {@link warnDroppedNestedLists} for why that case cannot use the exit-4
@@ -179,6 +190,16 @@ export function applyColumnsProjection(value, cols) {
     const unknown = cols.filter((c) => !matched.includes(c));
     const listed = unknown.map((c) => describeUnknownColumn(c, available)).join(", ");
     if (matched.length === 0) {
+        // fb#1823: a WRITE has already happened by the time its output reaches
+        // this projection — exiting 4 here reads as "the write failed" when it
+        // didn't (a thin `{ updated }` / raw-mssql outputShape has nothing a
+        // projection could match). Warn and return the unprojected payload
+        // instead; the LOUD exit-4 policy stays in force for reads, where a
+        // silent narrowing WOULD hide a real bug.
+        if (state().activeSpecIsWrite) {
+            warnNote(`[ib] --columns: none of [${listed}] exist in this output (the write still succeeded) — available: ${availableList}. Returning the unprojected result.`);
+            return value;
+        }
         failUsage(`--columns: none of [${listed}] exist in this output. Available: ${availableList}.`);
     }
     // Name the AVAILABLE set in the note itself (fb#858): without it, a name the

@@ -7,6 +7,7 @@ import {
   errorMessage,
   setActiveCommandErrors,
   setActiveSpecWriteFlags,
+  setActiveSpecIsWrite,
   setListColumns,
   setOutputMode,
   setProjectionColumns,
@@ -323,6 +324,41 @@ describe("JSON output", () => {
       expect((err as CliError).exitCode).toBe(4);
       expect((err as CliError).message).toContain("a, b");
       expect(stdoutSpy.mock.calls.length).toBe(callsBefore);
+    });
+
+    // fb#1823: a WRITE has already happened by the time its thin outputShape
+    // (`{ updated }`, raw mssql) reaches the projection — exiting 4 here reads
+    // as "the write failed" when it didn't.
+    describe("on a write command (fb#1823)", () => {
+      beforeEach(() => setActiveSpecIsWrite(true));
+      afterEach(() => setActiveSpecIsWrite(false));
+
+      test("no matching column warns and returns the unprojected payload instead of exiting 4", () => {
+        setProjectionColumns(["nope"]);
+        let threw = false;
+        try {
+          writeJson({ updated: true });
+        } catch {
+          threw = true;
+        }
+        expect(threw).toBe(false);
+        expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({ updated: true });
+        const warn = String(stderrSpy.mock.calls.at(-1)![0]);
+        expect(warn).toContain("nope");
+        expect(warn).toContain("write still succeeded");
+        expect(warn).toContain("available: updated");
+      });
+
+      test("a matching column still projects normally", () => {
+        setProjectionColumns(["updated"]);
+        writeJson({ updated: true, rowsAffected: [1] });
+        expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({ updated: true });
+      });
+
+      test("an unprojectable scalar still exits 4 — the write-exemption only covers the zero-match record/list case", () => {
+        setProjectionColumns(["a"]);
+        expect(() => writeJson("just a string")).toThrowError(CliError);
+      });
     });
 
     // fb#671. The real miss: `--columns changelogId,version` on a row whose

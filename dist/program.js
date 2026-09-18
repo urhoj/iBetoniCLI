@@ -23,11 +23,11 @@ import { addEditFlags, parseEditOp } from "./textEdit.js";
 import { intFlag } from "./targets.js";
 import { addWriteFlagsToCommand, requireReason } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
-import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
+import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain, isWriteSpec } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setActiveSpecWriteFlags, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setActiveSpecWriteFlags, setActiveSpecIsWrite, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT } from "./output/validationEnvelope.js";
@@ -390,6 +390,7 @@ export function applySpecErrors(actionCommand) {
     const spec = specFor(actionCommand);
     setActiveCommandErrors(spec?.errors ?? null);
     setActiveSpecWriteFlags(spec?.writeFlags ?? false);
+    setActiveSpecIsWrite(spec ? isWriteSpec(spec) : false);
     setListColumns(spec?.prettyColumns ?? null);
 }
 /**
@@ -680,6 +681,7 @@ export function handleParseRejection(err, hooks = {}) {
             const spec = specFor(cmd);
             setActiveCommandErrors(spec?.errors ?? null);
             setActiveSpecWriteFlags(spec?.writeFlags ?? false);
+            setActiveSpecIsWrite(spec ? isWriteSpec(spec) : false);
         }
         exitWithError(err);
         return;

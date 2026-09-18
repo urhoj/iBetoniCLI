@@ -15,6 +15,15 @@ export interface EmbeddedCtx {
    * remedy offer `--idempotency-key` only where the command accepts it (fb#1585).
    */
   activeSpecWriteFlags: boolean;
+  /**
+   * Whether the command currently executing IS a write (`isWriteSpec` —
+   * `mutates` ?? `!!writeFlags`), seeded alongside `activeCommandErrors`.
+   * Lets `applyColumnsProjection` (fb#1823) downgrade a zero-match `--columns`
+   * from exit 4 to a stderr warning on a write whose output already
+   * succeeded — a thin `{ updated }` / raw-mssql outputShape otherwise reads
+   * as "the write failed" when it didn't. Reads keep the LOUD exit-4 policy.
+   */
+  activeSpecIsWrite: boolean;
   listColumns: readonly string[] | null;
   /** Explicit global `--columns` output projection (fb#451) — see `output/json.ts`. */
   projectionColumns: readonly string[] | null;
@@ -76,6 +85,7 @@ export function makeEmbeddedCtx(seed: EmbeddedCtxSeed): EmbeddedCtx {
     outputMode: seed.outputMode ?? "json",
     activeCommandErrors: seed.activeCommandErrors ?? null,
     activeSpecWriteFlags: seed.activeSpecWriteFlags ?? false,
+    activeSpecIsWrite: seed.activeSpecIsWrite ?? false,
     listColumns: seed.listColumns ?? null,
     projectionColumns: seed.projectionColumns ?? null,
     commandPath: seed.commandPath ?? null,

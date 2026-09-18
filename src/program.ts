@@ -24,11 +24,11 @@ import { addEditFlags, parseEditOp } from "./textEdit.js";
 import { intFlag } from "./targets.js";
 import { addWriteFlagsToCommand, type WriteFlags, requireReason } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
-import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
+import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain, isWriteSpec } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence, type CommandSpec } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setActiveSpecWriteFlags, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setActiveSpecWriteFlags, setActiveSpecIsWrite, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
@@ -490,6 +490,7 @@ export function applySpecErrors(actionCommand: Command): void {
   const spec = specFor(actionCommand);
   setActiveCommandErrors(spec?.errors ?? null);
   setActiveSpecWriteFlags(spec?.writeFlags ?? false);
+  setActiveSpecIsWrite(spec ? isWriteSpec(spec) : false);
   setListColumns(spec?.prettyColumns ?? null);
 }
 
@@ -836,6 +837,7 @@ export function handleParseRejection(
       const spec = specFor(cmd);
       setActiveCommandErrors(spec?.errors ?? null);
       setActiveSpecWriteFlags(spec?.writeFlags ?? false);
+      setActiveSpecIsWrite(spec ? isWriteSpec(spec) : false);
     }
     exitWithError(err);
     return;
