@@ -124,9 +124,22 @@ export function closestName(target, names, synonyms = VERB_SYNONYMS) {
     if (!target || names.length === 0)
         return null;
     const t = target.toLowerCase();
-    const prefix = names.find((n) => t.length >= 2 && n.toLowerCase().startsWith(t));
-    if (prefix)
-        return prefix;
+    // Among ALL names sharing the prefix, keep the SHORTEST one — the closest
+    // extension of what was typed — rather than the first one in array order
+    // (fb#1826: "dailyMessageBox" matched both "dailyMessageBoxes" (2 extra
+    // chars, the real table) and "dailyMessageBoxAsiakas" (7 extra chars), and
+    // whichever the caller's table list happened to list first won).
+    if (t.length >= 2) {
+        let shortestPrefix = null;
+        for (const n of names) {
+            if (!n.toLowerCase().startsWith(t))
+                continue;
+            if (shortestPrefix === null || n.length < shortestPrefix.length)
+                shortestPrefix = n;
+        }
+        if (shortestPrefix !== null)
+            return shortestPrefix;
+    }
     // Substring/ends-with pass (fb#832): for short tokens like "id", edit distance
     // ranks "kind" (distance 2) above "feedbackId" (distance 8) — but "feedbackId"
     // literally contains the typed token. Prefer a column that ENDS WITH the token

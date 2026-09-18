@@ -375,6 +375,28 @@ describe("ib schema", () => {
       });
     });
 
+    // fb#1826: when the typed name is a PREFIX of more than one live table, the
+    // shortest/closest extension must win — not whichever one happens to sort
+    // first in the catalogue.
+    test("a prefix shared by two tables picks the shorter/closer one, not catalogue order", async () => {
+      post().mockRejectedValueOnce(
+        new CliError("SQL error: Invalid object name 'dailyMessageBox'.", 400, null, 4)
+      );
+      get()
+        .mockResolvedValueOnce({
+          items: [{ name: "dailyMessageBoxAsiakas" }, { name: "dailyMessageBoxes" }],
+          nextCursor: null,
+          count: 2,
+        })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(
+        runSchemaQuery(mockClient, "SELECT boxId FROM dailyMessageBox WHERE ownerAsiakasId = 8")
+      ).rejects.toMatchObject({
+        hint: expect.stringContaining("dbo.dailyMessageBoxes"),
+      });
+    });
+
     // dbo holds ~250 tables against a 200-row default page (fb#1483 follow-up,
     // caught live: the suggestion still "worked" by luck on a name inside the
     // first page, but fired a nonsensical TRUNCATED stderr warning and would
