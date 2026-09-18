@@ -1233,6 +1233,14 @@ ib person fk list --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib person fk list-source --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
+ib person fk list-source --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib person fk remove --asiakas <id>
   ! --asiakas must be an integer >= 1
   > (no hint)

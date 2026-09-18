@@ -6,6 +6,7 @@ import {
   planPersonFkSet,
   runPersonFkImport,
   runPersonFkList,
+  runPersonFkListSource,
   runPersonFkRemove,
   runPersonFkSet,
 } from "../../src/commands/person/fk.js";
@@ -69,6 +70,32 @@ describe("person fk list", () => {
       { personForeignKeyId: 901, key: "x", source: null, sourceId: 99, text: null, isDisabled: false, entryTime: ROW.entryTime },
     ]);
     expect(out.count).toBe(2);
+  });
+});
+
+describe("person fk list-source (fb#1740)", () => {
+  test("resolves the source and lists every nickname across persons, joined to a display name", async () => {
+    const rows = [
+      { personForeignKeyId: 900, personId: 6354, personFirstName: "Matti", personLastName: "Meikalainen", foreignKey: "Tomppa", foreignKeyText: null, isDisabled: false, entryTime: ROW.entryTime },
+      { personForeignKeyId: 901, personId: 6355, personFirstName: "Jani", personLastName: null, foreignKey: "Jani K", foreignKeyText: "sheet spelling", isDisabled: true, entryTime: ROW.entryTime },
+    ];
+    const c = client(rows);
+    const out = await runPersonFkListSource(c, "betomik-orderbook", 27);
+    expect(c.get).toHaveBeenCalledWith("/api/person/getForeignKeysBySource/27/42");
+    expect(out.items).toEqual([
+      { personForeignKeyId: 900, personId: 6354, personName: "Matti Meikalainen", key: "Tomppa", text: null, isDisabled: false, entryTime: ROW.entryTime },
+      { personForeignKeyId: 901, personId: 6355, personName: "Jani", key: "Jani K", text: "sheet spelling", isDisabled: true, entryTime: ROW.entryTime },
+    ]);
+    expect(out.count).toBe(2);
+  });
+
+  test("unknown source → exit 4 listing the owner's sources, no list GET", async () => {
+    const c = client([]);
+    await expect(runPersonFkListSource(c, "nope", 27)).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringContaining("betomik-orderbook (42)"),
+    });
+    expect(c.get).not.toHaveBeenCalledWith(expect.stringContaining("/api/person/getForeignKeysBySource/"));
   });
 });
 

@@ -12289,11 +12289,53 @@ NOTES
   - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
 
 SEE ALSO
-  ib person fk set, ib person fk sources
+  ib person fk set, ib person fk sources, ib person fk list-source
 
 EXAMPLES
   ib person fk list 6354 --owner 27
   ib person fk list 'Matti Virtanen'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person fk list-source matches snapshot 1`] = `
+"USAGE
+  ib person fk list-source <source> [flags]
+
+DESCRIPTION
+  List EVERY taught foreign key of one source for an owner, across ALL persons (fb#1740) — the aggregate counterpart to \`fk list\`, which is scoped to one person. Reviewing a whole source's taught vocabulary (e.g. every betomik-orderbook driver nickname under an owner) otherwise required a raw dbo query.
+  Permissions: requires membership of the owner tenant (read).
+
+ARGUMENTS
+  <source> STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personForeignKeyId, personId, personName, key, text, isDisabled, entryTime }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
+
+SEE ALSO
+  ib person fk list, ib person fk sources
+
+EXAMPLES
+  ib person fk list-source betomik-orderbook --owner 27
+  ib person fk list-source 6 --owner 27
 "
 `;
 

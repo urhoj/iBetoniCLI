@@ -24,6 +24,7 @@ import {
   normKey,
   pickFkSource,
   registerFkSourcesLeaf,
+  resolveFkSource,
   resolveOwner,
   sourceNameOf,
   type FkSource,
@@ -121,6 +122,54 @@ export async function runPersonFkList(client: ApiClient, person: string, owner?:
     isDisabled: Boolean(r.isDisabled),
     entryTime: r.entryTime ?? null,
   }));
+  return listEnvelope(items, { truncated: false });
+}
+
+/** Raw dbo.personForeignKeys row joined to person, as `getForeignKeysBySource` sends it. */
+export interface PersonFkBySourceRaw {
+  personForeignKeyId: number;
+  personId: number;
+  personFirstName: string | null;
+  personLastName: string | null;
+  foreignKey: string;
+  foreignKeyText: string | null;
+  isDisabled: boolean | 0 | 1;
+  entryTime?: string;
+}
+
+export interface PersonFkBySourceRow {
+  personForeignKeyId: number;
+  personId: number;
+  personName: string;
+  key: string;
+  text: string | null;
+  isDisabled: boolean;
+  entryTime: string | null;
+}
+
+async function fetchPersonFksBySource(client: ApiClient, owner: number, sourceId: number): Promise<PersonFkBySourceRaw[]> {
+  return unwrapRows(await client.get(`/api/person/getForeignKeysBySource/${owner}/${sourceId}`)) as unknown as PersonFkBySourceRaw[];
+}
+
+/**
+ * Every taught nickname of ONE source for an owner, across ALL persons
+ * (fb#1740) — the aggregate counterpart to {@link runPersonFkList}, which is
+ * scoped to one person. Reviewing the taught vocabulary otherwise required a
+ * raw dbo query via `ib dev schema query`.
+ */
+export async function runPersonFkListSource(client: ApiClient, sourceRef: string, owner?: number): Promise<ListEnvelope<PersonFkBySourceRow>> {
+  const ownerId = resolveOwner(client, owner);
+  const source = await resolveFkSource(client, ownerId, sourceRef);
+  const rows = await fetchPersonFksBySource(client, ownerId, source.foreignKeySourceId);
+  const items = rows.map((r) => ({
+    personForeignKeyId: Number(r.personForeignKeyId),
+    personId: Number(r.personId),
+    personName: [r.personFirstName, r.personLastName].filter(Boolean).join(" "),
+    key: r.foreignKey,
+    text: r.foreignKeyText ?? null,
+    isDisabled: Boolean(r.isDisabled),
+    entryTime: r.entryTime ?? null,
+  })) as PersonFkBySourceRow[];
   return listEnvelope(items, { truncated: false });
 }
 
@@ -341,6 +390,13 @@ export function registerPersonFkCommands(person: Command, getClient: () => Promi
     jsonAction(getClient, (client, personRef: string, opts: { owner?: number }) => {
       foldOwnerAlias(opts);
       return runPersonFkList(client, personRef, opts.owner);
+    })
+  );
+
+  addOwnerWithAlias(fk.command("list-source <source>")).action(
+    jsonAction(getClient, (client, source: string, opts: { owner?: number }) => {
+      foldOwnerAlias(opts);
+      return runPersonFkListSource(client, source, opts.owner);
     })
   );
 

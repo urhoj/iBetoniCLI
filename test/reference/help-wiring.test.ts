@@ -167,6 +167,7 @@ describe("Rich --help wiring — real command tree", () => {
     // fb#1732: person fk scopes by --owner while the rest of `ib person` spells
     // the tenant scope --asiakas — accept the domain's spelling on the fk leaf.
     "ib person fk list --asiakas": "--owner",
+    "ib person fk list-source --asiakas": "--owner",
     "ib person fk set --asiakas": "--owner",
     "ib person fk remove --asiakas": "--owner",
     "ib person fk import --asiakas": "--owner",

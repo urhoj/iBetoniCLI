@@ -86,8 +86,27 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE],
-    seeAlso: ["ib person fk set", "ib person fk sources"],
+    seeAlso: ["ib person fk set", "ib person fk sources", "ib person fk list-source"],
     examples: ["ib person fk list 6354 --owner 27", "ib person fk list 'Matti Virtanen'"],
+  },
+  {
+    command: "ib person fk list-source",
+    description:
+      "List EVERY taught foreign key of one source for an owner, across ALL persons (fb#1740) — the aggregate counterpart to `fk list`, which is scoped to one person. Reviewing a whole source's taught vocabulary (e.g. every betomik-orderbook driver nickname under an owner) otherwise required a raw dbo query.",
+    permissions: ["membership of the owner tenant (read)"],
+    args: [{ name: "source", type: "string", description: "foreignKeySources row, by NAME (case-insensitive) or numeric id — `fk sources` lists them" }],
+    flags: [OWNER_ASIAKAS_FLAG],
+    outputShape: "ListEnvelope<{ personForeignKeyId, personId, personName, key, text, isDisabled, entryTime }>",
+    errors: [
+      OWNER_PARSE_ERR,
+      OWNER_UNRESOLVED_ERR,
+      SOURCE_UNKNOWN_ERR,
+      READ_403,
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE],
+    seeAlso: ["ib person fk list", "ib person fk sources"],
+    examples: ["ib person fk list-source betomik-orderbook --owner 27", "ib person fk list-source 6 --owner 27"],
   },
   {
     command: "ib person fk set",

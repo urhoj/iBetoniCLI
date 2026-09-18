@@ -17,7 +17,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlag
 import { failWith, writeJson } from "../../output/json.js";
 import { addOwnerOption, intFlag, parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { dryRunOr, fetchFkSources, normKey, pickFkSource, registerFkSourcesLeaf, resolveOwner, sourceNameOf, } from "../_shared/foreignKeys.js";
+import { dryRunOr, fetchFkSources, normKey, pickFkSource, registerFkSourcesLeaf, resolveFkSource, resolveOwner, sourceNameOf, } from "../_shared/foreignKeys.js";
 import { resolvePersonRef } from "../notification/index.js";
 async function fetchPersonFks(client, personId, owner) {
     return unwrapRows(await client.get(`/api/person/getForeignKeys/${personId}/${owner}`));
@@ -55,6 +55,30 @@ export async function runPersonFkList(client, person, owner) {
         key: r.foreignKey,
         source: sourceNameOf(sources, Number(r.foreignKeySourceId)),
         sourceId: Number(r.foreignKeySourceId),
+        text: r.foreignKeyText ?? null,
+        isDisabled: Boolean(r.isDisabled),
+        entryTime: r.entryTime ?? null,
+    }));
+    return listEnvelope(items, { truncated: false });
+}
+async function fetchPersonFksBySource(client, owner, sourceId) {
+    return unwrapRows(await client.get(`/api/person/getForeignKeysBySource/${owner}/${sourceId}`));
+}
+/**
+ * Every taught nickname of ONE source for an owner, across ALL persons
+ * (fb#1740) — the aggregate counterpart to {@link runPersonFkList}, which is
+ * scoped to one person. Reviewing the taught vocabulary otherwise required a
+ * raw dbo query via `ib dev schema query`.
+ */
+export async function runPersonFkListSource(client, sourceRef, owner) {
+    const ownerId = resolveOwner(client, owner);
+    const source = await resolveFkSource(client, ownerId, sourceRef);
+    const rows = await fetchPersonFksBySource(client, ownerId, source.foreignKeySourceId);
+    const items = rows.map((r) => ({
+        personForeignKeyId: Number(r.personForeignKeyId),
+        personId: Number(r.personId),
+        personName: [r.personFirstName, r.personLastName].filter(Boolean).join(" "),
+        key: r.foreignKey,
         text: r.foreignKeyText ?? null,
         isDisabled: Boolean(r.isDisabled),
         entryTime: r.entryTime ?? null,
@@ -213,6 +237,10 @@ export function registerPersonFkCommands(person, getClient) {
     addOwnerWithAlias(fk.command("list <person>")).action(jsonAction(getClient, (client, personRef, opts) => {
         foldOwnerAlias(opts);
         return runPersonFkList(client, personRef, opts.owner);
+    }));
+    addOwnerWithAlias(fk.command("list-source <source>")).action(jsonAction(getClient, (client, source, opts) => {
+        foldOwnerAlias(opts);
+        return runPersonFkListSource(client, source, opts.owner);
     }));
     addWriteFlagsToCommand(addOwnerWithAlias(fk.command("set <person>")
         .requiredOption("--source <ref>")
