@@ -397,6 +397,35 @@ describe("ib schema", () => {
       });
     });
 
+    // fb#1799: the real backing table (`grid_palkit`) carries a feature-area
+    // prefix, so it never wins the PREFIX pass — only the unrelated junction
+    // tables `palkkiAsiakas`/`palkkiPerson` literally start with `palkki`. A
+    // curated override must win over both, proving it beats the closer-by-
+    // prefix-but-wrong candidates rather than merely being the sole candidate.
+    test("a domain term whose real table has a feature-area prefix uses the curated override, not the literal prefix match", async () => {
+      post().mockRejectedValueOnce(new CliError("SQL error: Invalid object name 'dbo.palkki'.", 400, null, 4));
+      get()
+        .mockResolvedValueOnce({
+          items: [
+            { name: "grid_palkit" },
+            { name: "grid_palkkiForeignKeys" },
+            { name: "grid_palkkiTypes" },
+            { name: "grid_palkkiVisibility" },
+            { name: "palkkiAsiakas" },
+            { name: "palkkiPerson" },
+          ],
+          nextCursor: null,
+          count: 6,
+        })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(
+        runSchemaQuery(mockClient, "SELECT * FROM dbo.palkki WHERE palkkiId = 9290")
+      ).rejects.toMatchObject({
+        hint: expect.stringContaining("dbo.grid_palkit"),
+      });
+    });
+
     // dbo holds ~250 tables against a 200-row default page (fb#1483 follow-up,
     // caught live: the suggestion still "worked" by luck on a name inside the
     // first page, but fired a nonsensical TRUNCATED stderr warning and would

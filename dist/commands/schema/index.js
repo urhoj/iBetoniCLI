@@ -430,6 +430,22 @@ export function resolveSqlInput(positional, flag, file) {
  *  `SQL error: ${err.message}` forwarding — captures the quoted object name. */
 const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
 /**
+ * Curated fixes for {@link nearestObjectNameSuggestion} guesses that are
+ * textually plausible but semantically wrong (fb#1799): the real backing
+ * table carries a feature-area prefix (`grid_`) that no prefix/substring/
+ * edit-distance pass on the bare typed name can reach — `palkki` (6 chars)
+ * is ~5 edits from `grid_palkit`, well past `closestName`'s
+ * `max(2, floor(len/2))=3` threshold, while `palkkiAsiakas`/`palkkiPerson`
+ * win the PREFIX pass purely because they happen to literally start with the
+ * typed string despite being unrelated junction tables. Keyed by the bare
+ * (lowercased) typed name; re-validated against the live table/view list at
+ * call time in {@link nearestObjectNameSuggestion} so a rename can't leave a
+ * dead override suggesting a table that no longer exists.
+ */
+const OBJECT_NAME_DID_YOU_MEAN_OVERRIDES = {
+    palkki: "grid_palkit",
+};
+/**
  * "Did you mean …?" for an `Invalid object name` failure (fb#1483/fb#1532):
  * `ib dev schema query` runs on a login with no catalogue metadata visibility
  * (see the command's NOTES), so a bad name otherwise reaches the caller as a
@@ -454,10 +470,11 @@ async function nearestObjectNameSuggestion(client, badName) {
     const names = [...tables.items, ...views.items]
         .map((r) => r.name)
         .filter((n) => typeof n === "string");
+    const overrideTarget = OBJECT_NAME_DID_YOU_MEAN_OVERRIDES[bare.toLowerCase()];
     // {} not the default VERB_SYNONYMS table (add/create/show/get…) — meaningless
     // for a SQL object name and only ever a copy-paste artifact from the
     // command-name did-you-mean use case (bug-review finding on fb#1483).
-    const match = closestName(bare, names, {});
+    const match = overrideTarget && names.includes(overrideTarget) ? overrideTarget : closestName(bare, names, {});
     return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
 }
 /** SQL Server 207, forwarded verbatim like 208 above — captures the quoted column name. */
