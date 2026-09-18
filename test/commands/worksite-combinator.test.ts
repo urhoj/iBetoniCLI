@@ -122,4 +122,15 @@ describe("runWorksiteMerge", () => {
       hint: "check --main/--secondary",
     });
   });
+
+  // fb#1839: a non-400 CliError (401/403/5xx/network) from the SAME validate
+  // POST must propagate completely unchanged — the pre-fix code clobbered its
+  // hint to "check --main/--secondary" regardless of status.
+  test("fb#1839: a non-400 CliError (e.g. 403 permission) from --dry-run's validate call is rethrown UNCHANGED", async () => {
+    const original = new CliError("Not permitted on this tenant", 403, { error: "forbidden" }, 3);
+    asPost().mockRejectedValueOnce(original);
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toBe(original);
+  });
 });

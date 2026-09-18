@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { CliError } from "../../src/api/errors.js";
 import {
   runPersonDuplicates,
   runPersonMerge,
@@ -99,6 +100,58 @@ describe("runPersonMerge", () => {
       { dryRun: true }
     );
     expect(asPost().mock.calls[0][1]).toEqual({ mainPersonId: 10, secondaryPersonId: 27, ownerAsiakasId: 0 });
+  });
+
+  // fb#1839: a person-combinator day-vehicle conflict (errorNumber 50203) carries
+  // conflictingFields too, but its remedy is `ib person day clear` / `ib vehicle
+  // driver assign` — NOT the tyomaa-only "align onto the secondary" text. The
+  // hint must stay unset here so hintDetailForError falls through to person.ts's
+  // own curated spec row instead of the generic (and wrong) worksite-shaped one.
+  test("fb#1839: a person-combinator conflictingFields 400 enriches the message but leaves the hint UNSET (so the curated 50203 spec remedy still resolves)", async () => {
+    const conflictBody = {
+      success: false,
+      error: {
+        message: "Molemmat henkilöt ajavat eri ajoneuvoa samana päivänä.",
+        code: 50203,
+        type: "VALIDATION_ERROR",
+        conflictingFields: [
+          { field: "personPvm@2026-09-10", mainValue: "vehicle:12", secondaryValue: "vehicle:34" },
+        ],
+      },
+    };
+    asPost().mockRejectedValueOnce(
+      new CliError("Molemmat henkilöt ajavat eri ajoneuvoa samana päivänä.", 400, conflictBody, 4)
+    );
+    await expect(
+      runPersonMerge(mockClient, { mainId: 6001, secondaryId: 6002, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("personPvm@2026-09-10 ('vehicle:12' vs 'vehicle:34')"),
+      hint: undefined,
+    });
+  });
+
+  // fb#1839: a non-400 CliError (401/403/5xx/network) from the SAME validate
+  // POST must propagate completely unchanged — the old code clobbered its hint
+  // to "check --main/--secondary" regardless of status.
+  test("fb#1839: a non-400 CliError (e.g. 401 token-expired) from --dry-run's validate call is rethrown UNCHANGED", async () => {
+    const original = new CliError("Token expired", 401, { error: "jwt expired" }, 2);
+    asPost().mockRejectedValueOnce(original);
+    await expect(
+      runPersonMerge(mockClient, { mainId: 6001, secondaryId: 6002, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toBe(original);
+  });
+
+  // fb#1840: a malformed conflictingFields entry must not crash — extraction
+  // treats it as absent and falls back to the plain (still exit-4) error.
+  test("fb#1840: a malformed conflictingFields array (non-object element) does not throw — falls back to the plain error", async () => {
+    const malformedBody = {
+      success: false,
+      error: { message: "Kenttäkonfliktit.", conflictingFields: [null, "not-an-object"] },
+    };
+    asPost().mockRejectedValueOnce(new CliError("Kenttäkonfliktit.", 400, malformedBody, 4));
+    await expect(
+      runPersonMerge(mockClient, { mainId: 6001, secondaryId: 6002, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toMatchObject({ message: "Kenttäkonfliktit.", hint: "check --main/--secondary" });
   });
 });
 

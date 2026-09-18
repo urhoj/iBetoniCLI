@@ -19,13 +19,23 @@ interface ConflictingField {
   secondaryValue: unknown;
 }
 
-/** Pulls `error.conflictingFields` out of a combinator validate 400's parsed body, if present and non-empty. */
+/**
+ * Pulls `error.conflictingFields` out of a combinator validate 400's parsed
+ * body, if present, non-empty, and every element is a well-formed
+ * {field, mainValue, secondaryValue} object (fb#1840) — a malformed entry
+ * (null, a bare string/number) is treated as absent so the caller falls back
+ * to the plain error instead of formatConflictingFields crashing on it.
+ */
 function extractConflictingFields(body: unknown): ConflictingField[] | null {
   if (!body || typeof body !== "object") return null;
   const err = (body as Record<string, unknown>).error;
   if (!err || typeof err !== "object") return null;
   const fields = (err as Record<string, unknown>).conflictingFields;
-  return Array.isArray(fields) && fields.length > 0 ? (fields as ConflictingField[]) : null;
+  if (!Array.isArray(fields) || fields.length === 0) return null;
+  const wellFormed = fields.every(
+    (f) => f && typeof f === "object" && typeof (f as Record<string, unknown>).field === "string"
+  );
+  return wellFormed ? (fields as ConflictingField[]) : null;
 }
 
 function formatConflictingFields(fields: ConflictingField[]): string {
@@ -124,11 +134,19 @@ export async function runCombinatorMerge(
       // fb#1822: a field conflict (validationStatus ERROR) answers 400 with the
       // Finnish message AND error.conflictingFields [{field, mainValue,
       // secondaryValue}] — the caller's actual remedy — but that detail was
-      // visible only under --verbose. Fold it into the compact error, with a
-      // hint naming `ib worksite update` for the entity that supports it. Also
-      // drops the generic "run --dry-run first" hint on THIS call, since it IS
-      // the dry run.
-      if (err instanceof CliError) {
+      // visible only under --verbose. Fold it into the compact error. Also
+      // drops the generic "run --dry-run first" hint on a plain 400 HERE,
+      // since this call IS the dry run.
+      //
+      // fb#1839: narrowed to statusCode === 400 ONLY — a 401/403/404/5xx/network
+      // CliError from this same POST must keep its own spec-driven hint (e.g.
+      // "ib auth refresh" on 401), not get overwritten. And the new hint text
+      // is set only for tyomaa-combinator, where it's actually correct; for
+      // person/customer the hint is left UNSET so hintDetailForError falls
+      // through to that entity's own curated spec row (e.g. person.ts's
+      // errorNumber-50203 day-vehicle-conflict remedy, which names a completely
+      // different fix than "align fields onto the secondary").
+      if (err instanceof CliError && err.statusCode === 400) {
         const conflicts = extractConflictingFields(err.body);
         if (conflicts) {
           throw new CliError(
@@ -138,7 +156,7 @@ export async function runCombinatorMerge(
             err.exitCode,
             base === "tyomaa-combinator"
               ? "align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
-              : "align the conflicting field(s) onto the secondary, then re-run --dry-run"
+              : undefined
           );
         }
         throw new CliError(err.message, err.statusCode, err.body, err.exitCode, "check --main/--secondary");
