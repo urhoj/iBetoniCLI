@@ -128,14 +128,22 @@ export function closestName(target, names, synonyms = VERB_SYNONYMS) {
     // extension of what was typed — rather than the first one in array order
     // (fb#1826: "dailyMessageBox" matched both "dailyMessageBoxes" (2 extra
     // chars, the real table) and "dailyMessageBoxAsiakas" (7 extra chars), and
-    // whichever the caller's table list happened to list first won).
+    // whichever the caller's table list happened to list first won). An exact
+    // LENGTH tie breaks alphabetically (deterministic, not array order) — the
+    // same class of bug fb#1826 fixed, just less likely to trigger (fb#1837).
     if (t.length >= 2) {
         let shortestPrefix = null;
+        let shortestPrefixLower = "";
         for (const n of names) {
-            if (!n.toLowerCase().startsWith(t))
+            const nLower = n.toLowerCase();
+            if (!nLower.startsWith(t))
                 continue;
-            if (shortestPrefix === null || n.length < shortestPrefix.length)
+            if (shortestPrefix === null ||
+                n.length < shortestPrefix.length ||
+                (n.length === shortestPrefix.length && nLower < shortestPrefixLower)) {
                 shortestPrefix = n;
+                shortestPrefixLower = nLower;
+            }
         }
         if (shortestPrefix !== null)
             return shortestPrefix;
