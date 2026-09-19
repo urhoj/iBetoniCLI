@@ -155,6 +155,14 @@ export function buildWorksiteUpdateBody(parsedBody, typed) {
  *     columns from the stored row (fb#234; the `tyomaa_save` proc itself
  *     blanket-overwrites every column). DEPLOY-GATED — against a backend
  *     without that merge, a partial body NULLs the omitted columns.
+ *
+ * Returns the UPDATED worksite record (a follow-up `worksite get`), not the
+ * route's raw mssql result (fb#1820): `{ recordsets, rowsAffected, … }` carries
+ * no column of the row, so `--columns tyomaaId,address` exited 4 AFTER the
+ * write had persisted and the caller could not confirm the new value. The
+ * route is shared with the FE full-form save, so its wire shape stays; the
+ * re-read is one extra GET. A dry run returns the server's `wouldUpdate`
+ * preview unchanged — nothing was written, so there is nothing to re-read.
  */
 export async function runWorksiteUpdate(client, opts, body, flags) {
     const yyyymmdd = opts.yyyymmdd || todayYyyymmdd();
@@ -166,7 +174,10 @@ export async function runWorksiteUpdate(client, opts, body, flags) {
         tyomaaId: opts.tyomaaId,
         ownerAsiakasId: opts.ownerAsiakasId,
     };
-    return client.post(`/api/tyomaa/set/${opts.ownerAsiakasId}/${opts.tyomaaId}/${yyyymmdd}`, fullBody, { headers: writeFlagsToHeaders(flags) });
+    const res = await client.post(`/api/tyomaa/set/${opts.ownerAsiakasId}/${opts.tyomaaId}/${yyyymmdd}`, fullBody, { headers: writeFlagsToHeaders(flags) });
+    if (flags.dryRun)
+        return res;
+    return runWorksiteGet(client, opts.tyomaaId);
 }
 /**
  * GET /api/cli/worksite/metrics/:tyomaaId — volume / keikka-count summary plus

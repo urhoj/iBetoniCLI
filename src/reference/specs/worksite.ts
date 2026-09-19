@@ -164,7 +164,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }",
+    outputShape: "the updated worksite record (same shape as `ib worksite get`; re-read after the write so --columns sees the new value); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }",
     errors: [
       // CLIENT-side, not a backend 400 (fb#668): the empty-patch guard is a
       // `failWith(..., 4)` in the action, so nothing ever arrives over HTTP with

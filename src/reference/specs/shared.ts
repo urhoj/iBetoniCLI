@@ -403,6 +403,20 @@ export const ASIAKAS_TARGET_FLAG: CommandFlag = {
   type: "number",
   description: "Target asiakasId (alias for the positional)",
 };
+/**
+ * The resolveTarget failure for an `<asiakasId>` / `--asiakas` dual-target
+ * command. Declares `match` so a sibling exit-4 client row can never be picked
+ * for it: matchClientRowForMessage falls back to the ONLY un-matched exit-4 row,
+ * which on `ib customer settings` was the --gps-provider one — "pass ecofleet
+ * or mapon" for a missing target (fb#1844).
+ */
+export const ASIAKAS_TARGET_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "missing or invalid target",
+  meaning: "No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target",
+  remedy: "pass <asiakasId> positionally or via --asiakas <id>",
+};
 /** The write-safety `--reason` spelled REQUIRED (the v1.0.1 lifecycle rows). */
 export const REASON_REQUIRED_FLAG: CommandFlag = {
   name: "reason",

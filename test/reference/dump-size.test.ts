@@ -114,7 +114,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // 810 006 B; after the fb#1816 trims + `reopen --from-json` 810 363 B, so the cap
 // sits at 811_000 — headroom ~637 B, thin per this file's convention.
 // Bumped for the Betomik tick dashboard's two new specs (tick-report, tick-runs).
-const DUMP_LIMIT_BYTES = 815_000; // fb#1740: +`ib person fk list-source` spec
+// 815_000 → 816_000 (fb#1844/fb#1820, 2026-09-19): the shared ASIAKAS_TARGET_ERR
+// row on `customer settings/modules/operator` (hoisted once + three @id refs) and
+// `worksite update`'s outputShape now naming the re-read record. Measured
+// 815 498 B after trimming both strings once; master was already within ~100 B.
+const DUMP_LIMIT_BYTES = 816_000; // fb#1740: +`ib person fk list-source` spec
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

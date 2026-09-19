@@ -1782,6 +1782,7 @@ OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Unknown field key, or key in both --set and --unset → use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders
   exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
@@ -1833,6 +1834,7 @@ OUTPUT (JSON, stdout)
   verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  --set and --reset both given → pass at most one of --set / --reset
   exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
@@ -2041,6 +2043,7 @@ OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting }, gpsProvider:'ecofleet'|'mapon' } | write: { asiakasId, applied:{set,unset,dryRun,gpsProvider?}, state }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Unknown setting name, or name in both --set/--unset → use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu
   exit 4 (client-side)  unknown --gps-provider: <value> → pass ecofleet or mapon
   exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
@@ -16612,7 +16615,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }
+  the updated worksite record (same shape as \`ib worksite get\`; re-read after the write so --columns sees the new value); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch

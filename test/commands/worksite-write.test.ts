@@ -82,6 +82,38 @@ describe("ib worksite create/update", () => {
     expect(url.endsWith(expected)).toBe(true);
   });
 
+  // fb#1820: the set route answers with the raw mssql result (recordsets /
+  // rowsAffected), which carries no column of the row — so `--columns
+  // tyomaaId,address` exited 4 AFTER the write. The command re-reads the
+  // record so the output IS the updated worksite.
+  test("runWorksiteUpdate returns the re-read worksite record, not the raw write ack", async () => {
+    mockClient.get.mockReset();
+    mockClient.post.mockResolvedValueOnce({ recordsets: [[]], rowsAffected: [1] });
+    mockClient.get.mockResolvedValueOnce({ tyomaaId: 5151, address: "Pekanraitti 3" });
+    const result = await runWorksiteUpdate(
+      mockClient,
+      { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" },
+      { tyomaaOsoite1: "Pekanraitti 3" },
+      { reason: "fix address" }
+    );
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/get/5151");
+    expect(result).toEqual({ tyomaaId: 5151, address: "Pekanraitti 3" });
+  });
+
+  test("runWorksiteUpdate --dry-run returns the server preview and never re-reads", async () => {
+    mockClient.get.mockReset();
+    const preview = { dryRun: true, wouldUpdate: { tyomaaOsoite1: "Pekanraitti 3", omittedFieldsPreserved: true } };
+    mockClient.post.mockResolvedValueOnce(preview);
+    const result = await runWorksiteUpdate(
+      mockClient,
+      { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" },
+      { tyomaaOsoite1: "Pekanraitti 3" },
+      { dryRun: true }
+    );
+    expect(result).toBe(preview);
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+
   test("runWorksiteRefreshLocation: POST refreshLocation with write flags", async () => {
     mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteRefreshLocation(mockClient, 42, { reason: "address fix" });

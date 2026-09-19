@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
+import { ASIAKAS_TARGET_ERR, ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -274,6 +274,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     outputShape:
       "report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "Unknown field key, or key in both --set and --unset", "use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders"),
       apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
       apiErr(404, "Customer not found", "verify asiakasId"),
@@ -307,6 +308,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     outputShape:
       "verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "--set and --reset both given", "pass at most one of --set / --reset"),
       apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
       apiErr(404, "Customer not found", "verify asiakasId"),
@@ -409,8 +411,9 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     outputShape:
       "report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting }, gpsProvider:'ecofleet'|'mapon' } | write: { asiakasId, applied:{set,unset,dryRun,gpsProvider?}, state }",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "Unknown setting name, or name in both --set/--unset", "use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu"),
-      { exit: 4, origin: "client", meaning: "unknown --gps-provider: <value>", remedy: "pass ecofleet or mapon" },
+      { exit: 4, origin: "client", match: "gps-provider", meaning: "unknown --gps-provider: <value>", remedy: "pass ecofleet or mapon" },
       apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
