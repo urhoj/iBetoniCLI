@@ -1,0 +1,207 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 3a4e095..393a76f 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -135,6 +135,8 @@ Redirect layers, in the order the hint renders them:
+ - `siblingsAcceptingOption` (fb#308) — sibling commands in the same domain whose spec accepts the flag. Derived from `COMMAND_SPECS`, tier-gated, capped at 3; a leaf named after the flag wins over catalogue order. Suppressed by a same-command `didYouMean` (fb#443/449) — with one exception (fb#1731): when the guess came from `FLAG_SYNONYMS` (not spelling) AND a sibling accepts the typed flag verbatim while ALSO owning the guessed one, that sibling is reported alongside the guess, because the domain provably treats the pair as two concepts (`ib keikka` `--asiakas` = tenant vs `--customer` = the order's customer — the pre-fb#1641 dead end). A plain verbatim sibling is NOT enough: in all 22 catalogue pairs where a synonym guess coexists with one, the sibling's flag means something else (`person day set --text` is a note body), so it would be noise.
+ - `siblingsAcceptingSynonym` (fb#388) — the same scan retried under synonym spellings, for when the capability lives on a sibling under a *different* name. Sets `acceptedAs` on the envelope, because those commands do NOT accept the rejected spelling and `acceptedBy` alone would misreport that. Suppressed when a same-command did-you-mean already fired.
+ - `GROUP_SIBLING_DOMAINS` (fb#343) — curated `company`↔`customer` pair (two views of one `asiakas`). Curated, not derived: nearly every domain owns a `get`, so a scan would suggest noise.
++- `nestedGroupTwins` (fb#1640) — the same-named GROUP under a sibling subgroup owns the verb (`ib jerry request resend` → `ib jerry admin request resend`). Derived; needs a nested group (depth ≥ 3), so it never overlaps the curated pairs.
++- `ROOT_FEATURE_DOMAINS` (fb#1708) — a ROOT token that names a FEATURE, not a domain: `ib grid` → `ib palkki`, with a `why` naming the palkki/schedule/keikka split. Curated, root-only (under a group the token is a verb guess), tier-gated on whole-domain visibility. The three curated layers are disjoint by depth, so they are concatenated without ordering.
+ - `descendantsOwningVerb` (fb#379, fb#383) — the verb lives in a child subgroup (`ib keikka assign` → `ib keikka drivers assign`). At the ROOT it returns the **complete** owner list or nothing (`ROOT_MAX_OWNERS = 4`), never a truncation — a generic verb like `list` owns ~28 leaves and three arbitrary ones would be noise.
+ - `descendantsOwningCompoundVerb` (fb#1020, fb#1154) — the token is COMPOUND (`company-search`). Three rules, in order: **A.** spelled with spaces it IS a visible path (`ib jerry admin-request-stats` → `ib jerry admin request stats`) → that path, whatever its depth; **B.** the prefix or the verb names a visible child of this group (`ib keikka drivers-list` → the real `drivers` subgroup; `ib customer company-list` → the direct `list`) → SILENT, and `compoundChildOf` makes that child the `didYouMean` (edit distance alone landed on `dead-list`); **C.** otherwise the deep scan, answering only on a SINGLE in-group owner (`ib jerry company-search` → `ib jerry admin search`) — a compound token is a weaker signal than a real verb, and the ambiguous pairs are all generic CRUD (`ib jerry ~ list` ×5). Before fb#1154 the layer had only rule C and so inherited the depth≥2 rule from the exact layer, which meant a DIRECT child could never be the answer and the actionable sentence aimed at a deep owner over the obvious sibling in 7 catalogue cases.
+ - `topLevelDomainRedirect` (fb#386) — the unknown token IS a top-level domain (`ib dev task list` → `ib task list`, `ib keikka glossary` → `ib glossary`). Derived, and noise-free by exact domain-name equality rather than a verb scan; domains come from `commandDomains(COMMAND_SPECS)`, i.e. the CANONICAL paths, so the re-homed `schema`/`ai`/`changelog` are correctly not domains and the hidden back-compat aliases can never be suggested. **Ranked below every in-group verb layer on purpose** — 8 catalogue pairs collide with `descendantsOwningVerb` and the in-group answer is right in all 8 (`ib jerry stats` → `ib jerry admin request stats`, not the `ib stats` domain) — but ABOVE the positional layer: an exact domain-name match outranks an argument-name heuristic (fb#1154 found the two evaluated in the other order, with comments claiming otherwise; no catalogue token distinguishes them today). Also yields when a visible child literally EXTENDS the token (exactly 3: `ib auth log`→`login`, `ib customer worksite`→`worksites`, `ib legal version`→`versions`). Tier-gated on WHOLE-domain visibility, so a standard caller is never told the developer-only `task` domain exists. The one `availableElsewhere` entry that is a GROUP path, not a leaf.
+@@ -182,7 +184,7 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
+ 
+ `src/commands/feedback/` — when the AI hits friction using `ib`, it files a freetext note so the CLI can be improved. `create` (any user) `list`/`get`/`resolve` (developer-only) over `puminet5api` `/api/feedback` (a **quiet** sink: no GitHub issue, no admin broadcast — deliberately separate from `bugReport`; developers/sysadmins who opted in — person-setting 51, toggled on betoni.online `/profile` — get a push notification). A developer-gated analyzer skill (`code/.claude/skills/analyze-cli-feedback`) reads them back and closes the loop.
+ 
+-**Relations (2026-08-31):** rows link pairwise via `link <id> <relatedId> --type duplicate|same-root-cause|related|blocks` / `unlink` (either direction, one link per pair, 409 on an existing pair). `cluster <id>` returns the FIX-TOGETHER component (`duplicate`+`same-root-cause` edges only; `related`/`blocks` are context); `relations`/`related` are its discovery aliases, since the write side and every doc say "relations" and edit distance cannot bridge that to `cluster` (fb#1420/#1436) — all four edge types on one row are `related[]` on `get --full`. `get` always carries `related: []` on a relations-aware backend (key absent = older backend). `resolve --also <ids>` multi-resolves explicitly named rows with a client-side hold-guard (a row held by another agent, or "mine" only via the unproven derived identity — fb#901 — is skipped, never written). All developer-gated; backend half in `puminet5api` `modules/feedback/` + `dbo.cliFeedbackRelation`. The `groom-feedback-relations` skill (daily routine) maintains the links.
++**Relations (2026-08-31):** rows link pairwise via `link <id> <relatedId> --type duplicate|same-root-cause|related|blocks` / `unlink` (either direction, one link per pair, 409 on an existing pair). `cluster <id>` returns the FIX-TOGETHER component (`duplicate`+`same-root-cause` edges only; `related`/`blocks` are context); `relations`/`related` are its discovery aliases, since the write side and every doc say "relations" and edit distance cannot bridge that to `cluster` (fb#1420/#1436) — all four edge types on one row are `related[]` on `get --full`. `get` always carries `related: []` on a relations-aware backend (key absent = older backend). `resolve --also <ids>` multi-resolves explicitly named rows with a client-side hold-guard (a row held by another agent, or "mine" only via the unproven derived identity — fb#901 — is skipped, never written). `reopen <id> [note]` puts a closed row back in the queue — it IS `resolve --status open`, given its own verb because that spelling reads as the opposite of the intent and `update` has no `--status` (fb#1363); its note takes `--from-json` like resolve's. All developer-gated; backend half in `puminet5api` `modules/feedback/` + `dbo.cliFeedbackRelation`. The `groom-feedback-relations` skill (daily routine) maintains the links.
+ 
+ **`meta` read-only exemption:** `create` is sent with `client.post(..., { meta: true })`. In `src/api/client.ts` the read-only write-lock and the acting-as diagnostic both skip `meta` requests — so an agent running `--read-only` / `IB_READ_ONLY` can *still* file feedback (it's not a domain mutation). `meta` is the ONLY write-lock bypass; use it only for non-mutating diagnostics. `resolve` is a real write (PUT, blocked under read-only). `--dry-run` on `create`/`resolve` resolves **client-side** (prints the payload, never sends) — not the server `X-Dry-Run`. Specs keep `writeFlags:false` (custom client-side dry-run; the standard write-safety block would mis-document them) but set `mutates:true`, so `ib commands` classifies them as writes via `mutates ?? !!writeFlags` — `--mutations` lists them and `--reads` excludes them. **Deploy-gated**: `/api/feedback` + the `cliFeedback` table must deploy first.
+ 
+diff --git a/src/commands/changelog/index.ts b/src/commands/changelog/index.ts
+index 2afa78f..d07acfe 100644
+--- a/src/commands/changelog/index.ts
++++ b/src/commands/changelog/index.ts
+@@ -1002,7 +1002,7 @@ export function warnFeedbackUnlinkEffects(
+     else if (typeof feedbackStatus === "string")
+       warn(
+         `[ib] note: ${at}the link is gone, but the row is still \`${feedbackStatus}\` — unlinking never changes a status. ` +
+-          `If it was closed by the link you just removed, reopen it with \`ib dev feedback resolve ${typeof feedbackId === "number" ? feedbackId : "<id>"} --status open\`.`
++          `If it was closed by the link you just removed, reopen it with \`ib dev feedback reopen ${typeof feedbackId === "number" ? feedbackId : "<id>"}\`.`
+       );
+   }
+ }
+@@ -1772,7 +1772,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
+         name: "unlink",
+         type: "string",
+         description:
+-          "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback (fb#585), which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback resolve <id> --status open`).",
++          "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback (fb#585), which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback reopen <id>`).",
+       },
+       {
+         name: "no-resolve",
+diff --git a/src/commands/feedback/index.ts b/src/commands/feedback/index.ts
+index c380cc0..689fb43 100644
+--- a/src/commands/feedback/index.ts
++++ b/src/commands/feedback/index.ts
+@@ -1621,6 +1621,11 @@ const RESOLVE_FROM_JSON: FromJsonConfig = {
+   nonPayload: new Set(["fromJson", "dryRun", "full", "also", "help"]),
+ };
+ 
++/** `reopen`'s payload is the note alone — the status is the command. */
++const REOPEN_FROM_JSON: FromJsonConfig = {
++  nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
++};
++
+ /**
+  * --note / --reason / --resolution are aliases for the same stored note. When a
+  * caller passes more than one with DIFFERENT values — natural for an AI, since
+@@ -2365,15 +2370,22 @@ export function registerFeedbackCommands(
+   // when it cannot find the path is to leave a half-fixed row marked applied.
+   f.command("reopen <id> [note]")
+     .option("--note <text>")
++    .option("--from-json <file>")
+     .option("--dry-run")
+     .option("--full")
+     .action(
+       guarded(async (
+         idStr: string,
+         notePositional: string | undefined,
+-        opts: { note?: string; dryRun?: boolean; full?: boolean }
++        opts: { note?: string; fromJson?: string; dryRun?: boolean; full?: boolean },
++        cmd: Command
+       ) => {
+         const id = parseRefId(idStr, "feedback", "reopen");
++        // The note is prose — the shell-quoting hazard resolve's --from-json
++        // exists for applies here verbatim (fb#1816). Same config as resolve;
++        // a `status` key in the file is rejected like any other unknown key,
++        // because this command's whole point is that the status is fixed.
++        applyFromJson(cmd, opts as Record<string, unknown>, REOPEN_FROM_JSON);
+         warnIfShellMangled({ note: notePositional ?? opts.note });
+         const client = await getClient();
+         writeJson(
+diff --git a/src/output/unknownCommand.ts b/src/output/unknownCommand.ts
+index 34fdaf4..c0f7e20 100644
+--- a/src/output/unknownCommand.ts
++++ b/src/output/unknownCommand.ts
+@@ -56,17 +56,13 @@ export const GROUP_SIBLING_DOMAINS: Record<string, SiblingGroup> = {
+ };
+ 
+ /**
+- * ROOT tokens that name a FEATURE rather than a domain, mapped to the domain
+- * group that owns most of it (fb#1708). `grid` is what the day-driver
+- * schedule is called everywhere — GridKeikkaEditor, gridStyle, gridScope, the
+- * glossary — so it is the natural first guess for `ib grid`, and a cron hit
+- * it verbatim; but the functionality is split across `palkki` (the schedule
+- * blocks the grid renders), `schedule` and `keikka`, none named grid.
+- * Curated, not derived: no spec path contains the token, so every derived
+- * layer is silent and the caller gets the bare 32-domain list. The `why` names
+- * the split so the caller can pick the OTHER domain when palkki is not it.
++ * ROOT tokens that name a FEATURE rather than a domain, mapped to the group
++ * that owns most of it (fb#1708). `grid` is the codebase's name for the
++ * day-driver schedule, so `ib grid` is the natural first guess (a cron hit it
++ * verbatim) — but no spec path contains the token, so every derived layer is
++ * silent. Curated; the `why` names the split so the caller can pick another.
+  */
+-export const ROOT_FEATURE_DOMAINS: Record<string, SiblingGroup> = {
++const ROOT_FEATURE_DOMAINS: Record<string, SiblingGroup> = {
+   grid: {
+     domain: "palkki",
+     why: "there is no `grid` domain — the Grid (day-driver schedule) is split across `ib palkki` (the schedule blocks/bars it renders), `ib schedule` and `ib keikka`",
+@@ -78,7 +74,7 @@ export const ROOT_FEATURE_DOMAINS: Record<string, SiblingGroup> = {
+  * at `tier`. Only the root: under any group the token is a verb guess, not a
+  * feature name, and the in-group layers own it.
+  */
+-export function rootFeatureRedirect(group: string, token: string, tier: CallerTier): SiblingGroupMatch[] {
++function rootFeatureRedirect(group: string, token: string, tier: CallerTier): SiblingGroupMatch[] {
+   if (group !== "ib") return [];
+   const feature = ROOT_FEATURE_DOMAINS[token.toLowerCase()];
+   if (!feature || fullyHiddenDomains(tier).has(feature.domain)) return [];
+@@ -520,8 +516,9 @@ export function buildUnknownCommandEnvelope(
+   // in-group list is only context. Rendered with the caller's remaining args
+   // (`ib customer get 8`, not `ib customer get`) so it is copy-paste runnable;
+   // cmd.args holds the bad token followed by whatever came after it.
+-  // The two are disjoint by depth (curated pairs are depth-2 domains, twins
+-  // need a nested group), so a plain concat never double-answers.
++  // The three are disjoint by depth (curated pairs are depth-2 domains, twins
++  // need a nested group, feature names fire only at the root), so a plain
++  // concat never double-answers.
+   const curated = [
+     ...siblingGroupsWithCommand(group, unknownToken, tier),
+     ...nestedGroupTwins(group, unknownToken, tier),
+diff --git a/src/reference/domain.ts b/src/reference/domain.ts
+index f9802a4..0da804b 100644
+--- a/src/reference/domain.ts
++++ b/src/reference/domain.ts
+@@ -152,7 +152,7 @@ export const TOPICS: Topic[] = [
+     id: "shell-quoting",
+     title: "Shell quoting (PowerShell + bash): prose via --from-json, clear a field with --flag=",
+     body:
+-      'Windows PowerShell mangles native-exe arguments in THREE ways, and bash/Git Bash adds TWO of its own: item 4 defeats the --from-json escape hatch the first three are fixed with, so read it before trusting a pipe; item 5 is the bash twin of item 2 and corrupts prose SILENTLY, so a caller who skipped this topic because it says "Windows" is exactly the caller it bites.Two of them corrupt long-form PROSE (feedback reports, changelog entries, resolution notes); the third eats an EMPTY-STRING argument, which is how you CLEAR a field. Only one of the three is reliably loud.\n\n1. DOUBLE QUOTES — LOUD. PowerShell splits a native argument on its INNER double-quotes, and prose is exactly the text most likely to contain them (quoted identifiers, JSON fragments, error strings). The CLI then sees several positionals and exits 4 with "too many arguments" — or, when no split fragment starts with `-`, silently stores text TRUNCATED at the first quote (destructive on update/resolve commands, which overwrite the stored row). (fb#299/#300/#327/#332)\n\n2. BACKTICKS — SILENT. The backtick is PowerShell\'s ESCAPE character, so inside a double-quoted argument it is consumed and its sequence EXPANDED before the CLI ever sees it: `r becomes a carriage return, `n a newline, `t a tab. A markdown `resolve` is therefore stored as CR + "esolve" — exit code 0, no warning, and the corrupted text is now the permanent record. This is the more dangerous half precisely because nothing fails, and backticks are how anyone writes an identifier, a flag name or a code fragment in prose. Note the damage is an injected CONTROL CHARACTER, not a literal backslash. (fb#552)\n\nFIX FOR 1 AND 2: pass the whole payload via --from-json <file|-> (sidesteps argv entirely; required flags may come from the JSON). PER-COMMAND, not universal: every command carrying a --body payload has it, and so do the prose writers (changelog/feedback/message/notification/person notify/glossary/task/sales/worksite/customer/keikka/sijainti/ohje), but a command with only typed flags and no payload may not — check `ib <cmd> --help`, which lists it when present. Where it is absent the equals form and short values are the fallback. Stripping the quotes or backticks instead silently degrades the permanent record. The CLI warns on stderr when it detects the signature of an eaten backtick, but detection is best-effort — --from-json is the guarantee. With one qualification: a FILE is byte-exact, while `-` is only as faithful as the pipe feeding it (item 4).\n\n3. EMPTY STRING — LOUD OR SILENT, depending on what follows it. PS 5.1 DROPS an empty-string argument entirely when calling a native exe ([string]::Empty and $null go the same way), and the flag then STEALS the next token as its value. Three outcomes, and only the first two announce themselves: (a) the next token is a ROOT global such as --pretty — Commander will not consume a known option as an option-argument and exits 4 with "argument missing"; (b) a positional is left stranded — `--email "" --asiakas 1380` becomes `--email --asiakas` plus a stray 1380 and exits 4 with "too many arguments", the shape fb#634 was filed from; (c) the next token is a LOCAL flag or a bare word — it is consumed as the value and NOTHING fails. `--reason "" --dry-run` yields reason = the literal string "--dry-run" with the dry-run silently swallowed, so a rehearsal becomes a REAL write whose audit trail records a flag name; `--email "" --dry-run` persists "--dry-run" into the field you meant to clear. (fb#634)\n\nFIX FOR 3: use the EQUALS form — `--email=`, nothing after the sign. PowerShell passes it through intact and it means exactly the same thing in bash, so it is the one clear-a-field syntax that works in every shell; prefer it over `--email ""` everywhere, including in bash. Where the convention applies: --comment/--memo/--email and siblings on worksite/person/customer update, --synonyms/--related/--entity on glossary set, --email on jerry provider-settings set, --parked-until on jerry prospect, --title on message thread, --summary/--detail on reference detail set, --instructions/--skill/--agent on task update, --img on ohje update, and --with on the textEdit trio (where empty deletes the matched text). NOT `sijainti update`, which clears via an explicit JSON null in --body rather than an empty typed flag. The CLI now REFUSES any flag whose value is another flag name that arrived as the next separate token, so the silent shape above exits 4 instead of writing. If you genuinely mean a value that looks like a flag, the equals form passes it through: `--command=--dry-run`.\n\n4. GIT BASH BACKSLASH COLLAPSE (a HEREDOC into `--from-json -`) — SILENT until the JSON fails to parse. Items 1-3 are PowerShell; this one bites the shell you reach for to ESCAPE PowerShell. Piping a quoted heredoc into `-` on Windows Git Bash delivers BOTH an escaped `\\\\` and a lone `\\` to the process as ONE backslash, so an escaped backslash cannot be expressed that way at all: the JSON arrives with a bare `\\H`, JSON.parse calls it a bad escape, and the payload you authored was valid. Measured 2026-08-17, both spellings, same single byte. The same bytes written to a FILE survive intact and parse. So: any payload containing a backslash (Windows paths, regexes, `\\n` inside a string) goes in a FILE — `--from-json ./entry.json`, never `--from-json -` off a heredoc. A pipe is fine for backslash-free prose, which is most of it. (fb#705)\n\n5. BASH / GIT BASH BACKTICKS, $( ) AND $VAR INSIDE DOUBLE QUOTES — SILENT. In bash a double-quoted string is NOT literal: a `backtick span` and $( ) are COMMAND SUBSTITUTION and $name is variable expansion. The shell RUNS the span (printing e.g. `descriptions: command not found` on stderr — easy to miss under the CLI\'s own output), splices its usually-empty output into the argument, and hands the CLI a description with the backticked words DELETED; a span containing a semicolon or a space can even run part of your own prose as a separate command. Exit 0, a feedbackId returned, the stored text quietly missing words — the same shape as item 2, minus the control character, so the eaten-backtick warning cannot see it. Markdown backticks are how an AI writes prose ABOUT code, so any feedback row, changelog entry, glossary definition, legal draft or ohje text filed from bash is one backtick away from this. (fb#1499)\n\nFIX FOR 5: the same --from-json <file|-> as items 1-2 (single quotes around a heredoc delimiter — <<\'EOF\' — keep the file contents literal); or single-quote the argument (\'…\' is literal in bash, but then it cannot contain an apostrophe); or escape each backtick and dollar with a backslash. Item 4 still applies to the pipe form when the prose contains a backslash.',
++      'Windows PowerShell mangles native-exe arguments in THREE ways, and bash/Git Bash adds TWO of its own: item 4 defeats the --from-json escape hatch the first three are fixed with, so read it before trusting a pipe; item 5 is the bash twin of item 2 and corrupts prose SILENTLY, so a caller who skipped this topic because it says "Windows" is exactly the caller it bites. Two of them corrupt long-form PROSE (feedback reports, changelog entries, resolution notes); the third eats an EMPTY-STRING argument, which is how you CLEAR a field. Only one of the three is reliably loud.\n\n1. DOUBLE QUOTES — LOUD. PowerShell splits a native argument on its INNER double-quotes, and prose is exactly the text most likely to contain them (quoted identifiers, JSON fragments, error strings). The CLI then sees several positionals and exits 4 with "too many arguments" — or, when no split fragment starts with `-`, silently stores text TRUNCATED at the first quote (destructive on update/resolve commands, which overwrite the stored row). (fb#299/#300/#327/#332)\n\n2. BACKTICKS — SILENT. The backtick is PowerShell\'s ESCAPE character, so inside a double-quoted argument it is consumed and its sequence EXPANDED before the CLI ever sees it: `r becomes a carriage return, `n a newline, `t a tab. A markdown `resolve` is therefore stored as CR + "esolve" — exit code 0, no warning, and the corrupted text is now the permanent record. This is the more dangerous half precisely because nothing fails, and backticks are how anyone writes an identifier, a flag name or a code fragment in prose. Note the damage is an injected CONTROL CHARACTER, not a literal backslash. (fb#552)\n\nFIX FOR 1 AND 2: pass the whole payload via --from-json <file|-> (sidesteps argv entirely; required flags may come from the JSON). PER-COMMAND, not universal: every command carrying a --body payload has it, and so do the prose writers (changelog/feedback/message/notification/person notify/glossary/task/sales/worksite/customer/keikka/sijainti/ohje), but a command with only typed flags and no payload may not — check `ib <cmd> --help`, which lists it when present. Where it is absent the equals form and short values are the fallback. Stripping the quotes or backticks instead silently degrades the permanent record. The CLI warns on stderr when it detects the signature of an eaten backtick, but detection is best-effort — --from-json is the guarantee. With one qualification: a FILE is byte-exact, while `-` is only as faithful as the pipe feeding it (item 4).\n\n3. EMPTY STRING — LOUD OR SILENT, depending on what follows it. PS 5.1 DROPS an empty-string argument entirely when calling a native exe ([string]::Empty and $null go the same way), and the flag then STEALS the next token as its value. Three outcomes, and only the first two announce themselves: (a) the next token is a ROOT global such as --pretty — Commander will not consume a known option as an option-argument and exits 4 with "argument missing"; (b) a positional is left stranded — `--email "" --asiakas 1380` becomes `--email --asiakas` plus a stray 1380 and exits 4 with "too many arguments", the shape fb#634 was filed from; (c) the next token is a LOCAL flag or a bare word — it is consumed as the value and NOTHING fails. `--reason "" --dry-run` yields reason = the literal string "--dry-run" with the dry-run silently swallowed, so a rehearsal becomes a REAL write whose audit trail records a flag name; `--email "" --dry-run` persists "--dry-run" into the field you meant to clear. (fb#634)\n\nFIX FOR 3: use the EQUALS form — `--email=`, nothing after the sign. PowerShell passes it through intact and it means exactly the same thing in bash, so it is the one clear-a-field syntax that works in every shell; prefer it over `--email ""` everywhere, including in bash. Where the convention applies: --comment/--memo/--email and siblings on worksite/person/customer update, --synonyms/--related/--entity on glossary set, --email on jerry provider-settings set, --parked-until on jerry prospect, --title on message thread, --summary/--detail on reference detail set, --instructions/--skill/--agent on task update, --img on ohje update, and --with on the textEdit trio (where empty deletes the matched text). NOT `sijainti update`, which clears via an explicit JSON null in --body rather than an empty typed flag. The CLI now REFUSES any flag whose value is another flag name that arrived as the next separate token, so the silent shape above exits 4 instead of writing. If you genuinely mean a value that looks like a flag, the equals form passes it through: `--command=--dry-run`.\n\n4. GIT BASH BACKSLASH COLLAPSE (a HEREDOC into `--from-json -`) — SILENT until the JSON fails to parse. Items 1-3 are PowerShell; this one bites the shell you reach for to ESCAPE PowerShell. Piping a quoted heredoc into `-` on Windows Git Bash delivers BOTH an escaped `\\\\` and a lone `\\` to the process as ONE backslash, so an escaped backslash cannot be expressed that way at all: the JSON arrives with a bare `\\H`, JSON.parse calls it a bad escape, and the payload you authored was valid. Measured 2026-08-17, both spellings, same single byte. The same bytes written to a FILE survive intact and parse. So: any payload containing a backslash (Windows paths, regexes, `\\n` inside a string) goes in a FILE — `--from-json ./entry.json`, never `--from-json -` off a heredoc. A pipe is fine for backslash-free prose, which is most of it. (fb#705)\n\n5. BASH / GIT BASH BACKTICKS, $( ) AND $VAR INSIDE DOUBLE QUOTES — SILENT. In bash a double-quoted string is NOT literal: a `backtick span` and $( ) are COMMAND SUBSTITUTION and $name is variable expansion. The shell RUNS the span (a `command not found` on stderr is easy to miss under the CLI\'s own output), splices its usually-empty output into the argument, and hands the CLI a description with the backticked words DELETED; a span with a space or semicolon can even run part of your own prose as a command. Exit 0, a feedbackId returned, the stored text quietly missing words — the same shape as item 2, minus the control character, so the eaten-backtick warning cannot see it. Markdown backticks are how an AI writes prose ABOUT code, so every prose-taking write is one backtick away from this. (fb#1499)\n\nFIX FOR 5: the same --from-json <file|-> as items 1-2 (single quotes around a heredoc delimiter — <<\'EOF\' — keep the file contents literal); or single-quote the argument (\'…\' is literal in bash, but then it cannot contain an apostrophe); or escape each backtick and dollar with a backslash. Item 4 still applies to the pipe form when the prose contains a backslash.',
+   },
+   {
+     id: "severity",
+diff --git a/src/reference/specs/dev-feedback.ts b/src/reference/specs/dev-feedback.ts
+index 5c778f3..7cd3540 100644
+--- a/src/reference/specs/dev-feedback.ts
++++ b/src/reference/specs/dev-feedback.ts
+@@ -284,7 +284,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
+       { name: "note", type: "string", required: false, description: "The resolution note, positionally — the same field as --note, so `resolve 42 --status applied -- \"…\"` works exactly like `--note \"…\"`. Mirrors its sibling `ib dev feedback create <description>`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once." },
+     ],
+     flags: [
+-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). To put a CLOSED row back in the queue, `ib dev feedback reopen <id>` is the readable spelling of --status open (fb#1363)", allowed: [...FEEDBACK_STATUSES] },
++      { name: "status", type: "string", description: "open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). Reopen a closed row with `ib dev feedback reopen <id>` (fb#1363)", allowed: [...FEEDBACK_STATUSES] },
+       { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
+       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
+       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
+@@ -339,7 +339,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
+       { name: "relatedId", type: "number", description: "The OTHER feedbackId to link to" },
+     ],
+     flags: [
+-      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. There is NO follow-up/successor type (fb#1638): a row filed against another's shipped fix, split out of it, or found while verifying it is `related`, with the direction and the predecessor named in --note — `duplicate`/`same-root-cause` would pull it into the wrong fix-together cluster", allowed: [...FEEDBACK_RELATION_TYPES] },
++      { name: "type", type: "string", required: true, description: "duplicate/blocks are DIRECTED (id→relatedId); same-root-cause/related are symmetric. No follow-up/successor type (fb#1638): a row filed against another's shipped fix is `related`, predecessor named in --note — not duplicate/same-root-cause, which would cluster it into the wrong fix", allowed: [...FEEDBACK_RELATION_TYPES] },
+       { name: "note", type: "string", description: "Optional free-text note stored on the relation" },
+       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+     ],
+@@ -384,7 +384,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
+   {
+     command: "ib dev feedback reopen",
+     description:
+-      "Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of `resolve --status open` (developer-only). Exists because the verb that sets status is `resolve`, so 'reopen' reads as its opposite and was guessed as `update --status open` / a `reopen` verb, neither of which existed (fb#1363). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.",
++      "Put a closed (applied/dismissed) feedback row BACK in the active queue — the readable spelling of `resolve --status open`, which reads as the opposite of the intent (fb#1363; developer-only). Same write as resolve: blocked under --read-only (exit 3); --dry-run previews client-side.",
+     permissions: ["isSystemAdmin or isDeveloper"],
+     tier: "developer",
+     mutates: true,
+@@ -395,6 +395,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
+     ],
+     flags: [
+       { name: "note", type: "string", description: "Same as the positional" },
++      { name: "from-json", type: "string", description: "Read the note from a JSON object file (or - for stdin): { note }. Shell-safe for prose with quotes/backticks (`ib help shell-quoting`); a `status` key is rejected — the status IS this command" },
+       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
+       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
+     ],
+@@ -504,7 +505,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
+       intParseErr("--ttl-hours", "pass an integer 1-24"),
+       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+-      apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback resolve <id> --status open` first if it should not be", "already closed"),
++      apiErr(409, "Already closed", "the row is done — read the linked entry with `ib dev changelog get <id>`; reopen it with `ib dev feedback reopen <id>` first if it should not be", "already closed"),
+       apiErr(409, "Already claimed by another session", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway", "claimed by"),
+       apiErr(500, "Backend error", "retry with --verbose"),
+     ],
+diff --git a/src/reference/specs/dev-schema.ts b/src/reference/specs/dev-schema.ts
+index 33bcff1..b0350f6 100644
+--- a/src/reference/specs/dev-schema.ts
++++ b/src/reference/specs/dev-schema.ts
+@@ -207,7 +207,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
+       {
+         command: "ib dev schema query",
+         description:
+-          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY — its login sees only a fraction of the ROWS in the routine-bearing catalog views, and OBJECT_DEFINITION() returns NULL (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
++          "Run ONE read-only SELECT (or WITH … SELECT) against the live DB — the ad-hoc path for data-SHAPE questions (COUNT, GROUP BY, histograms, row-existence probes) that `schema tables/table` cannot answer. NOT authoritative for whether an OBJECT exists, nor for its BODY (see NOTES). Read-over-POST: works under --read-only. Developer-only.",
+         permissions: DEV_PERMS,
+         tier: "developer",
+         args: [{ name: "sql", type: "string", required: false, description: "The SELECT statement, positionally — same field as --sql; giving both is fine when they agree (exit 4 if they disagree)." }],

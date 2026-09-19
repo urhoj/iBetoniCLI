@@ -1,0 +1,286 @@
+diff --git a/src/auth/login.ts b/src/auth/login.ts
+index 10f894b..6041fd3 100644
+--- a/src/auth/login.ts
++++ b/src/auth/login.ts
+@@ -31,8 +31,12 @@ interface TokenResponse {
+  *   6. Decode the JWT to extract personId / ownerAsiakasId / email / tenant name.
+  *   7. Persist the credentials profile to disk.
+  *   8. Print a Finnish-style confirmation to stderr (stdout stays parseable).
++ *
++ * Returns the minted access token so a caller can print it (`--print-token`,
++ * fb#1513) — the JWT itself is never written to stderr/disk logs, only handed
++ * back for the caller to decide whether to surface it.
+  */
+-export async function performLogin(opts: LoginOptions): Promise<void> {
++export async function performLogin(opts: LoginOptions): Promise<{ token: string }> {
+   const clientId = opts.clientId ?? "ib-cli";
+   const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
+   const { verifier, challenge, method } = generatePkcePair();
+@@ -167,4 +171,6 @@ export async function performLogin(opts: LoginOptions): Promise<void> {
+   const who = payload.email ?? "user";
+   const where = payload.ownerAsiakasName ?? `tenant ${payload.ownerAsiakasId}`;
+   process.stderr.write(`Logged in as ${who} at ${where}.\n`);
++
++  return { token: tokenBody.access_token };
+ }
+diff --git a/src/commands/_shared/fromJson.ts b/src/commands/_shared/fromJson.ts
+index 6dd792b..34aa8e6 100644
+--- a/src/commands/_shared/fromJson.ts
++++ b/src/commands/_shared/fromJson.ts
+@@ -143,12 +143,20 @@ export function normalizeFromJson(
+       continue;
+     }
+     if (csv.has(key) && Array.isArray(value)) {
+-      if (!value.every((v) => typeof v === "string")) problems.push(`"${rawKey}" array must contain only strings`);
+-      else out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
++      // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) also
++      // tolerates numbers INSIDE the array (fb#1627) — [1621, 1622] is the
++      // natural JSON spelling of several ids when the file is templated off a
++      // read row whose column is itself a number, and the scalar path already
++      // accepted a bare number since fb#576; the array path had not caught up.
++      const tolerant = numericTolerant.has(key);
++      const isAcceptable = (v: unknown) => typeof v === "string" || (tolerant && typeof v === "number" && Number.isFinite(v));
++      if (!value.every(isAcceptable))
++        problems.push(`"${rawKey}" array must contain only strings${tolerant ? " or numbers" : ""}`);
++      else out[key] = value.map((v) => String(v).trim()).filter(Boolean).join(",");
+       continue;
+     }
+     // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) round-trips
+-    // a JSON number too — the natural shape when the JSON was templated off a
++    // a bare JSON number too — the natural shape when the JSON was templated off a
+     // read row whose column is itself a number (changelog list's feedbackId).
+     // Deliberately NOT every csvFields entry: see numericTolerantCsvFields' doc
+     // for why a bare number is a real error for files/repo/sha/commit.
+diff --git a/src/commands/auth/index.ts b/src/commands/auth/index.ts
+index 4c256fd..d4c3300 100644
+--- a/src/commands/auth/index.ts
++++ b/src/commands/auth/index.ts
+@@ -51,13 +51,18 @@ export function registerAuthCommands(
+     // during parse (Commander recognises root options anywhere), so a local
+     // duplicate silently fell back to its default — `auth login --endpoint
+     // <staging>` authorized against PROD. Read the global instead.
++    .option(
++      "--print-token",
++      "Print the minted JWT on stdout as JSON ({ token }) for use outside the CLI (curl, browser testing) — e.g. scripting a second endpoint's session without a second interactive login"
++    )
+     .action(
+-      guarded(async () => {
++      guarded(async (opts: { printToken?: boolean }) => {
+         try {
+-          await performLogin({
++          const { token } = await performLogin({
+             endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
+             credentialsPath: defaultCredentialsPath(),
+           });
++          if (opts.printToken) writeJson({ token });
+         } catch (e) {
+           // Anything that goes wrong in the OAuth flow is an auth failure —
+           // re-raised as a CliError so `guarded` reports it, instead of the old
+diff --git a/src/reference/specs/auth.ts b/src/reference/specs/auth.ts
+index 3f339df..5c597d9 100644
+--- a/src/reference/specs/auth.ts
++++ b/src/reference/specs/auth.ts
+@@ -19,9 +19,14 @@ export const AUTH_SPECS: CommandSpec[] = [
+         default: "https://api.ibetoni.fi",
+         description: "API endpoint to authorize against",
+       },
++      {
++        name: "print-token",
++        type: "boolean",
++        description: "Also print the minted JWT as { token } (curl/browser use)",
++      },
+     ],
+     outputShape:
+-      "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written",
++      "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written; stdout: nothing, or { token } with --print-token",
+     errors: [
+       {
+         origin: "client",
+@@ -46,7 +51,7 @@ export const AUTH_SPECS: CommandSpec[] = [
+     ],
+     examples: [
+       "ib auth login",
+-      "ib auth login --endpoint https://api-staging.ibetoni.fi",
++      "ib auth login --endpoint https://api-staging.ibetoni.fi --print-token",
+     ],
+   },
+   {
+diff --git a/src/reference/specs/betomik-orderbook.ts b/src/reference/specs/betomik-orderbook.ts
+index 1bbc048..482627a 100644
+--- a/src/reference/specs/betomik-orderbook.ts
++++ b/src/reference/specs/betomik-orderbook.ts
+@@ -49,6 +49,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
+     flags: [],
+     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
+     outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>",
++    prettyColumns: ["importRunId", "jobDate", "plate", "vehicleLabel", "driverName", "driverMatchStatus", "sourceType", "m3", "reviewStatus"],
+     notes: [
+       "rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via `review`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see `propose`/`ai-stats`.",
+     ],
+diff --git a/src/reference/specs/shared.ts b/src/reference/specs/shared.ts
+index e0657d5..c4b6ebf 100644
+--- a/src/reference/specs/shared.ts
++++ b/src/reference/specs/shared.ts
+@@ -448,5 +448,5 @@ export const FROM_JSON_FLAGS_FLAG: CommandFlag = {
+   name: "from-json",
+   type: "string",
+   description:
+-    "Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.",
++    "Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.",
+ };
+diff --git a/test/auth/login.test.ts b/test/auth/login.test.ts
+index c434457..7576093 100644
+--- a/test/auth/login.test.ts
++++ b/test/auth/login.test.ts
+@@ -81,12 +81,15 @@ describe("performLogin", () => {
+     });
+ 
+     const credentialsPath = join(dir, "credentials.json");
+-    await performLogin({
++    const result = await performLogin({
+       endpoint: "https://api.example.com",
+       credentialsPath,
+       timeoutMs: 5000,
+     });
+ 
++    // fb#1513: the resolved token is what `--print-token` surfaces.
++    expect(result.token).toBe(fakeJwt);
++
+     // Verify the browser was launched with a valid authorize URL.
+     expect(mockOpen).toHaveBeenCalledTimes(1);
+     const authorizeUrl = new URL(mockOpen.mock.calls[0][0] as string);
+diff --git a/test/commands/changelog.test.ts b/test/commands/changelog.test.ts
+index 679126b..52ee343 100644
+--- a/test/commands/changelog.test.ts
++++ b/test/commands/changelog.test.ts
+@@ -1082,6 +1082,26 @@ describe("changelog add/update --from-json (fb#300)", () => {
+     expect(normalizeChangelogJson({ feedback: 357 }, addKeyMap())).toEqual({ feedback: "357" });
+   });
+ 
++  // fb#1627: [1621, 1622] is the natural JSON spelling of several ids — the
++  // scalar path already tolerated a bare number (fb#576 above); the array path
++  // had not caught up and rejected the whole array as "must contain only strings".
++  test("an array of JSON numbers on --feedback is accepted (fb#1627)", () => {
++    expect(normalizeChangelogJson({ feedback: [1621, 1622, 1623] }, addKeyMap()))
++      .toEqual({ feedback: "1621,1622,1623" });
++  });
++
++  test("a mixed string/number array on --feedback is accepted (fb#1627)", () => {
++    expect(normalizeChangelogJson({ feedback: ["1621", 1622] }, addKeyMap()))
++      .toEqual({ feedback: "1621,1622" });
++  });
++
++  test("an array of numbers on repo/sha/files/commit still exits 4 (numeric tolerance stays scoped to --feedback)", () => {
++    const err = captureThrow(() => normalizeChangelogJson({ files: [1, 2] }, addKeyMap()));
++    expect(err.exitCode).toBe(4);
++    expect((err as unknown as Error).message).toMatch(/"files" array must contain only strings/);
++    expect((err as unknown as Error).message).not.toMatch(/or numbers/);
++  });
++
+   test("a quote-bearing entry round-trips, and JSON supplies the required trio", async () => {
+     asPost().mockResolvedValue({ changelogId: 300 });
+     const description =
+diff --git a/test/reference/__snapshots__/help-snapshots.test.ts.snap b/test/reference/__snapshots__/help-snapshots.test.ts.snap
+index 06bea9d..edf6cd5 100644
+--- a/test/reference/__snapshots__/help-snapshots.test.ts.snap
++++ b/test/reference/__snapshots__/help-snapshots.test.ts.snap
+@@ -657,13 +657,14 @@ DESCRIPTION
+ 
+ FLAGS
+   --endpoint URL    API endpoint to authorize against (default: https://api.ibetoni.fi)
++  --print-token    Also print the minted JWT as { token } (curl/browser use)
+ 
+ GLOBAL FLAGS
+   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+ 
+ OUTPUT (JSON, stdout)
+-  stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written
++  stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written; stdout: nothing, or { token } with --print-token
+ 
+ ERRORS (stderr, exit non-zero)
+   exit 2 (client-side)  OAuth flow failed      → retry; check network / browser
+@@ -676,7 +677,7 @@ NOTES
+ 
+ EXAMPLES
+   ib auth login
+-  ib auth login --endpoint https://api-staging.ibetoni.fi
++  ib auth login --endpoint https://api-staging.ibetoni.fi --print-token
+ "
+ `;
+ 
+@@ -8726,7 +8727,7 @@ FLAGS
+   --thread NUMBER    Thread id the message belongs to
+   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+   --body STRING    New message text (max 4000 chars) (required)
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ WRITE-SAFETY FLAGS
+   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+@@ -8955,7 +8956,7 @@ FLAGS
+   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+   --body STRING    Message text (max 4000 chars) (required)
+   --source STRING    Provenance: web|cli|ai (default: IB_SOURCE env or cli)
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ WRITE-SAFETY FLAGS
+   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+@@ -9515,7 +9516,7 @@ FLAGS
+   --keikka NUMBER    keikkaId this escalation is about
+   --body STRING    The message to support (required)
+   --dry-run    Print the payload without sending (client-side)
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ GLOBAL FLAGS
+   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+@@ -9923,7 +9924,7 @@ FLAGS
+   --html STRING    Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)
+   --html-body STRING    Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)
+   --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ WRITE-SAFETY FLAGS
+   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+@@ -9977,7 +9978,7 @@ FLAGS
+   --title STRING    Notification title (required)
+   --body STRING    Notification body (required)
+   --data STRING    Extra FCM data payload as a JSON object (e.g. '{"url":"/grid"}')
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ WRITE-SAFETY FLAGS
+   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+@@ -12360,7 +12361,7 @@ FLAGS
+   --title STRING    Notification title (required)
+   --body STRING    Notification body (required)
+   --data STRING    Extra FCM data payload as a JSON object
+-  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys are the flag names (e.g. body, title). The shell-safe route for prose on Windows PowerShell, which splits a quote-bearing or multi-line value into separate arguments. An explicitly-typed flag wins over the file, and a REQUIRED flag may be supplied this way instead of on argv.
++  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+ 
+ WRITE-SAFETY FLAGS
+   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+diff --git a/test/reference/dump-size.test.ts b/test/reference/dump-size.test.ts
+index 4c44de5..cf4844d 100644
+--- a/test/reference/dump-size.test.ts
++++ b/test/reference/dump-size.test.ts
+@@ -79,7 +79,15 @@ import { buildReference } from "../../src/reference/dump.js";
+ // Bumped 772_100 -> 785_000 for the `ib palkki color` command group (6 new
+ // leaves: list/get/create/update/delete/reorder — grid bar-coloring rules,
+ // "Palkkiväritykset"; fb#1690/fb#1694).
+-const DUMP_LIMIT_BYTES = 785_000;
++// 785_000 -> 785_200 on 2026-09-14 (fb#1513/fb#1693): `ib auth login` gained
++// --print-token (+flag row +outputShape clause +example); the shared
++// --from-json flag description (hoisted, so paid once) now states both
++// accepted key spellings and that the write-safety trio is never a JSON key
++// (fb#1693 — the old text implied only one spelling and never mentioned the
++// trio exclusion). Prose trimmed twice first (from +212 B to +84 B over the
++// prior limit) before reaching for this bump; 785,084 B measured. Headroom
++// ~116 B, thin per this file's convention.
++const DUMP_LIMIT_BYTES = 785_200;
+ // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
+ // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
+ // surface IS the contract; fb#747/fb#757 resolutions should shrink them
