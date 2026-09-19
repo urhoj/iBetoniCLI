@@ -306,6 +306,8 @@ export interface VehicleWriteFields {
   lastDate?: string | null;
   /** Free-text CSS for the grid vehicle cell (raw CSS string, applied via sx). "" clears. */
   gridStyle?: string;
+  /** Whether the vehicle has GPS tracking hardware installed (gates the GPS keikka-tila row). */
+  hasGpsTracking?: boolean;
 }
 
 /**
@@ -316,7 +318,10 @@ export interface VehicleWriteFields {
  * Betomik fleet validator can put the grid in the order-book sheet's order.
  * `showInReports`/`useNoDriverBar` joined the same day (fb#1717) so the
  * Betomik owner rule ("Ei kuljettajaa -palkki" on every truck but Jemma) can
- * be applied from the CLI instead of only read back.
+ * be applied from the CLI instead of only read back. `hasGpsTracking` joined
+ * 2026-09-19 (`--gps-tracking`) so a vehicle confirmed against a live fleet
+ * tracker (`ib vehicle locations` matched:true) can have its "GPS-seuranta
+ * asennettu" flag flipped without the FE edit-vehicle form.
  */
 /**
  * The writable vehicle columns as ONE table: flag spelling, help text, and the
@@ -376,6 +381,7 @@ const VEHICLE_FIELDS: ReadonlyArray<{
   { flag: "--sort-no <n>", description: "Grid order within the tenant (sortNo; lower sorts first)", optKey: "sortNo", field: "sortNo", parse: intFlag("--sort-no"), modes: ["update"] },
   { flag: "--show-in-reports <bool>", description: "Whether the vehicle appears in reports (true/false)", optKey: "showInReports", field: "showInReports", parse: parseBoolFlag, modes: ["update"] },
   { flag: "--use-no-driver-bar <bool>", description: "Whether the vehicle uses the 'Ei kuljettajaa' (no-driver) bar (true/false)", optKey: "useNoDriverBar", field: "useNoDriverBar", parse: parseBoolFlag, modes: ["update"] },
+  { flag: "--gps-tracking <bool>", description: "Whether the vehicle has GPS tracking hardware installed (hasGpsTracking; gates the GPS keikka-tila row; true/false)", optKey: "gpsTracking", field: "hasGpsTracking", parse: parseBoolFlag, modes: ["update"] },
   { flag: "--first-date <date>", description: 'Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow; "" clears)', optKey: "firstDate", field: "firstDate", modes: ["update"] },
   { flag: "--last-date <date>", description: 'End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow; "" clears, i.e. un-retires)', optKey: "lastDate", field: "lastDate", modes: ["update"] },
   {
@@ -437,6 +443,7 @@ const VEHICLE_DIFF_FIELDS = [
   "vehicleM3",
   "vehiclePuomi",
   "gridStyle",
+  "hasGpsTracking",
 ] as const;
 
 /**
@@ -574,7 +581,7 @@ export async function runVehicleUpdate(
     isRestricted: current.isRestricted,
     multiTenantVisibility: current.multiTenantVisibility,
     defaultVisibilityAsiakasIds: current.defaultVisibilityAsiakasIds,
-    hasGpsTracking: current.hasGpsTracking,
+    hasGpsTracking: changes.hasGpsTracking ?? current.hasGpsTracking,
     vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
     // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
     gridStyle: changes.gridStyle ?? current.gridStyle,
