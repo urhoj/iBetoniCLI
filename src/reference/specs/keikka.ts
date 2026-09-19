@@ -431,12 +431,13 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "All tenants (requires developer/system-admin access; 403 otherwise)" },
     ],
     outputShape:
-      "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.",
+      "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.",
     errors: COMMON_AUTH_ERRORS,
     notes: [
       "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
       "Deploy-gated: returns 404 until GET /api/cli/stats is deployed.",
       "Revenue and driver hours are out of scope (v1).",
+      "Soft-deleted orders (keikkaTilaId 10, hidden in the grid) are excluded from every figure; totals.deleted counts them.",
       "--all requires developer/system-admin access (403 for everyone else); omit to stay scoped to your own visibility.",
     ],
     examples: [
