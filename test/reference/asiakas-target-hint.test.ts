@@ -13,7 +13,8 @@ const TARGET_MSG = "missing or invalid target: pass <asiakasId> positionally or 
 const clientErr = (msg: string): CliError => new CliError(msg, 0, null, 4);
 
 describe("customer dual-target commands — missing-target hint", () => {
-  test.each(["ib customer settings", "ib customer modules", "ib customer operator"])(
+  // fb#1863: the jerry admin trio had NO row at all (hint: null), same gap.
+  test.each(["ib customer settings", "ib customer modules", "ib customer operator", "ib jerry admin detail", "ib jerry admin enable", "ib jerry admin disable"])(
     "%s resolves the target remedy, never a sibling exit-4 row",
     (command) => {
       const spec = COMMAND_SPECS.find((s) => s.command === command);

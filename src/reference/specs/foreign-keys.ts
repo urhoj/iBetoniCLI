@@ -4,7 +4,7 @@
 // is load-bearing (catalogue order drives sibling-suggestion ranking and the
 // parse-guard-hint snapshots).
 import type { CommandArg, CommandError, CommandFlag, CommandSpec } from "../../output/help.js";
-import { ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, OWNER_ASIAKAS_FLAG, PERSON_SCOPE_404_REMEDY, apiErr, intParseErr } from "./shared.js";
+import { ASIAKAS_TARGET_ERR, ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, OWNER_ASIAKAS_FLAG, PERSON_SCOPE_404_REMEDY, apiErr, intParseErr } from "./shared.js";
 
 const SOURCE_FLAG: CommandFlag = {
   name: "source",
@@ -28,13 +28,6 @@ const SOURCE_UNKNOWN_ERR: CommandError = {
   match: "unknown foreign-key source",
   meaning: "--source names no row in the owner's source list (the message lists the valid names + ids)",
   remedy: "pick one of the listed names, or check `--owner` — sources are per tenant (plus the global ones)",
-};
-const TARGET_ERR: CommandError = {
-  origin: "client",
-  exit: 4,
-  match: "missing or invalid target",
-  meaning: "No asiakasId given (or not a positive integer)",
-  remedy: "pass <asiakasId> positionally or via --asiakas <id>",
 };
 const idParseErr = (name: string): CommandError => ({
   origin: "client",
@@ -209,7 +202,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
     args: [ASIAKAS_ID_ARG],
     flags: [ASIAKAS_TARGET_FLAG, OWNER_ASIAKAS_FLAG],
     outputShape: "ListEnvelope<{ asiakasForeignKeyId, key, source, sourceId, entryTime }>",
-    errors: [TARGET_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, READ_403, ...COMMON_AUTH_ERRORS],
+    errors: [ASIAKAS_TARGET_ERR, OWNER_PARSE_ERR, OWNER_UNRESOLVED_ERR, READ_403, ...COMMON_AUTH_ERRORS],
     notes: [OWNER_NOTE],
     seeAlso: ["ib customer fk set", "ib customer fk sources"],
     examples: ["ib customer fk list 1234", "ib customer fk list --asiakas 1234 --owner 8"],
@@ -225,7 +218,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same } }",
     errors: [
-      TARGET_ERR,
+      ASIAKAS_TARGET_ERR,
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,

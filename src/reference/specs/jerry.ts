@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, ASIAKAS_TARGET_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 /** The `--tier` parse-guard row every onboarding list/add/set leaf shares. */
 const TIER_PARSE_ERR = intParseErr("--tier", "pass 1 (priority) or 2 (secondary)");
@@ -590,6 +590,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId,canRespond,reason}]} }. canRespond answers the question adminCount never could (fb#1265): can the person the mail ACTUALLY reaches open the request and bid? reason is null when they can, \"no-person-behind-address\" for the offerNotificationEmail/billingEmail branches (a bare address — nobody can sign in as an inbox, the strongest possible no), or \"missing-jerry-role\" for a configured contact holding none of {1,2,5,6,11,22}. Note adminCount is IRRELEVANT to delivery: admins are step 3 of the recipient chain, reached only when steps 0-2 are empty. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       apiErr(404, "Company not found", "the asiakasId has no asiakas row — distinct from a real company with no Jerry config, which returns 200 with empty arrays"),
       SYSADMIN_403,
@@ -621,6 +622,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     outputShape:
       "{ success: true, validation?: { ok, summary: { [severity]: 'passed/total' }, missing: [{ id, severity, titleFi, detail }] } } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       SYSADMIN_403,
       apiErr(404, "Company not found", "verify asiakasId"),
@@ -649,6 +651,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
+      ASIAKAS_TARGET_ERR,
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       SYSADMIN_403,
       apiErr(404, "Company not found", "verify asiakasId"),

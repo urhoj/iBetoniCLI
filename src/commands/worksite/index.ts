@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
+import { CliError } from "../../api/errors.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
@@ -248,10 +249,14 @@ export function buildWorksiteUpdateBody(
  * Returns the UPDATED worksite record (a follow-up `worksite get`), not the
  * route's raw mssql result (fb#1820): `{ recordsets, rowsAffected, … }` carries
  * no column of the row, so `--columns tyomaaId,address` exited 4 AFTER the
- * write had persisted and the caller could not confirm the new value. The
- * route is shared with the FE full-form save, so its wire shape stays; the
- * re-read is one extra GET. A dry run returns the server's `wouldUpdate`
- * preview unchanged — nothing was written, so there is nothing to re-read.
+ * write had persisted. The route is shared with the FE full-form save, so its
+ * wire shape stays; a dry run returns the server's `wouldUpdate` preview.
+ *
+ * The worksite is READ FIRST and the update refused (exit 5) when it is not
+ * visible to the active company (fb#1860): the write gate accepts any edit
+ * role on the worksite's OWNER company, but the CLI injects the ACTIVE company
+ * as ownerAsiakasId, under which the geofence UPDATE silently no-ops and the
+ * cache sweep misses the owner's keys. Run it under `--company <owner>`.
  */
 export async function runWorksiteUpdate(
   client: ApiClient,
@@ -259,6 +264,18 @@ export async function runWorksiteUpdate(
   body: Record<string, unknown>,
   flags: WriteFlags
 ): Promise<unknown> {
+  try {
+    await runWorksiteGet(client, opts.tyomaaId);
+  } catch (err) {
+    if (err instanceof CliError && err.statusCode === 404) {
+      failWith(
+        `tyomaa ${opts.tyomaaId} is not visible to the active company (asiakasId ${opts.ownerAsiakasId}); nothing was written`,
+        5,
+        "re-run under the worksite's owner: `--company <ownerAsiakasId>` (or `ib auth switch <ownerAsiakasId>`)"
+      );
+    }
+    throw err;
+  }
   const yyyymmdd = opts.yyyymmdd || todayYyyymmdd();
   // Inject the backend-required ids; the URL/derived ids are authoritative
   // (they override anything in --body), so the caller's body need only carry
@@ -273,8 +290,7 @@ export async function runWorksiteUpdate(
     fullBody,
     { headers: writeFlagsToHeaders(flags) }
   );
-  if (flags.dryRun) return res;
-  return runWorksiteGet(client, opts.tyomaaId);
+  return flags.dryRun ? res : runWorksiteGet(client, opts.tyomaaId);
 }
 
 /**

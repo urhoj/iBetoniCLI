@@ -173,6 +173,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       // it shadowed the real "Validation failed" 400 below it.
       { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag or a --body/--from-json patch" },
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
+      { origin: "client", exit: 5, match: "not visible to the active company", meaning: "The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale", remedy: "re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)" },
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors(WORKSITE_EDIT_PERMISSION),

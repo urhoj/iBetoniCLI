@@ -118,7 +118,7 @@ import { buildReference } from "../../src/reference/dump.js";
 // row on `customer settings/modules/operator` (hoisted once + three @id refs) and
 // `worksite update`'s outputShape now naming the re-read record. Measured
 // 815 498 B after trimming both strings once; master was already within ~100 B.
-const DUMP_LIMIT_BYTES = 816_000; // fb#1740: +`ib person fk list-source` spec
+const DUMP_LIMIT_BYTES = 816_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

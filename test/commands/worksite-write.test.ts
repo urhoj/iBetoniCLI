@@ -10,7 +10,7 @@ import {
 } from "../../src/commands/worksite/index.js";
 import { ownerAsiakasIdFromToken } from "../../src/owner.js";
 import { todayHelsinki } from "../../src/dates.js";
-import type { CliError } from "../../src/api/errors.js";
+import { CliError } from "../../src/api/errors.js";
 import { decodeJwtPayload } from "../../src/auth/jwt.js";
 vi.mock("../../src/auth/jwt.js", () => ({
   decodeJwtPayload: vi.fn(),
@@ -89,19 +89,45 @@ describe("ib worksite create/update", () => {
   test("runWorksiteUpdate returns the re-read worksite record, not the raw write ack", async () => {
     mockClient.get.mockReset();
     mockClient.post.mockResolvedValueOnce({ recordsets: [[]], rowsAffected: [1] });
-    mockClient.get.mockResolvedValueOnce({ tyomaaId: 5151, address: "Pekanraitti 3" });
+    mockClient.get
+      .mockResolvedValueOnce({ tyomaaId: 5151, address: "Pekanraitti 1" }) // pre-read (visibility)
+      .mockResolvedValueOnce({ tyomaaId: 5151, address: "Pekanraitti 3" }); // re-read
     const result = await runWorksiteUpdate(
       mockClient,
       { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" },
       { tyomaaOsoite1: "Pekanraitti 3" },
       { reason: "fix address" }
     );
+    expect(mockClient.get).toHaveBeenCalledTimes(2);
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/get/5151");
     expect(result).toEqual({ tyomaaId: 5151, address: "Pekanraitti 3" });
   });
 
+  // fb#1860: the write gate accepts an edit role on the worksite's OWNER
+  // company, but the CLI injects the ACTIVE company as ownerAsiakasId — under
+  // which the geofence UPDATE no-ops and the cache sweep misses the owner. So
+  // the worksite is read first and the update REFUSED when not visible.
+  test("runWorksiteUpdate refuses (exit 5, nothing written) when the worksite is not visible to the active company", async () => {
+    mockClient.get.mockReset();
+    mockClient.get.mockRejectedValueOnce(new CliError("Worksite not found", 404, null, 5));
+    await expect(
+      runWorksiteUpdate(mockClient, { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" }, { tyomaaOsoite1: "x" }, { reason: "r" })
+    ).rejects.toMatchObject({ exitCode: 5, message: expect.stringContaining("5151"), hint: expect.stringContaining("--company") });
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("runWorksiteUpdate rethrows a non-404 pre-read failure", async () => {
+    mockClient.get.mockReset();
+    mockClient.get.mockRejectedValueOnce(new CliError("boom", 500, null, 6));
+    await expect(
+      runWorksiteUpdate(mockClient, { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" }, { tyomaaNimi: "x" }, {})
+    ).rejects.toMatchObject({ statusCode: 500 });
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runWorksiteUpdate --dry-run returns the server preview and never re-reads", async () => {
     mockClient.get.mockReset();
+    mockClient.get.mockResolvedValueOnce({ tyomaaId: 5151 }); // pre-read only
     const preview = { dryRun: true, wouldUpdate: { tyomaaOsoite1: "Pekanraitti 3", omittedFieldsPreserved: true } };
     mockClient.post.mockResolvedValueOnce(preview);
     const result = await runWorksiteUpdate(
@@ -111,7 +137,7 @@ describe("ib worksite create/update", () => {
       { dryRun: true }
     );
     expect(result).toBe(preview);
-    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.get).toHaveBeenCalledTimes(1);
   });
 
   test("runWorksiteRefreshLocation: POST refreshLocation with write flags", async () => {

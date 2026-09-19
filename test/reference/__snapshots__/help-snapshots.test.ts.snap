@@ -1425,7 +1425,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasForeignKeyId, key, source, sourceId, entryTime }>
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --asiakas <id>
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 3 (HTTP 403)  No read access to the owner tenant → you must belong to --owner's company (or hold a view role there); sysadmin/developer bypass
@@ -1521,7 +1521,7 @@ OUTPUT (JSON, stdout)
   { asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  No asiakasId given (or not a positive integer) → pass <asiakasId> positionally or via --asiakas <id>
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
@@ -5698,6 +5698,7 @@ OUTPUT (JSON, stdout)
   { asiakasNimi, admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,osoite,lat,lng,maxDeliveryDistance,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId,canRespond,reason}]} }. canRespond answers the question adminCount never could (fb#1265): can the person the mail ACTUALLY reaches open the request and bid? reason is null when they can, "no-person-behind-address" for the offerNotificationEmail/billingEmail branches (a bare address — nobody can sign in as an inbox, the strongest possible no), or "missing-jerry-role" for a configured contact holding none of {1,2,5,6,11,22}. Note adminCount is IRRELEVANT to delivery: admins are step 3 of the recipient chain, reached only when steps 0-2 are empty. lastLoginTime null = that person has never signed in. sijainnit carries the fields the varikko-matching contract keys on (lat/lng/maxDeliveryDistance) plus osoite (sijaintiOsoite1, free-text — dbo.sijainti has no separate city column); any of lat/lng/maxDeliveryDistance can be null on an unconfigured depot (fb#455).
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
   exit 5 (HTTP 404)  Company not found      → the asiakasId has no asiakas row — distinct from a real company with no Jerry config, which returns 200 with empty arrays
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -5748,6 +5749,7 @@ OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 5 (HTTP 404)  Company not found      → verify asiakasId
@@ -5789,6 +5791,7 @@ OUTPUT (JSON, stdout)
   { success: true, validation?: { ok, summary: { [severity]: 'passed/total' }, missing: [{ id, severity, titleFi, detail }] } } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 5 (HTTP 404)  Company not found      → verify asiakasId
@@ -14276,7 +14279,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.
+  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -14286,6 +14289,7 @@ NOTES
   - Default range is today. Exactly one of --today/--month/--week/(--from & --to).
   - Deploy-gated: returns 404 until GET /api/cli/stats is deployed.
   - Revenue and driver hours are out of scope (v1).
+  - Soft-deleted orders (keikkaTilaId 10, hidden in the grid) are excluded from every figure; totals.deleted counts them.
   - --all requires developer/system-admin access (403 for everyone else); omit to stay scoped to your own visibility.
 
 EXAMPLES
@@ -16620,6 +16624,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the contact
+  exit 5 (client-side)  The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale → re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)
   exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
