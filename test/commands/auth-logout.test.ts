@@ -4,6 +4,10 @@
  * carried no --dry-run. Driven through the real command tree (like
  * auth-switch.test.ts) with the credentials store and the revoke call mocked,
  * so the test never touches the real filesystem or network.
+ *
+ * fb#1895 (found in /post-impl-verify of fb#1443): the borrowed-session branch
+ * did not honour --dry-run at all, silently breaking the documented
+ * outputShape for that one branch — covered below.
  */
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildProgram, enableParserThrow, handleParseRejection } from "../../src/program.js";
@@ -61,5 +65,24 @@ describe("ib auth logout --dry-run (fb#1443)", () => {
   test("without --dry-run the real revoke still runs (no regression)", async () => {
     await parse(["auth", "logout"]);
     expect(performLogout).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * fb#1895: the borrowed-session branch (an --endpoint whose own session is a
+   * SLOT_SIBLINGS fallback of PROFILE.endpoint) used to `return` before ever
+   * checking opts.dryRun, so --dry-run there emitted no stdout JSON at all —
+   * contradicting the CommandSpec's documented outputShape.
+   */
+  test("--dry-run on a BORROWED session (--endpoint slot-sibling) still emits the documented preview JSON", async () => {
+    await parse(["auth", "logout", "--dry-run", "--endpoint", "https://api-staging.ibetoni.fi"]);
+    expect(performLogout).not.toHaveBeenCalled();
+    expect(printed()).toContain('"dryRun":true');
+    expect(printed()).toContain('"wouldRevoke":false');
+  });
+
+  test("without --dry-run, the borrowed-session branch still just warns (no regression)", async () => {
+    await parse(["auth", "logout", "--endpoint", "https://api-staging.ibetoni.fi"]);
+    expect(performLogout).not.toHaveBeenCalled();
+    expect(printed()).toBe("");
   });
 });

@@ -74,6 +74,11 @@ export function registerAuthCommands(parent, isReadOnly) {
             const borrowed = override ? borrowedSessionNote(creds, override) : null;
             if (borrowed) {
                 warnNote(borrowed);
+                // fb#1895: --dry-run's documented outputShape always carries stdout
+                // JSON — this branch used to return with only the stderr note,
+                // silently breaking that contract for a caller scripting against it.
+                if (opts.dryRun)
+                    writeJson({ dryRun: true, wouldRevoke: false, note: borrowed });
                 return;
             }
             // fb#1443: logout destroys SERVER-side state (revokes the whole

@@ -55,7 +55,10 @@ export async function runValidatePerson(
  * with a second positional `[id]` as an alias for --person/--asiakas (fb#1407 —
  * every sibling entity command in the CLI takes its target positionally, and
  * this command's own USAGE line advertised the slot without saying what filled
- * it). Otherwise it runs the flag-driven form unchanged: entity is inferred
+ * it). Both forms may be combined only when they AGREE (fb#1894, mirroring
+ * resolveTarget's dual-target convention) — a mismatch exits 4 rather than the
+ * positional silently overwriting an explicit flag. Otherwise it runs the
+ * flag-driven form unchanged: entity is inferred
  * from `--person`: present → person validation (profile defaults to
  * "onboarding"); absent → company validation (profile required).
  * Profile/entity mismatch is enforced server-side (404). Deploy-gated: 404
@@ -91,8 +94,20 @@ export function registerValidateCommands(
             if (idStr === undefined) {
               failWith(`\`validate ${action}\` needs an id: \`ib validate ${action} <id> --profile <p>\`.`, 4);
             }
-            const id = parseId(idStr, action === "person" ? "personId" : "asiakasId");
-            if (action === "person") opts.person = id;
+            const isPerson = action === "person";
+            const id = parseId(idStr, isPerson ? "personId" : "asiakasId");
+            // fb#1894: the dual-target convention (src/targets.ts resolveTarget) is
+            // exactly one required, both allowed only when they AGREE — a caller who
+            // passes both got silent last-write-wins instead.
+            const flagValue = isPerson ? opts.person : opts.asiakas;
+            if (flagValue !== undefined && flagValue !== id) {
+              const flagName = isPerson ? "--person" : "--asiakas";
+              failWith(
+                `positional ${action} id (${id}) and ${flagName} (${flagValue}) differ — pass only one`,
+                4
+              );
+            }
+            if (isPerson) opts.person = id;
             else opts.asiakas = id;
           } else if (action !== undefined) {
             failWith(`Unknown validate action "${action}" — use \`person <id>\`, \`company <id>\`, or \`list\`.`, 4);

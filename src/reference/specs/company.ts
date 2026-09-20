@@ -107,6 +107,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "Unknown validate action", meaning: "The first positional is neither 'list', 'person', nor 'company'", remedy: "use `ib validate person <id>`, `ib validate company <id>`, or `ib validate list`" },
       { origin: "client", exit: 4, match: "invalid personId", meaning: "The `validate person <id>` positional is not a positive integer", remedy: "pass a positive personId" },
       { origin: "client", exit: 4, match: "invalid asiakasId", meaning: "The `validate company <id>` positional is not a positive integer", remedy: "pass a positive asiakasId" },
+      { origin: "client", exit: 4, match: "differ", meaning: "The `person`/`company` positional id and the matching --person/--asiakas flag disagree", remedy: "pass only one — the dual-target convention (fb#1894) requires them to agree when both are given" },
       { origin: "client", exit: 4, match: ["Company validation needs --profile", "must be a positive integer"], meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
     ],
     notes: [
@@ -115,7 +116,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "Exit code is 0 even when ok:false — the JSON carries the outcome.",
       "Deploy-gated: returns 404 until /api/validation is deployed.",
       "'ib company validate' was renamed to this command (exit 4 on the old path).",
-      "`validate person <id>` / `validate company <id>` (fb#1407) are positional aliases for --person/--asiakas, matching the positional convention every sibling entity command uses; --profile is still required/defaulted the same way as the flag-driven form.",
+      "`validate person <id>` / `validate company <id>` (fb#1407) are positional aliases for --person/--asiakas, matching every sibling entity command's convention; --profile still works as in the flag-driven form. Both forms may combine only when they AGREE (fb#1894) — a mismatch exits 4.",
     ],
     seeAlso: ["ib person get", "ib customer modules", "ib jerry admin detail"],
     examples: [

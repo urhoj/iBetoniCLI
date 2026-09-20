@@ -82,6 +82,46 @@ describe("ib validate person|company <id> — positional alias", () => {
     expect(client.get).toHaveBeenCalledWith("/api/validation/betoni/8");
   });
 
+  /**
+   * fb#1894 (found in /post-impl-verify of fb#1407): before this, `validate
+   * person <id>` unconditionally overwrote an explicitly-passed --person,
+   * last-write-wins with no error — breaking the CLI's dual-target convention
+   * (src/targets.ts resolveTarget: agree, or exit 4).
+   */
+  test("`validate person <id> --person <id>` (agreeing) succeeds", async () => {
+    const result = { entity: "person", profile: "onboarding", asiakasId: 8, personId: 10, ok: true };
+    const { p, client } = program(() => result);
+    await p.parseAsync(
+      ["validate", "person", "10", "--person", "10", "--asiakas", "8", "--profile", "onboarding"],
+      { from: "user" }
+    );
+    expect(client.get).toHaveBeenCalledWith("/api/validation/person/onboarding/8/10");
+  });
+
+  test("`validate person <id> --person <other>` (disagreeing) exits 4, no GET", async () => {
+    const { p, client } = program(() => ({}));
+    const { exitCode, envelope } = await captureActionError(() =>
+      p.parseAsync(["validate", "person", "10", "--person", "99", "--profile", "onboarding"], {
+        from: "user",
+      })
+    );
+    expect(exitCode).toBe(4);
+    expect(String(envelope.error)).toMatch(/differ/);
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  test("`validate company <id> --asiakas <other>` (disagreeing) exits 4, no GET", async () => {
+    const { p, client } = program(() => ({}));
+    const { exitCode, envelope } = await captureActionError(() =>
+      p.parseAsync(["validate", "company", "8", "--asiakas", "27", "--profile", "betoni"], {
+        from: "user",
+      })
+    );
+    expect(exitCode).toBe(4);
+    expect(String(envelope.error)).toMatch(/differ/);
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
   test("`validate person` with no id exits 4, naming the remedy", async () => {
     const { p, client } = program(() => ({}));
     const { exitCode, envelope } = await captureActionError(() =>
