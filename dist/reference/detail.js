@@ -175,11 +175,31 @@ export async function runReferenceDetailEdit(client, commandParts, field, op, fl
     // Cap-check the MERGED text before the dry-run branch, so a preview that would
     // 400 on write reports it here instead of returning a clean-looking diff.
     assertWithinCap(field, next, "would be");
+    // fb#1868: a disjoint overwrite on the OTHER field (--summary alongside an
+    // edit op on --field detail, or vice versa) rides along in the same PUT —
+    // the caller's own program.ts guard already proved this is the OTHER field,
+    // never the edited one, so there is nothing to arbitrate. Silently dropping
+    // it here would be worse than the exit-4 it replaces: the call would look
+    // like it wrote both fields and only wrote one.
+    const otherField = field === "summary" ? "detail" : "summary";
+    const otherOverwrite = flags[otherField];
+    if (otherOverwrite !== undefined)
+        assertWithinCap(otherField, otherOverwrite);
     if (seamInserted)
         warnNote("[ib] a newline seam was inserted between the existing text and the new text (fb#790)");
     if (flags.dryRun) {
-        return textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field, seamInserted);
+        const envelope = textEditDryRunEnvelope(before, next, matchCount, { command: resolvedCommand }, field, seamInserted);
+        return otherOverwrite !== undefined
+            ? { ...envelope, alsoOverwrites: { field: otherField, value: otherOverwrite } }
+            : envelope;
     }
-    return runReferenceDetailSet(client, commandParts, { [field]: next, aiConfidence: flags.aiConfidence, needsHumanReview: flags.needsHumanReview }, flags, tier);
+    const payload = {
+        aiConfidence: flags.aiConfidence,
+        needsHumanReview: flags.needsHumanReview,
+    };
+    payload[field] = next;
+    if (otherOverwrite !== undefined)
+        payload[otherField] = otherOverwrite;
+    return runReferenceDetailSet(client, commandParts, payload, flags, tier);
 }
 //# sourceMappingURL=detail.js.map

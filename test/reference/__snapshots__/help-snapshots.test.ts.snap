@@ -13214,13 +13214,14 @@ FLAGS
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
   --needs-human-review    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
   --no-needs-human-review    Un-park the row — same effect as omitting --needs-human-review (both reset it), but explicit in the command line.
-  --field STRING    Edit-mode target field: summary | detail (default detail)
+  --field STRING    Edit-mode target field: summary | detail (default detail). Conflicts with --summary/--detail only on the SAME field (fb#1868).
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace (empty deletes the matched text; pass "" to clear — PowerShell DROPS a bare "", so use \`--with=\` there (same meaning in bash; \`ib help shell-quoting\`))
   --append STRING    Edit mode: append text to the target field (verbatim)
   --prepend STRING    Edit mode: prepend text to the target field (verbatim)
   --all    With --replace: substitute every occurrence
   --from-json STRING    Read the content fields from a JSON object file (or - for stdin); argv-safe route for prose containing Finnish ä/ö or an em-dash. Accepts summary, detail, aiConfidence, field, replace, with, append, prepend. Explicit flags outrank the file; unknown or wrong-typed keys exit 4.
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED in edit mode (--replace/--append/--prepend), optional for a plain --summary/--detail overwrite
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -13233,11 +13234,12 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}
+  { command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified, alsoOverwrites?}
 
 ERRORS (stderr, exit non-zero)
   exit 5 (client-side)  Unknown command        → \`ib commands\` for valid paths
   exit 4 (HTTP 400)  summary >160 or detail >4000 chars (the message names the submitted length) → Trim to the cap — cut any flag/exit-code recap first (it already renders in \`--help\`), keep the business context
+  exit 4 (client-side)  --summary/--detail and the edit op's --field name the SAME field (fb#1868) — a disjoint pair composes fine → Point --field at the OTHER field, or drop one of the two
   exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
 
 NOTES

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -81,16 +81,19 @@ describe("ib reference detail set --from-json (fb#613)", () => {
     expect(JSON.parse(stderr).error).toMatch(/"summary" must be a string/);
   });
 
-  test("applies BEFORE the edit-mode guards, so JSON-supplied modes still conflict", async () => {
+  test("applies BEFORE the edit-mode guards, so a JSON-supplied SAME-FIELD conflict still fires", async () => {
     // Proves ordering: parseEditOp must see the merged options. If --from-json
     // were applied after, this would sail past the guard and PUT a mixed body.
-    const file = write("mixed.json", { replace: "x", with: "y", summary: "s" });
+    // --replace/--with default to --field detail, so --detail here targets the
+    // SAME field (fb#1868) — unlike --summary, which would now be a disjoint
+    // write and is allowed (covered in the "same-field-only" describe block below).
+    const file = write("mixed.json", { replace: "x", with: "y", detail: "s" });
     const { exitCode, stderr } = await runArgv(
       ["reference", "detail", "set", "keikka", "list", "--from-json", file, "--reason", "t"],
       opts
     );
     expect(exitCode).toBe(4);
-    expect(JSON.parse(stderr).error).toMatch(/cannot be combined with --summary\/--detail/);
+    expect(JSON.parse(stderr).error).toMatch(/cannot be combined with --detail/);
   });
 
   test("non-ASCII prose survives the file route intact", async () => {
@@ -106,5 +109,52 @@ describe("ib reference detail set --from-json (fb#613)", () => {
     // rejected as validation, and the assertion needs no network.
     expect(exitCode).toBe(3);
     expect(JSON.parse(stderr).code).toBe("READ_ONLY_BLOCKED");
+  });
+});
+
+describe("ib reference detail set — same-field-only edit/overwrite validation (fb#1868)", () => {
+  const opts = { token: "", endpoint: "https://example.invalid" };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("(a) --summary + --prepend (default --field detail) is a disjoint write — passes validation, no longer rejected", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ command: "ib keikka list", summary: "old summary", detail: "old detail", hint: "" }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { exitCode, stderr } = await runArgv(
+      ["reference", "detail", "set", "keikka", "list", "--summary", "new summary", "--prepend", "PREFIX ", "--reason", "t"],
+      opts
+    );
+    // Whatever this does downstream, it must not hit the old blanket guard.
+    expect(stderr).not.toMatch(/cannot be combined with --/);
+    expect(exitCode).toBe(0);
+  });
+
+  test("(b) --summary + --replace --field summary still FAILS with the same-field message", async () => {
+    const { exitCode, stderr } = await runArgv(
+      [
+        "reference", "detail", "set", "keikka", "list",
+        "--summary", "new summary", "--replace", "x", "--with", "y", "--field", "summary", "--reason", "t",
+      ],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/edit mode with --field summary cannot be combined with --summary/);
+  });
+
+  test("(c) --detail + --append (default --field detail) still FAILS with the same-field message", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["reference", "detail", "set", "keikka", "list", "--detail", "new detail", "--append", "more", "--reason", "t"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/edit mode with --field detail cannot be combined with --detail/);
   });
 });

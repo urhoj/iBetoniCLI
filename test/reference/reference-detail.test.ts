@@ -280,6 +280,53 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
     expect(c.put).toHaveBeenCalledTimes(1);
   });
 
+  test("fb#1868: a disjoint --summary overwrite rides along with a --field detail edit in one PUT", async () => {
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      put: vi.fn().mockResolvedValue({ command: "ib keikka list" }),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
+    await runReferenceDetailEdit(
+      c, ["keikka", "list"], "detail",
+      { kind: "prepend", text: "## Keikka list — updated\n" },
+      { reason: "combined refresh", summary: "New summary" }, "developer"
+    );
+    const body = c.put.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(body.summary).toBe("New summary");
+    expect(body.detail).toContain("## Keikka list — updated");
+    expect(c.put).toHaveBeenCalledTimes(1);
+  });
+
+  test("fb#1868: edit-mode --dry-run surfaces the sibling overwrite via alsoOverwrites, still no PUT", async () => {
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
+    const out = await runReferenceDetailEdit(
+      c, ["keikka", "list"], "detail",
+      { kind: "prepend", text: "## Keikka list — updated\n" },
+      { dryRun: true, summary: "New summary" }, "developer"
+    ) as Record<string, unknown>;
+    expect(c.put).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ dryRun: true, field: "detail", alsoOverwrites: { field: "summary", value: "New summary" } });
+  });
+
+  test("fb#1868: an over-cap sibling overwrite still exits 4, before any PUT", async () => {
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      put: vi.fn(),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
+    await expect(
+      runReferenceDetailEdit(
+        c, ["keikka", "list"], "detail",
+        { kind: "append", text: " more" },
+        { reason: "r", summary: "s".repeat(161) }, "developer"
+      )
+    ).rejects.toMatchObject({ exitCode: 4, message: "summary is 161 chars, max 160" });
+    expect(c.put).not.toHaveBeenCalled();
+  });
+
   test("forwards --ai-confidence/--needs-human-review from the edit-mode flags into the PUT body (fb#907)", async () => {
     const c = mockApiClient({
       get: vi.fn().mockResolvedValue(CURRENT),

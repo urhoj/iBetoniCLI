@@ -292,12 +292,16 @@ export async function buildProgram(argv) {
             failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
         }
         if (editOp) {
-            if (opts.summary !== undefined || opts.detail !== undefined) {
-                failUsage("edit mode (--replace/--append/--prepend) cannot be combined with --summary/--detail");
-            }
             const field = (opts.field ?? "detail");
             if (field !== "summary" && field !== "detail") {
                 failUsage("--field must be one of: summary, detail");
+            }
+            // fb#1868: only reject when the overwrite flag and the edit op's
+            // (possibly-defaulted) field target the SAME field — --summary plus
+            // an edit op on --field detail are two disjoint writes, nothing to
+            // arbitrate.
+            if ((field === "summary" && opts.summary !== undefined) || (field === "detail" && opts.detail !== undefined)) {
+                failUsage(`edit mode with --field ${field} cannot be combined with --${field} (they target the same field)`);
             }
             // Deliberate exception to the spec-declared reasonPolicy migration:
             // --reason is required only in EDIT mode (a conditional the spec cannot
