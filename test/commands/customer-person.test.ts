@@ -107,7 +107,7 @@ describe("runCustomerPersonList", () => {
       .mockResolvedValueOnce([
         { asiakasPersonSettingId: 10, asiakasPersonSettingTypeId: 2 }, // asiakasAdmin
         { asiakasPersonSettingId: 14, asiakasPersonSettingTypeId: 9 }, // tyosuhteessa
-        { asiakasPersonSettingId: 18, asiakasPersonSettingTypeId: 3 }, // unnamed → dropped
+        { asiakasPersonSettingId: 18, asiakasPersonSettingTypeId: 23 }, // ASIAKAS_WORKING_HOURS_ROLE_TYPE_ID — deliberately unnamed (fb#1619), not a JWT role → dropped
       ]);
     const result = await runCustomerPersonList(mockClient, 27, undefined, true);
     expect(get).toHaveBeenNthCalledWith(1, "/api/asiakas/person/list/27/0");

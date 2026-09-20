@@ -125,7 +125,12 @@ import { buildReference } from "../../src/reference/dump.js";
 // claim --also` (one flag, examples row), `auth logout --dry-run` (one flag +
 // outputShape line), `validate person|company <id>` (one arg, four exit-4 rows,
 // one note, two examples). Measured 821 231 B.
-const DUMP_LIMIT_BYTES = 822_000;
+// 822_000 → 824_000 (2026-09-20): fb#1802/#1838/#1721 feedback-queue batch — two
+// brand-new commands `ib person default-company get`/`set` (fb#1838, full specs
+// incl. errors/notes/dry-run), a `seeAlso` cross-reference on `betomik-orderbook
+// review` (fb#1802), and a new `--owner` flag + note on `customer list` (fb#1721).
+// Measured 823 702 B after one trim pass on the new specs' notes.
+const DUMP_LIMIT_BYTES = 824_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

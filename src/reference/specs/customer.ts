@@ -33,6 +33,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "sijainti-types", type: "string", description: "With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched" },
       { name: "since", type: "string", description: "Only customers registered on/after this day (YYYY-MM-DD, or today/yesterday) — 'new customers since X'. Server-side filter on the registration timestamp." },
       { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side.", allowed: ["name", "registered"] },
+      OWNER_ASIAKAS_FLAG,
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, ownerAsiakasId, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
@@ -55,6 +56,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       "ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription",
       "ib customer list --ids 26 --include sijainnit --sijainti-types 1,2",
       "ib customer list --since yesterday --sort registered",
+      "ib customer list --owner 27 --full",
     ],
   },
   {

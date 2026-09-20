@@ -96,12 +96,14 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     outputShape: "{ updated: boolean } — updated:false means no row with that id under the Betomik tenant",
     notes: [
       "Classification FREEZE: a row whose reviewedBy is set keeps its rowKind/palkkiType across later sheet uploads for as long as its rowKey (date + Työmaa + parser kind) is stable — a sheet edit that re-keys the row inserts a fresh unfrozen row and ages the frozen one to gone (fb#1749). reviewedBy is stamped only by a CLASSIFYING call — --status approved (approving accepts the shown type), or an explicit --row-kind/--palkki-type — so a --note-only call, or pending/rejected without a type, does not arm the freeze and leaves the parser's guess live (fb#1780). There is no unfreeze; to change a frozen row, re-review it with the type you want.",
+      "Discover valid --palkki-type names with `ib palkki type list --owner <id>` instead of probing with a bad value.",
     ],
     errors: [
       { origin: "client", exit: 4, meaning: "rowId is not a positive integer", remedy: "Pass the betomikOrderbookImportRowId from `ib dev betomik-orderbook rows <runId>`" },
       { http: 400, exit: 4, meaning: "Bad status / rowKind / palkkiType", remedy: "status: pending|approved|rejected; rowKind: keikka|palkki; palkkiType must be one of the names the 400 message lists" },
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
     ],
+    seeAlso: ["ib palkki type list"],
     examples: [
       'ib dev betomik-orderbook review 143 --status approved --row-kind palkki --palkki-type "pois ajosta" --reason "Halli-rivi, laivaan"',
       "ib dev betomik-orderbook review 8 --status approved --row-kind keikka --dry-run",

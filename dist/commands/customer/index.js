@@ -72,6 +72,7 @@ export async function runCustomerList(client, opts) {
         sijaintiTypes: opts.sijaintiTypes?.length ? opts.sijaintiTypes.join(",") : undefined,
         since: opts.since || undefined,
         sort: opts.sort || undefined,
+        owner: opts.owner,
     })}`);
     // Re-apply --fields / --sijainti-types CLIENT-SIDE too, so the flags trim the
     // payload even against a backend that predates the server-side push-down. On a
@@ -744,6 +745,7 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--sijainti-types <csv>")
         .option("--since <date>")
         .option("--sort <field>")
+        .option("--owner <id>", "", intFlag("--owner", 1, "ownerAsiakasId to scope the list to — omit to use the active company (sysadmins: pass to avoid an all-tenant list)"))
         .action(guarded(async (opts) => {
         const client = await getClient();
         assertEnum(opts.sort, ["name", "registered"], "--sort");
@@ -769,6 +771,7 @@ export function registerCustomerCommands(parent, getClient) {
             sijaintiTypes,
             since: resolveDate(opts.since),
             sort: opts.sort,
+            owner: opts.owner,
         });
         writeJson(result);
     }));

@@ -1638,6 +1638,7 @@ FLAGS
   --sijainti-types STRING    With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched
   --since STRING    Only customers registered on/after this day (YYYY-MM-DD, or today/yesterday) — 'new customers since X'. Server-side filter on the registration timestamp.
   --sort STRING    Result ordering: name (default) or registered (newest-registered first). Server-side.
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -1670,6 +1671,7 @@ EXAMPLES
   ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription
   ib customer list --ids 26 --include sijainnit --sijainti-types 1,2
   ib customer list --since yesterday --sort registered
+  ib customer list --owner 27 --full
 "
 `;
 
@@ -2734,6 +2736,10 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Classification FREEZE: a row whose reviewedBy is set keeps its rowKind/palkkiType across later sheet uploads for as long as its rowKey (date + Työmaa + parser kind) is stable — a sheet edit that re-keys the row inserts a fresh unfrozen row and ages the frozen one to gone (fb#1749). reviewedBy is stamped only by a CLASSIFYING call — --status approved (approving accepts the shown type), or an explicit --row-kind/--palkki-type — so a --note-only call, or pending/rejected without a type, does not arm the freeze and leaves the parser's guess live (fb#1780). There is no unfreeze; to change a frozen row, re-review it with the type you want.
+  - Discover valid --palkki-type names with \`ib palkki type list --owner <id>\` instead of probing with a bad value.
+
+SEE ALSO
+  ib palkki type list
 
 EXAMPLES
   ib dev betomik-orderbook review 143 --status approved --row-kind palkki --palkki-type "pois ajosta" --reason "Halli-rivi, laivaan"
@@ -11991,6 +11997,84 @@ EXAMPLES
   ib person day statuses
   ib person day statuses --pretty
   ib person day statuses --full
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person default-company get matches snapshot 1`] = `
+"USAGE
+  ib person default-company get <personId> [flags]
+
+DESCRIPTION
+  Read a person's default active company (personSettings type 15, OLETUS_ADMIN_YRITYS_ID) — the company a login/impersonation lands on when none is explicitly chosen.
+
+ARGUMENTS
+  <personId> NUMBER    personId to read (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { personId, companyId: number|null } — companyId is null when the setting has never been written for this person
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+
+SEE ALSO
+  ib person default-company set, ib person owner
+
+EXAMPLES
+  ib person default-company get 294
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person default-company set matches snapshot 1`] = `
+"USAGE
+  ib person default-company set <personId> --asiakas <asiakas> [flags]
+
+DESCRIPTION
+  Set a person's default active company (personSettings type 15, OLETUS_ADMIN_YRITYS_ID), via the same change-tracked personSql.setPersonSetting path jerryAdminSql.defaultMainContactToCompany already uses.
+  Permissions: requires self, sysadmin/developer, or admin of the target person's owner company (requirePersonWriteAccess).
+
+ARGUMENTS
+  <personId> NUMBER    personId to update (required)
+
+FLAGS
+  --asiakas NUMBER    asiakasId to set as this person's default active company (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  200 empty body on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 3 (HTTP 403)  Not allowed to change this person's settings → see the permissions above (self/sysadmin/admin-of-owner)
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Distinct from \`ib person owner\` (which changes the OWNING tenant) — this only picks which of a person's companies a bare login/impersonation lands on. --dry-run resolves client-side (GETs first, never POSTs) since the route has no server-side X-Dry-Run guard.
+
+SEE ALSO
+  ib person default-company get, ib person owner
+
+EXAMPLES
+  ib person default-company set 294 --asiakas 27 --reason 'migrated away from old company'
 "
 `;
 

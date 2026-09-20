@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { unwrapRows, listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
@@ -51,6 +52,7 @@ import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
+import { diffFields } from "../../diff.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -1001,6 +1003,38 @@ export function registerPersonCommands(
     writeJson(result);
   }));
 
+  // ─── person default-company subgroup ─────────────────────────────────────
+  const personDefaultCompany = p
+    .command("default-company")
+    .description("Read/set a person's default active company (personSettings type 15, OLETUS_ADMIN_YRITYS_ID) — the company a login/impersonation lands on when none is explicitly chosen.");
+
+  personDefaultCompany
+    .command("get <personId>")
+    .action(
+      jsonAction(getClient, (client, personIdStr: string) =>
+        runPersonGetDefaultCompany(client, parseId(personIdStr, "personId"))
+      )
+    );
+
+  addWriteFlagsToCommand(
+    personDefaultCompany
+      .command("set <personId>")
+      .requiredOption(
+        "--asiakas <id>",
+        "",
+        intFlag("--asiakas", 1, "asiakasId to set as this person's default active company")
+      )
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { asiakas: number }) => {
+    const client = await getClient();
+    const result = await runPersonSetDefaultCompany(
+      client,
+      parseId(personIdStr, "personId"),
+      opts.asiakas,
+      opts
+    );
+    writeJson(result);
+  }));
+
   addWriteFlagsToCommand(
     p
       .command("delete <personId>")
@@ -1255,6 +1289,73 @@ export async function runPersonSetOwner(
   return client.post(
     `/api/person/setOwner/${personId}`,
     { ownerAsiakasId },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+// `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so the
+// ESM build doesn't need a default-export shim. Memoized so the constant is read
+// once, not on every default-company get/set call.
+let _oletusAdminYritysIdTypeId: number | null = null;
+function oletusAdminYritysIdTypeId(): number {
+  if (_oletusAdminYritysIdTypeId !== null) return _oletusAdminYritysIdTypeId;
+  const constants = createRequire(import.meta.url)("@ibetoni/constants") as {
+    PERSON_SETTING_TYPE_IDS: Record<string, number>;
+  };
+  _oletusAdminYritysIdTypeId = constants.PERSON_SETTING_TYPE_IDS.OLETUS_ADMIN_YRITYS_ID;
+  return _oletusAdminYritysIdTypeId;
+}
+
+/**
+ * GET /api/person/setting/get/:personId/:personSettingTypeId — read a person's
+ * default active company (personSettings type 15). Projects the raw
+ * personSettings_get recordset (0 or 1 rows) to a flat shape; `companyId: null`
+ * means the setting has never been written for this person.
+ */
+export async function runPersonGetDefaultCompany(
+  client: ApiClient,
+  personId: number
+): Promise<{ personId: number; companyId: number | null }> {
+  const rows = await client.get<Array<{ intVar?: number | null }>>(
+    `/api/person/setting/get/${personId}/${oletusAdminYritysIdTypeId()}`
+  );
+  const companyId = rows?.[0]?.intVar ?? null;
+  return { personId, companyId };
+}
+
+/**
+ * POST /api/person/settings/set — set a person's default active company
+ * (personSettings type 15, boolVar:true, intVar:companyId), the same
+ * change-tracked personSql.setPersonSetting path jerryAdminSql.defaultMainContactToCompany
+ * uses.
+ *
+ * `--dry-run` resolves CLIENT-SIDE: this route has no server-side X-Dry-Run
+ * guard (confirmed live — a header-only dry-run silently persists), so a GET
+ * of the current value runs first and, under --dry-run, the diff is reported
+ * without ever calling POST. Safe-by-construction, mirroring `vehicle update`.
+ */
+export async function runPersonSetDefaultCompany(
+  client: ApiClient,
+  personId: number,
+  companyId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  const current = await runPersonGetDefaultCompany(client, personId);
+  if (flags.dryRun) {
+    return {
+      dryRun: true,
+      personId,
+      wouldChange: diffFields(current, { companyId }, ["companyId"]),
+    };
+  }
+  return client.post(
+    "/api/person/settings/set",
+    {
+      personId,
+      personSettingTypeId: oletusAdminYritysIdTypeId(),
+      boolVar: true,
+      intVar: companyId,
+    },
     { headers: writeFlagsToHeaders(flags) }
   );
 }

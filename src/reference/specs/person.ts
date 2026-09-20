@@ -170,6 +170,37 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib person default-company get",
+    description: "Read a person's default active company (personSettings type 15, OLETUS_ADMIN_YRITYS_ID) — the company a login/impersonation lands on when none is explicitly chosen.",
+    args: [{ name: "personId", type: "number", description: "personId to read" }],
+    flags: [],
+    outputShape: "{ personId, companyId: number|null } — companyId is null when the setting has never been written for this person",
+    errors: [PERSON_PARSE_ERR, ...COMMON_AUTH_ERRORS, apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY)],
+    seeAlso: ["ib person default-company set", "ib person owner"],
+    examples: ["ib person default-company get 294"],
+  },
+  {
+    command: "ib person default-company set",
+    description: "Set a person's default active company (personSettings type 15, OLETUS_ADMIN_YRITYS_ID), via the same change-tracked personSql.setPersonSetting path jerryAdminSql.defaultMainContactToCompany already uses.",
+    permissions: ["self, sysadmin/developer, or admin of the target person's owner company (requirePersonWriteAccess)"],
+    args: [{ name: "personId", type: "number", description: "personId to update" }],
+    flags: [{ name: "asiakas", type: "number", description: "asiakasId to set as this person's default active company", required: true }],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "200 empty body on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)",
+    errors: [
+      PERSON_PARSE_ERR,
+      apiErr(403, "Not allowed to change this person's settings", "see the permissions above (self/sysadmin/admin-of-owner)"),
+      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Distinct from `ib person owner` (which changes the OWNING tenant) — this only picks which of a person's companies a bare login/impersonation lands on. --dry-run resolves client-side (GETs first, never POSTs) since the route has no server-side X-Dry-Run guard.",
+    ],
+    seeAlso: ["ib person default-company get", "ib person owner"],
+    examples: ["ib person default-company set 294 --asiakas 27 --reason 'migrated away from old company'"],
+  },
+  {
     command: "ib person role list",
     description:
       "List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, `--asiakas` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.",

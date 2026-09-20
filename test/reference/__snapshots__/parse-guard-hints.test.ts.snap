@@ -381,6 +381,10 @@ ib customer list --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 with NO cursor pagination (nextCursor is always null, even when truncated) — narrow with --ids/--since/--sort instead of paging
 
+ib customer list --owner <id>
+  ! --owner must be an integer >= 1
+  > ownerAsiakasId to scope the list to — omit to use the active company (sysadmins: pass to avoid an all-tenant list)
+
 ib customer log --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this cursor-less route caps at 500 and has no narrowing filter — raise --limit to reach older rows
@@ -1216,6 +1220,10 @@ ib person day get --person <id>
 ib person day set --person <id>
   ! --person must be an integer >= 1
   > pass a positive personId
+
+ib person default-company set --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > asiakasId to set as this person's default active company
 
 ib person duplicates --owner <id>
   ! --owner must be an integer >= 1

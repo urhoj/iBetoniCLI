@@ -59,6 +59,8 @@ export interface CustomerListFilter {
   since?: string;
   /** Result ordering: "name" (default) or "registered" (newest-registered first). Server-side. */
   sort?: "name" | "registered";
+  /** Scope to one tenant's own roster (default: active company; sysadmins otherwise list across ALL tenants). Deploy-gated — a no-op against an older backend. */
+  owner?: number;
 }
 
 /**
@@ -120,6 +122,7 @@ export async function runCustomerList(
       sijaintiTypes: opts.sijaintiTypes?.length ? opts.sijaintiTypes.join(",") : undefined,
       since: opts.since || undefined,
       sort: opts.sort || undefined,
+      owner: opts.owner,
     })}`
   );
   // Re-apply --fields / --sijainti-types CLIENT-SIDE too, so the flags trim the
@@ -1109,8 +1112,13 @@ export function registerCustomerCommands(
     .option("--sijainti-types <csv>")
     .option("--since <date>")
     .option("--sort <field>")
+    .option(
+      "--owner <id>",
+      "",
+      intFlag("--owner", 1, "ownerAsiakasId to scope the list to — omit to use the active company (sysadmins: pass to avoid an all-tenant list)")
+    )
     .action(
-      guarded(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string; since?: string; sort?: string }) => {
+      guarded(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string; since?: string; sort?: string; owner?: number }) => {
         const client = await getClient();
         assertEnum(opts.sort, ["name", "registered"], "--sort");
         const ids =
@@ -1139,6 +1147,7 @@ export function registerCustomerCommands(
           sijaintiTypes,
           since: resolveDate(opts.since),
           sort: opts.sort as "name" | "registered" | undefined,
+          owner: opts.owner,
         });
         writeJson(result);
       })
