@@ -452,7 +452,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
       "Deploy-gated: returns 404 until GET /api/cli/stats is deployed.",
       "Revenue and driver hours are out of scope (v1).",
-      "Soft-deleted orders (keikkaTilaId 10, hidden in the grid) are excluded from every figure; totals.deleted counts them.",
+      "Soft-deleted orders (keikkaTilaId 10, hidden in the grid) and cancelled ones (keikkaTilaId 8, Peruttu — visible in the grid, red) are excluded from every figure; totals.deleted and totals.cancelled count them. For Betomik, cancelled = the red rows of the order book, deleted = rows that left it (withdrawn or moved to another day).",
       "--all requires developer/system-admin access (403 for everyone else); omit to stay scoped to your own visibility.",
     ],
     examples: [
