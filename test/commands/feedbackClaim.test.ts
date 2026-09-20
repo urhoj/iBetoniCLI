@@ -87,6 +87,62 @@ describe("runFeedbackClaim", () => {
   });
 });
 
+/**
+ * fb#1833: `claim` gains the same `--also` batch ergonomics `resolve` already
+ * has. Unlike resolve, claim has no client-side hold-check GET — mutual
+ * exclusion is the backend's one atomic UPDATE, so a held also-row simply
+ * 409s from the POST itself, which the loop catches into a per-row result.
+ */
+describe("runFeedbackClaim --also (fb#1833)", () => {
+  test("applies the same claim to each named id, per-row results, no rollback", async () => {
+    const client = mockClient();
+    const post = (client as never as { post: ReturnType<typeof vi.fn> }).post;
+    post.mockResolvedValueOnce({ feedbackId: 1, claimedBy: "c6b96c" });
+    post.mockResolvedValueOnce({ feedbackId: 2, claimedBy: "c6b96c", claimExpiresAt: "t" });
+    const out = await runFeedbackClaim(client, 1, { by: "c6b96c", also: [2] });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post).toHaveBeenLastCalledWith(
+      "/api/feedback/2/claim",
+      expect.objectContaining({ by: "c6b96c" }),
+      expect.anything()
+    );
+    expect(out.also).toEqual([{ feedbackId: 2, ok: true, claimedBy: "c6b96c", claimExpiresAt: "t" }]);
+    expect(out.failed).toBe(0);
+  });
+
+  test("function-level guard: primary id and duplicates inside `also` are dropped", async () => {
+    const client = mockClient();
+    const post = (client as never as { post: ReturnType<typeof vi.fn> }).post;
+    post.mockResolvedValue({ feedbackId: 0, claimedBy: "c6b96c" });
+    const out = await runFeedbackClaim(client, 1, { by: "c6b96c", also: [1, 2, 2] });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post.mock.calls.filter((c: unknown[]) => c[0] === "/api/feedback/1/claim")).toHaveLength(1);
+    expect((out.also as Record<string, unknown>[]).map((r) => r.feedbackId)).toEqual([2]);
+  });
+
+  test("a row held by another agent (409) fails that row, others proceed", async () => {
+    const client = mockClient();
+    const post = (client as never as { post: ReturnType<typeof vi.fn> }).post;
+    const conflict = new CliError("Feedback 2 is already claimed by other-agent", 409, null, exitCodeFromStatus(409));
+    post.mockResolvedValueOnce({ feedbackId: 1, claimedBy: "c6b96c" });
+    post.mockRejectedValueOnce(conflict);
+    post.mockResolvedValueOnce({ feedbackId: 3, claimedBy: "c6b96c" });
+    const out = await runFeedbackClaim(client, 1, { by: "c6b96c", also: [2, 3] });
+    const also = out.also as Record<string, unknown>[];
+    expect(out.failed).toBe(1);
+    expect(also[0]).toMatchObject({ feedbackId: 2, ok: false });
+    expect(String(also[0].error)).toMatch(/already claimed/);
+    expect(also[1]).toMatchObject({ feedbackId: 3, ok: true });
+  });
+
+  test("without --also the primary claim is unaffected (no also/failed keys)", async () => {
+    const client = mockClient();
+    const out = await runFeedbackClaim(client, 42, { by: "c6b96c" });
+    expect(out).not.toHaveProperty("also");
+    expect(out).not.toHaveProperty("failed");
+  });
+});
+
 describe("runFeedbackRelease", () => {
   test("DELETEs one row's claim, carrying the label in the QUERY STRING", async () => {
     // ApiClient.delete takes (path, opts?: FetchOptions) and FetchOptions has no

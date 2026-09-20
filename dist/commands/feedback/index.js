@@ -1349,6 +1349,27 @@ export function mergeNoteFlags(...values) {
     return distinct.length ? distinct.join("\n\n") : undefined;
 }
 /**
+ * Parse `--also <ids>` into a deduped, self-excluding id array — shared by
+ * `resolve --also` and `claim --also` (fb#1833), which both apply one call's
+ * body to a batch of sibling rows named by this flag.
+ */
+export function parseAlsoIds(raw, excludeId) {
+    if (!raw)
+        return undefined;
+    return [
+        ...new Set(String(raw)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((s) => {
+            if (!/^\d+$/.test(s))
+                failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
+            return Number(s);
+        })
+            .filter((n) => n !== excludeId)),
+    ];
+}
+/**
  * PUT /api/feedback/:id — developer triage (status and/or resolution note).
  * A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
  * body client-side without sending.
@@ -1633,10 +1654,28 @@ export async function runFeedbackClaim(client, id, input) {
         body.ttlHours = input.ttlHours;
     if (input.steal)
         body.steal = true;
-    const row = await client.post(`/api/feedback/${id}/claim`, body, {
-        headers: writeFlagsToHeaders({ reason: input.reason }),
-    });
+    const headers = writeFlagsToHeaders({ reason: input.reason });
+    const row = await client.post(`/api/feedback/${id}/claim`, body, { headers });
     warnAlreadyLinked(row);
+    // Batch claim (fb#1833), same shape as resolve's --also: per-row results,
+    // never rolled back — a row another agent already holds (or a 404) is
+    // reported, not thrown, so the primary claim above still stands.
+    if (input.also?.length) {
+        const alsoIds = [...new Set(input.also)].filter((n) => n !== id);
+        const also = [];
+        for (const alsoId of alsoIds) {
+            try {
+                const r = await client.post(`/api/feedback/${alsoId}/claim`, body, { headers });
+                warnAlreadyLinked(r);
+                also.push({ feedbackId: alsoId, ok: true, claimedBy: r.claimedBy, claimExpiresAt: r.claimExpiresAt });
+            }
+            catch (e) {
+                also.push({ feedbackId: alsoId, ok: false, error: errorMessage(e) });
+            }
+        }
+        row.also = also;
+        row.failed = also.filter((r) => !r.ok).length;
+    }
     return row;
 }
 /** Release one lease (DELETE) or every lease held by the label (--all). */
@@ -1905,20 +1944,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             resolution: opts.resolution,
             reason: opts.reason,
         });
-        const also = opts.also
-            ? [
-                ...new Set(String(opts.also)
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                    .map((s) => {
-                    if (!/^\d+$/.test(s))
-                        failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
-                    return Number(s);
-                })
-                    .filter((n) => n !== id)),
-            ]
-            : undefined;
+        const also = parseAlsoIds(opts.also, id);
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackResolve(client, id, {
             status: opts.status,
@@ -2010,10 +2036,12 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--ttl-hours <n>", "Lease length in hours, 1-24 (default 24, measured from FIRST acquire)", intFlag("--ttl-hours", 1))
         .option("--steal", "Take a row under another agent's LIVE claim")
         .option("--reason <text>", "Human-readable why-string stored in audit logs (X-Action-Reason)")
+        .option("--also <ids>", "Comma-separated feedback ids to apply the same claim to")
         .action(guarded(async (idStr, opts) => {
         const id = parseRefId(idStr, "feedback", "claim");
+        const also = parseAlsoIds(opts.also, id);
         const client = await getClient();
-        writeJson(await runFeedbackClaim(client, id, opts));
+        writeJson(await runFeedbackClaim(client, id, { ...opts, also }));
     }));
     f.command("release [id]")
         .option("--by <label>", "The holder label — must match the label used to claim")

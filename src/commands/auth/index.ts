@@ -76,8 +76,12 @@ export function registerAuthCommands(
 
   auth
     .command("logout")
+    .option(
+      "--dry-run",
+      "Preview which session would be revoked and removed, without sending the revoke or touching the credentials file"
+    )
     .action(
-      guarded(async () => {
+      guarded(async (opts: { dryRun?: boolean }) => {
         try {
           const store = createStore(defaultCredentialsPath());
           // Sessions are per endpoint (fb#855): `--endpoint` logs out THAT
@@ -86,11 +90,25 @@ export function registerAuthCommands(
           const creds = override ? await store.loadFor(override) : await store.load();
           if (!creds) {
             // Not logged in — no-op success.
+            if (opts.dryRun) writeJson({ dryRun: true, wouldRevoke: false, note: "not logged in — nothing to revoke" });
             return;
           }
           const borrowed = override ? borrowedSessionNote(creds, override) : null;
           if (borrowed) {
             warnNote(borrowed);
+            return;
+          }
+          // fb#1443: logout destroys SERVER-side state (revokes the whole
+          // refresh-token family) before touching the local file, unlike every
+          // other write which carries --dry-run. Client-side only — resolves
+          // before the fetch, mirrors no server X-Dry-Run guard.
+          if (opts.dryRun) {
+            writeJson({
+              dryRun: true,
+              wouldRevoke: true,
+              endpoint: creds.endpoint,
+              credentialsPath: defaultCredentialsPath(),
+            });
             return;
           }
           await performLogout({

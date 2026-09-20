@@ -4,7 +4,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { assertPositiveInt, intFlag } from "../../targets.js";
+import { assertPositiveInt, intFlag, parseId } from "../../targets.js";
 // Static: program.ts registers the keikka domain on every invocation anyway, so
 // the dynamic import bought nothing and hid the edge from the module graph.
 import { runKeikkaValidate } from "../keikka/index.js";
@@ -51,49 +51,69 @@ export async function runValidatePerson(
 /**
  * Register the top-level `ib validate` command as a SINGLE LEAF (no subcommands,
  * so it renders a full leaf `--help` with a FLAGS section). The optional
- * positional `action` is `list` to list profiles; otherwise it runs flag-driven
- * validation. Entity is inferred from `--person`: present → person validation
- * (profile defaults to "onboarding"); absent → company validation (profile
- * required). Profile/entity mismatch is enforced server-side (404). Deploy-gated:
- * 404 until /api/validation/person is deployed.
+ * positional `action` is `list` to list profiles, or `person`/`company` paired
+ * with a second positional `[id]` as an alias for --person/--asiakas (fb#1407 —
+ * every sibling entity command in the CLI takes its target positionally, and
+ * this command's own USAGE line advertised the slot without saying what filled
+ * it). Otherwise it runs the flag-driven form unchanged: entity is inferred
+ * from `--person`: present → person validation (profile defaults to
+ * "onboarding"); absent → company validation (profile required).
+ * Profile/entity mismatch is enforced server-side (404). Deploy-gated: 404
+ * until /api/validation/person is deployed.
  */
 export function registerValidateCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
 ): void {
   parent
-    .command("validate [action]")
+    .command("validate [action] [id]")
     .option("--asiakas <id>", "", Number)
     .option("--person <id>", "", Number)
     .option("--profile <p>")
     .option("--keikka <id>", "", intFlag("--keikka"))
     .action(
-      guarded(async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }) => {
-        const client = await getClient();
-        if (opts.keikka != null) {
-          writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
-          return;
+      guarded(
+        async (
+          action: string | undefined,
+          idStr: string | undefined,
+          opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }
+        ) => {
+          const client = await getClient();
+          if (opts.keikka != null) {
+            writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
+            return;
+          }
+          if (action === "list") {
+            writeJson(await runValidateProfiles(client));
+            return;
+          }
+          if (action === "person" || action === "company") {
+            if (idStr === undefined) {
+              failWith(`\`validate ${action}\` needs an id: \`ib validate ${action} <id> --profile <p>\`.`, 4);
+            }
+            const id = parseId(idStr, action === "person" ? "personId" : "asiakasId");
+            if (action === "person") opts.person = id;
+            else opts.asiakas = id;
+          } else if (action !== undefined) {
+            failWith(`Unknown validate action "${action}" — use \`person <id>\`, \`company <id>\`, or \`list\`.`, 4);
+          }
+          const asiakasId =
+            opts.asiakas ??
+            ownerAsiakasIdFromToken(client, "pass --asiakas <id>, or run `ib auth switch`");
+          if (opts.person != null) {
+            writeJson(
+              await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)
+            );
+            return;
+          }
+          if (!opts.profile) {
+            failWith(
+              "Company validation needs --profile (jerry | betoni). Run `ib validate list` to see profiles.",
+              4
+            );
+          }
+          writeJson(await runValidateCompany(client, opts.profile, asiakasId));
         }
-        if (action === "list") {
-          writeJson(await runValidateProfiles(client));
-          return;
-        }
-        const asiakasId =
-          opts.asiakas ??
-          ownerAsiakasIdFromToken(client, "pass --asiakas <id>, or run `ib auth switch`");
-        if (opts.person != null) {
-          writeJson(
-            await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)
-          );
-          return;
-        }
-        if (!opts.profile) {
-          failWith(
-            "Company validation needs --profile (jerry | betoni). Run `ib validate list` to see profiles.",
-            4
-          );
-        }
-        writeJson(await runValidateCompany(client, opts.profile, asiakasId));
-      })
+      )
     );
 }

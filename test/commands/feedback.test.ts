@@ -3407,6 +3407,48 @@ describe("ib dev feedback resolve --also — argv parsing", () => {
   });
 });
 
+// ─── claim --also, argv-level parsing (fb#1833) ────────────────────────────
+
+describe("ib dev feedback claim --also — argv parsing", () => {
+  test("--also 2,3 reaches runFeedbackClaim as [2, 3]", async () => {
+    post.mockResolvedValue({ feedbackId: 0, claimedBy: "c" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "claim", "1", "--by", "c", "--also", "2,3"],
+      { from: "user" }
+    );
+    const postPaths = post.mock.calls.map((c: unknown[]) => c[0]);
+    expect(postPaths).toEqual(["/api/feedback/1/claim", "/api/feedback/2/claim", "/api/feedback/3/claim"]);
+  });
+
+  test("a non-integer --also token exits 4 naming it, no POST to the also rows", async () => {
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    const { exitCode, envelope } = await captureActionError(() =>
+      program.parseAsync(
+        ["feedback", "claim", "1", "--by", "c", "--also", "2,x"],
+        { from: "user" }
+      )
+    );
+    expect(exitCode).toBe(4);
+    expect(String(envelope.error)).toMatch(/--also must be comma-separated feedback ids \(got 'x'\)/);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("the primary id is excluded from --also — claim 5 --also 5,6 only also-claims 6", async () => {
+    post.mockResolvedValue({ feedbackId: 0, claimedBy: "c" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "claim", "5", "--by", "c", "--also", "5,6"],
+      { from: "user" }
+    );
+    const postPaths = post.mock.calls.map((c: unknown[]) => c[0]);
+    expect(postPaths).toEqual(["/api/feedback/5/claim", "/api/feedback/6/claim"]);
+  });
+});
+
 /**
  * fb#1439 — the wiring half. The helper existing is not the fix; the fix is that
  * the two hard-capped list routes actually call it.

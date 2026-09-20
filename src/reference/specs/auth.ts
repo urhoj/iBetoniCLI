@@ -59,12 +59,15 @@ export const AUTH_SPECS: CommandSpec[] = [
     description:
       "Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); the credentials file is removed with the last session.",
     auth: "any",
-    flags: [],
-    outputShape: "no stdout output; exit 0 on success",
+    dryRunKind: "client",
+    flags: [
+      { name: "dry-run", type: "boolean", description: "Preview which session would be revoked and removed, without sending the revoke or touching the credentials file (fb#1443 — logout is the one destructive command that used to carry no write-safety symmetry with the rest of the CLI)." },
+    ],
+    outputShape: "no stdout output; exit 0 on success. With --dry-run: { dryRun:true, wouldRevoke:boolean, endpoint?, credentialsPath?, note? }.",
     errors: [
       { origin: "client", exit: 1, meaning: "I/O error", remedy: "check file permissions" },
     ],
-    examples: ["ib auth logout", "ib auth logout --endpoint http://127.0.0.1:8080"],
+    examples: ["ib auth logout", "ib auth logout --dry-run", "ib auth logout --endpoint http://127.0.0.1:8080"],
   },
   {
     command: "ib auth whoami",

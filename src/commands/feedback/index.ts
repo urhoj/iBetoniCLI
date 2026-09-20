@@ -1638,6 +1638,28 @@ export function mergeNoteFlags(...values: Array<string | undefined>): string | u
 }
 
 /**
+ * Parse `--also <ids>` into a deduped, self-excluding id array — shared by
+ * `resolve --also` and `claim --also` (fb#1833), which both apply one call's
+ * body to a batch of sibling rows named by this flag.
+ */
+export function parseAlsoIds(raw: string | undefined, excludeId: number): number[] | undefined {
+  if (!raw) return undefined;
+  return [
+    ...new Set(
+      String(raw)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          if (!/^\d+$/.test(s)) failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
+          return Number(s);
+        })
+        .filter((n) => n !== excludeId)
+    ),
+  ];
+}
+
+/**
  * PUT /api/feedback/:id — developer triage (status and/or resolution note).
  * A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
  * body client-side without sending.
@@ -1960,16 +1982,33 @@ function assertClaimIdentity(explicit: string | undefined, action: string): void
 export async function runFeedbackClaim(
   client: ApiClient,
   id: number,
-  input: { by?: string; ttlHours?: number; steal?: boolean; reason?: string }
+  input: { by?: string; ttlHours?: number; steal?: boolean; reason?: string; also?: number[] }
 ): Promise<Record<string, unknown>> {
   assertClaimIdentity(input.by, "claim");
   const body: Record<string, unknown> = { by: resolveClaimId(input.by) };
   if (input.ttlHours !== undefined) body.ttlHours = input.ttlHours;
   if (input.steal) body.steal = true;
-  const row = await client.post<Record<string, unknown>>(`/api/feedback/${id}/claim`, body, {
-    headers: writeFlagsToHeaders({ reason: input.reason }),
-  });
+  const headers = writeFlagsToHeaders({ reason: input.reason });
+  const row = await client.post<Record<string, unknown>>(`/api/feedback/${id}/claim`, body, { headers });
   warnAlreadyLinked(row);
+  // Batch claim (fb#1833), same shape as resolve's --also: per-row results,
+  // never rolled back — a row another agent already holds (or a 404) is
+  // reported, not thrown, so the primary claim above still stands.
+  if (input.also?.length) {
+    const alsoIds = [...new Set(input.also)].filter((n) => n !== id);
+    const also: Record<string, unknown>[] = [];
+    for (const alsoId of alsoIds) {
+      try {
+        const r = await client.post<Record<string, unknown>>(`/api/feedback/${alsoId}/claim`, body, { headers });
+        warnAlreadyLinked(r);
+        also.push({ feedbackId: alsoId, ok: true, claimedBy: r.claimedBy, claimExpiresAt: r.claimExpiresAt });
+      } catch (e) {
+        also.push({ feedbackId: alsoId, ok: false, error: errorMessage(e) });
+      }
+    }
+    row.also = also;
+    row.failed = also.filter((r) => !r.ok).length;
+  }
   return row;
 }
 
@@ -2330,21 +2369,7 @@ export function registerFeedbackCommands(
           resolution: opts.resolution,
           reason: opts.reason,
         });
-        const also = opts.also
-          ? [
-              ...new Set(
-                String(opts.also)
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean)
-                  .map((s) => {
-                    if (!/^\d+$/.test(s)) failWith(`--also must be comma-separated feedback ids (got '${s}')`, 4);
-                    return Number(s);
-                  })
-                  .filter((n) => n !== id)
-              ),
-            ]
-          : undefined;
+        const also = parseAlsoIds(opts.also, id);
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
@@ -2484,11 +2509,13 @@ export function registerFeedbackCommands(
     .option("--ttl-hours <n>", "Lease length in hours, 1-24 (default 24, measured from FIRST acquire)", intFlag("--ttl-hours", 1))
     .option("--steal", "Take a row under another agent's LIVE claim")
     .option("--reason <text>", "Human-readable why-string stored in audit logs (X-Action-Reason)")
+    .option("--also <ids>", "Comma-separated feedback ids to apply the same claim to")
     .action(
-      guarded(async (idStr: string, opts: { by?: string; ttlHours?: number; steal?: boolean; reason?: string }) => {
+      guarded(async (idStr: string, opts: { by?: string; ttlHours?: number; steal?: boolean; reason?: string; also?: string }) => {
         const id = parseRefId(idStr, "feedback", "claim");
+        const also = parseAlsoIds(opts.also, id);
         const client = await getClient();
-        writeJson(await runFeedbackClaim(client, id, opts));
+        writeJson(await runFeedbackClaim(client, id, { ...opts, also }));
       })
     );
 

@@ -492,9 +492,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "ttl-hours", type: "number", description: "Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it." },
       { name: "steal", type: "boolean", description: "Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead." },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
+      { name: "also", type: "string", description: "Comma-separated feedback ids to apply the SAME claim to (fb#1833, mirrors resolve --also). A row held LIVE by another agent is skipped and reported, not fatal — check `failed` in the output, not just the exit code." },
     ],
     outputShape:
-      "The claimed feedback row, including claimedBy, claimedAt, claimExpiresAt and `changelogLinks: [{changelogId, role}]`.",
+      "The claimed feedback row, including claimedBy, claimedAt, claimExpiresAt and `changelogLinks: [{changelogId, role}]`. With --also: also: [{feedbackId, ok, claimedBy?, claimExpiresAt?, error?}], failed (count).",
     errors: [
       // The 1-24 range check is SERVER-side (feedback.js claim(): sendValidationError
       // -> HTTP 400), not client-side — runFeedbackClaim forwards ttlHours unchecked.
@@ -521,6 +522,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback claim 42 --by c6b96c",
       "ib dev feedback claim 42 --by c6b96c --ttl-hours 4",
       "ib dev feedback claim 42 --by c6b96c --steal",
+      "ib dev feedback claim 1821 --also 1825,1827",
     ],
   },
   {

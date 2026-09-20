@@ -87,7 +87,8 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "person: the above OR HR admin (typeId 24) of the target company",
     ],
     args: [
-      { name: "action", type: "string", required: false, description: "Use 'list' to list available profiles; omit to run validation." },
+      { name: "action", type: "string", required: false, description: "'list' to list available profiles; 'person'/'company' paired with the second positional [id] as an alias for --person/--asiakas; omit both to run the flag-driven form." },
+      { name: "id", type: "number", required: false, description: "personId or asiakasId, positionally — only meaningful when action is 'person' or 'company' (fb#1407)." },
     ],
     flags: [
       { name: "asiakas", type: "number", description: "Target asiakasId (default: active company)" },
@@ -102,6 +103,10 @@ export const COMPANY_SPECS: CommandSpec[] = [
       apiErr(403, "Not an admin/HR of the target company", "use an admin/HR token"),
       apiErr(404, "Unknown profile for that entity, or company/person not found", "run `ib validate list` to see profiles"),
       intParseErr("--keikka", "pass a keikkaId"),
+      { origin: "client", exit: 4, match: "needs an id", meaning: "`validate person`/`validate company` given with no second positional", remedy: "pass the id positionally (`ib validate person <id> --profile <p>`) or use --person/--asiakas" },
+      { origin: "client", exit: 4, match: "Unknown validate action", meaning: "The first positional is neither 'list', 'person', nor 'company'", remedy: "use `ib validate person <id>`, `ib validate company <id>`, or `ib validate list`" },
+      { origin: "client", exit: 4, match: "invalid personId", meaning: "The `validate person <id>` positional is not a positive integer", remedy: "pass a positive personId" },
+      { origin: "client", exit: 4, match: "invalid asiakasId", meaning: "The `validate company <id>` positional is not a positive integer", remedy: "pass a positive asiakasId" },
       { origin: "client", exit: 4, match: ["Company validation needs --profile", "must be a positive integer"], meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
     ],
     notes: [
@@ -110,10 +115,13 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "Exit code is 0 even when ok:false — the JSON carries the outcome.",
       "Deploy-gated: returns 404 until /api/validation is deployed.",
       "'ib company validate' was renamed to this command (exit 4 on the old path).",
+      "`validate person <id>` / `validate company <id>` (fb#1407) are positional aliases for --person/--asiakas, matching the positional convention every sibling entity command uses; --profile is still required/defaulted the same way as the flag-driven form.",
     ],
     seeAlso: ["ib person get", "ib customer modules", "ib jerry admin detail"],
     examples: [
       "ib validate list",
+      "ib validate person 10 --profile onboarding",
+      "ib validate company 8 --profile betoni",
       "ib validate --asiakas 8 --profile betoni",
       "ib validate --asiakas 8 --person 10",
       "ib validate --person 10 --profile onboarding",

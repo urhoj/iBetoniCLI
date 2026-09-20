@@ -690,20 +690,21 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  (none)
+  --dry-run    Preview which session would be revoked and removed, without sending the revoke or touching the credentials file (fb#1443 — logout is the one destructive command that used to carry no write-safety symmetry with the rest of the CLI).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  no stdout output; exit 0 on success
+  no stdout output; exit 0 on success. With --dry-run: { dryRun:true, wouldRevoke:boolean, endpoint?, credentialsPath?, note? }.
 
 ERRORS (stderr, exit non-zero)
   exit 1 (client-side)  I/O error              → check file permissions
 
 EXAMPLES
   ib auth logout
+  ib auth logout --dry-run
   ib auth logout --endpoint http://127.0.0.1:8080
 "
 `;
@@ -3798,13 +3799,14 @@ FLAGS
   --ttl-hours NUMBER    Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it.
   --steal    Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead.
   --reason STRING    Audit-log reason (X-Action-Reason)
+  --also STRING    Comma-separated feedback ids to apply the SAME claim to (fb#1833, mirrors resolve --also). A row held LIVE by another agent is skipped and reported, not fatal — check \`failed\` in the output, not just the exit code.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  The claimed feedback row, including claimedBy, claimedAt, claimExpiresAt and \`changelogLinks: [{changelogId, role}]\`.
+  The claimed feedback row, including claimedBy, claimedAt, claimExpiresAt and \`changelogLinks: [{changelogId, role}]\`. With --also: also: [{feedbackId, ok, claimedBy?, claimExpiresAt?, error?}], failed (count).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation             → --ttl-hours must be 1-24
@@ -3829,6 +3831,7 @@ EXAMPLES
   ib dev feedback claim 42 --by c6b96c
   ib dev feedback claim 42 --by c6b96c --ttl-hours 4
   ib dev feedback claim 42 --by c6b96c --steal
+  ib dev feedback claim 1821 --also 1825,1827
 "
 `;
 
@@ -14576,14 +14579,15 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib validate matches snapshot 1`] = `
 "USAGE
-  ib validate [<action>] [flags]
+  ib validate [<action>] [<id>] [flags]
 
 DESCRIPTION
   Validate a company OR a single employee against a profile — a pass/fail/skip checklist with Finnish details naming what is missing. Entity is inferred from --person: absent → company (profiles: jerry, betoni; --profile required); present → person (profile: onboarding, default). \`ib validate list\` lists profiles. Company: GET /api/validation/:profile/:asiakasId. Person: GET /api/validation/person/:profile/:asiakasId/:personId.
   Permissions: requires company: system admin OR admin-tier role in the target (or owner) company, person: the above OR HR admin (typeId 24) of the target company.
 
 ARGUMENTS
-  <action> STRING    Use 'list' to list available profiles; omit to run validation. (optional)
+  <action> STRING    'list' to list available profiles; 'person'/'company' paired with the second positional [id] as an alias for --person/--asiakas; omit both to run the flag-driven form. (optional)
+  <id> NUMBER    personId or asiakasId, positionally — only meaningful when action is 'person' or 'company' (fb#1407). (optional)
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (default: active company)
@@ -14603,6 +14607,10 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not an admin/HR of the target company → use an admin/HR token
   exit 5 (HTTP 404)  Unknown profile for that entity, or company/person not found → run \`ib validate list\` to see profiles
   exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a keikkaId
+  exit 4 (client-side)  \`validate person\`/\`validate company\` given with no second positional → pass the id positionally (\`ib validate person <id> --profile <p>\`) or use --person/--asiakas
+  exit 4 (client-side)  The first positional is neither 'list', 'person', nor 'company' → use \`ib validate person <id>\`, \`ib validate company <id>\`, or \`ib validate list\`
+  exit 4 (client-side)  The \`validate person <id>\` positional is not a positive integer → pass a positive personId
+  exit 4 (client-side)  The \`validate company <id>\` positional is not a positive integer → pass a positive asiakasId
   exit 4 (client-side)  Missing --profile for company validation, or a non-positive --asiakas/--person → pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run \`ib validate list\`
 
 NOTES
@@ -14611,12 +14619,15 @@ NOTES
   - Exit code is 0 even when ok:false — the JSON carries the outcome.
   - Deploy-gated: returns 404 until /api/validation is deployed.
   - 'ib company validate' was renamed to this command (exit 4 on the old path).
+  - \`validate person <id>\` / \`validate company <id>\` (fb#1407) are positional aliases for --person/--asiakas, matching the positional convention every sibling entity command uses; --profile is still required/defaulted the same way as the flag-driven form.
 
 SEE ALSO
   ib person get, ib customer modules, ib jerry admin detail
 
 EXAMPLES
   ib validate list
+  ib validate person 10 --profile onboarding
+  ib validate company 8 --profile betoni
   ib validate --asiakas 8 --profile betoni
   ib validate --asiakas 8 --person 10
   ib validate --person 10 --profile onboarding
