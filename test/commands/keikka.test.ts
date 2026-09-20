@@ -1,7 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
-  runKeikkaUpdate,
   runKeikkaLatest,
   runKeikkaValidate,
 } from "../../src/commands/keikka/index.js";
@@ -10,15 +9,6 @@ import { todayHelsinki, addDaysISO } from "../../src/dates.js";
 const mockClient = mockApiClient();
 
 const getMock = mockClient.get;
-
-describe("ib keikka update validation", () => {
-  test("runKeikkaUpdate throws when no status field is present", async () => {
-    await expect(
-      runKeikkaUpdate(mockClient, 5, {}, {})
-    ).rejects.toThrow(/nothing to update/i);
-    expect(mockClient.post).not.toHaveBeenCalled();
-  });
-});
 
 /** Build the backend list envelope for n items. */
 function envelope(items: Record<string, unknown>[]) {

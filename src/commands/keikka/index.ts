@@ -328,31 +328,6 @@ export interface KeikkaUpdateFields {
 }
 
 /**
- * Compose the POST /api/cli/keikka/move/:id body from typed flags. A time flag
- * needs the row's current Helsinki day/start (`ib keikka get` → pvm/time) to
- * fill what was not given: `--date` alone keeps the clock time, `--end` alone
- * turns into pumppuKesto against the current start. Pure; exit 4 on bad input.
- */
-export function buildKeikkaMoveBody(
-  typed: KeikkaUpdateFields,
-  cur: { pvm?: unknown; time?: unknown } | null
-): { vehicleId?: number; pumppuAika?: string; pumppuKesto?: number } {
-  const body: { vehicleId?: number; pumppuAika?: string; pumppuKesto?: number } = {};
-  if (typed.vehicle !== undefined) body.vehicleId = typed.vehicle;
-  if (typed.date === undefined && typed.start === undefined && typed.end === undefined) return body;
-  const date = typed.date ?? (typeof cur?.pvm === "string" ? cur.pvm : undefined);
-  const start = typed.start ?? (typeof cur?.time === "string" ? cur.time : undefined);
-  if (!date || !start) {
-    failWith("keikka has no pumppuAika to move from — pass both --date and --start", 4);
-  }
-  if (typed.date !== undefined || typed.start !== undefined) {
-    body.pumppuAika = composeInstant(date!, start!, "--start");
-  }
-  if (typed.end !== undefined) body.pumppuKesto = minutesBetween(start!, typed.end, "--end");
-  return body;
-}
-
-/**
  * Update a keikka. `--status` posts the numeric keikkaTilaId to
  * /api/keikka/tila/set; the move flags (`--vehicle/--date/--start/--end` — the
  * grid's drag-and-drop) post to /api/cli/keikka/move/:id, which read-merges
@@ -366,11 +341,8 @@ export async function runKeikkaUpdate(
   fields: KeikkaUpdateFields,
   flags: WriteFlags
 ): Promise<unknown> {
-  const isMove =
-    fields.vehicle !== undefined ||
-    fields.date !== undefined ||
-    fields.start !== undefined ||
-    fields.end !== undefined;
+  const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
+  const isMove = needsRow || fields.vehicle !== undefined;
   if (fields.status !== undefined && isMove) {
     failWith("--status cannot be combined with --vehicle/--date/--start/--end — run two commands", 4);
   }
@@ -378,13 +350,24 @@ export async function runKeikkaUpdate(
     failWith("Nothing to update: pass --status, or a move flag (--vehicle/--date/--start/--end)", 4);
   }
   if (isMove) {
-    const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
-    const cur = needsRow ? await runKeikkaGet(client, keikkaId) : null;
-    return client.post<unknown>(
-      `/api/cli/keikka/move/${keikkaId}`,
-      buildKeikkaMoveBody(fields, cur),
-      { headers: writeFlagsToHeaders(flags) }
-    );
+    const body: { vehicleId?: number; pumppuAika?: string; pumppuKesto?: number } = {};
+    if (fields.vehicle !== undefined) body.vehicleId = fields.vehicle;
+    if (needsRow) {
+      // A time flag fills what it omits from the row's Helsinki day/start (`ib keikka
+      // get` → pvm/time): `--date` alone keeps the clock time, `--end` alone becomes
+      // pumppuKesto against the current start.
+      const cur = (await runKeikkaGet(client, keikkaId)) as { pvm?: unknown; time?: unknown };
+      const date = fields.date ?? (typeof cur.pvm === "string" ? cur.pvm : undefined);
+      const start = fields.start ?? (typeof cur.time === "string" ? cur.time : undefined);
+      if (!date || !start) {
+        failWith("keikka has no pumppuAika to move from — pass both --date and --start", 4);
+      }
+      if (fields.date !== undefined || fields.start !== undefined) {
+        body.pumppuAika = composeInstant(date, start, "--start");
+      }
+      if (fields.end !== undefined) body.pumppuKesto = minutesBetween(start, fields.end, "--end");
+    }
+    return client.post<unknown>(`/api/cli/keikka/move/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
   }
   // --status is a keikkaTilaId and MUST go to /api/keikka/tila/set as
   // `keikkaTilaId`. The older /setStatus endpoint ignores a `tila` field (it
@@ -794,7 +777,7 @@ export function registerKeikkaCommands(
         {
           status: opts.status,
           vehicle: opts.vehicle,
-          date: opts.date !== undefined ? resolveDate(opts.date) : undefined,
+          date: resolveDate(opts.date),
           start: opts.start,
           end: opts.end,
         },

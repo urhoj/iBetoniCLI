@@ -7790,7 +7790,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers|null } (--dry-run: { dryRun:true, wouldUpdate, validation })
+  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null } (--dry-run: { dryRun:true, wouldUpdate, validation })
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag: --vehicle / --date / --start / --end

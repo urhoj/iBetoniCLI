@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { composeInstant } from "../../src/dates.js";
 import {
   buildPalkkiBody,
-  composeInstant,
   runPalkkiList,
   runPalkkiGet,
   runPalkkiCreate,

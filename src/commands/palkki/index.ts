@@ -343,9 +343,6 @@ export interface PalkkiFields {
   style?: string;
 }
 
-// composeInstant moved to dates.ts (shared with `ib keikka update`); re-exported for callers/tests.
-export { composeInstant };
-
 /**
  * Merge typed flags over a parsed --body object (typed flags win) into the
  * POST /api/cli/palkki/create|update body. Time flags are composed only when

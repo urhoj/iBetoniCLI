@@ -313,7 +313,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers|null } (--dry-run: { dryRun:true, wouldUpdate, validation })",
+      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null } (--dry-run: { dryRun:true, wouldUpdate, validation })",
     errors: [
       // The THIRD twin of the fb#668 class, and the client-side shape of it:
       // this command has several exit-4 client guards; a sole matchless client
