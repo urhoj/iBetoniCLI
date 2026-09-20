@@ -797,6 +797,10 @@ ib keikka search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 100
 
+ib keikka update --vehicle <id>
+  ! --vehicle must be an integer >= 1
+  > pass a positive vehicleId
+
 ib legal acceptances --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 500 — narrow with \`--doc-version\` rather than raising the cap

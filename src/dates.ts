@@ -159,6 +159,27 @@ export function resolveDateTime(input?: string, flag = "--time"): string | undef
   return new Date(wallAsUtc - helsinkiOffsetMs(guess)).toISOString();
 }
 
+const HHMM_RE = /^\d{2}:\d{2}$/;
+
+/**
+ * Helsinki wall-clock `date` + `HH:MM` → ISO instant (the web grid's own wire
+ * format). Goes through resolveDateTime so DST is handled the same way as
+ * every other `--time` flag. Shared by `ib palkki` and `ib keikka` time moves.
+ */
+export function composeInstant(date: string, hhmm: string, flag: string): string {
+  if (!HHMM_RE.test(hhmm)) failWith(`${flag}: expected HH:MM, got "${hhmm}"`, 4);
+  return resolveDateTime(`${date}T${hhmm}`, flag)!;
+}
+
+/** Whole minutes between two same-day HH:MM wall-clock times; exit 4 unless end > start. */
+export function minutesBetween(start: string, end: string, flag: string): number {
+  if (!HHMM_RE.test(end)) failWith(`${flag}: expected HH:MM, got "${end}"`, 4);
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const kesto = toMin(end) - toMin(start);
+  if (kesto <= 0) failWith(`${flag} must be after the start time (${start})`, 4);
+  return kesto;
+}
+
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 /** Expand `YYYY-MM` to { from: first day, to: last day } (leap-year aware). */

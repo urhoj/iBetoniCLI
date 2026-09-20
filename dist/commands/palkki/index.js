@@ -7,7 +7,7 @@ import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { intFlag, parseId } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { resolveDate, resolveDateTime, todayHelsinki } from "../../dates.js";
+import { resolveDate, todayHelsinki, composeInstant } from "../../dates.js";
 /**
  * Merge typed convenience flags over a parsed --body object (typed flags win).
  * The body shape is shared by POST /grid/palkkiType/new and /save/:id — the
@@ -208,17 +208,8 @@ export async function runPalkkiColorReorder(client, barColorId1, barColorId2, fl
         headers: writeFlagsToHeaders(flags),
     });
 }
-const HHMM_RE = /^\d{2}:\d{2}$/;
-/**
- * Helsinki wall-clock `date` + `HH:MM` → ISO instant (the web grid's own wire
- * format). Goes through resolveDateTime so DST is handled the same way as
- * every other `--time` flag.
- */
-export function composeInstant(date, hhmm, flag) {
-    if (!HHMM_RE.test(hhmm))
-        failWith(`${flag}: expected HH:MM, got "${hhmm}"`, 4);
-    return resolveDateTime(`${date}T${hhmm}`, flag);
-}
+// composeInstant moved to dates.ts (shared with `ib keikka update`); re-exported for callers/tests.
+export { composeInstant };
 /**
  * Merge typed flags over a parsed --body object (typed flags win) into the
  * POST /api/cli/palkki/create|update body. Time flags are composed only when

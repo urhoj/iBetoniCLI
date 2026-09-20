@@ -7766,7 +7766,7 @@ exports[`Help snapshots — contract stability > help for ib keikka update match
   ib keikka update <keikkaId> [flags]
 
 DESCRIPTION
-  Update a keikka. v1.0 supports only \`--status\` (the numeric keikkaTilaId, posted to POST /api/keikka/tila/set). Other field-setters land in v1.1.
+  Update a keikka: \`--status\` (numeric keikkaTilaId → POST /api/keikka/tila/set), or MOVE it like the grid's drag-and-drop — \`--vehicle\`/\`--date\`/\`--start\`/\`--end\` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side). Status and move are two routes: one per call.
   Permissions: requires auth.page.grid.tilaus.edit.
 
 ARGUMENTS
@@ -7774,6 +7774,10 @@ ARGUMENTS
 
 FLAGS
   --status STRING    New keikkaTilaId (numeric, e.g. 9 = Toimitettu)
+  --vehicle NUMBER    Move to this vehicleId (drivers re-derived like a grid drop)
+  --date STRING    Move to this day (YYYY-MM-DD | today | tomorrow), keeping the clock time
+  --start STRING    New pump start, HH:MM Helsinki
+  --end STRING    New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -7786,22 +7790,34 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { ok: true } or backend response
+  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers|null } (--dry-run: { dryRun:true, wouldUpdate, validation })
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId> — it is the only field v1.0 can update
+  exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag: --vehicle / --date / --start / --end
+  exit 4 (client-side)  --status given together with a move flag — two routes, no atomicity → run them as two commands
   exit 4 (client-side)  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
-  exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
+  exit 4 (client-side)  --start/--end not HH:MM → pass e.g. --start 08:00
+  exit 4 (client-side)  --end is not after the (new or current) start; same-day only → pass an --end later than the start, or move --start first
+  exit 4 (client-side)  The row has no pumppuAika, so a partial time flag has nothing to fill from → pass both --date and --start
+  exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
+  exit 4 (HTTP 400)  Move body rejected (vehicleId, pumppuAika, or pumppuKesto outside 15..10080 min) → check the flags
+  exit 5 (HTTP 404)  Keikka not found, soft-deleted, OR outside your visible scope → verify keikkaId — NOT proof the row is absent: results mirror your permissions, so another tenant's keikka 404s identically
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
   - --status takes the numeric keikkaTilaId, NOT a name — e.g. \`--status 9\` (Toimitettu), \`--status 8\` (Peruttu), \`--status 2\` (Lähetetty). See the legend on \`ib keikka list --help\` or the \`tila\` GLOSSARY entry on \`ib --help\`.
+  - A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.
+  - Time flags read the row first (pvm/time) to fill what you omit: \`--date\` alone keeps the clock time, \`--end\` alone recomputes pumppuKesto from the current start. \`--vehicle\` alone makes no read.
 
 EXAMPLES
   ib keikka update 9001 --status 9
   ib keikka update 9001 --status 8 --reason 'phone cancellation'
+  ib keikka update 9001 --vehicle 1226 --dry-run
+  ib keikka update 9001 --vehicle 1226 --reason 'NLR-210 huollossa'
+  ib keikka update 9001 --date tomorrow
+  ib keikka update 9001 --start 09:00 --end 11:30
 "
 `;
 

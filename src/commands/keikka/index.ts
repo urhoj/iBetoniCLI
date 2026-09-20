@@ -8,7 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
-import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
+import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween } from "../../dates.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
@@ -319,21 +319,71 @@ export async function runKeikkaIntakeCommit(
   });
 }
 
+export interface KeikkaUpdateFields {
+  status?: string;
+  vehicle?: number;
+  date?: string;
+  start?: string;
+  end?: string;
+}
+
 /**
- * Update a keikka. v1.0 supports only `--status` (the lifecycle keikkaTilaId);
- * other fields are deferred until the dedicated CLI mutation routes ship (v1.1).
- * Posts the numeric keikkaTilaId to `/api/keikka/tila/set` with the universal
- * write-flag headers.
+ * Compose the POST /api/cli/keikka/move/:id body from typed flags. A time flag
+ * needs the row's current Helsinki day/start (`ib keikka get` → pvm/time) to
+ * fill what was not given: `--date` alone keeps the clock time, `--end` alone
+ * turns into pumppuKesto against the current start. Pure; exit 4 on bad input.
+ */
+export function buildKeikkaMoveBody(
+  typed: KeikkaUpdateFields,
+  cur: { pvm?: unknown; time?: unknown } | null
+): { vehicleId?: number; pumppuAika?: string; pumppuKesto?: number } {
+  const body: { vehicleId?: number; pumppuAika?: string; pumppuKesto?: number } = {};
+  if (typed.vehicle !== undefined) body.vehicleId = typed.vehicle;
+  if (typed.date === undefined && typed.start === undefined && typed.end === undefined) return body;
+  const date = typed.date ?? (typeof cur?.pvm === "string" ? cur.pvm : undefined);
+  const start = typed.start ?? (typeof cur?.time === "string" ? cur.time : undefined);
+  if (!date || !start) {
+    failWith("keikka has no pumppuAika to move from — pass both --date and --start", 4);
+  }
+  if (typed.date !== undefined || typed.start !== undefined) {
+    body.pumppuAika = composeInstant(date!, start!, "--start");
+  }
+  if (typed.end !== undefined) body.pumppuKesto = minutesBetween(start!, typed.end, "--end");
+  return body;
+}
+
+/**
+ * Update a keikka. `--status` posts the numeric keikkaTilaId to
+ * /api/keikka/tila/set; the move flags (`--vehicle/--date/--start/--end` — the
+ * grid's drag-and-drop) post to /api/cli/keikka/move/:id, which read-merges
+ * over the blanket keikka_saveAika proc server-side and re-derives the driver
+ * like a grid drop. The two are separate routes with no atomicity, so mixing
+ * them in one call is refused.
  */
 export async function runKeikkaUpdate(
   client: ApiClient,
   keikkaId: number,
-  fields: Record<string, unknown>,
+  fields: KeikkaUpdateFields,
   flags: WriteFlags
 ): Promise<unknown> {
-  if (!("status" in fields)) {
-    throw new Error(
-      "v1.0 only supports --status; other fields are pending v1.1"
+  const isMove =
+    fields.vehicle !== undefined ||
+    fields.date !== undefined ||
+    fields.start !== undefined ||
+    fields.end !== undefined;
+  if (fields.status !== undefined && isMove) {
+    failWith("--status cannot be combined with --vehicle/--date/--start/--end — run two commands", 4);
+  }
+  if (fields.status === undefined && !isMove) {
+    failWith("Nothing to update: pass --status, or a move flag (--vehicle/--date/--start/--end)", 4);
+  }
+  if (isMove) {
+    const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
+    const cur = needsRow ? await runKeikkaGet(client, keikkaId) : null;
+    return client.post<unknown>(
+      `/api/cli/keikka/move/${keikkaId}`,
+      buildKeikkaMoveBody(fields, cur),
+      { headers: writeFlagsToHeaders(flags) }
     );
   }
   // --status is a keikkaTilaId and MUST go to /api/keikka/tila/set as
@@ -580,7 +630,7 @@ export async function runKeikkaPersonList(
  *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
  *   - get      single keikka by id
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
- *   - update   POST /api/keikka/setStatus (v1.0: --status only)
+ *   - update   --status → POST /api/keikka/tila/set; --vehicle/--date/--start/--end → POST /api/cli/keikka/move/:id
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
  *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
  *
@@ -730,17 +780,24 @@ export function registerKeikkaCommands(
 
   const updateCmd = k
     .command("update <keikkaId>")
-    .option("--status <s>");
+    .option("--status <s>")
+    .option("--vehicle <id>", "Move to this vehicleId (drivers re-derived like a grid drop)", intFlag("--vehicle"))
+    .option("--date <d>", "Move to this day (YYYY-MM-DD | today | tomorrow), keeping the clock time")
+    .option("--start <HH:MM>", "New pump start, Helsinki wall-clock")
+    .option("--end <HH:MM>", "New pump end, Helsinki wall-clock (sets pumppuKesto)");
   addWriteFlagsToCommand(updateCmd).action(
-    guarded(async (idStr: string, opts: WriteFlags & { status?: string }) => {
-      if (opts.status === undefined) {
-        failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);
-      }
+    guarded(async (idStr: string, opts: WriteFlags & KeikkaUpdateFields) => {
       const client = await getClient();
       const result = await runKeikkaUpdate(
         client,
         parseId(idStr, "keikkaId"),
-        { status: opts.status },
+        {
+          status: opts.status,
+          vehicle: opts.vehicle,
+          date: opts.date !== undefined ? resolveDate(opts.date) : undefined,
+          start: opts.start,
+          end: opts.end,
+        },
         opts
       );
       writeJson(result);

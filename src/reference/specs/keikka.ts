@@ -296,7 +296,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka update",
     description:
-      "Update a keikka. v1.0 supports only `--status` (the numeric keikkaTilaId, posted to POST /api/keikka/tila/set). Other field-setters land in v1.1.",
+      "Update a keikka: `--status` (numeric keikkaTilaId → POST /api/keikka/tila/set), or MOVE it like the grid's drag-and-drop — `--vehicle`/`--date`/`--start`/`--end` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side). Status and move are two routes: one per call.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to update" }],
     flags: [
@@ -305,28 +305,43 @@ export const KEIKKA_SPECS: CommandSpec[] = [
         type: "string",
         description: "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)",
       },
+      { name: "vehicle", type: "number", description: "Move to this vehicleId (drivers re-derived like a grid drop)" },
+      { name: "date", type: "string", description: "Move to this day (YYYY-MM-DD | today | tomorrow), keeping the clock time" },
+      { name: "start", type: "string", description: "New pump start, HH:MM Helsinki" },
+      { name: "end", type: "string", description: "New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)" },
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ ok: true } or backend response",
+    outputShape:
+      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers|null } (--dry-run: { dryRun:true, wouldUpdate, validation })",
     errors: [
       // The THIRD twin of the fb#668 class, and the client-side shape of it:
-      // this command has two exit-4 client guards but documented only one, and a
-      // sole matchless client row is `matchClientRow`'s fallback — so
-      // `ib keikka update <id>` with no flags was answered "pass a number, e.g.
-      // --status 9", advice for a problem the caller does not have. Both rows
-      // now carry a `match`, so each guard reaches its own remedy.
-      { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status <keikkaTilaId> — it is the only field v1.0 can update" },
+      // this command has several exit-4 client guards; a sole matchless client
+      // row is `matchClientRow`'s fallback, so every row carries a `match` and
+      // each guard reaches its own remedy.
+      { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status <keikkaTilaId>, or a move flag: --vehicle / --date / --start / --end" },
+      { origin: "client", exit: 4, match: "cannot be combined", meaning: "--status given together with a move flag — two routes, no atomicity", remedy: "run them as two commands" },
       { origin: "client", exit: 4, match: "--status must be a numeric", meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
-      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
+      { origin: "client", exit: 4, match: "expected HH:MM", meaning: "--start/--end not HH:MM", remedy: "pass e.g. --start 08:00" },
+      { origin: "client", exit: 4, match: "must be after the start", meaning: "--end is not after the (new or current) start; same-day only", remedy: "pass an --end later than the start, or move --start first" },
+      { origin: "client", exit: 4, match: "no pumppuAika to move from", meaning: "The row has no pumppuAika, so a partial time flag has nothing to fill from", remedy: "pass both --date and --start" },
+      { origin: "client", exit: 4, match: "--vehicle must be an integer", meaning: "--vehicle is not an integer >= 1, rejected locally before any request", remedy: "pass a positive vehicleId" },
+      apiErr(400, "Move body rejected (vehicleId, pumppuAika, or pumppuKesto outside 15..10080 min)", "check the flags"),
+      apiErr(404, "Keikka not found, soft-deleted, OR outside your visible scope", "verify keikkaId — NOT proof the row is absent: results mirror your permissions, so another tenant's keikka 404s identically"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
       "--status takes the numeric keikkaTilaId, NOT a name — e.g. `--status 9` (Toimitettu), `--status 8` (Peruttu), `--status 2` (Lähetetty). See the legend on `ib keikka list --help` or the `tila` GLOSSARY entry on `ib --help`.",
+      "A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.",
+      "Time flags read the row first (pvm/time) to fill what you omit: `--date` alone keeps the clock time, `--end` alone recomputes pumppuKesto from the current start. `--vehicle` alone makes no read.",
     ],
     examples: [
       "ib keikka update 9001 --status 9",
       "ib keikka update 9001 --status 8 --reason 'phone cancellation'",
+      "ib keikka update 9001 --vehicle 1226 --dry-run",
+      "ib keikka update 9001 --vehicle 1226 --reason 'NLR-210 huollossa'",
+      "ib keikka update 9001 --date tomorrow",
+      "ib keikka update 9001 --start 09:00 --end 11:30",
     ],
   },
   {

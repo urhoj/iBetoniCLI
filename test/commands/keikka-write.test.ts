@@ -48,16 +48,59 @@ describe("ib keikka create/update/drivers", () => {
       { headers: {} }
     );
 
-    // Non-status field set without status → v1.0 guard rejects.
+    // No known field at all → exit 4, no POST.
     await expect(
-      runKeikkaUpdate(mockClient, 9001, { vehicleId: 7 }, {})
-    ).rejects.toThrow(/v1\.0 only supports --status/);
+      runKeikkaUpdate(mockClient, 9001, {}, {})
+    ).rejects.toThrow(/nothing to update/i);
 
     // Non-numeric status → exit-4 validation error (failWith), no POST.
     mockClient.post.mockClear();
     await expect(
       runKeikkaUpdate(mockClient, 9001, { status: "done" }, {})
     ).rejects.toThrow(/numeric keikkaTilaId/);
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("runKeikkaUpdate with --status AND a move flag → exit 4 before any POST (two routes, no atomicity)", async () => {
+    await expect(
+      runKeikkaUpdate(mockClient, 9001, { status: "9", vehicle: 54 }, {})
+    ).rejects.toThrow(expect.objectContaining({ exitCode: 4 }));
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("runKeikkaUpdate --vehicle alone posts {vehicleId} to /api/cli/keikka/move/:id without reading the row", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 9001, vehicleChanged: true });
+    await runKeikkaUpdate(mockClient, 9001, { vehicle: 54 }, { dryRun: true });
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/move/9001",
+      { vehicleId: 54 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("runKeikkaUpdate time flags read pvm/time from `get` and compose Helsinki instants + kesto", async () => {
+    mockClient.get.mockResolvedValueOnce({ keikkaId: 9001, pvm: "2026-09-21", time: "08:00" });
+    mockClient.post.mockResolvedValueOnce({ ok: true });
+    // --date alone keeps 08:00; --end derives kesto from the (unchanged) start.
+    await runKeikkaUpdate(mockClient, 9001, { date: "2026-09-22", end: "10:30" }, {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/get/9001");
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/move/9001",
+      { pumppuAika: "2026-09-22T05:00:00.000Z", pumppuKesto: 150 },
+      { headers: {} }
+    );
+  });
+
+  test("runKeikkaUpdate --end before --start → exit 4; keikka without pumppuAika needs both --date and --start", async () => {
+    mockClient.get.mockResolvedValue({ keikkaId: 9001, pvm: "2026-09-21", time: "08:00" });
+    await expect(
+      runKeikkaUpdate(mockClient, 9001, { end: "07:00" }, {})
+    ).rejects.toThrow(expect.objectContaining({ exitCode: 4 }));
+    mockClient.get.mockResolvedValue({ keikkaId: 9001, pvm: null, time: null });
+    await expect(
+      runKeikkaUpdate(mockClient, 9001, { start: "09:00" }, {})
+    ).rejects.toThrow(/--date and --start/);
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 

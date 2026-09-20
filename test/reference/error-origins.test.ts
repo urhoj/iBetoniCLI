@@ -369,10 +369,10 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
     // "--status must be numeric" one, so "you passed nothing" got "pass a
     // number, e.g. --status 9" — advice for a problem the caller does not have.
     const hint = hintForError(
-      client4("Nothing to update: pass --status (v1.0 supports --status only)"),
+      client4("Nothing to update: pass --status, or a move flag (--vehicle/--date/--start/--end)"),
       rowsOf("ib keikka update")
     );
-    expect(hint).toMatch(/only field v1\.0 can update/);
+    expect(hint).toMatch(/or a move flag/);
     expect(hint).not.toMatch(/pass a number/);
   });
 

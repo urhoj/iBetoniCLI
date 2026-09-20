@@ -118,7 +118,10 @@ import { buildReference } from "../../src/reference/dump.js";
 // row on `customer settings/modules/operator` (hoisted once + three @id refs) and
 // `worksite update`'s outputShape now naming the re-read record. Measured
 // 815 498 B after trimming both strings once; master was already within ~100 B.
-const DUMP_LIMIT_BYTES = 816_000;
+// 816_000 → 819_000 (2026-09-20): `ib keikka update` grew the grid's drag-and-drop
+// (--vehicle/--date/--start/--end → /api/cli/keikka/move) — four flags, five exit-4
+// guard rows and two notes. Measured 818 424 B after trimming the row's strings once.
+const DUMP_LIMIT_BYTES = 819_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

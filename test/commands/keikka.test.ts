@@ -15,7 +15,7 @@ describe("ib keikka update validation", () => {
   test("runKeikkaUpdate throws when no status field is present", async () => {
     await expect(
       runKeikkaUpdate(mockClient, 5, {}, {})
-    ).rejects.toThrow(/only supports --status/);
+    ).rejects.toThrow(/nothing to update/i);
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 });
