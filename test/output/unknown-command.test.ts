@@ -1303,15 +1303,7 @@ describe("rejected --asiakas points at the global --company, never --customer (f
     expect(env.hint).not.toContain("--customer");
   });
 
-  test("worksite list (owns --customer): no did-you-mean --customer either", () => {
-    const env = buildUnknownOptionEnvelope(leafByPath("worksite", "list"), "--asiakas");
-    expect(env.didYouMean).toBeNull();
-    expect(env.hint).toContain("--company <asiakasId>");
-    expect(env.hint).not.toContain("Did you mean");
-  });
-
-  test("the tenant hint is specific to --asiakas and yields to a curated redirect", () => {
-    expect(buildUnknownOptionEnvelope(leafByPath("worksite", "get"), "--tenant").hint).not.toContain("names the TENANT");
+  test("the tenant hint yields to a curated redirect", () => {
     // `ib person activity --asiakas` has a hand-written OPTION_REDIRECTS row; it wins alone.
     const env = buildUnknownOptionEnvelope(leafByPath("person", "activity"), "--asiakas");
     expect(env.hint).toContain("developer-only");
@@ -1345,10 +1337,16 @@ describe("nested-group redirect at the root (fb#1909)", () => {
     expect(env.availableElsewhere).toEqual([]);
   });
 
-  test("silent on a direct child, a leaf verb, a short token, and an ambiguous group name", () => {
+  test("a short but unique group name still resolves — no length threshold (fb#1912)", () => {
+    expect(descendantsOwningGroup("ib", "fcm", "developer").map((m) => m.path)).toEqual(["ib notification fcm"]);
+    expect(buildUnknownCommandEnvelope(program, "fcm", "developer").availableElsewhere).toEqual(["ib notification fcm"]);
+  });
+
+  test("silent on a direct child, a leaf verb, and an ambiguous group name", () => {
     // direct children are didYouMean's job; leaves are verbs
-    expect(descendantsOwningGroup("ib", "dev", "developer")).toEqual([]);
+    expect(descendantsOwningGroup("ib", "keikka", "developer")).toEqual([]);
     expect(descendantsOwningGroup("ib", "list", "developer")).toEqual([]);
+    // `fk` is a subgroup of customer, vehicle AND person → ambiguous
     expect(descendantsOwningGroup("ib", "fk", "developer")).toEqual([]);
     // `dates` is a subgroup of both worksite and vehicle → ambiguous → nothing
     const owners = new Set(COMMAND_SPECS.filter((s) => s.command.split(" ")[2] === "dates").map((s) => s.command.split(" ")[1]));

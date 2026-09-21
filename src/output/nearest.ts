@@ -82,8 +82,8 @@ export const VERB_SYNONYMS: Record<string, string[]> = {
  * the Finnish form appears in the domain vocabulary but no spec declares it).
  *
  * `asiakas` ↔ `customer` is deliberately NOT a pair (fb#1907, fb#1731): in this
- * catalogue `--asiakas` (45 specs) is the TENANT — a cross-tenant read — while
- * `--customer` (5 specs) is the order's / worksite's customer INSIDE the active
+ * catalogue `--asiakas` (54 specs) is the TENANT — a cross-tenant read — while
+ * `--customer` (9 specs) is the order's / worksite's customer INSIDE the active
  * tenant (`keikka list --help` spells it out: "NOT the tenant itself"). A
  * synonym guess between them silently swaps a cross-tenant read for an
  * in-tenant filter and answers count:0 or the wrong company's rows. A rejected

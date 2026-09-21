@@ -178,7 +178,9 @@ export function nestedGroupTwins(
  * compared hyphen- and case-insensitively (`betomikOrderbook` ≡
  * `betomik-orderbook`) and answers only when exactly ONE group path matches —
  * a group name shared by two subtrees is ambiguous, and naming one is the
- * noise every resolver in this file refuses to add. Tier-gated: a hidden
+ * noise every resolver in this file refuses to add. That single-owner rule is
+ * the ONLY guard — no length threshold: `ib fcm` → `ib notification fcm` is
+ * short, unique and right (fb#1912). Tier-gated: a hidden
  * developer group must not be confirmed to exist by the hint (enumeration
  * secrecy, same rule as every other redirect).
  */
@@ -189,7 +191,7 @@ export function descendantsOwningGroup(
 ): SiblingGroupMatch[] {
   const flat = (seg: string) => seg.toLowerCase().replace(/-/g, "");
   const t = flat(token);
-  if (t.length < 4) return [];
+  if (!t) return [];
   const base = canonicalPath(group);
   const paths = new Set<string>();
   for (const s of COMMAND_SPECS) {
@@ -201,8 +203,9 @@ export function descendantsOwningGroup(
   }
   if (paths.size !== 1) return [];
   const path = [...paths][0];
-  const name = path.slice(path.lastIndexOf(" ") + 1);
-  const parent = path.slice(0, path.lastIndexOf(" "));
+  const cut = path.lastIndexOf(" ");
+  const name = path.slice(cut + 1);
+  const parent = path.slice(0, cut);
   return [{ path, why: `\`${name}\` is a subgroup of \`${parent}\`, not a top-level command; run \`${path} --help\` for its verbs` }];
 }
 
@@ -1226,7 +1229,10 @@ export function buildUnknownOptionEnvelope(
   // pre-fb#1641 `keikka latest --asiakas` → "did you mean --customer" sent the
   // caller to the wrong scope with no error (fb#1731). The proof that the pair
   // is distinct HERE is a sibling that accepts the typed flag verbatim AND owns
-  // the guessed one too (`keikka list` had both). Only that shape is reported
+  // the guessed one too (`keikka list` owned both `--asiakas` and `--customer`
+  // while that pair was still in FLAG_SYNONYMS; fb#1907 removed it, and no
+  // catalogue command reaches the shape today — the fb#1731 test rebuilds it
+  // with a spec-less probe leaf). Only that shape is reported
   // alongside the guess: a plain verbatim sibling is NOT stronger evidence — of
   // the 22 catalogue pairs where a synonym guess coexists with one, all 22 have
   // the sibling's flag meaning something else (`person day set --text` is a
@@ -1276,19 +1282,14 @@ export function buildUnknownOptionEnvelope(
       ? null
       : siblingsAcceptingSynonym(canonical, unknownOption, tier);
   const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
-  // A rejected `--asiakas` means the caller wants the TENANT (fb#1907): it is
-  // the cross-tenant flag on 45 specs, and the only reason it is missing here
-  // is that this command is scoped to the active company. The answer is the
-  // global `--company`, never `--customer` — that sibling flag is the order's
-  // customer INSIDE the tenant, and following a synonym guess to it silently
-  // turned a cross-tenant read into an in-tenant filter (count:0 or the wrong
-  // company's rows). Rendered alongside a verbatim-sibling list (`keikka list`
-  // owns `--asiakas` for real), suppressed by a curated redirect or a
-  // near-spelling on this command.
+  // A rejected `--asiakas` wants the TENANT (fb#1907): the answer is the global
+  // `--company`, never a synonym guess at `--customer` — why the two are not a
+  // pair is documented on FLAG_SYNONYMS. Coexists with a verbatim-sibling list;
+  // a curated redirect or a near-spelling on this command wins instead.
   const tenantHint =
-    unknownOption.replace(/^-+/, "") === "asiakas" && !redirect && !didYouMean
-      ? "`--asiakas` names the TENANT and this command has no cross-tenant flag; the global `--company <asiakasId>` runs it as that tenant (`ib help multi-tenancy`)."
-      : null;
+    redirect || didYouMean || bare !== "asiakas"
+      ? null
+      : "`--asiakas` names the TENANT and this command has no cross-tenant flag; the global `--company <asiakasId>` runs it as that tenant (`ib help multi-tenancy`).";
 
   const discover = discoverHint(command);
 
