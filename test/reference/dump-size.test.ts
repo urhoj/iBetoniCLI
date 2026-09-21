@@ -159,11 +159,17 @@ const PER_SPEC_LIMIT_BYTES = 13_400;
 describe("reference dump size ratchet (fb#779)", () => {
   test(`the full developer dump stays under ${DUMP_LIMIT_BYTES} bytes`, () => {
     const size = JSON.stringify(buildReference(undefined, "developer", [])).length;
+    // Next 1000 above the measurement, mirroring every bump in the history above.
+    const nextLimit = Math.ceil((size + 1) / 1000) * 1000;
+    const today = new Date().toISOString().slice(0, 10);
     expect(
       size,
-      `full dump is ${size} B (limit ${DUMP_LIMIT_BYTES}). If this growth is deliberate, ` +
-        `bump DUMP_LIMIT_BYTES in the same PR and justify it in the commit message; ` +
-        `otherwise trim (notes -> \`ib reference detail set\`; see notes-budget-baseline.json).`
+      `full dump is ${size} B (limit ${DUMP_LIMIT_BYTES}), ${size - DUMP_LIMIT_BYTES + 1} B over. ` +
+        `If this growth is deliberate: in test/reference/dump-size.test.ts set ` +
+        `\`const DUMP_LIMIT_BYTES = ${nextLimit.toLocaleString("en-US").replace(",", "_")};\` and add the history line ` +
+        `\`// ${DUMP_LIMIT_BYTES.toLocaleString("en-US").replace(",", "_")} → ${nextLimit.toLocaleString("en-US").replace(",", "_")} (${today}): <what grew>. Measured ${size.toLocaleString("en-US").replace(",", " ")} B.\` ` +
+        `above it, then justify it in the commit message; otherwise trim ` +
+        `(notes -> \`ib reference detail set\`; see notes-budget-baseline.json).`
     ).toBeLessThan(DUMP_LIMIT_BYTES);
   });
 

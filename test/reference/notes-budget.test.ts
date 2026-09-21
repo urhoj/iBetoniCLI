@@ -29,7 +29,10 @@ describe("spec notes budget (fb#780)", () => {
       if (ceiling !== undefined) {
         if (bytes > ceiling) {
           failures.push(
-            `${spec.command}: notes grew to ${bytes} B (ceiling ${ceiling} B)`
+            `${spec.command}: notes grew to ${bytes} B (ceiling ${ceiling} B). ` +
+              `Trim ${bytes - ceiling} B (move business context to \`ib reference detail set "${spec.command.replace(/^ib /, "")}" --field detail\`); ` +
+              `ceilings are shrink-only, so do NOT raise the entry in test/reference/notes-budget-baseline.json — ` +
+              `after trimming, the liveness test names the new (lower) value to write.`
           );
         }
       } else if (bytes > NOTES_BUDGET_BYTES) {
