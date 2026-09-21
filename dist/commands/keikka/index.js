@@ -125,9 +125,8 @@ export async function runKeikkaLatest(client, opts) {
  * (customer/worksite/vehicle/driver, each `{...} | null`), so no client-side
  * reshaping happens here (fb#246: the spec's nested outputShape IS the wire shape).
  */
-export async function runKeikkaGet(client, keikkaId, opts = {}) {
-    const qs = opts.full ? "?full=1" : ""; // fb#1744: see the spec's --full row
-    return client.get(`/api/cli/keikka/get/${keikkaId}${qs}`);
+export async function runKeikkaGet(client, keikkaId) {
+    return client.get(`/api/cli/keikka/get/${keikkaId}`);
 }
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
@@ -452,8 +451,7 @@ export function registerKeikkaCommands(parent, getClient) {
     k.command("get <keikkaId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .option("--full")
-        .action(jsonAction(getClient, (client, idStr, opts) => runKeikkaGet(client, parseId(idStr, "keikkaId"), opts)));
+        .action(jsonAction(getClient, (client, idStr) => runKeikkaGet(client, parseId(idStr, "keikkaId"))));
     k.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())

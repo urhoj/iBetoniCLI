@@ -202,12 +202,10 @@ export async function runKeikkaLatest(
  */
 export async function runKeikkaGet(
   client: ApiClient,
-  keikkaId: number,
-  opts: { full?: boolean } = {}
+  keikkaId: number
 ): Promise<Record<string, unknown>> {
-  const qs = opts.full ? "?full=1" : ""; // fb#1744: see the spec's --full row
   return client.get<Record<string, unknown>>(
-    `/api/cli/keikka/get/${keikkaId}${qs}`
+    `/api/cli/keikka/get/${keikkaId}`
   );
 }
 
@@ -694,10 +692,9 @@ export function registerKeikkaCommands(
   k.command("get <keikkaId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .option("--full")
     .action(
-      jsonAction(getClient, (client, idStr: string, opts: { full?: boolean }) =>
-        runKeikkaGet(client, parseId(idStr, "keikkaId"), opts)
+      jsonAction(getClient, (client, idStr: string) =>
+        runKeikkaGet(client, parseId(idStr, "keikkaId"))
       )
     );
 

@@ -144,20 +144,6 @@ describe("ib keikka list/get", () => {
     expect(result.keikkaId).toBe(9001);
   });
 
-  test("runKeikkaGet --full: ?full=1 is sent and the widened row passes through (fb#1744)", async () => {
-    mockClient.get.mockResolvedValueOnce({
-      keikkaId: 9001,
-      puomi: 36,
-      linja: 10,
-      kestoMin: 90,
-      otsikko: "Anturat",
-      comment: null,
-      ajoOhje: "portti B",
-    });
-    const result = await runKeikkaGet(mockClient, 9001, { full: true });
-    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/get/9001?full=1");
-    expect(result).toMatchObject({ puomi: 36, kestoMin: 90, ajoOhje: "portti B" });
-  });
 });
 
 describe("resolveDate", () => {

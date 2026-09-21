@@ -7437,14 +7437,14 @@ ARGUMENTS
   <keikkaId> NUMBER    keikkaId to fetch (required)
 
 FLAGS
-  --full    Also return the pump dimensions and free-text fields the grid renders: puomi/linja (m), kestoMin, otsikko, comment, ajoOhje (fb#1744/fb#1910). Deploy-gated: an older backend ignores it.
+  (none)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status } · with --full adds { puomi, linja, kestoMin, otsikko, comment, ajoOhje } (each null when unset)
+  { keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status, puomi, linja (m), kestoMin, otsikko, comment, ajoOhje (the six pump/free-text fields are null when unset; deploy-gated — an older backend omits them) }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
@@ -7458,7 +7458,7 @@ NOTES
 
 EXAMPLES
   ib keikka get 9001
-  ib keikka get 9001 --full --columns otsikko,comment,ajoOhje
+  ib keikka get 9001 --columns otsikko,comment,ajoOhje
 "
 `;
 
