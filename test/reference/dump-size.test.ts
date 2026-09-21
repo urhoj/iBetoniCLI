@@ -130,7 +130,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // incl. errors/notes/dry-run), a `seeAlso` cross-reference on `betomik-orderbook
 // review` (fb#1802), and a new `--owner` flag + note on `customer list` (fb#1721).
 // Measured 823 702 B after one trim pass on the new specs' notes.
-const DUMP_LIMIT_BYTES = 824_000;
+// 824_000 → 825_000 (2026-09-21): fb#1744/fb#1910 `keikka get --full` — one
+// flag row, an outputShape clause and one example. Measured 824 283 B.
+const DUMP_LIMIT_BYTES = 825_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

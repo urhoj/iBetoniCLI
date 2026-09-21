@@ -125,8 +125,12 @@ export async function runKeikkaLatest(client, opts) {
  * (customer/worksite/vehicle/driver, each `{...} | null`), so no client-side
  * reshaping happens here (fb#246: the spec's nested outputShape IS the wire shape).
  */
-export async function runKeikkaGet(client, keikkaId) {
-    return client.get(`/api/cli/keikka/get/${keikkaId}`);
+export async function runKeikkaGet(client, keikkaId, opts = {}) {
+    // fb#1744/fb#1910: `?full=1` adds the pump dimensions + free-text fields
+    // (puomi/linja/kestoMin/otsikko/comment/ajoOhje). Opt-in so the default
+    // payload stays slim; the backend cache key embeds the flag.
+    const qs = opts.full ? "?full=1" : "";
+    return client.get(`/api/cli/keikka/get/${keikkaId}${qs}`);
 }
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
@@ -451,7 +455,8 @@ export function registerKeikkaCommands(parent, getClient) {
     k.command("get <keikkaId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
-        .action(jsonAction(getClient, (client, idStr) => runKeikkaGet(client, parseId(idStr, "keikkaId"))));
+        .option("--full")
+        .action(jsonAction(getClient, (client, idStr, opts) => runKeikkaGet(client, parseId(idStr, "keikkaId"), { full: opts.full })));
     k.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())

@@ -162,9 +162,11 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "Get a single keikka by id with related customer / worksite / vehicle / driver projections and the concrete side (source, betoniSupplier, plant).",
     permissions: ["auth.page.grid.tilaus.read"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
-    flags: [],
+    flags: [
+      { name: "full", type: "boolean", description: "Also return the pump dimensions and free-text fields the grid renders: puomi/linja (m), kestoMin, otsikko, comment, ajoOhje (fb#1744/fb#1910). Deploy-gated: an older backend ignores it." },
+    ],
     outputShape:
-      "{ keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status }",
+      "{ keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status } · with --full adds { puomi, linja, kestoMin, otsikko, comment, ajoOhje } (each null when unset)",
     errors: [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.read"),
@@ -173,7 +175,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "A 404 answers 'can I see it', not 'does it exist' — every command mirrors the caller's permissions, so a keikka owned by another tenant is indistinguishable from a keikkaId that was never issued. Do NOT read it as a typo. To settle existence you need a caller whose scope could see it: `ib company switch` to the owning tenant, or a system-admin/developer token (feedback #427).",
       "Concrete side (fb#1742): `source` = lähdeasiakas, the concrete maker that took the order; `betoniSupplier` = betonitoimittaja; `plant` = the betoniSijainti. Each is null when the order carries none (the DB stores 0). Deploy-gated on puminet5api — an older backend omits the three keys.",
     ],
-    examples: ["ib keikka get 9001"],
+    examples: ["ib keikka get 9001", "ib keikka get 9001 --full --columns otsikko,comment,ajoOhje"],
   },
   {
     command: "ib keikka person list",

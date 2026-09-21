@@ -202,10 +202,15 @@ export async function runKeikkaLatest(
  */
 export async function runKeikkaGet(
   client: ApiClient,
-  keikkaId: number
+  keikkaId: number,
+  opts: { full?: boolean } = {}
 ): Promise<Record<string, unknown>> {
+  // fb#1744/fb#1910: `?full=1` adds the pump dimensions + free-text fields
+  // (puomi/linja/kestoMin/otsikko/comment/ajoOhje). Opt-in so the default
+  // payload stays slim; the backend cache key embeds the flag.
+  const qs = opts.full ? "?full=1" : "";
   return client.get<Record<string, unknown>>(
-    `/api/cli/keikka/get/${keikkaId}`
+    `/api/cli/keikka/get/${keikkaId}${qs}`
   );
 }
 
@@ -692,9 +697,10 @@ export function registerKeikkaCommands(
   k.command("get <keikkaId>")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
+    .option("--full")
     .action(
-      jsonAction(getClient, (client, idStr: string) =>
-        runKeikkaGet(client, parseId(idStr, "keikkaId"))
+      jsonAction(getClient, (client, idStr: string, opts: { full?: boolean }) =>
+        runKeikkaGet(client, parseId(idStr, "keikkaId"), { full: opts.full })
       )
     );
 
