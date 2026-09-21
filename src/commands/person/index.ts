@@ -1294,17 +1294,13 @@ export async function runPersonSetOwner(
 }
 
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so the
-// ESM build doesn't need a default-export shim. Memoized so the constant is read
-// once, not on every default-company get/set call.
-let _oletusAdminYritysIdTypeId: number | null = null;
-function oletusAdminYritysIdTypeId(): number {
-  if (_oletusAdminYritysIdTypeId !== null) return _oletusAdminYritysIdTypeId;
-  const constants = createRequire(import.meta.url)("@ibetoni/constants") as {
+// ESM build doesn't need a default-export shim. A plain property read on an
+// already-loaded module, so a top-level const is all the caching it needs (fb#1902).
+const OLETUS_ADMIN_YRITYS_ID_TYPE_ID: number = (
+  createRequire(import.meta.url)("@ibetoni/constants") as {
     PERSON_SETTING_TYPE_IDS: Record<string, number>;
-  };
-  _oletusAdminYritysIdTypeId = constants.PERSON_SETTING_TYPE_IDS.OLETUS_ADMIN_YRITYS_ID;
-  return _oletusAdminYritysIdTypeId;
-}
+  }
+).PERSON_SETTING_TYPE_IDS.OLETUS_ADMIN_YRITYS_ID;
 
 /**
  * GET /api/person/setting/get/:personId/:personSettingTypeId — read a person's
@@ -1317,7 +1313,7 @@ export async function runPersonGetDefaultCompany(
   personId: number
 ): Promise<{ personId: number; companyId: number | null }> {
   const rows = await client.get<Array<{ intVar?: number | null }>>(
-    `/api/person/setting/get/${personId}/${oletusAdminYritysIdTypeId()}`
+    `/api/person/setting/get/${personId}/${OLETUS_ADMIN_YRITYS_ID_TYPE_ID}`
   );
   const companyId = rows?.[0]?.intVar ?? null;
   return { personId, companyId };
@@ -1352,7 +1348,7 @@ export async function runPersonSetDefaultCompany(
     "/api/person/settings/set",
     {
       personId,
-      personSettingTypeId: oletusAdminYritysIdTypeId(),
+      personSettingTypeId: OLETUS_ADMIN_YRITYS_ID_TYPE_ID,
       boolVar: true,
       intVar: companyId,
     },

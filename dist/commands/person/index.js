@@ -844,16 +844,9 @@ export async function runPersonSetOwner(client, personId, ownerAsiakasId, flags)
     return client.post(`/api/person/setOwner/${personId}`, { ownerAsiakasId }, { headers: writeFlagsToHeaders(flags) });
 }
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so the
-// ESM build doesn't need a default-export shim. Memoized so the constant is read
-// once, not on every default-company get/set call.
-let _oletusAdminYritysIdTypeId = null;
-function oletusAdminYritysIdTypeId() {
-    if (_oletusAdminYritysIdTypeId !== null)
-        return _oletusAdminYritysIdTypeId;
-    const constants = createRequire(import.meta.url)("@ibetoni/constants");
-    _oletusAdminYritysIdTypeId = constants.PERSON_SETTING_TYPE_IDS.OLETUS_ADMIN_YRITYS_ID;
-    return _oletusAdminYritysIdTypeId;
-}
+// ESM build doesn't need a default-export shim. A plain property read on an
+// already-loaded module, so a top-level const is all the caching it needs (fb#1902).
+const OLETUS_ADMIN_YRITYS_ID_TYPE_ID = createRequire(import.meta.url)("@ibetoni/constants").PERSON_SETTING_TYPE_IDS.OLETUS_ADMIN_YRITYS_ID;
 /**
  * GET /api/person/setting/get/:personId/:personSettingTypeId — read a person's
  * default active company (personSettings type 15). Projects the raw
@@ -861,7 +854,7 @@ function oletusAdminYritysIdTypeId() {
  * means the setting has never been written for this person.
  */
 export async function runPersonGetDefaultCompany(client, personId) {
-    const rows = await client.get(`/api/person/setting/get/${personId}/${oletusAdminYritysIdTypeId()}`);
+    const rows = await client.get(`/api/person/setting/get/${personId}/${OLETUS_ADMIN_YRITYS_ID_TYPE_ID}`);
     const companyId = rows?.[0]?.intVar ?? null;
     return { personId, companyId };
 }
@@ -887,7 +880,7 @@ export async function runPersonSetDefaultCompany(client, personId, companyId, fl
     }
     return client.post("/api/person/settings/set", {
         personId,
-        personSettingTypeId: oletusAdminYritysIdTypeId(),
+        personSettingTypeId: OLETUS_ADMIN_YRITYS_ID_TYPE_ID,
         boolVar: true,
         intVar: companyId,
     }, { headers: writeFlagsToHeaders(flags) });
