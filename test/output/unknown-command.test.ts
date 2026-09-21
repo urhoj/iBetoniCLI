@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { FLAG_SYNONYMS } from "../../src/output/nearest.js";
 import {
   levenshtein,
   closestName,
@@ -19,6 +20,8 @@ import {
   descendantsOwningVerb,
   descendantsOwningCompoundVerb,
   descendantsOwningPositional,
+  descendantsOwningGroup,
+  usageEnvelopeResolves,
   nestedGroupTwins,
   topLevelDomainRedirect,
   OPTION_REDIRECTS,
@@ -359,6 +362,9 @@ describe("flag synonyms (fb#388)", () => {
 // are DIFFERENT concepts, and `keikka list` owns both; before fb#1641 added the
 // flag, `keikka latest --asiakas` answered "did you mean --customer" with
 // acceptedBy [] — following it silently returned the wrong scope's rows.
+// fb#1907 then removed the asiakas↔customer pair from FLAG_SYNONYMS outright
+// (the two are never the same thing anywhere in the catalogue), so `--asiakas`
+// no longer guesses at all: the verbatim sibling and the tenant hint answer.
 describe("synonym guess vs a distinct-concept sibling (fb#1731)", () => {
   // The pre-fb#1641 shape, rebuilt without mocks: a keikka leaf with no spec
   // (so its options come from Commander) that owns --customer but not
@@ -368,13 +374,13 @@ describe("synonym guess vs a distinct-concept sibling (fb#1731)", () => {
     return root.command("keikka").command("probe").option("--customer <id>");
   };
 
-  test("a sibling owning BOTH flags is reported alongside the synonym guess", () => {
+  test("--asiakas never guesses --customer; the both-owning sibling and the tenant hint answer", () => {
     const env = buildUnknownOptionEnvelope(probe(), "--asiakas");
-    expect(env.didYouMean).toBe("--customer");
+    expect(env.didYouMean).toBeNull();
     expect(env.acceptedBy).toContain("ib keikka list");
     expect(env.acceptedAs).toBeUndefined();
-    // the sibling answer leads; the guess follows
-    expect(env.hint.indexOf("ib keikka list")).toBeLessThan(env.hint.indexOf("Did you mean"));
+    expect(env.hint).toContain("--company <asiakasId>");
+    expect(env.hint).not.toContain("--customer` is the same thing");
   });
 
   test("a synonym guess with no both-owning sibling still suppresses the sibling scan", () => {
@@ -1278,5 +1284,75 @@ describe("curated redirect: dev feedback update --status (fb#1363)", () => {
       const command = key.slice(0, key.lastIndexOf(" "));
       expect(COMMAND_SPECS.some((s) => s.command === command)).toBe(true);
     }
+  });
+});
+
+// feedback #1907 — the hint for a rejected `--asiakas` equated it with the
+// sibling's `--customer` ("is the same thing — send it to `ib worksite list`").
+// It is not: `--asiakas` is the TENANT, `--customer` the worksite's / order's
+// customer inside the active tenant. An agent following the hint swapped a
+// cross-tenant read for an in-tenant filter and read count:0 as "no rows".
+describe("rejected --asiakas points at the global --company, never --customer (fb#1907)", () => {
+  test("worksite get: no synonym redirect, tenant hint present", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("worksite", "get"), "--asiakas");
+    expect(env.didYouMean).toBeNull();
+    expect(env.acceptedAs).toBeUndefined();
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).toContain("names the TENANT");
+    expect(env.hint).toContain("--company <asiakasId>");
+    expect(env.hint).not.toContain("--customer");
+  });
+
+  test("worksite list (owns --customer): no did-you-mean --customer either", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("worksite", "list"), "--asiakas");
+    expect(env.didYouMean).toBeNull();
+    expect(env.hint).toContain("--company <asiakasId>");
+    expect(env.hint).not.toContain("Did you mean");
+  });
+
+  test("the tenant hint is specific to --asiakas and yields to a curated redirect", () => {
+    expect(buildUnknownOptionEnvelope(leafByPath("worksite", "get"), "--tenant").hint).not.toContain("names the TENANT");
+    // `ib person activity --asiakas` has a hand-written OPTION_REDIRECTS row; it wins alone.
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "activity"), "--asiakas");
+    expect(env.hint).toContain("developer-only");
+    expect(env.hint).not.toContain("names the TENANT");
+  });
+
+  test("the synonym table no longer pairs asiakas with customer; client names the customer concept", () => {
+    expect(FLAG_SYNONYMS.asiakas).toBeUndefined();
+    expect(FLAG_SYNONYMS.customer).toBeUndefined();
+    expect(FLAG_SYNONYMS.client).toEqual(["customer"]);
+  });
+});
+
+// feedback #1909 — at the root, a token naming a NESTED group dead-ended:
+// `ib betomikOrderbook` → didYouMean null, availableElsewhere [], although
+// `ib dev betomik-orderbook` is a whole subgroup. Every verb layer scans leaf
+// segments and the domain redirect knows only direct children.
+describe("nested-group redirect at the root (fb#1909)", () => {
+  test.each(["betomikOrderbook", "betomik-orderbook", "BetomikOrderBook"])("`ib %s` names the dev subgroup", (token) => {
+    expect(descendantsOwningGroup("ib", token, "developer").map((m) => m.path)).toEqual(["ib dev betomik-orderbook"]);
+    const env = buildUnknownCommandEnvelope(program, token, "developer");
+    expect(env.availableElsewhere).toEqual(["ib dev betomik-orderbook"]);
+    expect(env.hint).toContain("`ib dev betomik-orderbook` does");
+    expect(env.hint).toContain("is a subgroup of `ib dev`");
+    expect(usageEnvelopeResolves(env)).toBe(true);
+  });
+
+  test("tier-gated: a standard caller is not told the developer group exists", () => {
+    expect(descendantsOwningGroup("ib", "betomikOrderbook", "standard")).toEqual([]);
+    const env = buildUnknownCommandEnvelope(program, "betomikOrderbook", "standard");
+    expect(env.availableElsewhere).toEqual([]);
+  });
+
+  test("silent on a direct child, a leaf verb, a short token, and an ambiguous group name", () => {
+    // direct children are didYouMean's job; leaves are verbs
+    expect(descendantsOwningGroup("ib", "dev", "developer")).toEqual([]);
+    expect(descendantsOwningGroup("ib", "list", "developer")).toEqual([]);
+    expect(descendantsOwningGroup("ib", "fk", "developer")).toEqual([]);
+    // `dates` is a subgroup of both worksite and vehicle → ambiguous → nothing
+    const owners = new Set(COMMAND_SPECS.filter((s) => s.command.split(" ")[2] === "dates").map((s) => s.command.split(" ")[1]));
+    expect(owners.size).toBeGreaterThan(1);
+    expect(descendantsOwningGroup("ib", "dates", "developer")).toEqual([]);
   });
 });

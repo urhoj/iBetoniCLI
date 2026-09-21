@@ -75,12 +75,20 @@ export const VERB_SYNONYMS: Record<string, string[]> = {
  * flag is never overridden, and the table cannot invent a flag.
  *
  * Pairs are bidirectional wherever BOTH spellings are live in the catalogue
- * (`asiakas` 38 uses ↔ `customer` 9, `worksite` 13 ↔ `tyomaa` 3, `type` 20 ↔
- * `kind` 4). That is the case this exists for: the majority spelling is right on
- * most commands and wrong on the minority that use the other, so guessing either
- * one is wrong somewhere. One-way entries point at a spelling with no live
- * counterpart (`pvm`→`date`: the Finnish form appears in the domain vocabulary
- * but no spec declares it).
+ * (`worksite` 13 uses ↔ `tyomaa` 3, `type` 20 ↔ `kind` 4). That is the case this
+ * exists for: the majority spelling is right on most commands and wrong on the
+ * minority that use the other, so guessing either one is wrong somewhere.
+ * One-way entries point at a spelling with no live counterpart (`pvm`→`date`:
+ * the Finnish form appears in the domain vocabulary but no spec declares it).
+ *
+ * `asiakas` ↔ `customer` is deliberately NOT a pair (fb#1907, fb#1731): in this
+ * catalogue `--asiakas` (45 specs) is the TENANT — a cross-tenant read — while
+ * `--customer` (5 specs) is the order's / worksite's customer INSIDE the active
+ * tenant (`keikka list --help` spells it out: "NOT the tenant itself"). A
+ * synonym guess between them silently swaps a cross-tenant read for an
+ * in-tenant filter and answers count:0 or the wrong company's rows. A rejected
+ * `--asiakas` is answered by the tenant hint in unknownCommand.ts (the global
+ * `--company`) instead. `client` maps to `customer`, the concept it names.
  */
 export const FLAG_SYNONYMS: Record<string, string[]> = {
   query: ["search"],
@@ -89,9 +97,7 @@ export const FLAG_SYNONYMS: Record<string, string[]> = {
   keyword: ["search"],
   filter: ["search"],
   text: ["search"],
-  customer: ["asiakas"],
-  client: ["asiakas"],
-  asiakas: ["customer"],
+  client: ["customer"],
   worksite: ["tyomaa"],
   tyomaa: ["worksite"],
   site: ["worksite"],

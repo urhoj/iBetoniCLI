@@ -109,6 +109,47 @@ export function nestedGroupTwins(group, token, tier) {
     });
 }
 /**
+ * The token names a NESTED GROUP under `group`, not a verb (fb#1909): at the
+ * root `ib betomikOrderbook` dead-ended with `didYouMean: null` although
+ * `ib dev betomik-orderbook` is a heavily used subgroup — every verb layer
+ * above scans LEAF segments, and the top-level-domain redirect only knows the
+ * direct children, so a group one level deeper was reachable by nothing. The
+ * same call under `ib dev` already resolves, because there the group IS a
+ * direct child and closestName bridges the camelCase→kebab spelling.
+ *
+ * Only INTERMEDIATE segments below the direct-child layer are scanned (index ≥
+ * 1): a direct child is `didYouMean`'s job, and a leaf is a verb. Spelling is
+ * compared hyphen- and case-insensitively (`betomikOrderbook` ≡
+ * `betomik-orderbook`) and answers only when exactly ONE group path matches —
+ * a group name shared by two subtrees is ambiguous, and naming one is the
+ * noise every resolver in this file refuses to add. Tier-gated: a hidden
+ * developer group must not be confirmed to exist by the hint (enumeration
+ * secrecy, same rule as every other redirect).
+ */
+export function descendantsOwningGroup(group, token, tier) {
+    const flat = (seg) => seg.toLowerCase().replace(/-/g, "");
+    const t = flat(token);
+    if (t.length < 4)
+        return [];
+    const base = canonicalPath(group);
+    const paths = new Set();
+    for (const s of COMMAND_SPECS) {
+        if (!s.command.startsWith(`${base} `) || isHiddenAtTier(s, tier))
+            continue;
+        const rest = s.command.slice(base.length + 1).split(" ");
+        for (let i = 1; i < rest.length - 1; i++) {
+            if (flat(rest[i]) === t)
+                paths.add(`${base} ${rest.slice(0, i + 1).join(" ")}`);
+        }
+    }
+    if (paths.size !== 1)
+        return [];
+    const path = [...paths][0];
+    const name = path.slice(path.lastIndexOf(" ") + 1);
+    const parent = path.slice(0, path.lastIndexOf(" "));
+    return [{ path, why: `\`${name}\` is a subgroup of \`${parent}\`, not a top-level command; run \`${path} --help\` for its verbs` }];
+}
+/**
  * How many owners a verb may have before the ROOT-level scan stays silent.
  *
  * At the root every domain is in scope, so the scan must separate a SPECIFIC
@@ -430,9 +471,14 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
         : descendantsOwningCompoundVerb(group, unknownToken, tier, available);
     // Below every in-group verb layer: the token names a top-level DOMAIN (fb#386)
     // — an answer inside the group the caller chose beats sending them elsewhere.
-    const elsewhere = curated.length || descendants.length
+    const domainRedirect = curated.length || descendants.length
         ? curated
         : topLevelDomainRedirect(group, unknownToken, available, tier);
+    // Below the domain redirect, above the positional fallback: the token names
+    // a NESTED GROUP rather than a verb (fb#1909).
+    const elsewhere = curated.length || descendants.length || domainRedirect.length
+        ? domainRedirect
+        : descendantsOwningGroup(group, unknownToken, tier);
     // Last resort, below ALL of the above: the token names an ARGUMENT rather than
     // a command (fb#1020). An exact domain-name match outranks this heuristic;
     // the previous order let it pre-empt the domain redirect (fb#1154).
@@ -1029,12 +1075,26 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
         ? null
         : siblingsAcceptingSynonym(canonical, unknownOption, tier);
     const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
+    // A rejected `--asiakas` means the caller wants the TENANT (fb#1907): it is
+    // the cross-tenant flag on 45 specs, and the only reason it is missing here
+    // is that this command is scoped to the active company. The answer is the
+    // global `--company`, never `--customer` — that sibling flag is the order's
+    // customer INSIDE the tenant, and following a synonym guess to it silently
+    // turned a cross-tenant read into an in-tenant filter (count:0 or the wrong
+    // company's rows). Rendered alongside a verbatim-sibling list (`keikka list`
+    // owns `--asiakas` for real), suppressed by a curated redirect or a
+    // near-spelling on this command.
+    const tenantHint = unknownOption.replace(/^-+/, "") === "asiakas" && !redirect && !didYouMean
+        ? "`--asiakas` names the TENANT and this command has no cross-tenant flag; the global `--company <asiakasId>` runs it as that tenant (`ib help multi-tenancy`)."
+        : null;
     const discover = discoverHint(command);
     const parts = [];
     if (redirect)
         parts.push(redirect);
     if (idiomHint)
         parts.push(idiomHint);
+    if (tenantHint)
+        parts.push(tenantHint);
     if (viaSynonym && acceptedBy.length === 1) {
         parts.push(`\`${unknownOption}\` is not accepted here or by any sibling, but \`${viaSynonym.flag}\` is the same thing — send it to \`${acceptedBy[0]}\`.`);
     }
