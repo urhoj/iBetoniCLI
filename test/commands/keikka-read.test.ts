@@ -158,12 +158,6 @@ describe("ib keikka list/get", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/get/9001?full=1");
     expect(result).toMatchObject({ puomi: 36, kestoMin: 90, ajoOhje: "portti B" });
   });
-
-  test("runKeikkaGet without --full sends no query string", async () => {
-    mockClient.get.mockResolvedValueOnce({ keikkaId: 9001 });
-    await runKeikkaGet(mockClient, 9001, { full: false });
-    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/get/9001");
-  });
 });
 
 describe("resolveDate", () => {

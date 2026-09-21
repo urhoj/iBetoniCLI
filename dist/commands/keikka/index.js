@@ -126,10 +126,7 @@ export async function runKeikkaLatest(client, opts) {
  * reshaping happens here (fb#246: the spec's nested outputShape IS the wire shape).
  */
 export async function runKeikkaGet(client, keikkaId, opts = {}) {
-    // fb#1744/fb#1910: `?full=1` adds the pump dimensions + free-text fields
-    // (puomi/linja/kestoMin/otsikko/comment/ajoOhje). Opt-in so the default
-    // payload stays slim; the backend cache key embeds the flag.
-    const qs = opts.full ? "?full=1" : "";
+    const qs = opts.full ? "?full=1" : ""; // fb#1744: see the spec's --full row
     return client.get(`/api/cli/keikka/get/${keikkaId}${qs}`);
 }
 /**
@@ -456,7 +453,7 @@ export function registerKeikkaCommands(parent, getClient) {
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
         .option("--full")
-        .action(jsonAction(getClient, (client, idStr, opts) => runKeikkaGet(client, parseId(idStr, "keikkaId"), { full: opts.full })));
+        .action(jsonAction(getClient, (client, idStr, opts) => runKeikkaGet(client, parseId(idStr, "keikkaId"), opts)));
     k.command("search [query]")
         .option("--search <s>")
         .addOption(queryAliasOption())
