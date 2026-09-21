@@ -130,8 +130,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // incl. errors/notes/dry-run), a `seeAlso` cross-reference on `betomik-orderbook
 // review` (fb#1802), and a new `--owner` flag + note on `customer list` (fb#1721).
 // Measured 823 702 B after one trim pass on the new specs' notes.
-// 824_000 → 825_000 (2026-09-21): fb#1744/fb#1910 `keikka get --full` — one
-// flag row, an outputShape clause and one example. Measured 824 283 B.
+// 824_000 → 825_000 (2026-09-21): fb#1744/fb#1910 `keikka get` — the six pump /
+// free-text fields in outputShape (the --full flag shipped and was dropped the
+// same day; the longer outputShape is what remains). Measured 824 097 B.
 const DUMP_LIMIT_BYTES = 825_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
@@ -162,12 +163,13 @@ describe("reference dump size ratchet (fb#779)", () => {
     // Next 1000 above the measurement, mirroring every bump in the history above.
     const nextLimit = Math.ceil((size + 1) / 1000) * 1000;
     const today = new Date().toISOString().slice(0, 10);
+    const fmt = (n: number, sep = "_") => n.toLocaleString("en-US").replaceAll(",", sep);
     expect(
       size,
       `full dump is ${size} B (limit ${DUMP_LIMIT_BYTES}), ${size - DUMP_LIMIT_BYTES + 1} B over. ` +
         `If this growth is deliberate: in test/reference/dump-size.test.ts set ` +
-        `\`const DUMP_LIMIT_BYTES = ${nextLimit.toLocaleString("en-US").replace(",", "_")};\` and add the history line ` +
-        `\`// ${DUMP_LIMIT_BYTES.toLocaleString("en-US").replace(",", "_")} → ${nextLimit.toLocaleString("en-US").replace(",", "_")} (${today}): <what grew>. Measured ${size.toLocaleString("en-US").replace(",", " ")} B.\` ` +
+        `\`const DUMP_LIMIT_BYTES = ${fmt(nextLimit)};\` and add the history line ` +
+        `\`// ${fmt(DUMP_LIMIT_BYTES)} → ${fmt(nextLimit)} (${today}): <what grew>. Measured ${fmt(size, " ")} B.\` ` +
         `above it, then justify it in the commit message; otherwise trim ` +
         `(notes -> \`ib reference detail set\`; see notes-budget-baseline.json).`
     ).toBeLessThan(DUMP_LIMIT_BYTES);
