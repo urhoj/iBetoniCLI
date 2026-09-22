@@ -7759,6 +7759,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 100
+  exit 4 (HTTP 400)  The session token carries no active company, so there is nothing to scope the search to → Re-auth with \`ib auth switch\`, or pass --company <id> for a one-off
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

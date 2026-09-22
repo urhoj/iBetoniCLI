@@ -398,7 +398,11 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone, ownerAsiakasId, ownerName }>",
-    errors: [limitErr("pass a positive integer; this command caps at 100"), ...COMMON_AUTH_ERRORS],
+    errors: [
+      limitErr("pass a positive integer; this command caps at 100"),
+      { http: 400, exit: 4, meaning: "The session token carries no active company, so there is nothing to scope the search to", remedy: "Re-auth with `ib auth switch`, or pass --company <id> for a one-off" },
+      ...COMMON_AUTH_ERRORS,
+    ],
     notes: [
       "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses).",
       "Scope: the active company, from the session token — a hit is returned when that company is the order's owner, source, betoni or pumppu supplier. Use --company <id> to search as another company.",

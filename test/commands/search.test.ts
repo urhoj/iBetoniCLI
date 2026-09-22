@@ -192,4 +192,23 @@ describe("ib search --my-companies wiring", () => {
     expect(calls.vehicleHadMy).toBe(false);   // vehicle ignores myCompanies
     expect(calls.sijaintiAtCap).toBe(true);   // sijainti fetches the joined list at the 500 cap, active company only
   });
+
+  // fb#1961. runUnifiedSearch invokes every source inside
+  // `Promise.allSettled(selected.map((e) => rawSources[e]()))`. The .map body runs
+  // SYNCHRONOUSLY, so a source that throws on the way to returning its promise escapes
+  // before allSettled exists and rejects the whole unified search -- the five healthy
+  // entities lose their hits too. keikka is the only source that resolves the active
+  // company eagerly (ownerAsiakasIdFromToken is sync and exits 4 on an unusable claim),
+  // so it is the one that has to hand back a REJECTED promise instead of throwing.
+  // The stub-injected "a failing entity lands in errors[]" test above cannot catch this:
+  // its stubs are already async, so it never exercises buildSearchSources.
+  test("the keikka source rejects instead of throwing synchronously when the token names no company (fb#1961)", async () => {
+    // payload `{}` -> decodes fine, carries no ownerAsiakasId claim.
+    const client = mockApiClient({ getCurrentToken: vi.fn(() => "h.e30.s") });
+    const srcs = buildSearchSources(client, "x", 5);
+
+    let pending: Promise<unknown> | undefined;
+    expect(() => { pending = srcs.keikka(); }).not.toThrow();
+    await expect(pending).rejects.toBeInstanceOf(CliError);
+  });
 });
