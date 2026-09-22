@@ -7774,6 +7774,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka tilat matches snapshot 1`] = `
+"USAGE
+  ib keikka tilat [flags]
+  (also: ib keikka statuses)
+
+DESCRIPTION
+  The keikkaTila catalogue: every lifecycle status id with its Finnish name, category and grid icon. Reference data for mapping the numeric \`tila\` on a keikka row.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --full    Also the lifecycle wiring (successTilaId/errorTilaId) and UI strings (subtitle, description, iconColor, mainAction, mainAdminAction)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tilaId, name, category, selectable, orderNumber, icon }>; with --full also { subtitle, description, successTilaId, errorTilaId, iconColor, mainAction, mainAdminAction }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - GLOBAL reference data — dbo.keikkaTila has no ownerAsiakasId, so every caller gets the same 17 rows and there is no --owner/--company axis. Source: GET /api/tila/list.
+  - Rows come back in orderNumber (lifecycle) order, not id order: the ids grew by accretion, so 9/12/13 all mean Toimitettu and 100 is Valmis. Sort by id only if you need the raw catalogue order.
+  - category buckets the id for the UI (kesken / odottaa / …) — use it instead of hard-coding id ranges, which is what breaks when a status is added.
+  - \`selectable\` (isSelectable) says whether a human may pick the status in the UI; a non-selectable one is reached by the system only. \`ib keikka update --status\` still takes the numeric id.
+
+SEE ALSO
+  ib keikka list, ib keikka update, ib person day statuses
+
+EXAMPLES
+  ib keikka tilat
+  ib keikka tilat --full
+  ib keikka tilat --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka update matches snapshot 1`] = `
 "USAGE
   ib keikka update <keikkaId> [flags]

@@ -365,6 +365,27 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
 
   {
+    command: "ib keikka tilat",
+    aliases: ["ib keikka statuses"],
+    description:
+      "The keikkaTila catalogue: every lifecycle status id with its Finnish name, category and grid icon. Reference data for mapping the numeric `tila` on a keikka row.",
+    auth: "any",
+    flags: [
+      { name: "full", type: "boolean", description: "Also the lifecycle wiring (successTilaId/errorTilaId) and UI strings (subtitle, description, iconColor, mainAction, mainAdminAction)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ tilaId, name, category, selectable, orderNumber, icon }>; with --full also { subtitle, description, successTilaId, errorTilaId, iconColor, mainAction, mainAdminAction }",
+    errors: [...COMMON_AUTH_ERRORS],
+    notes: [
+      "GLOBAL reference data — dbo.keikkaTila has no ownerAsiakasId, so every caller gets the same 17 rows and there is no --owner/--company axis. Source: GET /api/tila/list.",
+      "Rows come back in orderNumber (lifecycle) order, not id order: the ids grew by accretion, so 9/12/13 all mean Toimitettu and 100 is Valmis. Sort by id only if you need the raw catalogue order.",
+      "category buckets the id for the UI (kesken / odottaa / …) — use it instead of hard-coding id ranges, which is what breaks when a status is added.",
+      "`selectable` (isSelectable) says whether a human may pick the status in the UI; a non-selectable one is reached by the system only. `ib keikka update --status` still takes the numeric id.",
+    ],
+    seeAlso: ["ib keikka list", "ib keikka update", "ib person day statuses"],
+    examples: ["ib keikka tilat", "ib keikka tilat --full", "ib keikka tilat --pretty"],
+  },
+  {
     command: "ib keikka search",
     description:
       "Search keikkas via the backend full-text search: phone number, keikkaId, worksite name/number, invoice reference. Returns deduped hits (one per keikka), newest first.",

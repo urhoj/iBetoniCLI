@@ -632,6 +632,77 @@ export async function runKeikkaPersonList(
   return opts.byPerson ? listEnvelope(collapseByPerson(items)) : listEnvelope(items);
 }
 
+/** One row of the keikkaTila catalogue, CLI-projected. */
+export interface TilaRow {
+  tilaId: number;
+  name: string | null;
+  category: string | null;
+  selectable: boolean;
+  orderNumber: number | null;
+  icon: string | null;
+}
+
+/** --full adds the lifecycle wiring and the UI strings behind the tila. */
+export interface TilaRowFull extends TilaRow {
+  subtitle: string | null;
+  description: string | null;
+  successTilaId: number | null;
+  errorTilaId: number | null;
+  iconColor: string | null;
+  mainAction: string | null;
+  mainAdminAction: string | null;
+}
+
+/**
+ * `ib keikka tilat` — the keikkaTila catalogue (fb#1914).
+ *
+ * Every keikka row carries a numeric `tila` and nothing in the CLI mapped that
+ * id to its meaning, so an agent reading `tila: 8` had to query dbo.keikkaTila
+ * directly. Global reference data, not tenant-scoped: GET /api/tila/list reads
+ * the whole table (there is no ownerAsiakasId column on it), which is why this
+ * takes no --owner and gives every authenticated caller the same 17 rows.
+ *
+ * Ordered by orderNumber — the lifecycle order the grid renders, not the id
+ * order: the ids grew by accretion (9/12/13 all mean Toimitettu, 100 Valmis),
+ * so sorting by id reads as a jumble. Ties fall back to the id for stability.
+ */
+export async function runKeikkaTilat(
+  client: ApiClient,
+  opts: { full?: boolean } = {}
+): Promise<ListEnvelope<TilaRow | TilaRowFull>> {
+  const rows = await client.get<Record<string, unknown>[]>("/api/tila/list");
+  const num = (v: unknown) => (v != null ? Number(v) : null);
+  const str = (v: unknown) => ((v as string) ?? null);
+  const items = (rows || [])
+    .map((r) => {
+      const base: TilaRow = {
+        tilaId: Number(r.keikkaTilaId),
+        name: str(r.keikkaTilaSelite),
+        category: str(r.keikkaTilaCategory),
+        selectable: !!r.isSelectable,
+        orderNumber: num(r.orderNumber),
+        icon: str(r.iconName),
+      };
+      if (!opts.full) return base;
+      return {
+        ...base,
+        subtitle: str(r.keikkaTilaSelite2),
+        description: str(r.keikkaTilaSelite3),
+        successTilaId: num(r.successTilaId),
+        errorTilaId: num(r.errorTilaId),
+        iconColor: str(r.iconColor),
+        mainAction: str(r.mainAction),
+        mainAdminAction: str(r.mainAdminAction),
+      } as TilaRowFull;
+    })
+    .sort(
+      (a, b) =>
+        (a.orderNumber ?? Number.MAX_SAFE_INTEGER) - (b.orderNumber ?? Number.MAX_SAFE_INTEGER) ||
+        a.tilaId - b.tilaId
+    );
+  return listEnvelope(items);
+}
+
 /**
  * Register `ib keikka` subcommands on the parent commander instance:
  *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
@@ -651,6 +722,16 @@ export function registerKeikkaCommands(
   getClient: () => Promise<ApiClient>
 ): void {
   const k = parent.command("keikka").description("Keikka commands");
+
+  k.command("tilat")
+    // English reflex spelling for a Finnish-named reference command.
+    .alias("statuses")
+    .option("--full")
+    .action(
+      jsonAction(getClient, (client, opts: { full?: boolean }) =>
+        runKeikkaTilat(client, { full: opts.full })
+      )
+    );
 
   k.command("list")
     .option("--from <date>", "", "today")

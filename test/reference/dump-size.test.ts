@@ -133,7 +133,13 @@ import { buildReference } from "../../src/reference/dump.js";
 // 824_000 → 825_000 (2026-09-21): fb#1744/fb#1910 `keikka get` — the six pump /
 // free-text fields in outputShape (the --full flag shipped and was dropped the
 // same day; the longer outputShape is what remains). Measured 824 097 B.
-const DUMP_LIMIT_BYTES = 825_000;
+// 825_000 → 827_000 (2026-09-22): fb#1914 — new leaf `ib keikka tilat`
+// (+ `statuses` alias), the keikkaTila catalogue every keikka row's numeric
+// `tila` points at. Agents had to read dbo.keikkaTila directly to name a
+// status; `ib person day statuses` already had the equivalent for personPvm.
+// One new command with 4 notes, not padding on an existing one. Measured
+// 826 262 B. Headroom ~740 B, thin per this file's convention.
+const DUMP_LIMIT_BYTES = 827_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
