@@ -221,7 +221,7 @@ export interface KeikkaSearchHit {
   /** The company the order belongs to. Only a hit from ANOTHER company can differ from the
    * active one, and only `--all-companies` can return such a hit. A copy always lands in this
    * company, which is why the backend refuses to copy an order whose owner is not your
-   * active company (fb#1955). */
+   * active company (cl#2544). */
   ownerAsiakasId: number | null;
   ownerName: string | null;
 }
@@ -229,7 +229,7 @@ export interface KeikkaSearchHit {
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
  * tool). The route scopes results to the ACTIVE COMPANY, read from the JWT
- * (fb#1955): a keikka is returned when that company takes part in it as owner,
+ * (cl#2544): a keikka is returned when that company takes part in it as owner,
  * source, betoni or pumppu supplier. `scope=all` opts back into every keikka
  * the PERSON may read, across companies. ownerAsiakasId is deliberately NOT
  * sent any more — the backend stopped reading it from the query string once it

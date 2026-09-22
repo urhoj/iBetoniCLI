@@ -25,7 +25,7 @@ describe("runKeikkaSearch", () => {
     expect(path).toContain("usingFullTextSearch=true");
   });
 
-  // fb#1955 — the company is the token's, not the caller's to choose. Sending it again would
+  // cl#2544 — the company is the token's, not the caller's to choose. Sending it again would
   // be harmless today but re-establishes the habit the backend just stopped honouring.
   test("does NOT send ownerAsiakasId — the backend takes the company from the JWT", async () => {
     await runKeikkaSearch(mockClient, "kamppi");

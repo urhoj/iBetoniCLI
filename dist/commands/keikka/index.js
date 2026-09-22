@@ -130,7 +130,7 @@ export async function runKeikkaGet(client, keikkaId) {
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
  * tool). The route scopes results to the ACTIVE COMPANY, read from the JWT
- * (fb#1955): a keikka is returned when that company takes part in it as owner,
+ * (cl#2544): a keikka is returned when that company takes part in it as owner,
  * source, betoni or pumppu supplier. `scope=all` opts back into every keikka
  * the PERSON may read, across companies. ownerAsiakasId is deliberately NOT
  * sent any more — the backend stopped reading it from the query string once it

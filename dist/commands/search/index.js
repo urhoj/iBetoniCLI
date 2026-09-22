@@ -170,7 +170,7 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
             return runPersonSearch(client, query, limit);
         },
         vehicle: () => runVehicleSearch(client, query, limit), // active company only
-        // Active company only by default (fb#1955), and under --my-companies every keikka the
+        // Active company only by default (cl#2544), and under --my-companies every keikka the
         // person may read. Not a perfect synonym for "my companies" -- a delegated per-keikka
         // grant is in that set too -- but it is the cross-company scope the route offers, and
         // the flag would otherwise silently keep returning one company's orders.

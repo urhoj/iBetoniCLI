@@ -80,7 +80,7 @@ describe("no new naming outliers", () => {
    * (`--vehicle-available`/`--vehicle-unavailable` — `ib palkki type
    * create|update`'s vehicleAvailable column vs `--vehicle`, a vehicleId
    * TARGET — and `--all-companies`, once `ib keikka search` joined `ib person
-   * search` in fb#1955 — used to be listed here while they were singletons;
+   * search` in cl#2544 — used to be listed here while they were singletons;
    * a second command sharing the spelling is the rule's own definition of
    * "not an outlier", so the entry goes rather than the flag.)
    *
