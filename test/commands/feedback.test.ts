@@ -1405,12 +1405,61 @@ describe("ib feedback update", () => {
         expect(put).not.toHaveBeenCalled();
       });
 
+      // fb#1965: `feedback list` (no --full) prints descriptions over 200 chars
+      // as head(120) + " … " + tail(80); that copy is not an edit.
+      const LONG = "A".repeat(150) + "MIDDLE" + "Z".repeat(150);
+      const SHORT = LONG.slice(0, 120) + " … " + LONG.slice(-80);
+
+      test("a `list` row's shortened description is not written back (fb#1965)", async () => {
+        get.mockResolvedValueOnce({ ...ROW, description: LONG });
+        put.mockResolvedValueOnce({ feedbackId: 42 });
+        await withJsonFile({ ...ROW, description: SHORT, severity: "major" }, runUpdate);
+        expect(put).toHaveBeenCalledWith("/api/feedback/42", { severity: "major" }, expect.anything());
+      });
+
+      test("an edit made on top of a shortened copy exits 4 — the elided middle would be lost (no PUT)", async () => {
+        get.mockResolvedValueOnce({ ...ROW, description: LONG });
+        await withJsonFile({ ...ROW, description: SHORT + " Later note." }, async (p) => {
+          const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
+          expect(exitCode).toBe(4);
+          expect(String(envelope.error)).toMatch(/"description" is the shortened copy.*ib dev feedback get/);
+        });
+        expect(put).not.toHaveBeenCalled();
+      });
+
+      test("a full-text edit that merely CONTAINS the elision marker is still sent", async () => {
+        const full = LONG.replace("MIDDLE", "MID … DLE");
+        get.mockResolvedValueOnce({ ...ROW, description: full });
+        put.mockResolvedValueOnce({ feedbackId: 42 });
+        await withJsonFile({ ...ROW, description: full + " Later note." }, runUpdate);
+        expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: full + " Later note." }, expect.anything());
+      });
+
+      test("--append-description reuses the row read for the file — one GET, not two", async () => {
+        get.mockResolvedValueOnce(ROW);
+        put.mockResolvedValueOnce({ feedbackId: 42 });
+        await withJsonFile({ ...ROW, appendDescription: "Later." }, runUpdate);
+        expect(get).toHaveBeenCalledTimes(1);
+        expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "Original.\n\nLater." }, expect.anything());
+      });
+
+      test("without --from-json a usage error still exits 4 before any login is needed", async () => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => {
+          throw new CliError("Not logged in", 0, null, 2);
+        });
+        const { exitCode } = await captureActionError(() =>
+          program.parseAsync(["feedback", "update", "42", "--description", "a", "--body", "b"], { from: "user" })
+        );
+        expect(exitCode).toBe(4);
+      });
+
       test("a feedbackId that differs from the positional exits 4 (no PUT)", async () => {
         get.mockResolvedValueOnce(ROW);
         await withJsonFile({ ...ROW, feedbackId: 43, severity: "major" }, async (p) => {
           const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
           expect(exitCode).toBe(4);
-          expect(String(envelope.error)).toMatch(/"feedbackId" is 43 but the positional id is 42/);
+          expect(String(envelope.error)).toMatch(/"feedbackId" is read-only here and differs.*names another row than the positional id/);
         });
         expect(put).not.toHaveBeenCalled();
       });

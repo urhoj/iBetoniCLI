@@ -11,6 +11,7 @@ import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";
 import type { ValidationEnvelope } from "../../src/output/validationEnvelope.js";
 import { intCsvFlag } from "../../src/targets.js";
+import { CliError } from "../../src/api/errors.js";
 
 const client = mockApiClient();
 
@@ -1246,6 +1247,25 @@ describe("changelog add/update --from-json (fb#300)", () => {
         expect(String(envelope.error)).toMatch(/"feedbackLinks" is read-only here and differs.*--feedback.*--unlink/);
       });
       expect(asPut()).not.toHaveBeenCalled();
+    });
+
+    test("--append-description reuses the row read for the file — one GET, not two", async () => {
+      asGet().mockResolvedValueOnce(ROW);
+      asPut().mockResolvedValue({ changelogId: 386 });
+      await withJsonFile({ ...ROW, appendDescription: "Later." }, runUpdate);
+      expect(asGet()).toHaveBeenCalledTimes(1);
+      expect(asPut()).toHaveBeenCalledWith("/api/changelog/386", { description: "Old.\n\nLater." }, expect.any(Object));
+    });
+
+    test("without --from-json a usage error still exits 4 before any login is needed", async () => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => {
+        throw new CliError("Not logged in", 0, null, 2);
+      });
+      const { exitCode } = await captureActionError(() =>
+        program.parseAsync(["changelog", "update", "386", "--description", "a", "--body", "b"], { from: "user" })
+      );
+      expect(exitCode).toBe(4);
     });
 
     test("a changelogId that differs from the positional exits 4 (no PUT)", async () => {

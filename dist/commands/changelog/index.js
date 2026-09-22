@@ -518,7 +518,8 @@ const READ_SHAPE_KEY_ALIASES = {
  * Changelog's `--from-json` config (see {@link FromJsonConfig}):
  * - nonPayload: the JSON source itself, the write-safety trio, and help;
  * - readShapeAliases: {@link READ_SHAPE_KEY_ALIASES};
- * - numericFields/csvFields: how Commander parses the matching flags.
+ * - numericFields/csvFields: how Commander parses the matching flags;
+ * - roundTrip: how `update` treats a read row (fb#1814).
  */
 const CHANGELOG_FROM_JSON = {
     // `resolve` is --no-resolve's Commander attribute name, so registering that flag
@@ -543,18 +544,12 @@ const CHANGELOG_FROM_JSON = {
     // sha/commit stay string-or-array-only — a numeric --repo/--sha/--files/--commit
     // is a real caller mistake and must still exit 4, not silently coerce.
     numericTolerantCsvFields: new Set(["feedback"]),
-};
-/**
- * `update`'s config: {@link CHANGELOG_FROM_JSON} plus the `get`-row round-trip
- * (fb#1814). `feedbackLinks` stays loud when EDITED (fb#576 — never folded onto
- * --feedback); unchanged, it carries no edit and is dropped like any other echo.
- */
-const CHANGELOG_UPDATE_FROM_JSON = {
-    ...CHANGELOG_FROM_JSON,
+    // `update` only (add passes no current row): a read row round-trips (fb#1814).
     roundTrip: {
-        idKey: "changelogId",
-        volatileKeys: new Set(["createdAt", "updatedAt"]),
+        volatileKeys: new Set(["updatedAt"]),
         remedies: {
+            changelogId: "it names another entry than the positional id — drop the key, or pass the file's id",
+            // Loud when EDITED, never folded onto --feedback (fb#576).
             feedbackLinks: "link with --feedback <ids> (add --no-resolve for a references link) and remove with --unlink <ids>",
             isDeleted: "use `ib dev changelog delete <id>`",
         },
@@ -573,9 +568,9 @@ export function normalizeChangelogJson(json, keys) {
 // names for existing importers.
 export { explicitFlags };
 export { mergeFromJsonInput as mergeChangelogInput } from "../_shared/fromJson.js";
-/** Changelog's composed apply — the shared {@link sharedApplyFromJson}; a {@link RoundTrip} means `update`. */
-export function applyFromJson(cmd, o, round) {
-    sharedApplyFromJson(cmd, o, round ? CHANGELOG_UPDATE_FROM_JSON : CHANGELOG_FROM_JSON, round);
+/** Changelog's composed apply — the shared {@link sharedApplyFromJson} with {@link CHANGELOG_FROM_JSON}. */
+export function applyFromJson(cmd, o, current) {
+    sharedApplyFromJson(cmd, o, CHANGELOG_FROM_JSON, current);
 }
 /**
  * Enforce `add`'s required fields AFTER the --from-json merge.
@@ -1057,12 +1052,15 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--language <l>")
         .option("--from-json <file>")).action(guarded(async (idStr, o, cmd) => {
         const id = parseRefId(idStr, "changelog", "update");
-        const client = await getClient();
-        // The current row is read only for a file, so a `get` row round-trips (fb#1814).
-        const current = o.fromJson !== undefined
-            ? await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id))
-            : undefined;
-        applyFromJson(cmd, o, { id, current });
+        // The current row is read only for a file, so a read row round-trips (fb#1814);
+        // without a file the client is built where it always was.
+        let client;
+        let current;
+        if (o.fromJson !== undefined) {
+            const c = (client = await getClient());
+            current = await runWithSiblingHint(c, id, "feedback", () => runChangelogGet(c, id));
+        }
+        applyFromJson(cmd, o, current);
         normalizeChangelogEnums(o);
         validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
         // --summary/--body are aliases for --description (feedback #205/#278); fold
@@ -1080,11 +1078,12 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         }
         o.sha = resolveShaAlias(o.sha, o.commit);
         validateFieldLengths(o);
+        client ??= await getClient();
         // Read-merge-write: --description REPLACES the entry, which is destructive
         // (fb#757). Appending keeps the current text and adds to it instead.
         if (o.appendDescription !== undefined) {
-            const current = await runChangelogGet(client, id);
-            const existing = typeof current.description === "string" ? current.description : "";
+            const row = current ?? (await runChangelogGet(client, id));
+            const existing = typeof row.description === "string" ? row.description : "";
             o.description = existing ? `${existing.trimEnd()}\n\n${o.appendDescription.trim()}` : o.appendDescription.trim();
         }
         const patch = {};
@@ -1590,7 +1589,7 @@ export const CHANGELOG_SPECS = [
                 description: "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
                     fromJsonNonPayloadDesc(false) +
                     " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped)." +
-                    " A `changelog get` row round-trips (fb#1814): unchanged columns are dropped; an edited read-only one exits 4 naming its flag.",
+                    " A `changelog get` row round-trips (fb#1814): unchanged columns are dropped; an edited read-only one exits 4.",
             },
         ]),
         writeFlags: true,
@@ -1635,8 +1634,8 @@ export const CHANGELOG_SPECS = [
                 origin: "client",
                 exit: 4,
                 match: "--from-json",
-                meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
-                remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names",
+                meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, carries an unknown / wrong-typed key, or (a read row) edits a read-only column",
+                remedy: "The error says WHICH: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, an unknown / wrong-typed key, or a read-row column this command cannot write (the message names the flag or command that writes it — otherwise drop the key)",
             },
             {
                 origin: "client",

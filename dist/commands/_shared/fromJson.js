@@ -2,46 +2,37 @@ import { failUsage } from "../../output/json.js";
 import { readJsonObjectInput } from "../../api/parseBody.js";
 import { explicitFlags } from "./flags.js";
 /**
- * Let a `get` row round-trip through `update --from-json` (fb#1814). The file
- * carries columns no flag writes, and rejecting them as unknown made the natural
- * get → edit → update loop exit 4 on every run. Ignoring them outright would be
- * the fb#298 silent drop — an edited `status` would vanish. So each key is
- * compared against the CURRENT row: an UNCHANGED key carries no edit and is
- * dropped (payload keys too, so only the edited fields are sent — re-sending a
- * changelog row's legacy `feedbackId` would otherwise re-post it as a resolving
- * link); a CHANGED read-only key exits 4 naming where it is writable. A key the
- * row does not carry is left for {@link normalizeFromJson}'s unknown-key rejection.
+ * Let a read row round-trip through `update --from-json` (fb#1814): a key equal
+ * to the CURRENT row carries no edit and is dropped (payload keys too, so only
+ * edited fields are sent — an unedited changelog feedbackId is not re-posted as a
+ * link); a changed read-only key exits 4 (with its remedy, else "drop the key"),
+ * after the command's own `classify` has had its say. A key the row lacks is left for
+ * normalizeFromJson's unknown-key check.
  */
-export function dropUnchangedEchoes(json, keys, cfg, { id, current }) {
-    if (!cfg.roundTrip)
+function dropUnchangedEchoes(json, keys, cfg, current) {
+    const rt = cfg.roundTrip;
+    if (!rt)
         return json;
-    const { idKey, volatileKeys, remedies } = cfg.roundTrip;
-    const flagName = cfg.flagName ?? "--from-json";
     const out = { ...json };
-    if (idKey in out) {
-        // The one mismatch that would silently edit the WRONG row.
-        if (Number(out[idKey]) !== id) {
-            failUsage(`${flagName}: "${idKey}" is ${JSON.stringify(out[idKey])} but the positional id is ${id} — they must name the same row (drop the key, or pass the file's id)`);
-        }
-        delete out[idKey];
-    }
-    for (const k of volatileKeys)
+    for (const k of rt.volatileKeys)
         delete out[k];
-    if (!current)
-        return out;
     const problems = [];
     for (const k of Object.keys(out)) {
         if (!(k in current))
             continue;
-        if (JSON.stringify(out[k]) === JSON.stringify(current[k])) {
+        const verdict = JSON.stringify(out[k]) === JSON.stringify(current[k]) ? "echo" : rt.classify?.(k, out[k], current[k]);
+        if (verdict === "echo") {
             delete out[k];
         }
+        else if (verdict) {
+            problems.push(`"${k}" ${verdict}`);
+        }
         else if (!keys.has(k)) {
-            problems.push(`"${k}" is read-only here and differs from the current row — ${remedies[k] ?? "no flag on this command writes it; drop the key"}`);
+            problems.push(`"${k}" is read-only here and differs from the current row — ${rt.remedies[k] ?? "no flag on this command writes it; drop the key"}`);
         }
     }
     if (problems.length)
-        failUsage(`${flagName}: ${problems.join("; ")}`);
+        failUsage(`${cfg.flagName ?? "--from-json"}: ${problems.join("; ")}`);
     return out;
 }
 /**
@@ -177,16 +168,16 @@ export function mergeFromJsonInput(json, explicit, defaults = {}) {
  * Apply a `--from-json <file|->` payload onto the action's options object, in
  * place. No-op without the flag. Reads the file (or stdin) via the shared
  * shell-safe reader, validates the object against the command's OWN flags
- * (per `cfg`), and merges it UNDER the explicitly-typed flags. With a
- * {@link RoundTrip}, a `get` row's unchanged columns are dropped first.
+ * (per `cfg`), and merges it UNDER the explicitly-typed flags. Given the
+ * `current` row, a read row's unchanged columns are dropped first.
  */
-export function applyFromJson(cmd, o, cfg, round) {
+export function applyFromJson(cmd, o, cfg, current) {
     if (o.fromJson === undefined)
         return;
     const keys = payloadKeyMap(cmd, cfg);
     let raw = readJsonObjectInput(String(o.fromJson));
-    if (round)
-        raw = dropUnchangedEchoes(raw, keys, cfg, round);
+    if (current)
+        raw = dropUnchangedEchoes(raw, keys, cfg, current);
     const json = normalizeFromJson(raw, keys, cfg);
     Object.assign(o, mergeFromJsonInput(json, explicitFlags(cmd, o, new Set(keys.values())), o));
 }

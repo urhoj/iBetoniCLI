@@ -389,14 +389,30 @@ function gateValueMatches(gated: string, gateKind: unknown): boolean {
 
 /** Cap a string at MAX_FREETEXT chars, keeping HEAD+TAIL (elided middle) so an
  * appended update at the tail is never the part that gets cut (fb#714).
- * Non-strings pass through untouched. */
-function truncateField(v: unknown): { value: unknown; cut: boolean } {
+ * `elided` is the dropped middle. Non-strings pass through untouched. */
+function truncateField(v: unknown): { value: unknown; cut: boolean; elided?: string } {
   if (typeof v === "string" && v.length > MAX_FREETEXT) {
     const head = v.slice(0, TRUNCATE_HEAD);
     const tail = v.slice(-TRUNCATE_TAIL);
-    return { value: head + ELISION + tail, cut: true };
+    return { value: head + ELISION + tail, cut: true, elided: v.slice(TRUNCATE_HEAD, -TRUNCATE_TAIL) };
   }
   return { value: v, cut: false };
+}
+
+/**
+ * `update --from-json` verdict on a column `list` prints shortened (fb#1965): the
+ * list's copy of the current value is no edit; an edit made on top of that copy
+ * (marker kept, elided middle missing) would write the shortened text back.
+ */
+function classifyShortened(key: string, fileValue: unknown, currentValue: unknown): string | undefined {
+  if (!(TRUNCATED_FIELDS as readonly string[]).includes(key)) return undefined;
+  const t = truncateField(currentValue);
+  if (!t.cut) return undefined;
+  if (fileValue === t.value) return "echo";
+  const s = String(fileValue);
+  return s.includes(ELISION) && !s.includes(t.elided!)
+    ? "is the shortened copy `ib dev feedback list` prints, so writing it would drop the elided text — template the file off `ib dev feedback get <id>` or `list --full`"
+    : undefined;
 }
 
 /** Shallow-copy a feedback row with its long free-text fields capped. */
@@ -1783,11 +1799,12 @@ export interface FeedbackUpdateInput {
 const UPDATE_FROM_JSON: FromJsonConfig = {
   nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
   numericFields: new Set(["complexity"]),
-  // A `get` row round-trips (fb#1814): unchanged columns drop, changed ones exit 4 here.
+  // A `get`/`list` row round-trips (fb#1814, fb#1965): unchanged columns drop, changed ones exit 4 here.
   roundTrip: {
-    idKey: "feedbackId",
-    volatileKeys: new Set(["createdAt", "updatedAt", "claimedBy", "claimedAt", "claimExpiresAt", "claimState"]),
+    volatileKeys: new Set(["updatedAt", "claimedBy", "claimedAt", "claimExpiresAt", "claimState"]),
+    classify: classifyShortened,
     remedies: {
+      feedbackId: "it names another row than the positional id — drop the key, or pass the file's id",
       status: "use `ib dev feedback resolve <id> --status <s> --note <text>`",
       resolution: "use `ib dev feedback resolve <id> --status <s> --note <text>`",
       changelogLinks: "links are written by `ib dev changelog add|update --feedback <id>`",
@@ -1803,11 +1820,14 @@ const UPDATE_FROM_JSON: FromJsonConfig = {
  * (which sets status/note), same endpoint. A REAL write — blocked under
  * --read-only (exit 3). `--dry-run` previews the body client-side. Deploy-gated:
  * an older backend ignores these fields and 400s on a status-less body.
+ * `current` is the row the caller already read (`--from-json`), reused by the
+ * append instead of a second GET.
  */
 export async function runFeedbackUpdate(
   client: ApiClient,
   id: number,
-  input: FeedbackUpdateInput
+  input: FeedbackUpdateInput,
+  current?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   assertEnum(input.scope, SCOPES, "--scope");
   assertEnum(input.kind, KINDS, "--kind");
@@ -1847,8 +1867,8 @@ export async function runFeedbackUpdate(
   // destructive half of feedback #332. Appending keeps the original text and
   // adds to it, so later commentary can never overwrite the evidence.
   if (appendDescription !== undefined) {
-    const current = await runFeedbackGet(client, id);
-    const existing = typeof current.description === "string" ? current.description : "";
+    const row = current ?? (await runFeedbackGet(client, id));
+    const existing = typeof row.description === "string" ? row.description : "";
     body.description = existing ? `${existing.trimEnd()}\n\n${appendDescription}` : appendDescription;
   }
   if (Object.keys(body).length === 0) {
@@ -2477,15 +2497,17 @@ export function registerFeedbackCommands(
         cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "update");
-        const client = await getClient();
         // Shared merge: only EXPLICITLY-typed flags outrank the JSON object
         // (feedback #332); unknown or wrong-typed JSON keys exit 4 (fb#298). The
-        // current row is read only for a file, so a `get` row round-trips (fb#1814).
-        const current =
-          opts.fromJson !== undefined
-            ? await runWithSiblingHint(client, id, "changelog", () => runFeedbackGet(client, id))
-            : undefined;
-        applyFromJson(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON, { id, current });
+        // current row is read only for a file, so a read row round-trips (fb#1814);
+        // without a file the client is built where it always was.
+        let client: ApiClient | undefined;
+        let current: Record<string, unknown> | undefined;
+        if (opts.fromJson !== undefined) {
+          const c = (client = await getClient());
+          current = await runWithSiblingHint(c, id, "changelog", () => runFeedbackGet(c, id));
+        }
+        applyFromJson(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON, current);
         // --body (argv or JSON) is an alias for --description (feedback #278);
         // fold AFTER the merge so both sources are agreement-checked, mirroring
         // `changelog update` — differing values exit 4 instead of one silently
@@ -2500,6 +2522,7 @@ export function registerFeedbackCommands(
           appendDescription: opts.appendDescription,
           reason: opts.reason,
         });
+        client ??= await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
             runFeedbackUpdate(client, id, {
@@ -2515,7 +2538,7 @@ export function registerFeedbackCommands(
               gateUntil: opts.gateUntil,
               dryRun: opts.dryRun,
               full: opts.full,
-            })
+            }, current)
           )
         );
       })
