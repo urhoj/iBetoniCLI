@@ -158,7 +158,8 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
  *
  * When `myCompanies` is true, customer/worksite/person fan out across all
  * companies the caller belongs to (backend-side fan-out or the cross-company
- * person endpoint). Vehicle, keikka and sijainti are always active-company only.
+ * person endpoint). Keikka honours it too (cl#2544). Vehicle is always
+ * active-company only; sijainti always asks scope=all.
  */
 export function buildSearchSources(client, query, limit, myCompanies = false) {
     return {
@@ -175,7 +176,11 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
         // person may read. Not a perfect synonym for "my companies" -- a delegated per-keikka
         // grant is in that set too -- but it is the cross-company scope the route offers, and
         // the flag would otherwise silently keep returning one company's orders.
-        keikka: () => runKeikkaSearch(client, query, ownerAsiakasIdFromToken(client, "run `ib auth switch`"), limit, myCompanies),
+        // async, NOT a bare arrow: ownerAsiakasIdFromToken throws synchronously when the token
+        // carries no usable claim, and runUnifiedSearch calls these inside `Promise.allSettled(
+        // selected.map(...))` -- a sync throw escapes the .map before allSettled exists and fails
+        // ALL six entities instead of landing in errors[] beside the other five (fb#1961).
+        keikka: async () => runKeikkaSearch(client, query, ownerAsiakasIdFromToken(client, "run `ib auth switch`"), limit, myCompanies),
         // Sijainti resolution must see OTHER companies' rows too (supplier
         // betoniasemat etc. — the rows GPS visits/timeline reference), so the
         // source asks scope=all and forwards the query for server-side
