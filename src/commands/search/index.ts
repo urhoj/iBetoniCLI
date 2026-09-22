@@ -15,6 +15,7 @@ import {
   SIJAINTI_SEARCH_SCAN_LIMIT,
 } from "../sijainti/index.js";
 import { qs } from "../../api/query.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { listEnvelope } from "../../api/envelopes.js";
 /** Canonical entity order — also the within-tier sort order of merged hits. */
 export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"] as const;
@@ -245,7 +246,7 @@ export function buildSearchSources(
     // person may read. Not a perfect synonym for "my companies" -- a delegated per-keikka
     // grant is in that set too -- but it is the cross-company scope the route offers, and
     // the flag would otherwise silently keep returning one company's orders.
-    keikka: () => runKeikkaSearch(client, query, limit, myCompanies),
+    keikka: () => runKeikkaSearch(client, query, ownerAsiakasIdFromToken(client, "run `ib auth switch`"), limit, myCompanies),
     // Sijainti resolution must see OTHER companies' rows too (supplier
     // betoniasemat etc. — the rows GPS visits/timeline reference), so the
     // source asks scope=all and forwards the query for server-side

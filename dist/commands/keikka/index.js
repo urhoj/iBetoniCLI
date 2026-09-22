@@ -7,6 +7,7 @@ import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 /**
  * Build the count:0 disambiguation hint (feedback #165). An AI seeing an empty
  * list can't tell "no access" from "no data" from "date-filtered"; this spells
@@ -132,17 +133,27 @@ export async function runKeikkaGet(client, keikkaId) {
  * tool). The route scopes results to the ACTIVE COMPANY, read from the JWT
  * (cl#2544): a keikka is returned when that company takes part in it as owner,
  * source, betoni or pumppu supplier. `scope=all` opts back into every keikka
- * the PERSON may read, across companies. ownerAsiakasId is deliberately NOT
- * sent any more — the backend stopped reading it from the query string once it
- * began deciding which rows come back. `--company <id>` still works, because it
+ * the PERSON may read, across companies. `--company <id>` works because it
  * mints an ephemeral token whose active company is the target.
+ *
+ * ownerAsiakasId is STILL SENT even though the current backend ignores it and
+ * takes the company from the JWT. Dropping it broke this command for real: the
+ * migration that adds the scope filter to keikka_search_*_v2 lands BEFORE the
+ * backend that stops reading the query string, and in that window a request
+ * without the parameter reached the proc with @ownerAsiakasId = NULL, matched
+ * nothing, and returned 0 rows — indistinguishable from "no such order". The
+ * vendored copy of this CLI ships inside puminet5api and is bumped by CI, so it
+ * can be newer than the backend serving it at any time; sending a parameter the
+ * new backend ignores costs nothing and removes the ordering hazard entirely.
+ *
  * usingFullTextSearch=true mirrors the GPT tool's default path. Rows arrive
  * one-per-keikkaBetoni; dedupe by keikkaId. `limit` is applied client-side
  * (the backend caps at TOP 100, no limit param).
  */
-export async function runKeikkaSearch(client, query, limit, allCompanies = false) {
+export async function runKeikkaSearch(client, query, ownerAsiakasId, limit, allCompanies = false) {
     const rows = await client.get(`/api/keikka/search${qs({
         searchString: query,
+        ownerAsiakasId,
         usingFullTextSearch: "true",
         ...(allCompanies ? { scope: "all" } : {}),
     })}`);
@@ -465,7 +476,8 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--all-companies")
         .action(guarded(async (query, opts) => {
         const client = await getClient();
-        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.allCompanies);
+        const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
+        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search, opts.query), ownerAsiakasId, opts.limit, !!opts.allCompanies);
         writeJson(result);
     }));
     k.command("validate [keikkaId]")
