@@ -1272,6 +1272,9 @@ describe("ib feedback update", () => {
   // recover it). --from-json removes the shell hazard; --append-description
   // removes the overwrite risk entirely.
   describe("--from-json / --append-description (feedback #332)", () => {
+    // `update --from-json` reads the current row first (fb#1814); a bare id row
+    // shares no key with these payloads, so it changes nothing about them.
+    beforeEach(() => get.mockResolvedValue({ feedbackId: 42 }));
     const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
       const p = join(tmpdir(), `ib-update-fromjson-${process.pid}.json`);
       writeFileSync(p, JSON.stringify(payload), "utf8");
@@ -1365,6 +1368,70 @@ describe("ib feedback update", () => {
         { description: "First text." },
         expect.anything()
       );
+    });
+
+    // fb#1814: the natural edit loop is `get` → edit one field → `update
+    // --from-json`, and the row carries ~19 columns no update flag writes.
+    describe("a `get` row round-trips (fb#1814)", () => {
+      const ROW = {
+        feedbackId: 42, personId: 10, asiakasId: null, ownerAsiakasId: 27, kind: "idea",
+        description: "Original.", command: "ib x", errorText: null, cliVersion: "1.1.21", context: null,
+        status: "open", resolution: null, createdAt: "2026-09-17T07:34:25.136Z", updatedAt: "2026-09-22T17:12:34.077Z",
+        scope: "cli", resolvedByChangelogId: null, severity: "minor", complexity: 2,
+        claimedBy: "abc123", claimedAt: "2026-09-22T17:12:34.076Z", claimExpiresAt: "2026-09-23T17:12:34.076Z",
+        gateKind: null, gateRef: null, gateUntil: null, changelogLinks: [], related: [],
+      };
+      const runUpdate = async (p: string): Promise<void> => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
+      };
+
+      test("an unedited row with one edited field sends ONLY that field", async () => {
+        get.mockResolvedValueOnce(ROW);
+        put.mockResolvedValueOnce({ feedbackId: 42 });
+        await withJsonFile({ ...ROW, claimState: "held", severity: "major" }, runUpdate);
+        expect(get).toHaveBeenCalledWith("/api/feedback/42");
+        expect(put).toHaveBeenCalledWith("/api/feedback/42", { severity: "major" }, expect.anything());
+      });
+
+      test("an edited read-only column exits 4 naming where it IS writable (no PUT)", async () => {
+        get.mockResolvedValueOnce(ROW);
+        await withJsonFile({ ...ROW, status: "applied", severity: "major" }, async (p) => {
+          const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
+          expect(exitCode).toBe(4);
+          expect(String(envelope.error)).toMatch(/"status" is read-only here and differs.*ib dev feedback resolve/);
+        });
+        expect(put).not.toHaveBeenCalled();
+      });
+
+      test("a feedbackId that differs from the positional exits 4 (no PUT)", async () => {
+        get.mockResolvedValueOnce(ROW);
+        await withJsonFile({ ...ROW, feedbackId: 43, severity: "major" }, async (p) => {
+          const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
+          expect(exitCode).toBe(4);
+          expect(String(envelope.error)).toMatch(/"feedbackId" is 43 but the positional id is 42/);
+        });
+        expect(put).not.toHaveBeenCalled();
+      });
+
+      test("a key the row does not carry is still an unknown key", async () => {
+        get.mockResolvedValueOnce(ROW);
+        await withJsonFile({ ...ROW, sevrity: "major" }, async (p) => {
+          const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
+          expect(exitCode).toBe(4);
+          expect(String(envelope.error)).toMatch(/unknown key sevrity/);
+        });
+        expect(put).not.toHaveBeenCalled();
+      });
+
+      test("no --from-json, no extra read", async () => {
+        put.mockResolvedValueOnce({ feedbackId: 42 });
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "update", "42", "--scope", "app"], { from: "user" });
+        expect(get).not.toHaveBeenCalled();
+      });
     });
 
     test("--description and --append-description are mutually exclusive (exit 4, no reads/writes)", async () => {

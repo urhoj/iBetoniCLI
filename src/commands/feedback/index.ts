@@ -1783,6 +1783,18 @@ export interface FeedbackUpdateInput {
 const UPDATE_FROM_JSON: FromJsonConfig = {
   nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
   numericFields: new Set(["complexity"]),
+  // A `get` row round-trips (fb#1814): unchanged columns drop, changed ones exit 4 here.
+  roundTrip: {
+    idKey: "feedbackId",
+    volatileKeys: new Set(["createdAt", "updatedAt", "claimedBy", "claimedAt", "claimExpiresAt", "claimState"]),
+    remedies: {
+      status: "use `ib dev feedback resolve <id> --status <s> --note <text>`",
+      resolution: "use `ib dev feedback resolve <id> --status <s> --note <text>`",
+      changelogLinks: "links are written by `ib dev changelog add|update --feedback <id>`",
+      resolvedByChangelogId: "links are written by `ib dev changelog add|update --feedback <id>`",
+      related: "use `ib dev feedback link|unlink`",
+    },
+  },
 };
 
 /**
@@ -2465,9 +2477,15 @@ export function registerFeedbackCommands(
         cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "update");
+        const client = await getClient();
         // Shared merge: only EXPLICITLY-typed flags outrank the JSON object
-        // (feedback #332); unknown or wrong-typed JSON keys exit 4 (fb#298).
-        applyFromJson(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON);
+        // (feedback #332); unknown or wrong-typed JSON keys exit 4 (fb#298). The
+        // current row is read only for a file, so a `get` row round-trips (fb#1814).
+        const current =
+          opts.fromJson !== undefined
+            ? await runWithSiblingHint(client, id, "changelog", () => runFeedbackGet(client, id))
+            : undefined;
+        applyFromJson(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON, { id, current });
         // --body (argv or JSON) is an alias for --description (feedback #278);
         // fold AFTER the merge so both sources are agreement-checked, mirroring
         // `changelog update` — differing values exit 4 instead of one silently
@@ -2482,7 +2500,6 @@ export function registerFeedbackCommands(
           appendDescription: opts.appendDescription,
           reason: opts.reason,
         });
-        const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
             runFeedbackUpdate(client, id, {

@@ -1201,8 +1201,9 @@ describe("changelog add/update --from-json (fb#300)", () => {
     // The key map is derived per-command, so a key no flag backs is rejected
     // rather than silently dropped (fb#298) — checked here through the real
     // parse, not just normalizeChangelogJson, so nothing reaches the PUT.
-    // (Was `entryDate`, which fb#357 made a legitimate alias for --date.)
-    await withJsonFile({ changelogId: 386 }, async (p) => {
+    // (Was `entryDate`, which fb#357 made a legitimate alias for --date, then
+    // `changelogId`, which fb#1814 made a legitimate id echo.)
+    await withJsonFile({ notAField: 386 }, async (p) => {
       const program = new Command();
       registerChangelogCommands(program, async () => client);
       const { exitCode } = await captureActionError(() =>
@@ -1211,6 +1212,50 @@ describe("changelog add/update --from-json (fb#300)", () => {
       expect(exitCode).toBe(4);
     });
     expect(asPut()).not.toHaveBeenCalled();
+  });
+
+  // fb#1814: `changelog get` → edit → `update --from-json` used to exit 4 on
+  // changelogId/personId/isDeleted/createdAt/updatedAt/feedbackLinks.
+  describe("a `get` row round-trips (fb#1814)", () => {
+    const ROW = {
+      changelogId: 386, type: "bugfix", area: "cli", title: "T", description: "Old.", benefits: null, impact: null,
+      status: "Deployed", severity: null, files: null, repo: "betonicli", commitShas: "abc1234", versionTag: "betonicli@1.2.3",
+      bumpLevel: "patch", feedbackId: 1784, sentryIssue: null, source: "claude", entryDate: "2026-09-16", personId: 10,
+      language: "en", isDeleted: false, createdAt: "2026-09-16T18:48:31.342Z", updatedAt: "2026-09-16T18:48:31.342Z",
+      feedbackLinks: [{ feedbackId: 1784, role: "resolves" }],
+    };
+    const runUpdate = async (p: string): Promise<void> => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" });
+    };
+
+    test("sends ONLY the edited field — the unchanged feedbackId is not re-posted as a link", async () => {
+      asGet().mockResolvedValueOnce(ROW);
+      asPut().mockResolvedValue({ changelogId: 386 });
+      await withJsonFile({ ...ROW, description: "New." }, runUpdate);
+      expect(asGet()).toHaveBeenCalledWith("/api/changelog/386");
+      expect(asPut()).toHaveBeenCalledWith("/api/changelog/386", { description: "New." }, expect.any(Object));
+    });
+
+    test("an edited feedbackLinks exits 4 pointing at --feedback/--unlink (no PUT, fb#576 stays loud)", async () => {
+      asGet().mockResolvedValueOnce(ROW);
+      await withJsonFile({ ...ROW, feedbackLinks: [{ feedbackId: 1785, role: "resolves" }] }, async (p) => {
+        const { exitCode, envelope } = await captureActionError(() => runUpdate(p));
+        expect(exitCode).toBe(4);
+        expect(String(envelope.error)).toMatch(/"feedbackLinks" is read-only here and differs.*--feedback.*--unlink/);
+      });
+      expect(asPut()).not.toHaveBeenCalled();
+    });
+
+    test("a changelogId that differs from the positional exits 4 (no PUT)", async () => {
+      asGet().mockResolvedValueOnce(ROW);
+      await withJsonFile({ ...ROW, changelogId: 387 }, async (p) => {
+        const { exitCode } = await captureActionError(() => runUpdate(p));
+        expect(exitCode).toBe(4);
+      });
+      expect(asPut()).not.toHaveBeenCalled();
+    });
   });
 
   test("update accepts bumpLevel from --from-json (fb#303)", async () => {

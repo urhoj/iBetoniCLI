@@ -42,6 +42,7 @@ import { jsonAction, guarded } from "../_shared/action.js";
 import { explicitFlags, foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import {
   type FromJsonConfig,
+  type RoundTrip,
   payloadKeyMap as sharedPayloadKeyMap,
   normalizeFromJson,
   applyFromJson as sharedApplyFromJson,
@@ -690,6 +691,23 @@ const CHANGELOG_FROM_JSON: FromJsonConfig = {
   numericTolerantCsvFields: new Set(["feedback"]),
 };
 
+/**
+ * `update`'s config: {@link CHANGELOG_FROM_JSON} plus the `get`-row round-trip
+ * (fb#1814). `feedbackLinks` stays loud when EDITED (fb#576 — never folded onto
+ * --feedback); unchanged, it carries no edit and is dropped like any other echo.
+ */
+const CHANGELOG_UPDATE_FROM_JSON: FromJsonConfig = {
+  ...CHANGELOG_FROM_JSON,
+  roundTrip: {
+    idKey: "changelogId",
+    volatileKeys: new Set(["createdAt", "updatedAt"]),
+    remedies: {
+      feedbackLinks: "link with --feedback <ids> (add --no-resolve for a references link) and remove with --unlink <ids>",
+      isDeleted: "use `ib dev changelog delete <id>`",
+    },
+  },
+};
+
 /** Changelog's key map — the shared {@link sharedPayloadKeyMap} with {@link CHANGELOG_FROM_JSON}. */
 export function payloadKeyMap(cmd: Command): Map<string, string> {
   return sharedPayloadKeyMap(cmd, CHANGELOG_FROM_JSON);
@@ -709,9 +727,9 @@ export function normalizeChangelogJson(
 export { explicitFlags };
 export { mergeFromJsonInput as mergeChangelogInput } from "../_shared/fromJson.js";
 
-/** Changelog's composed apply — the shared {@link sharedApplyFromJson} with {@link CHANGELOG_FROM_JSON}. */
-export function applyFromJson(cmd: Command, o: Record<string, unknown>): void {
-  sharedApplyFromJson(cmd, o, CHANGELOG_FROM_JSON);
+/** Changelog's composed apply — the shared {@link sharedApplyFromJson}; a {@link RoundTrip} means `update`. */
+export function applyFromJson(cmd: Command, o: Record<string, unknown>, round?: RoundTrip): void {
+  sharedApplyFromJson(cmd, o, round ? CHANGELOG_UPDATE_FROM_JSON : CHANGELOG_FROM_JSON, round);
 }
 
 /**
@@ -1253,7 +1271,13 @@ export function registerChangelogCommands(
       )
   ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; unlink?: number[]; resolve?: boolean; fromJson?: string; appendDescription?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
-    applyFromJson(cmd, o as Record<string, unknown>);
+    const client = await getClient();
+    // The current row is read only for a file, so a `get` row round-trips (fb#1814).
+    const current =
+      o.fromJson !== undefined
+        ? await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id))
+        : undefined;
+    applyFromJson(cmd, o as Record<string, unknown>, { id, current });
     normalizeChangelogEnums(o);
     validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
     // --summary/--body are aliases for --description (feedback #205/#278); fold
@@ -1272,7 +1296,6 @@ export function registerChangelogCommands(
     }
     o.sha = resolveShaAlias(o.sha, o.commit)!;
     validateFieldLengths(o);
-    const client = await getClient();
     // Read-merge-write: --description REPLACES the entry, which is destructive
     // (fb#757). Appending keeps the current text and adds to it instead.
     if (o.appendDescription !== undefined) {
@@ -1798,7 +1821,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description:
           "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
           fromJsonNonPayloadDesc(false) +
-          " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).",
+          " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped)." +
+          " A `changelog get` row round-trips (fb#1814): unchanged columns are dropped; an edited read-only one exits 4 naming its flag.",
       },
     ]),
     writeFlags: true,

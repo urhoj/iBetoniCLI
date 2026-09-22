@@ -437,7 +437,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
       { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace" },
-      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
+      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). A `feedback get` row round-trips (fb#1814): unchanged columns are dropped; an edited read-only one exits 4 naming its command. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
