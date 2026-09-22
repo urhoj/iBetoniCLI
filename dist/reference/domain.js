@@ -177,7 +177,7 @@ export function renderDomainHelp() {
     lines.push("");
     lines.push("DISCOVER");
     lines.push("  First run: `ib auth login` (opens browser) or set IB_TOKEN=<jwt>; verify with `ib doctor`.");
-    lines.push("  Commands (cheap, offline): `ib commands` — domain index (~5 KB); `ib commands <domain>`");
+    lines.push("  Commands (cheap, offline): `ib commands` — domain index (small); `ib commands <domain>`");
     lines.push("    for one group's commands (e.g. `ib commands keikka`); `ib commands --all` for the full");
     lines.push("    flat list; filters --reads / --mutations / --permission <substr>.");
     lines.push("  Full machine-readable specs: `ib reference dump` (entire surface) or `ib reference dump");

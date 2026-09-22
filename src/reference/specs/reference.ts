@@ -276,7 +276,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
   {
     command: "ib commands",
     description:
-      "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
+      "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (a few KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
     auth: "none",
     args: [
       {
@@ -314,7 +314,7 @@ export const REFERENCE_SPECS: CommandSpec[] = [
         name: "all",
         type: "boolean",
         description:
-          "Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.",
+          "Full flat list of every command — the whole catalogue, roughly ten times the domain index; prefer a domain arg or --find. Default (no args) is the domain index.",
       },
       {
         name: "signatures",

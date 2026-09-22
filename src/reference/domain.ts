@@ -212,7 +212,7 @@ export function renderDomainHelp(): string {
     "  First run: `ib auth login` (opens browser) or set IB_TOKEN=<jwt>; verify with `ib doctor`."
   );
   lines.push(
-    "  Commands (cheap, offline): `ib commands` — domain index (~5 KB); `ib commands <domain>`"
+    "  Commands (cheap, offline): `ib commands` — domain index (small); `ib commands <domain>`"
   );
   lines.push(
     "    for one group's commands (e.g. `ib commands keikka`); `ib commands --all` for the full"

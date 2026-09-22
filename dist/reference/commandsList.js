@@ -189,8 +189,9 @@ export function buildCommandsList(filter, tier = getCallerTier()) {
  *  tripling the size of every fresh agent's FIRST discovery call (fb#382). */
 const INDEX_COMMANDS_CAP = 8;
 /**
- * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
- * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
+ * Bare `ib commands` — a small domain INDEX instead of the full flat list
+ * (~43 KB at 149 leaves when this landed 2026-06; ~93 KB at 401 leaves by
+ * 2026-09, so the help text no longer quotes a number — fb#1925). Progressive-discovery entry point:
  * index → `ib commands <domain>` → `ib <command> --help`. The flat list moved
  * behind `--all` (BREAKING, 2026-06-10). Blurbs come from the offline
  * {@link DOMAIN_BLURBS} map (via {@link domainBlurb}), so domains without an
