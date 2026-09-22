@@ -74,13 +74,15 @@ describe("no new naming outliers", () => {
    * outlier cannot hide among them.
    *
    * `--today` vs `--to` (a date bound vs a keyword), `--address2` vs
-   * `--address` (postal line 2), `--all-companies` / `--allow-big-merge` vs
-   * `--all`, `--from-brand` vs `--from` (sender identity vs date bound),
+   * `--address` (postal line 2), `--allow-big-merge` vs `--all`,
+   * `--from-brand` vs `--from` (sender identity vs date bound),
    * `--sijainti-types` vs `--sijainti` (a type filter vs an id).
    * (`--vehicle-available`/`--vehicle-unavailable` — `ib palkki type
    * create|update`'s vehicleAvailable column vs `--vehicle`, a vehicleId
-   * TARGET — used to be listed here while they were singletons; since the
-   * update command shares them they are no longer outliers by definition.)
+   * TARGET — and `--all-companies`, once `ib keikka search` joined `ib person
+   * search` in fb#1955 — used to be listed here while they were singletons;
+   * a second command sharing the spelling is the rule's own definition of
+   * "not an outlier", so the entry goes rather than the flag.)
    *
    * `--in` (`ib search`'s comma-separated entity-type scope filter, e.g.
    * `--in customer,vehicle`) started colliding once `ib palkki color
@@ -91,7 +93,6 @@ describe("no new naming outliers", () => {
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",
     "address2",
-    "all-companies",
     "allow-big-merge",
     "from-brand",
     "sijainti-types",

@@ -3,7 +3,6 @@ import type { ApiClient } from "../../api/client.js";
 import { writeJson, errorMessage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { resolveSearchQuery, queryAliasOption, intFlag } from "../../targets.js";
-import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { runCustomerSearch } from "../customer/index.js";
 import { runPersonSearch, type PersonSearchHit } from "../person/index.js";
 import { runWorksiteSearch } from "../worksite/index.js";
@@ -242,10 +241,11 @@ export function buildSearchSources(
       return runPersonSearch(client, query, limit);
     },
     vehicle: () => runVehicleSearch(client, query, limit), // active company only
-    keikka: async () => {
-      const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-      return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
-    },
+    // Active company only by default (fb#1955), and under --my-companies every keikka the
+    // person may read. Not a perfect synonym for "my companies" -- a delegated per-keikka
+    // grant is in that set too -- but it is the cross-company scope the route offers, and
+    // the flag would otherwise silently keep returning one company's orders.
+    keikka: () => runKeikkaSearch(client, query, limit, myCompanies),
     // Sijainti resolution must see OTHER companies' rows too (supplier
     // betoniasemat etc. — the rows GPS visits/timeline reference), so the
     // source asks scope=all and forwards the query for server-side

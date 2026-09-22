@@ -7748,13 +7748,14 @@ ARGUMENTS
 FLAGS
   --search STRING    Search query (alias for the <query> positional)
   --limit NUMBER    Max hits (client-side; backend caps at 100)
+  --all-companies    Search every company you may read, not just the active one — hits carry ownerAsiakasId/ownerName
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>
+  ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone, ownerAsiakasId, ownerName }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 100
@@ -7762,12 +7763,14 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Backed by the deployed GET /api/keikka/search (same path the AI order tool uses) — no deploy gate.
-  - Scope: the active company (ownerAsiakasId from the session token).
+  - Backed by the deployed GET /api/keikka/search (same path the AI order tool uses).
+  - Scope: the active company, from the session token — a hit is returned when that company is the order's owner, source, betoni or pumppu supplier. Use --company <id> to search as another company.
+  - --all-companies widens to every order you may read; each hit's ownerName says whose it is. An order owned by another company CANNOT be copied (POST /api/keikka/copy 403s) — a copy always lands in the owner's company.
 
 EXAMPLES
   ib keikka search 0401234567
   ib keikka search "As Oy Esimerkki" --limit 3
+  ib keikka search Vepe --all-companies
 "
 `;
 

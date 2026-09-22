@@ -3,7 +3,6 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween } from "../../dates.js";
-import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -130,17 +129,22 @@ export async function runKeikkaGet(client, keikkaId) {
 }
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
- * tool). NOTE: ownerAsiakasId comes from the QUERY STRING (no JWT fallback on
- * this route) — callers supply it from the active token via decodeJwtPayload.
+ * tool). The route scopes results to the ACTIVE COMPANY, read from the JWT
+ * (fb#1955): a keikka is returned when that company takes part in it as owner,
+ * source, betoni or pumppu supplier. `scope=all` opts back into every keikka
+ * the PERSON may read, across companies. ownerAsiakasId is deliberately NOT
+ * sent any more — the backend stopped reading it from the query string once it
+ * began deciding which rows come back. `--company <id>` still works, because it
+ * mints an ephemeral token whose active company is the target.
  * usingFullTextSearch=true mirrors the GPT tool's default path. Rows arrive
  * one-per-keikkaBetoni; dedupe by keikkaId. `limit` is applied client-side
  * (the backend caps at TOP 100, no limit param).
  */
-export async function runKeikkaSearch(client, query, ownerAsiakasId, limit) {
+export async function runKeikkaSearch(client, query, limit, allCompanies = false) {
     const rows = await client.get(`/api/keikka/search${qs({
         searchString: query,
-        ownerAsiakasId,
         usingFullTextSearch: "true",
+        ...(allCompanies ? { scope: "all" } : {}),
     })}`);
     const seen = new Map();
     for (const r of rows || []) {
@@ -156,6 +160,8 @@ export async function runKeikkaSearch(client, query, ownerAsiakasId, limit) {
             address: r.osoite ?? null,
             contactPerson: r.contactPerson ?? null,
             contactPhone: r.contactPhone ?? null,
+            ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
+            ownerName: r.ownerAsiakasNimi ?? null,
         });
     }
     const items = [...seen.values()].slice(0, limit ?? seen.size);
@@ -456,10 +462,10 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--search <s>")
         .addOption(queryAliasOption())
         .option("--limit <n>", "", cappedInt(100))
+        .option("--all-companies")
         .action(guarded(async (query, opts) => {
         const client = await getClient();
-        const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search, opts.query), ownerAsiakasId, opts.limit);
+        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search, opts.query), opts.limit, !!opts.allCompanies);
         writeJson(result);
     }));
     k.command("validate [keikkaId]")

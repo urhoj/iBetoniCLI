@@ -373,17 +373,20 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     flags: [
       SEARCH_ALIAS_FLAG,
       { name: "limit", type: "number", description: "Max hits (client-side; backend caps at 100)" },
+      { name: "all-companies", type: "boolean", description: "Search every company you may read, not just the active one — hits carry ownerAsiakasId/ownerName" },
     ],
     outputShape:
-      "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>",
+      "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone, ownerAsiakasId, ownerName }>",
     errors: [limitErr("pass a positive integer; this command caps at 100"), ...COMMON_AUTH_ERRORS],
     notes: [
-      "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses) — no deploy gate.",
-      "Scope: the active company (ownerAsiakasId from the session token).",
+      "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses).",
+      "Scope: the active company, from the session token — a hit is returned when that company is the order's owner, source, betoni or pumppu supplier. Use --company <id> to search as another company.",
+      "--all-companies widens to every order you may read; each hit's ownerName says whose it is. An order owned by another company CANNOT be copied (POST /api/keikka/copy 403s) — a copy always lands in the owner's company.",
     ],
     examples: [
       "ib keikka search 0401234567",
       "ib keikka search \"As Oy Esimerkki\" --limit 3",
+      "ib keikka search Vepe --all-companies",
     ],
   },
   {
