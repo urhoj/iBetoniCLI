@@ -32,8 +32,9 @@ export interface KeikkaListFilter {
 /**
  * Build the count:0 disambiguation hint (feedback #165). An AI seeing an empty
  * list can't tell "no access" from "no data" from "date-filtered"; this spells
- * it out: 0 rows on a 200/exit-0 is a PERMITTED-but-empty result (access denial
- * is exit 3 / HTTP 403), names the searched window, flags the today-only default,
+ * it out: 0 rows on a 200/exit-0 is not an access denial (that is exit 3 / HTTP
+ * 403), though since fb#1849 rows the caller may not see are filtered out too
+ * (fb#1948), names the searched window, flags the today-only default,
  * and points at the two ways to see more (widen --from/--to, or `ib keikka latest`
  * for the most recent match within its own --lookback window, default 365 days).
  */
@@ -56,8 +57,9 @@ function zeroRowHint(
     opts.status !== undefined;
   return (
     `0 rows: no keikka in ${window}${hasFilters ? " matching the given filters" : ""}. ` +
-    `A 0 count on a successful (exit 0) query means no data in this window, NOT an access error ` +
-    `(denied access surfaces as exit 3 / HTTP 403). ` +
+    `A 0 count on a successful (exit 0) query is not an access error (denied access surfaces as ` +
+    `exit 3 / HTTP 403), but rows you are not permitted to see are also absent — the row-level ` +
+    "visibility rule: `ib reference detail get keikka list`. " +
     (scopedToToday ? "The default window is TODAY only. " : "") +
     "Widen the range with --from/--to, or run `ib keikka latest` to fetch the most recent " +
     "keikka within the last 365 days (its --lookback default; raise --lookback for an older one)."

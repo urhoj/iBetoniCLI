@@ -104,6 +104,9 @@ describe("ib keikka list/get", () => {
     // Names the window, disambiguates from an access block, points at `latest`.
     expect(result.hint).toContain("2026-06-01..2026-06-30");
     expect(result.hint).toContain("exit 3");
+    // fb#1948: an empty day can also mean the rows are not visible to this caller.
+    expect(result.hint).toContain("not permitted to see");
+    expect(result.hint).not.toContain("means no data");
     expect(result.hint).toContain("ib keikka latest");
     // A dated window is not the default → no today-only note.
     expect(result.hint).not.toContain("TODAY only");

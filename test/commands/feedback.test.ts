@@ -374,6 +374,14 @@ describe("ib feedback create", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  // fb#1956: the docs call these rows "proposals"; edit distance cannot reach `idea`.
+  test("--kind proposal exits 4 and points at idea", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", kind: "proposal" })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining("did you mean idea?") });
+    expect(post).not.toHaveBeenCalled();
+  });
+
   test("--dry-run prints the payload and never POSTs", async () => {
     const out = await runFeedbackCreate(mockClient, {
       description: "preview me",

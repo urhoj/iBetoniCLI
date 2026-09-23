@@ -194,6 +194,15 @@ const SEVERITY_SYNONYMS: Record<string, string> = {
   trivial: "cosmetic",
 };
 
+/**
+ * `proposal` is the word the docs and --kind's own help use for these rows
+ * ("CLI proposals", "new-capability proposal"), and edit distance cannot
+ * bridge it to `idea`. A hint, never an alias — same rule as above (fb#1956).
+ */
+const KIND_SYNONYMS: Record<string, string> = {
+  proposal: "idea",
+};
+
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
 // (severity = urgency/impact; complexity = effort + how autonomously an agent
 // can act). 1 simple/autonomous · 2 simple/wants-input-proceeds-on-recommendation
@@ -709,7 +718,7 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   // own --kind — exited 4, so a bug filed as `--kind bugs` was silently
   // relabelled an improvement and returned a success + feedbackId: the caller
   // moved on and the row was mis-triaged with nothing recording the rewrite.
-  assertEnum(input.kind, KINDS, "--kind");
+  assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
   assertEnum(input.scope, SCOPES, "--scope");
   assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
@@ -1830,7 +1839,7 @@ export async function runFeedbackUpdate(
   current?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   assertEnum(input.scope, SCOPES, "--scope");
-  assertEnum(input.kind, KINDS, "--kind");
+  assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
   assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   // Empty string is the documented CLEAR convention (clearHint) — only a
   // non-empty value is validated against the enum, mirroring assertGateUntil.
