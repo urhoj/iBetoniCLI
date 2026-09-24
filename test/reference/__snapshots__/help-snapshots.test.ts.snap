@@ -11825,7 +11825,7 @@ exports[`Help snapshots — contract stability > help for ib person app-seen mat
   ib person app-seen --date <date> [flags]
 
 DESCRIPTION
-  Which drivers opened the Kuskit driver app (/kuski) on one day — open count and first/last open time per person (dbo.kuskiAppSeen). Tenant = the acting company (--company for another).
+  Which drivers opened the Kuskit driver app (/kuski) on one day — first/last open time and open count per person from dbo.kuskiAppSeen. Tenant = the acting company (global --company <id> to ask for another).
   Permissions: requires company membership (JWT-bound tenant).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -11845,7 +11845,8 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Read-only; an operator preview runs on an impersonation token and never writes a stamp, so a row means the driver's own device opened the app.
+  - Read-only. Operator previews run on impersonation tokens and never write a stamp, so a row means the driver's own device opened the app.
+  - Deploy-gated: needs the backend that ships GET /api/cli/driver/app-seen (Kuskit v1a).
 
 SEE ALSO
   ib person absences, ib vehicle driver board

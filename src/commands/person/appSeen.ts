@@ -10,6 +10,12 @@ export interface PersonAppSeenFilter {
   date: string;
 }
 
+/**
+ * GET /api/cli/driver/app-seen?date — which drivers opened the Kuskit driver app
+ * (/kuski) on one day, from dbo.kuskiAppSeen. A row means the driver's own device
+ * opened the app; an operator preview runs on an impersonation token and never
+ * writes one. Scoped to the acting company; date alias resolved first.
+ */
 export async function runPersonAppSeen(
   client: ApiClient,
   opts: PersonAppSeenFilter

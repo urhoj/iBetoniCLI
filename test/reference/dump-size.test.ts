@@ -144,9 +144,7 @@ import { buildReference } from "../../src/reference/dump.js";
 // long description/flag prose cut). One new command, not padding. Measured
 // 828 387 B. Headroom ~110 B.
 // 828_500 → 830_000 (2026-09-24): new `ib person app-seen` (Kuskit v1a seen-stamp
-// read, task 6). Trimmed once first (description shortened, the deploy-gated note
-// dropped since the description already implies a fresh backend route). One new
-// command, not padding. Measured 829 365 B.
+// read, task 6). One new command, not padding. Measured 829 469 B. Headroom ~531 B.
 const DUMP_LIMIT_BYTES = 830_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag

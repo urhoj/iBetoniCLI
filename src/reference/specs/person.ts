@@ -553,7 +553,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   {
     command: "ib person app-seen",
     description:
-      "Which drivers opened the Kuskit driver app (/kuski) on one day — open count and first/last open time per person (dbo.kuskiAppSeen). Tenant = the acting company (--company for another).",
+      "Which drivers opened the Kuskit driver app (/kuski) on one day — first/last open time and open count per person from dbo.kuskiAppSeen. Tenant = the acting company (global --company <id> to ask for another).",
     permissions: ["company membership (JWT-bound tenant)"],
     flags: [
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
@@ -564,7 +564,8 @@ export const PERSON_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Read-only; an operator preview runs on an impersonation token and never writes a stamp, so a row means the driver's own device opened the app.",
+      "Read-only. Operator previews run on impersonation tokens and never write a stamp, so a row means the driver's own device opened the app.",
+      "Deploy-gated: needs the backend that ships GET /api/cli/driver/app-seen (Kuskit v1a).",
     ],
     seeAlso: ["ib person absences", "ib vehicle driver board"],
     examples: ["ib person app-seen --date today", "ib person app-seen --date 2026-09-24 --company 27"],
