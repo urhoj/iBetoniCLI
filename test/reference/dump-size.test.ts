@@ -139,7 +139,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // status; `ib person day statuses` already had the equivalent for personPvm.
 // One new command with 4 notes, not padding on an existing one. Measured
 // 826 262 B. Headroom ~740 B, thin per this file's convention.
-const DUMP_LIMIT_BYTES = 827_000;
+// 827_000 → 828_500 (2026-09-24): new `ib keikka copy` (wraps POST /api/keikka/copy;
+// branch from 2026-09-07 finally merged). Trimmed once first (one note and the
+// long description/flag prose cut). One new command, not padding. Measured
+// 828 387 B. Headroom ~110 B.
+const DUMP_LIMIT_BYTES = 828_500;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

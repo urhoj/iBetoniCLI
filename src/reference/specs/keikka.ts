@@ -363,6 +363,32 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka drivers assign 9001 --dry-run",
     ],
   },
+  {
+    command: "ib keikka copy",
+    description:
+      "Duplicate a keikka (customer, worksite, vehicle, concrete lines) as a new row in your ACTIVE company; --date moves it to another day, keeping time-of-day. The target day's day-driver is auto-assigned.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    args: [{ name: "keikkaId", type: "number", description: "Source keikkaId to copy" }],
+    flags: [
+      { name: "date", type: "date", description: "Target date (YYYY-MM-DD or today/yesterday/tomorrow)" },
+    ],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape:
+      "real: raw mssql result — new keikkaId in `returnValue` (like `keikka create`) | --dry-run: { dryRun: true, wouldCopy: { keikkaId, creatorPersonId, newDate? } }",
+    errors: [
+      { origin: "client", exit: 4, meaning: "No personId claim on the token", remedy: "log in again (`ib auth login`)" },
+      ...authErrors(apiErr(403, "No keikkaEdit on the source, or it is not owned by your ACTIVE company", "a copy never leaves your active company (cl#2544), NO admin bypass: add the global `--company <ownerId>` to run this ONE command as the source's owner, or `ib company switch <id>` to persist it")),
+    ],
+    notes: [
+      "`--dry-run` is CLIENT-SIDE: this route ignores `X-Dry-Run`, so a real request always persists.",
+    ],
+    seeAlso: ["ib keikka get", "ib keikka create"],
+    examples: [
+      "ib keikka copy 9001",
+      "ib keikka copy 9001 --date tomorrow --reason \"repeat order\"",
+    ],
+  },
 
   {
     command: "ib keikka tilat",
