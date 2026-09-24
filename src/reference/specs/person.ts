@@ -551,6 +551,25 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib person app-seen",
+    description:
+      "Which drivers opened the Kuskit driver app (/kuski) on one day — open count and first/last open time per person (dbo.kuskiAppSeen). Tenant = the acting company (--company for another).",
+    permissions: ["company membership (JWT-bound tenant)"],
+    flags: [
+      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+    ],
+    outputShape: "ListEnvelope<{ personId, name, date, firstSeenAt, lastSeenAt, opens }>",
+    errors: [
+      apiErr(400, "date must be a real YYYY-MM-DD calendar date", "pass --date YYYY-MM-DD or today/yesterday/tomorrow"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Read-only; an operator preview runs on an impersonation token and never writes a stamp, so a row means the driver's own device opened the app.",
+    ],
+    seeAlso: ["ib person absences", "ib vehicle driver board"],
+    examples: ["ib person app-seen --date today", "ib person app-seen --date 2026-09-24 --company 27"],
+  },
+  {
     command: "ib person activity",
     description:
       "Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.",

@@ -17,6 +17,7 @@ import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonFkCommands } from "./fk.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
+import { registerPersonAppSeenCommand } from "./appSeen.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { applyFromJson } from "../_shared/fromJson.js";
@@ -432,6 +433,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     registerPersonEmailCommands(p, getClient);
     registerPersonFkCommands(p, getClient);
     registerPersonAbsencesCommand(p, getClient);
+    registerPersonAppSeenCommand(p, getClient);
     registerPersonActivityCommand(p, getClient);
     p.command("list")
         .option("--role <role>")
