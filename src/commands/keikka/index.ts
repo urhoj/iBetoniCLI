@@ -97,7 +97,7 @@ export async function runKeikkaList(
   // scoped — without it an empty list is indistinguishable from a mis-aimed query.
   const range = { from: opts.from ?? null, to: opts.to ?? null };
   // On an empty result add the "why zero rows" hint so an AI reader doesn't
-  // mistake permitted-but-empty for an access block (feedback #165).
+  // mistake an empty result for an access block (feedback #165, fb#1948).
   return envelope.count === 0
     ? { ...envelope, range, hint: zeroRowHint(range, opts) }
     : { ...envelope, range };

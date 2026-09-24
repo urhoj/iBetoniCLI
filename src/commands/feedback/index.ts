@@ -194,11 +194,7 @@ const SEVERITY_SYNONYMS: Record<string, string> = {
   trivial: "cosmetic",
 };
 
-/**
- * `proposal` is the word the docs and --kind's own help use for these rows
- * ("CLI proposals", "new-capability proposal"), and edit distance cannot
- * bridge it to `idea`. A hint, never an alias — same rule as above (fb#1956).
- */
+/** `proposal` (the docs' word) → idea: a hint, never an alias, like SEVERITY_SYNONYMS (fb#1956). */
 const KIND_SYNONYMS: Record<string, string> = {
   proposal: "idea",
 };

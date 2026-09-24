@@ -7659,7 +7659,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (pvm/time = Europe/Helsinki wall clock of pumppuAika, HH:mm, and --from/--to bound Helsinki days, fb#1761; range = the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (permitted-but-empty vs how to widen).
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (pvm/time = Europe/Helsinki wall clock of pumppuAika, HH:mm, and --from/--to bound Helsinki days, fb#1761; range = the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (why it can be empty, how to widen).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500 — page past it with \`--cursor\` from the previous response's \`nextCursor\`, or narrow with \`--from\` / \`--to\`
