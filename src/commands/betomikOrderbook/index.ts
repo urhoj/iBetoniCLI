@@ -87,7 +87,9 @@ export async function runBetomikOrderbookRows(
     failWith(
       `--status: unknown value${bad.length > 1 ? "s" : ""} ${bad.join(", ")} — accepted: ${ROW_SYNC_STATUSES.join(", ")}`,
       4,
-      bad.includes("removed") ? "removed rows are excluded by the route itself (fb#1722) and cannot be listed" : undefined
+      bad.includes("removed")
+        ? "removed rows are excluded by the route itself (fb#1722) and cannot be listed — read one by id with `ib dev betomik-orderbook row <rowId>`"
+        : undefined
     );
   }
   const raw = await client.get<unknown>(`/api/betomik-orderbook/runs/${runId}/rows`);
@@ -95,6 +97,19 @@ export async function runBetomikOrderbookRows(
   if (wanted.length) items = items.filter((r) => wanted.includes(String(r.syncStatus)));
   if (filter.raw === false) items = items.map(({ rawJson: _raw, ...rest }) => rest);
   return page(items, filter);
+}
+
+/**
+ * One ledger row whatever its syncStatus (GET /api/betomik-orderbook/rows/:rowId,
+ * fb#1977) — the only way to read a row that reached the terminal 'removed',
+ * which `rows` cannot list (fb#1722).
+ */
+export async function runBetomikOrderbookRow(client: ApiClient, rowId: number, opts: { raw?: boolean } = {}): Promise<Record<string, unknown>> {
+  const row = await client.get<Record<string, unknown>>(`/api/betomik-orderbook/rows/${rowId}`);
+  if (opts.raw !== false || !row || typeof row !== "object") return row;
+  const rest = { ...row };
+  delete rest.rawJson;
+  return rest;
 }
 
 export interface BetomikReviewBody {
@@ -362,6 +377,16 @@ export function registerBetomikOrderbookCommands(
     .action(
       jsonAction(getClient, (client, idStr: string, opts: BetomikRowsFilter) =>
         runBetomikOrderbookRows(client, parseId(idStr, "runId"), opts)
+      )
+    );
+
+  group
+    .command("row <rowId>")
+    .description("One staging row by id, whatever its syncStatus (incl. removed)")
+    .option("--no-raw", "Drop rawJson (the sheet cells)")
+    .action(
+      jsonAction(getClient, (client, idStr: string, opts: { raw?: boolean }) =>
+        runBetomikOrderbookRow(client, parseId(idStr, "rowId"), opts)
       )
     );
 

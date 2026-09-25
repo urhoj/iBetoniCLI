@@ -47,7 +47,9 @@ export async function runBetomikOrderbookRows(client, runId, filter = {}) {
     const wanted = (filter.status ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const bad = wanted.filter((s) => !ROW_SYNC_STATUSES.includes(s));
     if (bad.length) {
-        failWith(`--status: unknown value${bad.length > 1 ? "s" : ""} ${bad.join(", ")} — accepted: ${ROW_SYNC_STATUSES.join(", ")}`, 4, bad.includes("removed") ? "removed rows are excluded by the route itself (fb#1722) and cannot be listed" : undefined);
+        failWith(`--status: unknown value${bad.length > 1 ? "s" : ""} ${bad.join(", ")} — accepted: ${ROW_SYNC_STATUSES.join(", ")}`, 4, bad.includes("removed")
+            ? "removed rows are excluded by the route itself (fb#1722) and cannot be listed — read one by id with `ib dev betomik-orderbook row <rowId>`"
+            : undefined);
     }
     const raw = await client.get(`/api/betomik-orderbook/runs/${runId}/rows`);
     let items = itemsOf(raw);
@@ -56,6 +58,19 @@ export async function runBetomikOrderbookRows(client, runId, filter = {}) {
     if (filter.raw === false)
         items = items.map(({ rawJson: _raw, ...rest }) => rest);
     return page(items, filter);
+}
+/**
+ * One ledger row whatever its syncStatus (GET /api/betomik-orderbook/rows/:rowId,
+ * fb#1977) — the only way to read a row that reached the terminal 'removed',
+ * which `rows` cannot list (fb#1722).
+ */
+export async function runBetomikOrderbookRow(client, rowId, opts = {}) {
+    const row = await client.get(`/api/betomik-orderbook/rows/${rowId}`);
+    if (opts.raw !== false || !row || typeof row !== "object")
+        return row;
+    const rest = { ...row };
+    delete rest.rawJson;
+    return rest;
 }
 /** Review one staging row (POST /api/betomik-orderbook/rows/:rowId/review). */
 export async function runBetomikOrderbookReview(client, rowId, body, flags) {
@@ -198,6 +213,11 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .option("--offset <n>", "Rows to skip after --status", intFlag("--offset", 0))
         .option("--no-raw", "Drop rawJson (the sheet cells) from every row — fits a context window")
         .action(jsonAction(getClient, (client, idStr, opts) => runBetomikOrderbookRows(client, parseId(idStr, "runId"), opts)));
+    group
+        .command("row <rowId>")
+        .description("One staging row by id, whatever its syncStatus (incl. removed)")
+        .option("--no-raw", "Drop rawJson (the sheet cells)")
+        .action(jsonAction(getClient, (client, idStr, opts) => runBetomikOrderbookRow(client, parseId(idStr, "rowId"), opts)));
     const reviewCmd = group
         .command("review <rowId>")
         .description("Review one staging row: set status, optionally override keikka/palkki + palkki type")

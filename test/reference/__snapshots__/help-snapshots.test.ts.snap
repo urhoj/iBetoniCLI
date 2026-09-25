@@ -1403,12 +1403,116 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer fk add matches snapshot 1`] = `
+"USAGE
+  ib customer fk add [<asiakasId>] --source <source> --key <key> [flags]
+
+DESCRIPTION
+  APPEND one more key on a source, never replacing the existing ones (fb#1975) — how a customer carries several order-book spellings (betomik-orderbook aliases stop the importer creating a duplicate customer). A trimmed, case-insensitive match on the same source is \`unchanged\` and sends nothing. Keys are unique per owner across ALL sources, so a key held by ANOTHER customer is a 409 naming it. --dry-run resolves client-side.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <asiakasId> NUMBER    customer id — or pass --asiakas (optional)
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
+  --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  --key STRING    The foreign key value (external id / nickname); trimmed (required)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|unchanged, asiakasForeignKeyId (null on a dry-run insert) } · dry-run: { dryRun:true, would:{ …same } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 4 (client-side)  --key is empty after trimming → pass the spelling to add
+  exit 4 (HTTP 409)  The key already belongs to ANOTHER customer of this owner (the message names it) → remove it there first (\`ib customer fk remove <other> --key <text>\`) or use a different key
+  exit 5 (HTTP 404)  The backend predates fb#1975 (no /foreignKey/customer/add route) → wait for the next backend deploy — do NOT fall back to \`fk set\`, which replaces the existing key
+  exit 4 (HTTP 400)  Missing asiakasId / source / key / owner → pass all four
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - foreignKey is nvarchar(50).
+
+SEE ALSO
+  ib customer fk import, ib customer fk list, ib customer fk remove
+
+EXAMPLES
+  ib customer fk add 1496 --source betomik-orderbook --key 'vepe security' --owner 27 --reason 'sheet spelling'
+  ib customer fk add 1496 --source betomik-orderbook --key vepe --owner 27 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer fk import matches snapshot 1`] = `
+"USAGE
+  ib customer fk import <file> [flags]
+
+DESCRIPTION
+  Batch \`add\` from a JSON array (fb#1719) — seed many alias spellings in one pass. Rows: { asiakasId, key, source? }; \`source\` per row or the --source default. In-file repeats (same customer + source + key) read \`unchanged\` first; then ONE read per customer and each row appended like \`add\` (inserted / unchanged). Bad rows, unknown per-row sources and 409s (key on another customer) fail only their own row. --dry-run plans everything and sends nothing. Exit 0 even with failures — read \`failed\`.
+  Permissions: requires edit-tier company role on the owner tenant.
+
+ARGUMENTS
+  <file> STRING    JSON array file, or - for stdin (argv-safe for ä/ö) (required)
+
+FLAGS
+  --source STRING    Default source (name or id) for rows without their own \`source\`
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { dryRun?, results:[{ asiakasId, key, ok, action?, error? }] (input order), ok, failed, inserted, unchanged }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  File is not valid JSON, or its root is not an array → pass a JSON array of { asiakasId, key, source? } (or - for stdin)
+  exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
+  exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
+  - Per-row errors (incl. a 409 or a pre-fb#1975 backend's 404) are reported in \`results\`, not thrown; an unknown --source DEFAULT exits 4 before any request.
+
+SEE ALSO
+  ib customer fk add, ib person fk import
+
+EXAMPLES
+  ib customer fk import aliases.json --source betomik-orderbook --owner 27 --reason 'sheet spellings'
+  echo '[{"asiakasId":1496,"key":"vepe"},{"asiakasId":1496,"key":"vepe security"}]' | ib customer fk import - --source betomik-orderbook --owner 27 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer fk list matches snapshot 1`] = `
 "USAGE
   ib customer fk list [<asiakasId>] [flags]
 
 DESCRIPTION
-  List a customer's foreign keys (dbo.asiakasForeignKeys) for one owner tenant — the external id per source (e.g. an accounting-system customer number). One key per source.
+  List a customer's foreign keys (dbo.asiakasForeignKeys) for one owner tenant — the external ids per source (e.g. an accounting-system customer number). Usually one key per source; alias sources such as betomik-orderbook carry one row per spelling.
   Permissions: requires membership of the owner tenant (read).
 
 ARGUMENTS
@@ -1437,7 +1541,7 @@ NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
 
 SEE ALSO
-  ib customer fk set, ib customer fk sources
+  ib customer fk set, ib customer fk add, ib customer fk sources
 
 EXAMPLES
   ib customer fk list 1234
@@ -1447,17 +1551,19 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib customer fk remove matches snapshot 1`] = `
 "USAGE
-  ib customer fk remove <asiakasId> <asiakasForeignKeyId> [flags]
+  ib customer fk remove <asiakasId> [<asiakasForeignKeyId>] [flags]
 
 DESCRIPTION
-  Delete ONE customer foreign-key row by asiakasForeignKeyId. The id must be on that customer for that owner (checked client-side; the backend delete is also owner-scoped), otherwise exit 5 and nothing is sent. --dry-run resolves client-side.
+  Delete ONE customer foreign-key row, by <asiakasForeignKeyId> or by --key (trimmed, case-insensitive; --source narrows when the spelling sits on several sources) — so one alias goes without clearing the rest. The row must be on that customer for that owner (checked client-side; the backend delete is also owner-scoped), otherwise exit 5 and nothing is sent. --dry-run resolves client-side.
   Permissions: requires edit-tier company role on the owner tenant.
 
 ARGUMENTS
   <asiakasId> NUMBER    customer id (required)
-  <asiakasForeignKeyId> NUMBER    row id from \`ib customer fk list\` (required)
+  <asiakasForeignKeyId> NUMBER    row id from \`ib customer fk list\` — or pass --key (optional)
 
 FLAGS
+  --key STRING    Remove the row holding this key instead of naming its id
+  --source STRING    With --key: only match on this source (name or id)
   --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 WRITE-SAFETY FLAGS
@@ -1477,18 +1583,22 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  <asiakasForeignKeyId> is not a positive integer → pass a numeric asiakasForeignKeyId
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
-  exit 5 (client-side)  That asiakasForeignKeyId is not among this customer's rows for this owner → \`ib customer fk list <asiakasId> --owner <id>\` shows the ids
+  exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 4 (client-side)  Neither or both of <asiakasForeignKeyId> and --key were given → name the row by id OR by --key
+  exit 4 (client-side)  --source was given with an id → drop --source when removing by id
+  exit 4 (client-side)  --key matches rows on several sources → add --source, or remove by id
+  exit 5 (client-side)  No row with that id / key on this customer for this owner → \`ib customer fk list <asiakasId> --owner <id>\` shows the rows
   exit 5 (HTTP 404)  Row not found for this owner (deleted meanwhile) → re-list
   exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
-  ib customer fk list
+  ib customer fk list, ib customer fk add
 
 EXAMPLES
   ib customer fk remove 1234 55 --reason 'wrong number'
-  ib customer fk remove 1234 55 --owner 8 --dry-run
+  ib customer fk remove 1496 --key vepe --source betomik-orderbook --owner 27 --dry-run
 "
 `;
 
@@ -1497,7 +1607,7 @@ exports[`Help snapshots — contract stability > help for ib customer fk set mat
   ib customer fk set [<asiakasId>] --source <source> --key <key> [flags]
 
 DESCRIPTION
-  Set a customer's foreign key on one source (server upsert keyed by customer + source + owner). The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).
+  Set a customer's ONE foreign key on a source, REPLACING any existing key there (server upsert keyed by customer + source + owner) — for a single external id such as an accounting-system number. To keep several keys on one source (order-book name spellings) use \`fk add\`. The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).
   Permissions: requires edit-tier company role on the owner tenant.
 
 ARGUMENTS
@@ -1538,7 +1648,7 @@ NOTES
   - foreignKey is nvarchar(50).
 
 SEE ALSO
-  ib customer fk list, ib customer fk remove
+  ib customer fk add, ib customer fk list, ib customer fk remove
 
 EXAMPLES
   ib customer fk set 1234 --source fennoa --key F-1001 --reason 'accounting link'
@@ -2747,6 +2857,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook row matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook row <rowId> [flags]
+
+DESCRIPTION
+  One staging row by id, WHATEVER its syncStatus (GET /api/betomik-orderbook/rows/:rowId, fb#1977) — the only read of a row that reached the terminal \`removed\` (which \`rows\` excludes, fb#1722). Use it to confirm a re-import reconciled a row away, or to read back a rowId from a \`sync-row\` response.
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
+
+ARGUMENTS
+  <rowId> NUMBER    betomikOrderbookImportRowId (required)
+
+FLAGS
+  --no-raw    Drop rawJson (the raw sheet cells)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  one row, the same shape as a \`rows\` item (incl. syncStatus, keikkaId, palkkiId, blockReason)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  rowId is not a positive integer → Pass a numeric betomikOrderbookImportRowId
+  exit 5 (HTTP 404)  No row with that id for Betomik — or a backend older than fb#1977 (route absent) → Check the id against \`ib dev betomik-orderbook rows <runId>\`; on a pre-fb#1977 backend the route only exists after the next deploy
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+SEE ALSO
+  ib dev betomik-orderbook rows, ib dev betomik-orderbook sync-row
+
+EXAMPLES
+  ib dev betomik-orderbook row 1238
+  ib dev betomik-orderbook row 1238 --no-raw --columns syncStatus,keikkaId,palkkiId
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook rows matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook rows <runId> [flags]
@@ -2773,7 +2918,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
-  exit 4 (client-side)  --status names a value outside pending|blocked|synced|gone|frozen (incl. removed) → Use the listed syncStatus values; removed rows are never returned by the route
+  exit 4 (client-side)  --status names a value outside pending|blocked|synced|gone|frozen (incl. removed) → Use the listed syncStatus values; read a removed row by id with \`ib dev betomik-orderbook row <rowId>\`
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; it slices the fetched run client-side, so any size works
   exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass an integer >= 0 — the hint on a truncated page names the next one
   exit 4 (HTTP 400)  Backend rejected runId → Pass a numeric importRunId
@@ -2781,6 +2926,9 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via \`review\`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see \`propose\`/\`ai-stats\`.
+
+SEE ALSO
+  ib dev betomik-orderbook row
 
 EXAMPLES
   ib dev betomik-orderbook rows 1

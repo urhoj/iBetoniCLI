@@ -4,6 +4,7 @@ import {
   runBetomikOrderbookImport,
   runBetomikOrderbookRuns,
   runBetomikOrderbookRows,
+  runBetomikOrderbookRow,
   runBetomikOrderbookReview,
   runBetomikOrderbookPropose,
   runBetomikOrderbookAiStats,
@@ -141,6 +142,19 @@ describe("ib dev betomik-orderbook runs / rows", () => {
     test("--status removed is refused: the route excludes removed rows (fb#1722), so it can never match", async () => {
       await expect(runBetomikOrderbookRows(mockClient, 7, { status: "removed" })).rejects.toMatchObject({ exitCode: 4 });
     });
+  });
+});
+
+describe("ib dev betomik-orderbook row (fb#1977)", () => {
+  beforeEach(() => mockClient.get.mockReset());
+
+  test("reads one row by id, removed included; --no-raw drops rawJson", async () => {
+    const row = { betomikOrderbookImportRowId: 1238, syncStatus: "removed", rawJson: "{}" };
+    mockClient.get.mockResolvedValueOnce(row);
+    expect(await runBetomikOrderbookRow(mockClient, 1238)).toEqual(row);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows/1238");
+    mockClient.get.mockResolvedValueOnce({ ...row });
+    expect(await runBetomikOrderbookRow(mockClient, 1238, { raw: false })).toEqual({ betomikOrderbookImportRowId: 1238, syncStatus: "removed" });
   });
 });
 

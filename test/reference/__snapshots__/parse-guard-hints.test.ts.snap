@@ -361,6 +361,14 @@ ib customer duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
+ib customer fk add --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib customer fk import --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
 ib customer fk list --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`

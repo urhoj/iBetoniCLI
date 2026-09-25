@@ -148,7 +148,10 @@ import { buildReference } from "../../src/reference/dump.js";
 // 830_000 → 831_000 (2026-09-25): `ib dev betomik-orderbook runs --limit/--offset`
 // (fb#1953, error rows reuse `rows`' wording) + the zero-deleted shape on
 // `ib dev cache invalidate` (fb#1985). Measured 830 761 B. Headroom ~239 B.
-const DUMP_LIMIT_BYTES = 831_000;
+// 831_000 → 838_000 (2026-09-25): three new commands — `ib customer fk add` +
+// `fk import` (append-only aliases, fb#1975/fb#1719) and `ib dev betomik-orderbook
+// row` (fb#1977) — plus `fk remove --key/--source`. Measured 837 646 B. Headroom ~354 B.
+const DUMP_LIMIT_BYTES = 838_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
