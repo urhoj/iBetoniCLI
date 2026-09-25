@@ -85,7 +85,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     notes: [
       "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
-      "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
+      "Legend: `ib glossary lookup tila`. Includes tila 8/10 rows; `ib stats` excludes them.",
       "A keikka spanning multiple worksites returns ONE ROW PER tyomaa (join fan-out): the same keikkaId can appear on several rows with different tyomaaId, and `count` counts ROWS, not distinct deliveries — dedupe by keikkaId when counting deliveries.",
       "Default window is TODAY only (--from/--to both default to today). count:0 + exit 0 is not a denial (that is exit 3 / HTTP 403), but rows you may not see are left out too (`ib reference detail get keikka list`); see the `hint`. Widen with --from/--to, or use `ib keikka latest` (bounded by --lookback, default 365d).",
     ],

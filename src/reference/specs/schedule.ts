@@ -18,6 +18,10 @@ const SCHEDULE_SCOPE_NOTE =
 const SCHEDULE_TILA_NOTE =
   "`tila` is the numeric keikkaTilaId — legend at `ib keikka list --help` or `ib glossary lookup tila`. For labelled names instead of raw ids, use `ib stats --by customer|vehicle|worksite` rather than resolving each id yourself.";
 
+// fb#1973: a cross-check against `ib stats` saw 27 rows vs 24 orders for one day.
+const SCHEDULE_TILA_COUNT_NOTE =
+  "Includes cancelled (tila 8) and deleted (tila 10) rows; `ib stats` excludes them, so counts differ.";
+
 export const SCHEDULE_SPECS: CommandSpec[] = [
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
@@ -30,7 +34,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule today", "ib schedule today --pretty"],
   },
@@ -43,7 +47,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule day 2026-06-01", "ib schedule day tomorrow"],
   },
@@ -57,7 +61,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
-    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE],
+    notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
     examples: ["ib schedule week 2026-06-01", "ib schedule week today"],
   },
