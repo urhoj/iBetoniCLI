@@ -73,7 +73,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
       exit: 3,
       match: "shared-cache",
       meaning: "Refused: deployed endpoint without --force-prod",
-      remedy: "prod and staging share Redis DB 3; add --force-prod or use a local endpoint",
+      remedy: "prod and staging share one Redis; add --force-prod or use a local endpoint",
     };
     const readOnlyErr: CommandError = {
       origin: "client",
@@ -120,7 +120,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev cache invalidate",
-        description: "Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).",
+        description: "Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all deployed slots share one Redis).",
         permissions: ADMIN_PERMS,
         mutates: true,
         args: [{ name: "entityType", type: "string", description: "Entity family, e.g. keikka/asiakas/vehicle (see `ib dev cache entities`)" }],

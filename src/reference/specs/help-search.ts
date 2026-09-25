@@ -30,7 +30,7 @@ export const HELP_SEARCH_SPECS: CommandSpec[] = [
       SEARCH_ALIAS_FLAG,
       { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti" },
       { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
-      { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },
+      { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person/keikka)" },
     ],
     outputShape:
       "{ items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }",
@@ -40,7 +40,7 @@ export const HELP_SEARCH_SPECS: CommandSpec[] = [
       "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.",
       "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up `ib <entity> get <id>`.",
       "Sijainti is matched by name/address/typeName substring (type names like \"jäteasema\" match too) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.",
-      "--my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company (sijainti is already scope=all).",
+      "--my-companies widens customer/worksite/person/keikka; vehicle stays active-company only (sijainti is always scope=all).",
     ],
     examples: [
       "ib search kamppi",

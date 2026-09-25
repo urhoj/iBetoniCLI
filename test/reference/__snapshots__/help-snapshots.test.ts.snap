@@ -3030,7 +3030,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share one Redis; add --force-prod or use a local endpoint
   exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 4 (client-side)  --dry-run and --confirm passed together → drop --dry-run to execute, or drop --confirm to preview (preview is the default)
 
@@ -3071,7 +3071,7 @@ exports[`Help snapshots — contract stability > help for ib dev cache invalidat
   ib dev cache invalidate <entityType> [flags]
 
 DESCRIPTION
-  Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
+  Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all deployed slots share one Redis).
   Permissions: requires admin role (SystemAdmin, AsiakasAdmin, or LaskuAdmin) or developer.
 
 ARGUMENTS
@@ -3098,7 +3098,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib dev cache entities\` to list valid types
   exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
-  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share one Redis; add --force-prod or use a local endpoint
   exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 4 (client-side)  --dry-run and --confirm passed together → drop --dry-run to execute, or drop --confirm to preview (preview is the default)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3177,7 +3177,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share one Redis; add --force-prod or use a local endpoint
   exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 4 (client-side)  --dry-run and --confirm passed together → drop --dry-run to execute, or drop --confirm to preview (preview is the default)
   exit 4 (client-side)  No glob given, positionally or via --pattern → pass the glob positionally (\`ib dev cache pattern 'keikka:*'\`) or as --pattern 'keikka:*'
@@ -13827,7 +13827,7 @@ FLAGS
   --search STRING    Search query (alias for the <query> positional)
   --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti
   --limit NUMBER    Max hits per entity (default: 5)
-  --my-companies    Search across every company you belong to (customer/worksite/person)
+  --my-companies    Search across every company you belong to (customer/worksite/person/keikka)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -13846,7 +13846,7 @@ NOTES
   - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.
   - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up \`ib <entity> get <id>\`.
   - Sijainti is matched by name/address/typeName substring (type names like "jäteasema" match too) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.
-  - --my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company (sijainti is already scope=all).
+  - --my-companies widens customer/worksite/person/keikka; vehicle stays active-company only (sijainti is always scope=all).
 
 EXAMPLES
   ib search kamppi
