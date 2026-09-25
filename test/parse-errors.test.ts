@@ -91,6 +91,7 @@ describe("parser errors → JSON envelope", () => {
       "database",
       "cicd",
       "workspace",
+      "site",
     ]);
     expect(String(parsed.sample)).toContain("ib dev changelog add");
     expect(process.exitCode).toBe(4);

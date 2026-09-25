@@ -3233,7 +3233,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas. (required)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace|site (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas. (required)
   --title STRING    Entry title (max 300 chars) (required)
   --description STRING    Alias for the positional description; one positional/description/summary/body input is required, and if several are passed they must match (required: one description input)
   --summary STRING    Alias for --description (same one-required description-input group; several passed must match) (required: one description input)
@@ -3393,7 +3393,7 @@ DESCRIPTION
 FLAGS
   --month STRING    YYYY-MM
   --type STRING    feature|improvement|bugfix|docs
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace|site (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --repo STRING    Repo/submodule — matches entries whose --repo CSV CONTAINS this token, so \`--repo betonicli\` also returns cross-lane rows recorded as "puminet5api,betonicli" (deploy-gated: against an older backend this is an exact string match and those rows are invisible). Aliases resolve (\`cli\` → betonicli); a CSV here matches rows containing ANY of the tokens.
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
@@ -3556,7 +3556,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix|docs (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
-  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd|workspace|site (repo granularity goes in --repo, not here). This is different from \`ib dev feedback --scope\`, which names the product surface; ops/jerry/security are scopes, not areas.
   --title STRING    New title (max 300 chars)
   --description STRING    New description — REPLACES the whole text (destructive; use --append-description to add to it instead)
   --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the existing entry text intact. Mutually exclusive with --description/--summary/--body

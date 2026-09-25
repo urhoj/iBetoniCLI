@@ -51,7 +51,7 @@ import { qs } from "../../api/query.js";
 type Row = Record<string, unknown>;
 
 const TYPES = ["feature", "improvement", "bugfix", "docs"];
-const AREAS = ["frontend", "backend", "cli", "database", "cicd", "workspace"];
+const AREAS = ["frontend", "backend", "cli", "database", "cicd", "workspace", "site"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
@@ -97,7 +97,7 @@ const SERVER_ENUM_NOTE =
 const REPO_FLAG_DESC =
   "Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. `--repo \"puminet5api,betonicli\"`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via `npm run final`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none.";
 const AREA_FLAG_DESC =
-  "Technical layer: frontend|backend|cli|database|cicd|workspace (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
+  "Technical layer: frontend|backend|cli|database|cicd|workspace|site (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
 // Scope-shaped values agents predictably pass to --area (`ib dev feedback
 // --scope` accepts these). The remedy string is built from the key at the call
 // site. No `jerry` entry: AREA_REPO_REMEDIES below also carries `jerry` and
