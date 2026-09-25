@@ -1922,7 +1922,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Rows carry BOTH vocabularies (fb#621): the short \`name\` (first+last joined) and \`email\`, plus the canonical \`personFirstName\`/\`personLastName\`/\`personEmail\` that \`ib person get\` uses. Projecting the sibling's spelling here used to yield blank cells with no error — silently-empty data that reads as 'these people have no name on file'.
+  - Rows carry BOTH vocabularies (fb#621): \`name\` (first+last joined) and \`email\` are CANONICAL — the spelling every person-bearing list uses (fb#692); \`personFirstName\`/\`personLastName\`/\`personEmail\` are aliases matching \`ib person get\`. Projecting the sibling's spelling here used to yield blank cells with no error — silently-empty data that reads as 'these people have no name on file'.
 
 SEE ALSO
   ib person role list, ib person get

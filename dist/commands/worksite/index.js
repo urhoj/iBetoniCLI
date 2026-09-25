@@ -1,3 +1,4 @@
+import { projectPersonName } from "../_shared/personRow.js";
 import { CliError } from "../../api/errors.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
@@ -259,8 +260,7 @@ export async function runWorksitePersonList(client, tyomaaId) {
     const rows = await client.get(`/api/tyomaa/person/list/${tyomaaId}/0`);
     const items = (rows || []).map((r) => ({
         personId: r.personId,
-        name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-        email: r.personEmail || null,
+        ...projectPersonName(r),
         contactType: r.contactPersonTypeId || null,
     }));
     return listEnvelope(items);

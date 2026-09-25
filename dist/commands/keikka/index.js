@@ -1,3 +1,4 @@
+import { projectPersonName } from "../_shared/personRow.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
@@ -321,8 +322,7 @@ function projectKeikkaPersonRow(r) {
     return {
         keikkaPersonId: r.keikkaPersonId,
         personId: r.personId,
-        name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-        email: r.personEmail || null,
+        ...projectPersonName(r),
         phone: r.personPhone || null,
         sourceId: r.keikkaPersonSourceId ?? null,
         sourceText: r.keikkaPersonSourceText || null,

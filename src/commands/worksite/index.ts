@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
+import { projectPersonName } from "../_shared/personRow.js";
 import { CliError } from "../../api/errors.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
@@ -434,8 +435,7 @@ export async function runWorksitePersonList(
   );
   const items = (rows || []).map((r) => ({
     personId: r.personId,
-    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-    email: r.personEmail || null,
+    ...projectPersonName(r),
     contactType: r.contactPersonTypeId || null,
   }));
   return listEnvelope(items);

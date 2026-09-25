@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
+import { projectPersonName } from "../_shared/personRow.js";
 import { unwrapRows, listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   writeFlagsToHeaders,
@@ -1227,11 +1228,8 @@ export async function runPersonByEmail(
   );
   const row = Array.isArray(rows) ? rows[0] : undefined;
   if (!row || !row.personId) return null;
-  return {
-    personId: row.personId,
-    name: `${row.personFirstName || ""} ${row.personLastName || ""}`.trim() || null,
-    email: row.personEmail || null,
-  };
+  const projected = projectPersonName(row);
+  return { personId: row.personId, name: projected.name || null, email: projected.email };
 }
 
 /**

@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { projectPersonName } from "../_shared/personRow.js";
 import { listEnvelope, unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
@@ -1042,9 +1043,8 @@ export async function runCustomerPersonList(client, asiakasId, roleName, include
     const rows = (!Array.isArray(raw) && raw?.personList) || unwrapRows(raw);
     const items = rows.map((r) => ({
         personId: r.personId,
-        name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-        email: r.personEmail || null,
-        // Canonical spellings passed through verbatim (fb#621) — the backend already
+        ...projectPersonName(r),
+        // Alias spellings passed through verbatim (fb#621) — the backend already
         // sends exactly these names; this command was the one renaming them.
         personFirstName: r.personFirstName || null,
         personLastName: r.personLastName || null,

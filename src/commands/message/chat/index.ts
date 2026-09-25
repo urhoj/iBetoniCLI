@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
+import { projectPersonName, type PersonNameFields } from "../../_shared/personRow.js";
 import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../../api/envelopes.js";
 import {
   addWriteFlagsToCommand,
@@ -104,7 +105,7 @@ export async function runChatSend(
     );
     const recipients = (meta.participants ?? []).map((p) => ({
       personId: p.personId,
-      name: `${p.personFirstName ?? ""} ${p.personLastName ?? ""}`.trim(),
+      name: projectPersonName(p as PersonNameFields).name,
       role: p.role,
     }));
     return {

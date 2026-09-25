@@ -1,3 +1,4 @@
+import { projectPersonName } from "../../_shared/personRow.js";
 import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
@@ -64,7 +65,7 @@ export async function runChatSend(client, threadId, opts) {
         const meta = await client.get(`/api/messages/threads/${threadId}`);
         const recipients = (meta.participants ?? []).map((p) => ({
             personId: p.personId,
-            name: `${p.personFirstName ?? ""} ${p.personLastName ?? ""}`.trim(),
+            name: projectPersonName(p).name,
             role: p.role,
         }));
         return {

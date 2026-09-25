@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
+import { projectPersonName } from "../_shared/personRow.js";
 import { listEnvelope, unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
@@ -1512,10 +1513,9 @@ export interface CustomerPersonListItem {
    * CLI whose audience is AI assistants, silently-empty is worse than an error,
    * because the empty result gets reported onward as a finding.
    *
-   * Additive on purpose: `name`/`email` keep working, so nothing that consumes
-   * this list breaks. Which vocabulary is CANONICAL long-term (and whether a
-   * shared projection helper should own it, so a third command cannot invent a
-   * third spelling) is deliberately still open.
+   * DECIDED (fb#692): `name`/`email` are CANONICAL — every person-bearing list
+   * returns them, via the shared `projectPersonName`. These three are ALIASES
+   * kept for consumers that project `ib person get`'s spelling.
    */
   personFirstName: string | null;
   personLastName: string | null;
@@ -1564,9 +1564,8 @@ export async function runCustomerPersonList(
     (!Array.isArray(raw) && raw?.personList) || (unwrapRows(raw) as unknown as PersonRow[]);
   const items: CustomerPersonListItem[] = rows.map((r) => ({
     personId: r.personId,
-    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-    email: r.personEmail || null,
-    // Canonical spellings passed through verbatim (fb#621) — the backend already
+    ...projectPersonName(r),
+    // Alias spellings passed through verbatim (fb#621) — the backend already
     // sends exactly these names; this command was the one renaming them.
     personFirstName: r.personFirstName || null,
     personLastName: r.personLastName || null,

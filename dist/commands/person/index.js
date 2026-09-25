@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { projectPersonName } from "../_shared/personRow.js";
 import { unwrapRows, listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.js";
@@ -807,11 +808,8 @@ export async function runPersonByEmail(client, email) {
     const row = Array.isArray(rows) ? rows[0] : undefined;
     if (!row || !row.personId)
         return null;
-    return {
-        personId: row.personId,
-        name: `${row.personFirstName || ""} ${row.personLastName || ""}`.trim() || null,
-        email: row.personEmail || null,
-    };
+    const projected = projectPersonName(row);
+    return { personId: row.personId, name: projected.name || null, email: projected.email };
 }
 /**
  * POST /api/person/newPerson — create a new person record.

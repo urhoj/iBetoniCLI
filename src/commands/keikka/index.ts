@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
+import { projectPersonName } from "../_shared/personRow.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
@@ -546,8 +547,7 @@ function projectKeikkaPersonRow(r: KeikkaPersonRawRow): KeikkaPersonListItem {
   return {
     keikkaPersonId: r.keikkaPersonId,
     personId: r.personId,
-    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
-    email: r.personEmail || null,
+    ...projectPersonName(r),
     phone: r.personPhone || null,
     sourceId: r.keikkaPersonSourceId ?? null,
     sourceText: r.keikkaPersonSourceText || null,

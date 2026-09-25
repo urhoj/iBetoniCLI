@@ -92,7 +92,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.asiakas.read"),
     ],
     notes: [
-      "Rows carry BOTH vocabularies (fb#621): the short `name` (first+last joined) and `email`, plus the canonical `personFirstName`/`personLastName`/`personEmail` that `ib person get` uses. Projecting the sibling's spelling here used to yield blank cells with no error — silently-empty data that reads as 'these people have no name on file'.",
+      "Rows carry BOTH vocabularies (fb#621): `name` (first+last joined) and `email` are CANONICAL — the spelling every person-bearing list uses (fb#692); `personFirstName`/`personLastName`/`personEmail` are aliases matching `ib person get`. Projecting the sibling's spelling here used to yield blank cells with no error — silently-empty data that reads as 'these people have no name on file'.",
     ],
     seeAlso: ["ib person role list", "ib person get"],
     examples: ["ib customer person list 26", "ib customer person list --asiakas 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
