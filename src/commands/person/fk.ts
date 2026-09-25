@@ -10,6 +10,7 @@
  * Neither route honours X-Dry-Run, so --dry-run resolves client-side.
  */
 import { Option, type Command } from "commander";
+import { projectPersonName } from "../_shared/personRow.js";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import { errorMessage } from "../../api/errors.js";
@@ -140,7 +141,7 @@ export interface PersonFkBySourceRaw {
 export interface PersonFkBySourceRow {
   personForeignKeyId: number;
   personId: number;
-  personName: string;
+  name: string;
   key: string;
   text: string | null;
   isDisabled: boolean;
@@ -164,7 +165,7 @@ export async function runPersonFkListSource(client: ApiClient, sourceRef: string
   const items = rows.map((r) => ({
     personForeignKeyId: Number(r.personForeignKeyId),
     personId: Number(r.personId),
-    personName: [r.personFirstName, r.personLastName].filter(Boolean).join(" "),
+    name: projectPersonName(r).name,
     key: r.foreignKey,
     text: r.foreignKeyText ?? null,
     isDisabled: Boolean(r.isDisabled),

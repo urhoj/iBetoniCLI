@@ -89,7 +89,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     permissions: ["membership of the owner tenant (read)"],
     args: [{ name: "source", type: "string", description: "foreignKeySources row, by NAME (case-insensitive) or numeric id — `fk sources` lists them" }],
     flags: [OWNER_ASIAKAS_FLAG],
-    outputShape: "ListEnvelope<{ personForeignKeyId, personId, personName, key, text, isDisabled, entryTime }>",
+    outputShape: "ListEnvelope<{ personForeignKeyId, personId, name, key, text, isDisabled, entryTime }>",
     errors: [
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
@@ -97,7 +97,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
       READ_403,
       ...COMMON_AUTH_ERRORS,
     ],
-    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE],
+    notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE, "The person column is `name` (first + last), the canonical person vocabulary of every CLI list (fb#692); it was `personName` before 2026-09-25."],
     seeAlso: ["ib person fk list", "ib person fk sources"],
     examples: ["ib person fk list-source betomik-orderbook --owner 27", "ib person fk list-source 6 --owner 27"],
   },

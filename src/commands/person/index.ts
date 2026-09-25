@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { projectPersonName } from "../_shared/personRow.js";
+import { projectPersonName, type PersonNameFields } from "../_shared/personRow.js";
 import { unwrapRows, listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   writeFlagsToHeaders,
@@ -938,7 +938,7 @@ export function registerPersonCommands(
         if (e instanceof CliError && e.statusCode === 404) {
           created = {
             personId: newId,
-            name: `${body.personFirstName || ""} ${body.personLastName || ""}`.trim() || null,
+            name: projectPersonName(body as PersonNameFields).name || null,
             email: (body.personEmail as string | null | undefined) ?? null,
             phone: (body.personPhone as string | null | undefined) ?? null,
             ownerAsiakasId: body.ownerAsiakasId ?? null,

@@ -605,7 +605,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             if (e instanceof CliError && e.statusCode === 404) {
                 created = {
                     personId: newId,
-                    name: `${body.personFirstName || ""} ${body.personLastName || ""}`.trim() || null,
+                    name: projectPersonName(body).name || null,
                     email: body.personEmail ?? null,
                     phone: body.personPhone ?? null,
                     ownerAsiakasId: body.ownerAsiakasId ?? null,

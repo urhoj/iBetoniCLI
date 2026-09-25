@@ -1503,8 +1503,8 @@ export interface CustomerPersonListItem {
   name: string;
   email: string | null;
   /**
-   * The CANONICAL person vocabulary, carried alongside the short `name`/`email`
-   * this command has always returned (fb#621).
+   * ALIAS spellings of `name`/`email`, matching `ib person get`, carried
+   * alongside the canonical short pair this command has always returned (fb#621).
    *
    * `ib person get <id>` returns `personFirstName`/`personLastName`/`personEmail`;
    * this list returned only `name`/`email`. Projecting the sibling's spelling

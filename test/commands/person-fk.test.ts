@@ -83,8 +83,8 @@ describe("person fk list-source (fb#1740)", () => {
     const out = await runPersonFkListSource(c, "betomik-orderbook", 27);
     expect(c.get).toHaveBeenCalledWith("/api/person/getForeignKeysBySource/27/42");
     expect(out.items).toEqual([
-      { personForeignKeyId: 900, personId: 6354, personName: "Matti Meikalainen", key: "Tomppa", text: null, isDisabled: false, entryTime: ROW.entryTime },
-      { personForeignKeyId: 901, personId: 6355, personName: "Jani", key: "Jani K", text: "sheet spelling", isDisabled: true, entryTime: ROW.entryTime },
+      { personForeignKeyId: 900, personId: 6354, name: "Matti Meikalainen", key: "Tomppa", text: null, isDisabled: false, entryTime: ROW.entryTime },
+      { personForeignKeyId: 901, personId: 6355, name: "Jani", key: "Jani K", text: "sheet spelling", isDisabled: true, entryTime: ROW.entryTime },
     ]);
     expect(out.count).toBe(2);
   });

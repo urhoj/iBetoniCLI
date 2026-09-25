@@ -12551,7 +12551,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personForeignKeyId, personId, personName, key, text, isDisabled, entryTime }>
+  ListEnvelope<{ personForeignKeyId, personId, name, key, text, isDisabled, entryTime }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
@@ -12564,6 +12564,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
   - \`--asiakas <id>\` is accepted as a hidden alias of \`--owner\` (the rest of \`ib person\` spells the tenant scope that way); passing both with different values exits 4.
+  - The person column is \`name\` (first + last), the canonical person vocabulary of every CLI list (fb#692); it was \`personName\` before 2026-09-25.
 
 SEE ALSO
   ib person fk list, ib person fk sources
