@@ -8052,7 +8052,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --supplier alone — the supplier is derived from the plant → pass --plant <sijaintiId> (with or without --supplier)
   exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
-  exit 4 (client-side)  --plant is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId (find plants with \`ib sijainti list\`)
+  exit 4 (client-side)  --plant is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId (find plants with \`ib sijainti plants --search <name>\`)
   exit 4 (client-side)  --supplier is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 4 (client-side)  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
   exit 4 (client-side)  --start/--end not HH:MM → pass e.g. --start 08:00

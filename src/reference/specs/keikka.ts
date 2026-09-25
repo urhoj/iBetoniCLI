@@ -328,7 +328,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "--supplier needs --plant", meaning: "--supplier alone — the supplier is derived from the plant", remedy: "pass --plant <sijaintiId> (with or without --supplier)" },
       intParseErr("--customer", "pass a positive asiakasId"),
       intParseErr("--worksite", "pass a positive tyomaaId"),
-      intParseErr("--plant", "pass a positive sijaintiId (find plants with `ib sijainti list`)"),
+      intParseErr("--plant", "pass a positive sijaintiId (find plants with `ib sijainti plants --search <name>`)"),
       intParseErr("--supplier", "pass a positive asiakasId"),
       { origin: "client", exit: 4, match: "--status must be a numeric", meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
       { origin: "client", exit: 4, match: "expected HH:MM", meaning: "--start/--end not HH:MM", remedy: "pass e.g. --start 08:00" },
