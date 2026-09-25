@@ -337,7 +337,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     flags: [
-      { name: "body", type: "json", required: true, description: "{ host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps, sync, digestSent, stepLines, errorTail } — see the tick reporter" },
+      { name: "body", type: "json", required: true, description: "{ host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps, sync, extract, digestSent, stepLines, errorTail } — see the tick reporter" },
       FROM_JSON_BODY_FLAG,
     ],
     args: [],
@@ -356,7 +356,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     permissions: [BETOMIK_VIEW_PERMISSION],
     flags: [{ name: "limit", type: "number", description: "Rows to return (default 50, max 200)" }],
     args: [],
-    outputShape: "ListEnvelope<{ logCronJobId, entryTime, host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps: [{ name, durationMs }], sync: { importRunId, inserted, updated, unchanged, gone, planned, written, blocked, extracted, dayDrivers } | null, digestSent, stepLines, errorTail | null, parseError? }>",
+    outputShape: "ListEnvelope<{ logCronJobId, entryTime, host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps: [{ name, durationMs }], sync: { importRunId, inserted, updated, unchanged, gone, planned, written, blocked, extracted, dayDrivers } | null, extract: { ok, failed, byProvider } | null, digestSent, stepLines, errorTail | null, parseError? }>",
     errors: [
       intParseErr("--limit", "pass a positive integer (default 50, max 200)"),
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },

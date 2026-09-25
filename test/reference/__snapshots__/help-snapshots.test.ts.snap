@@ -3098,7 +3098,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --body JSON    { host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps, sync, digestSent, stepLines, errorTail } — see the tick reporter (required)
+  --body JSON    { host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps, sync, extract, digestSent, stepLines, errorTail } — see the tick reporter (required)
   --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
 WRITE-SAFETY FLAGS
@@ -3142,7 +3142,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ logCronJobId, entryTime, host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps: [{ name, durationMs }], sync: { importRunId, inserted, updated, unchanged, gone, planned, written, blocked, extracted, dayDrivers } | null, digestSent, stepLines, errorTail | null, parseError? }>
+  ListEnvelope<{ logCronJobId, entryTime, host, isoYear, isoWeek, mode, startedAt, finishedAt, durationMs, exitCode, failedStep, steps: [{ name, durationMs }], sync: { importRunId, inserted, updated, unchanged, gone, planned, written, blocked, extracted, dayDrivers } | null, extract: { ok, failed, byProvider } | null, digestSent, stepLines, errorTail | null, parseError? }>
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer (default 50, max 200)

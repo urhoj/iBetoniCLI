@@ -321,6 +321,8 @@ export interface BetomikTickRun {
   failedStep?: string | null;
   steps?: { name: string; durationMs: number }[];
   sync?: Record<string, unknown> | null;
+  /** The extractor's row counts; byProvider.bedrock = rows Bedrock served (the GX10 fallback when GX10 is configured, fb#1942). */
+  extract?: { ok: number; failed: number; byProvider: Record<string, number> | null } | null;
   digestSent?: boolean;
   stepLines?: string[];
   errorTail?: string[] | null;
