@@ -130,7 +130,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
           { name: "cascade", type: "boolean", description: "Also invalidate related families (keikka only)" },
           ...writeFlags,
         ],
-        outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ keyNamespace, hint when 0 — a fresh build's namespace starts empty)",
+        outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ totalKeysScanned, groups, hint when 0 — as the preview; null totalKeysScanned = Redis unreachable)",
         errors: [
           intParseErr("--id", "pass a positive entity id"),
           intParseErr("--asiakas", "pass a positive asiakasId"),

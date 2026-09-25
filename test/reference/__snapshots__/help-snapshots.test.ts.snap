@@ -3242,7 +3242,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ keyNamespace, hint when 0 — a fresh build's namespace starts empty)
+  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ totalKeysScanned, groups, hint when 0 — as the preview; null totalKeysScanned = Redis unreachable)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --id is not an integer >= 1, rejected locally before any request → pass a positive entity id

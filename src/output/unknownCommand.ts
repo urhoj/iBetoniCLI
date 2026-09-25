@@ -742,7 +742,8 @@ export interface UnknownOptionEnvelope {
  *
  * Capped at 3, and a leaf NAMED after the flag (`--search` → `person search`)
  * wins over catalogue order, since that is the strongest signal of which
- * sibling actually owns the capability.
+ * sibling actually owns the capability. Within that, siblings in the same
+ * parent GROUP rank ahead of the rest of the domain (fb#1953).
  *
  * `alsoOwning` narrows the scan to siblings that own THAT flag too (fb#1731):
  * a sibling accepting the rejected flag verbatim AND the flag it was guessed to
