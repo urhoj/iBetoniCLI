@@ -145,15 +145,10 @@ export async function runCustomerFkImport(client, entries, opts, flags) {
  * The row to remove: by <asiakasForeignKeyId>, or by --key (trimmed,
  * case-insensitive; --source narrows when one spelling sits on several
  * sources) so one alias can go without looking its id up first (fb#1975).
+ * The usage checks run in runCustomerFkRemove BEFORE any request (fb#2036).
  */
-function pickRowToRemove(rows, idStr, opts, where) {
-    if ((idStr === undefined) === (opts.key === undefined)) {
-        failWith("pass exactly one of <asiakasForeignKeyId> or --key <text>", 4);
-    }
-    if (idStr !== undefined) {
-        if (opts.source)
-            failWith("--source only narrows --key; drop it when removing by id", 4);
-        const id = parseId(idStr, "asiakasForeignKeyId");
+function pickRowToRemove(rows, id, opts, where) {
+    if (id !== undefined) {
         const row = rows.find((r) => r.asiakasForeignKeyId === id);
         if (!row)
             failWith(`asiakasForeignKeyId ${id} is not on ${where}`, 5);
@@ -168,13 +163,20 @@ function pickRowToRemove(rows, idStr, opts, where) {
     return hits[0];
 }
 export async function runCustomerFkRemove(client, asiakasId, idStr, opts, flags) {
+    if ((idStr === undefined) === (opts.key === undefined)) {
+        failWith("pass exactly one of <asiakasForeignKeyId> or --key <text>", 4);
+    }
+    if (idStr !== undefined && opts.source !== undefined) {
+        failWith("--source only narrows --key; drop it when removing by id", 4);
+    }
+    const fkId = idStr === undefined ? undefined : parseId(idStr, "asiakasForeignKeyId");
     const owner = resolveOwner(client, opts.owner);
     const [rows, source] = await Promise.all([
         fetchCustomerFks(client, asiakasId, owner),
         opts.source === undefined ? undefined : resolveFkSource(client, owner, opts.source),
     ]);
     const where = `customer ${asiakasId} for owner ${owner} — see \`ib customer fk list ${asiakasId} --owner ${owner}\``;
-    const row = pickRowToRemove(rows, idStr, { key: opts.key, source }, where);
+    const row = pickRowToRemove(rows, fkId, { key: opts.key, source }, where);
     const id = row.asiakasForeignKeyId;
     const result = {
         action: "removed",

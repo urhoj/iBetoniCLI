@@ -141,10 +141,16 @@ describe("customer fk remove --key", () => {
     expect(c.delete).not.toHaveBeenCalled();
   });
 
-  test("neither / both of id and --key exit 4; an unknown key exits 5", async () => {
+  test("usage errors (neither / both of id and --key, --source with an id) exit 4 before any request (fb#2036)", async () => {
     const c = aliasClient([alias(60, "vepe")]);
     await expect(runCustomerFkRemove(c, 1496, undefined, { owner: 27 }, {})).rejects.toMatchObject({ exitCode: 4 });
     await expect(runCustomerFkRemove(c, 1496, "60", { owner: 27, key: "vepe" }, {})).rejects.toMatchObject({ exitCode: 4 });
+    await expect(runCustomerFkRemove(c, 1496, "60", { owner: 27, source: "betomik-orderbook" }, {})).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.get).not.toHaveBeenCalled();
+  });
+
+  test("an unknown key exits 5", async () => {
+    const c = aliasClient([alias(60, "vepe")]);
     await expect(runCustomerFkRemove(c, 1496, undefined, { owner: 27, key: "srg" }, {})).rejects.toMatchObject({ exitCode: 5 });
     expect(c.delete).not.toHaveBeenCalled();
   });
