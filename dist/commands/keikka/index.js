@@ -226,21 +226,40 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
     });
 }
 /**
- * Update a keikka. `--status` posts the numeric keikkaTilaId to
- * /api/keikka/tila/set; the move flags (`--vehicle/--date/--start/--end` — the
- * grid's drag-and-drop) post to /api/cli/keikka/move/:id, which read-merges
- * over the blanket keikka_saveAika proc server-side and re-derives the driver
- * like a grid drop. The two are separate routes with no atomicity, so mixing
- * them in one call is refused.
+ * Update a keikka. Three flag groups, three routes, one group per call (no atomicity
+ * across routes, so mixing is refused):
+ *   - `--status` posts the numeric keikkaTilaId to /api/keikka/tila/set;
+ *   - the move flags (`--vehicle/--date/--start/--end` — the grid's drag-and-drop) post
+ *     to /api/cli/keikka/move/:id, which read-merges over the blanket keikka_saveAika proc
+ *     server-side and re-derives the driver like a grid drop;
+ *   - the reference flags (`--customer/--worksite/--plant [--supplier]`) post to
+ *     /api/cli/keikka/refs/:id, which re-points them through the grid's own procs,
+ *     read-merged server-side (fb#1943, fb#1986).
  */
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
     const isMove = needsRow || fields.vehicle !== undefined;
-    if (fields.status !== undefined && isMove) {
-        failWith("--status cannot be combined with --vehicle/--date/--start/--end — run two commands", 4);
+    const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined;
+    if (fields.supplier !== undefined && fields.plant === undefined) {
+        failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
     }
-    if (fields.status === undefined && !isMove) {
-        failWith("Nothing to update: pass --status, or a move flag (--vehicle/--date/--start/--end)", 4);
+    if ([fields.status !== undefined, isMove, isRefs].filter(Boolean).length > 1) {
+        failWith("--status, the move flags (--vehicle/--date/--start/--end) and the reference flags (--customer/--worksite/--plant) cannot be combined — run one command per group", 4);
+    }
+    if (fields.status === undefined && !isMove && !isRefs) {
+        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), or a reference flag (--customer/--worksite/--plant)", 4);
+    }
+    if (isRefs) {
+        const body = {};
+        if (fields.customer !== undefined)
+            body.asiakasId = fields.customer;
+        if (fields.worksite !== undefined)
+            body.tyomaaId = fields.worksite;
+        if (fields.plant !== undefined)
+            body.betoniSijaintiId = fields.plant;
+        if (fields.supplier !== undefined)
+            body.betoniAsiakasId = fields.supplier;
+        return client.post(`/api/cli/keikka/refs/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
     }
     if (isMove) {
         const body = {};
@@ -481,7 +500,8 @@ export async function runKeikkaTilat(client, opts = {}) {
  *   - get      single keikka by id
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
  *   - copy     POST /api/keikka/copy — duplicate onto an optional --date (client-side dry-run)
- *   - update   --status → POST /api/keikka/tila/set; --vehicle/--date/--start/--end → POST /api/cli/keikka/move/:id
+ *   - update   --status → POST /api/keikka/tila/set; --vehicle/--date/--start/--end → POST /api/cli/keikka/move/:id;
+ *              --customer/--worksite/--plant/--supplier → POST /api/cli/keikka/refs/:id
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
  *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
  *
@@ -599,7 +619,11 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--vehicle <id>", "Move to this vehicleId (drivers re-derived like a grid drop)", intFlag("--vehicle"))
         .option("--date <d>", "Move to this day (YYYY-MM-DD | today | tomorrow), keeping the clock time")
         .option("--start <HH:MM>", "New pump start, Helsinki wall-clock")
-        .option("--end <HH:MM>", "New pump end, Helsinki wall-clock (sets pumppuKesto)");
+        .option("--end <HH:MM>", "New pump end, Helsinki wall-clock (sets pumppuKesto)")
+        .option("--customer <asiakasId>", "Re-point to this customer (asiakasId)", intFlag("--customer"))
+        .option("--worksite <tyomaaId>", "Re-point to this worksite (tyomaaId)", intFlag("--worksite"))
+        .option("--plant <sijaintiId>", "Set the concrete plant (betoniSijaintiId); the supplier is its owner", intFlag("--plant"))
+        .option("--supplier <asiakasId>", "Assert the plant's supplier (betoniAsiakasId); must own --plant", intFlag("--supplier"));
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const result = await runKeikkaUpdate(client, parseId(idStr, "keikkaId"), {
@@ -608,6 +632,10 @@ export function registerKeikkaCommands(parent, getClient) {
             date: resolveDate(opts.date),
             start: opts.start,
             end: opts.end,
+            customer: opts.customer,
+            worksite: opts.worksite,
+            plant: opts.plant,
+            supplier: opts.supplier,
         }, opts);
         writeJson(result);
     }));

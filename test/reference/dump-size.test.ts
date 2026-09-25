@@ -151,7 +151,10 @@ import { buildReference } from "../../src/reference/dump.js";
 // 831_000 → 838_000 (2026-09-25): three new commands — `ib customer fk add` +
 // `fk import` (append-only aliases, fb#1975/fb#1719) and `ib dev betomik-orderbook
 // row` (fb#1977) — plus `fk remove --key/--source`. Measured 837 646 B. Headroom ~354 B.
-const DUMP_LIMIT_BYTES = 838_000;
+// 838_000 → 840_000 (2026-09-25): `ib keikka update --customer/--worksite/--plant
+// [--supplier]` (fb#1943, fb#1986) — four flags, five exit-4 rows, one note, two
+// examples (+~1.4 KB). Note trimmed once. Measured 839 337 B. Headroom ~663 B.
+const DUMP_LIMIT_BYTES = 840_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

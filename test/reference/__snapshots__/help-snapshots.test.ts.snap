@@ -8016,7 +8016,7 @@ exports[`Help snapshots — contract stability > help for ib keikka update match
   ib keikka update <keikkaId> [flags]
 
 DESCRIPTION
-  Update a keikka: \`--status\` (numeric keikkaTilaId → POST /api/keikka/tila/set), or MOVE it like the grid's drag-and-drop — \`--vehicle\`/\`--date\`/\`--start\`/\`--end\` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side). Status and move are two routes: one per call.
+  Update a keikka: \`--status\` (numeric keikkaTilaId → POST /api/keikka/tila/set), MOVE it like the grid's drag-and-drop — \`--vehicle\`/\`--date\`/\`--start\`/\`--end\` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side), or RE-POINT it — \`--customer\`/\`--worksite\`/\`--plant\` → POST /api/cli/keikka/refs/:id. Three routes: one group per call.
   Permissions: requires auth.page.grid.tilaus.edit.
 
 ARGUMENTS
@@ -8028,6 +8028,10 @@ FLAGS
   --date STRING    Move to this day (YYYY-MM-DD | today | tomorrow), keeping the clock time
   --start STRING    New pump start, HH:MM Helsinki
   --end STRING    New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)
+  --customer NUMBER    Re-point to this customer (asiakasId) — the tenant's own, or a self-owned company row
+  --worksite NUMBER    Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning
+  --plant NUMBER    Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner
+  --supplier NUMBER    Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -8040,18 +8044,23 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null } (--dry-run: { dryRun:true, wouldUpdate, validation })
+  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag: --vehicle / --date / --start / --end
-  exit 4 (client-side)  --status given together with a move flag — two routes, no atomicity → run them as two commands
+  exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag (--vehicle / --date / --start / --end), or a reference flag (--customer / --worksite / --plant)
+  exit 4 (client-side)  Flags from two groups (status / move / reference) — separate routes, no atomicity → run one command per group
+  exit 4 (client-side)  --supplier alone — the supplier is derived from the plant → pass --plant <sijaintiId> (with or without --supplier)
+  exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --plant is not an integer >= 1, rejected locally before any request → pass a positive sijaintiId (find plants with \`ib sijainti list\`)
+  exit 4 (client-side)  --supplier is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
   exit 4 (client-side)  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
   exit 4 (client-side)  --start/--end not HH:MM → pass e.g. --start 08:00
   exit 4 (client-side)  --end is not after the (new or current) start; same-day only → pass an --end later than the start, or move --start first
   exit 4 (client-side)  The row has no pumppuAika, so a partial time flag has nothing to fill from → pass both --date and --start
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
-  exit 4 (HTTP 400)  Move body rejected (vehicleId, pumppuAika, or pumppuKesto outside 15..10080 min) → check the flags
-  exit 5 (HTTP 404)  Keikka not found, soft-deleted, OR outside your visible scope → verify keikkaId — NOT proof the row is absent: results mirror your permissions, so another tenant's keikka 404s identically
+  exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant) → check the flags — the message names the plant's real supplier
+  exit 5 (HTTP 404)  Keikka, or a --customer/--worksite/--plant target, not found, soft-deleted, OR outside your visible scope → the message names which id — verify it; another tenant's customer/worksite/keikka 404s identically to a missing one
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8060,6 +8069,7 @@ NOTES
   - --status takes the numeric keikkaTilaId, NOT a name — e.g. \`--status 9\` (Toimitettu), \`--status 8\` (Peruttu), \`--status 2\` (Lähetetty). See the legend on \`ib keikka list --help\` or the \`tila\` GLOSSARY entry on \`ib --help\`.
   - A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.
   - Time flags read the row first (pvm/time) to fill what you omit: \`--date\` alone keeps the clock time, \`--end\` alone recomputes pumppuKesto from the current start. \`--vehicle\` alone makes no read.
+  - A re-point uses the grid's procs; betoniMatka is recomputed. Unlike a merge, the old customer/worksite is kept.
 
 EXAMPLES
   ib keikka update 9001 --status 9
@@ -8068,6 +8078,8 @@ EXAMPLES
   ib keikka update 9001 --vehicle 1226 --reason 'NLR-210 huollossa'
   ib keikka update 9001 --date tomorrow
   ib keikka update 9001 --start 09:00 --end 11:30
+  ib keikka update 12118 --customer 1482 --worksite 3438 --dry-run
+  ib keikka update 12147 --plant 45 --reason 'Swerock Lohja ok'
 "
 `;
 

@@ -817,9 +817,25 @@ ib keikka search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 100
 
+ib keikka update --customer <asiakasId>
+  ! --customer must be an integer >= 1
+  > pass a positive asiakasId
+
+ib keikka update --plant <sijaintiId>
+  ! --plant must be an integer >= 1
+  > pass a positive sijaintiId (find plants with \`ib sijainti list\`)
+
+ib keikka update --supplier <asiakasId>
+  ! --supplier must be an integer >= 1
+  > pass a positive asiakasId
+
 ib keikka update --vehicle <id>
   ! --vehicle must be an integer >= 1
   > pass a positive vehicleId
+
+ib keikka update --worksite <tyomaaId>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
 
 ib legal acceptances --limit <n>
   ! --limit must be an integer >= 1

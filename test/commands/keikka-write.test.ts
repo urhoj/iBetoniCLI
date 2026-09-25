@@ -105,6 +105,25 @@ describe("ib keikka create/update/drivers", () => {
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 
+  test("runKeikkaUpdate reference flags post to /api/cli/keikka/refs/:id with backend field names (fb#1943, fb#1986)", async () => {
+    mockClient.get.mockReset(); // beforeEach resets only post; earlier tests read the row
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12118, siteChanged: true });
+    await runKeikkaUpdate(mockClient, 12118, { customer: 1482, worksite: 3438, plant: 45, supplier: 28 }, { reason: "fix" });
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/refs/12118",
+      { asiakasId: 1482, tyomaaId: 3438, betoniSijaintiId: 45, betoniAsiakasId: 28 },
+      { headers: { "X-Action-Reason": "fix" } }
+    );
+  });
+
+  test("runKeikkaUpdate refuses mixing groups and a lone --supplier before any POST", async () => {
+    await expect(runKeikkaUpdate(mockClient, 9001, { customer: 1482, vehicle: 54 }, {})).rejects.toThrow(/cannot be combined/);
+    await expect(runKeikkaUpdate(mockClient, 9001, { status: "9", plant: 45 }, {})).rejects.toThrow(/cannot be combined/);
+    await expect(runKeikkaUpdate(mockClient, 9001, { supplier: 28 }, {})).rejects.toThrow(/--supplier needs --plant/);
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {
     mockClient.post.mockResolvedValueOnce({
       assigned: true,
