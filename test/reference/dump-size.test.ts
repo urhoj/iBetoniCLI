@@ -145,7 +145,10 @@ import { buildReference } from "../../src/reference/dump.js";
 // 828 387 B. Headroom ~110 B.
 // 828_500 → 830_000 (2026-09-24): new `ib person app-seen` (Kuskit v1a seen-stamp
 // read, task 6). One new command, not padding. Measured 829 469 B. Headroom ~531 B.
-const DUMP_LIMIT_BYTES = 830_000;
+// 830_000 → 831_000 (2026-09-25): `ib dev betomik-orderbook runs --limit/--offset`
+// (fb#1953, error rows reuse `rows`' wording) + the zero-deleted shape on
+// `ib dev cache invalidate` (fb#1985). Measured 830 761 B. Headroom ~239 B.
+const DUMP_LIMIT_BYTES = 831_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

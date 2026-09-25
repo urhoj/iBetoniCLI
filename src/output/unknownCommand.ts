@@ -766,7 +766,14 @@ export function siblingsAcceptingOption(
       (!alsoOwning || specOptionLongs(s).includes(alsoOwning))
   ).map((s) => s.command);
   const named = hits.filter((c) => c.endsWith(` ${flag.slice(2)}`));
-  return (named.length ? named : hits).slice(0, 3);
+  // Same parent GROUP before the rest of the domain (fb#1953): under `ib dev` the
+  // domain is the whole dev subtree, so `ib dev betomik-orderbook runs --limit`
+  // named three `ib dev schema` leaves over its own sibling `… rows`.
+  const parent = command.slice(0, command.lastIndexOf(" ") + 1);
+  const ranked = (named.length ? named : hits).sort(
+    (a, b) => Number(!a.startsWith(parent)) - Number(!b.startsWith(parent))
+  );
+  return ranked.slice(0, 3);
 }
 
 /**

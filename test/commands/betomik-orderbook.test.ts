@@ -75,6 +75,13 @@ describe("ib dev betomik-orderbook runs / rows", () => {
     });
   });
 
+  test("runs: --limit/--offset slice client-side with a next-offset hint (fb#1953)", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [1, 2, 3, 4, 5].map((importRunId) => ({ importRunId })) });
+    const result = await runBetomikOrderbookRuns(mockClient, { limit: 2, offset: 1 });
+    expect(result.items.map((r) => r.importRunId)).toEqual([2, 3]);
+    expect(result).toMatchObject({ count: 2, truncated: true, hint: "2 more row(s) — re-run with --offset 3" });
+  });
+
   test("runs: a non-envelope body yields an empty envelope, never a throw", async () => {
     mockClient.get.mockResolvedValueOnce(null);
     const result = await runBetomikOrderbookRuns(mockClient);

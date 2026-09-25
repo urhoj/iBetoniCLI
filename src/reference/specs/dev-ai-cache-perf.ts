@@ -130,7 +130,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
           { name: "cascade", type: "boolean", description: "Also invalidate related families (keikka only)" },
           ...writeFlags,
         ],
-        outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }",
+        outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ keyNamespace, hint when 0 — a fresh build's namespace starts empty)",
         errors: [
           intParseErr("--id", "pass a positive entity id"),
           intParseErr("--asiakas", "pass a positive asiakasId"),
@@ -151,6 +151,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
           "ib dev cache invalidate keikka --id 123",
           "ib dev cache invalidate keikka --id 123 --cascade --confirm",
           "ib dev cache invalidate asiakas --asiakas 8 --confirm",
+          "ib dev cache invalidate grid --confirm --force-prod",
         ],
       },
       {
@@ -213,7 +214,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
         description: "List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.",
         auth: "none",
         flags: [],
-        outputShape: "{ items: [{ entityType, params[], cascade?, developerOnly?, example }], count }",
+        outputShape: "{ items: [{ entityType, params[], cascade?, developerOnly?, example }], count, note }",
         errors: [{ origin: "client", exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
         examples: ["ib dev cache entities"],
       },

@@ -261,6 +261,13 @@ describe("sibling-command flag redirect (#308)", () => {
     expect(devOnly.length).toBeGreaterThan(0); // feedback list/resolve take --status
     expect(standard).toEqual([]); // …and are tier:"developer"
   });
+
+  test("same-group siblings rank ahead of the rest of the domain (fb#1953)", () => {
+    // `ib dev` is one domain, so `ib dev feedback` / `ib dev schema` leaves own
+    // `--status` too — the in-group `rows` must still come first.
+    const hits = siblingsAcceptingOption("ib dev betomik-orderbook runs", "--status", "developer");
+    expect(hits[0]).toBe("ib dev betomik-orderbook rows");
+  });
 });
 
 // feedback #443/#449 — a single-dash typo of a flag the command ITSELF owns must

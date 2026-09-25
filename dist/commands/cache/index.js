@@ -111,7 +111,13 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")).action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, resolveGlob(glob, opts.pattern), opts)));
     c.command("entities")
         .action(guarded(() => {
-        writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });
+        writeJson({
+            items: CACHE_ENTITIES,
+            count: CACHE_ENTITIES.length,
+            // fb#1985: the examples are endpoint-neutral, but the DEFAULT endpoint is
+            // the deployed API, where a copy-pasted --confirm exits 3 without this.
+            note: "Examples omit --force-prod: add it to any --confirm against the deployed API (the default endpoint); local backends need none.",
+        });
     }));
 }
 //# sourceMappingURL=index.js.map

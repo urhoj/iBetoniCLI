@@ -2798,7 +2798,8 @@ DESCRIPTION
   Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 FLAGS
-  (none)
+  --limit NUMBER    Runs to return (client-side, like \`rows\`)
+  --offset NUMBER    Runs to skip (default 0)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2809,9 +2810,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; it slices the fetched run client-side, so any size works
+  exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass an integer >= 0 — the hint on a truncated page names the next one
 
 EXAMPLES
-  ib dev betomik-orderbook runs
+  ib dev betomik-orderbook runs --limit 8
 "
 `;
 
@@ -3056,7 +3059,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
+  { items: [{ entityType, params[], cascade?, developerOnly?, example }], count, note }
 
 ERRORS (stderr, exit non-zero)
   exit 0 (client-side)  Always succeeds (offline static list) → n/a
@@ -3091,7 +3094,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
+  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted } (+ keyNamespace, hint when 0 — a fresh build's namespace starts empty)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --id is not an integer >= 1, rejected locally before any request → pass a positive entity id
@@ -3116,6 +3119,7 @@ EXAMPLES
   ib dev cache invalidate keikka --id 123
   ib dev cache invalidate keikka --id 123 --cascade --confirm
   ib dev cache invalidate asiakas --asiakas 8 --confirm
+  ib dev cache invalidate grid --confirm --force-prod
 "
 `;
 

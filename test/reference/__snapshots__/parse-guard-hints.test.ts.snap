@@ -469,6 +469,14 @@ ib dev betomik-orderbook rows --offset <n>
   ! --offset must be an integer >= 0
   > pass an integer >= 0 — the hint on a truncated page names the next one
 
+ib dev betomik-orderbook runs --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; it slices the fetched run client-side, so any size works
+
+ib dev betomik-orderbook runs --offset <n>
+  ! --offset must be an integer >= 0
+  > pass an integer >= 0 — the hint on a truncated page names the next one
+
 ib dev betomik-orderbook tick-runs --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer (default 50, max 200)

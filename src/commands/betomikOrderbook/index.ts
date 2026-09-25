@@ -32,10 +32,28 @@ function itemsOf<T>(raw: unknown): T[] {
   return Array.isArray(items) ? (items as T[]) : [];
 }
 
-/** Import runs for the Betomik staging table, newest first (GET /api/betomik-orderbook/runs). */
-export async function runBetomikOrderbookRuns(client: ApiClient): Promise<ListEnvelope<BetomikRunRow>> {
+/** Client-side --limit/--offset over an unpaged route's full result (fb#1953). */
+function page<T>(items: T[], { limit, offset }: { limit?: number; offset?: number }): ListEnvelope<T> {
+  if (limit === undefined && offset === undefined) return listEnvelope(items);
+  const start = offset ?? 0;
+  const end = limit === undefined ? items.length : start + limit;
+  const truncated = end < items.length;
+  return listEnvelope(items.slice(start, end), {
+    truncated,
+    ...(truncated ? { hint: `${items.length - end} more row(s) — re-run with --offset ${end}` } : {}),
+  });
+}
+
+/**
+ * Import runs for the Betomik staging table, newest first (GET /api/betomik-orderbook/runs).
+ * The route is unpaged, so --limit/--offset slice client-side like `rows` (fb#1953).
+ */
+export async function runBetomikOrderbookRuns(
+  client: ApiClient,
+  filter: { limit?: number; offset?: number } = {}
+): Promise<ListEnvelope<BetomikRunRow>> {
   const raw = await client.get<unknown>("/api/betomik-orderbook/runs");
-  return listEnvelope(itemsOf<BetomikRunRow>(raw));
+  return page(itemsOf<BetomikRunRow>(raw), filter);
 }
 
 export interface BetomikRowsFilter {
@@ -76,14 +94,7 @@ export async function runBetomikOrderbookRows(
   let items = itemsOf<Record<string, unknown>>(raw);
   if (wanted.length) items = items.filter((r) => wanted.includes(String(r.syncStatus)));
   if (filter.raw === false) items = items.map(({ rawJson: _raw, ...rest }) => rest);
-  if (filter.limit === undefined && filter.offset === undefined) return listEnvelope(items);
-  const offset = filter.offset ?? 0;
-  const end = filter.limit === undefined ? items.length : offset + filter.limit;
-  const truncated = end < items.length;
-  return listEnvelope(items.slice(offset, end), {
-    truncated,
-    ...(truncated ? { hint: `${items.length - end} more row(s) — re-run with --offset ${end}` } : {}),
-  });
+  return page(items, filter);
 }
 
 export interface BetomikReviewBody {
@@ -333,7 +344,13 @@ export function registerBetomikOrderbookCommands(
   group
     .command("runs")
     .description("List import runs (sheet label, ISO year/week, row count), newest first")
-    .action(jsonAction(getClient, (client) => runBetomikOrderbookRuns(client)));
+    .option("--limit <n>", "Runs to return (client-side; the route is unpaged)", intFlag("--limit"))
+    .option("--offset <n>", "Runs to skip", intFlag("--offset", 0))
+    .action(
+      jsonAction(getClient, (client, opts: { limit?: number; offset?: number }) =>
+        runBetomikOrderbookRuns(client, opts)
+      )
+    );
 
   group
     .command("rows <runId>")

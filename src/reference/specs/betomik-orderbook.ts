@@ -44,13 +44,18 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     description: "List Betomik order-book import runs — sheet label, ISO year/week, row count, importedAt — newest first (GET /api/betomik-orderbook/runs). The week-selector for `rows`: pick the run whose isoYear/isoWeek match, latest importedAt if several.",
     tier: "developer",
     permissions: [BETOMIK_VIEW_PERMISSION],
-    flags: [],
+    flags: [
+      { name: "limit", type: "number", description: "Runs to return (client-side, like `rows`)" },
+      { name: "offset", type: "number", description: "Runs to skip (default 0)" },
+    ],
     args: [],
     outputShape: "ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
+      intParseErr("--limit", "pass a positive integer; it slices the fetched run client-side, so any size works"),
+      intParseErr("--offset", "pass an integer >= 0 — the hint on a truncated page names the next one", 0),
     ],
-    examples: ["ib dev betomik-orderbook runs"],
+    examples: ["ib dev betomik-orderbook runs --limit 8"],
   },
   {
     command: "ib dev betomik-orderbook rows",

@@ -13,10 +13,25 @@ function itemsOf(raw) {
     const items = raw?.items;
     return Array.isArray(items) ? items : [];
 }
-/** Import runs for the Betomik staging table, newest first (GET /api/betomik-orderbook/runs). */
-export async function runBetomikOrderbookRuns(client) {
+/** Client-side --limit/--offset over an unpaged route's full result (fb#1953). */
+function page(items, { limit, offset }) {
+    if (limit === undefined && offset === undefined)
+        return listEnvelope(items);
+    const start = offset ?? 0;
+    const end = limit === undefined ? items.length : start + limit;
+    const truncated = end < items.length;
+    return listEnvelope(items.slice(start, end), {
+        truncated,
+        ...(truncated ? { hint: `${items.length - end} more row(s) — re-run with --offset ${end}` } : {}),
+    });
+}
+/**
+ * Import runs for the Betomik staging table, newest first (GET /api/betomik-orderbook/runs).
+ * The route is unpaged, so --limit/--offset slice client-side like `rows` (fb#1953).
+ */
+export async function runBetomikOrderbookRuns(client, filter = {}) {
     const raw = await client.get("/api/betomik-orderbook/runs");
-    return listEnvelope(itemsOf(raw));
+    return page(itemsOf(raw), filter);
 }
 /** Every syncStatus the ledger can hold; `removed` is server-excluded (fb#1722). */
 const ROW_SYNC_STATUSES = ["pending", "blocked", "synced", "gone", "frozen"];
@@ -40,15 +55,7 @@ export async function runBetomikOrderbookRows(client, runId, filter = {}) {
         items = items.filter((r) => wanted.includes(String(r.syncStatus)));
     if (filter.raw === false)
         items = items.map(({ rawJson: _raw, ...rest }) => rest);
-    if (filter.limit === undefined && filter.offset === undefined)
-        return listEnvelope(items);
-    const offset = filter.offset ?? 0;
-    const end = filter.limit === undefined ? items.length : offset + filter.limit;
-    const truncated = end < items.length;
-    return listEnvelope(items.slice(offset, end), {
-        truncated,
-        ...(truncated ? { hint: `${items.length - end} more row(s) — re-run with --offset ${end}` } : {}),
-    });
+    return page(items, filter);
 }
 /** Review one staging row (POST /api/betomik-orderbook/rows/:rowId/review). */
 export async function runBetomikOrderbookReview(client, rowId, body, flags) {
@@ -180,7 +187,9 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
     group
         .command("runs")
         .description("List import runs (sheet label, ISO year/week, row count), newest first")
-        .action(jsonAction(getClient, (client) => runBetomikOrderbookRuns(client)));
+        .option("--limit <n>", "Runs to return (client-side; the route is unpaged)", intFlag("--limit"))
+        .option("--offset <n>", "Runs to skip", intFlag("--offset", 0))
+        .action(jsonAction(getClient, (client, opts) => runBetomikOrderbookRuns(client, opts)));
     group
         .command("rows <runId>")
         .description("Staging rows of one import run (plate, driver, source type, m3, review status)")
