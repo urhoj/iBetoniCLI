@@ -518,7 +518,9 @@ export function registerWorksiteCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
 ): void {
-  const w = parent.command("worksite").description("Worksite commands");
+  // `tyomaa` — hidden Finnish root alias; `PLURAL_DOMAIN_ALIASES` in
+  // domains.ts maps the token for selective registration.
+  const w = parent.command("worksite").aliases(["tyomaa"]).description("Worksite commands");
 
   w.command("list")
     .option("--limit <n>", "", cappedInt(500))

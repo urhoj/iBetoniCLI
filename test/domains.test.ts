@@ -110,4 +110,12 @@ describe("resolveArgvDomain", () => {
     const vehicle = lean.commands.find((c) => c.name() === "vehicle");
     expect(vehicle?.aliases()).toContain("vehicles");
   });
+
+  test("Finnish root alias tyomaa resolves to worksite", async () => {
+    expect(resolveArgvDomain(["tyomaa", "get", "1"])).toBe("worksite");
+    const lean = await buildProgram(["tyomaa", "get", "1"]);
+    expect(names(lean)).toEqual(["commands", "reference", "worksite"]);
+    const worksite = lean.commands.find((c) => c.name() === "worksite");
+    expect(worksite?.aliases()).toContain("tyomaa");
+  });
 });

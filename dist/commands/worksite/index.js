@@ -325,7 +325,9 @@ export function runWorksiteMerge(client, opts, flags) {
     return runCombinatorMerge(client, "tyomaa-combinator", TYOMAA_MERGE_ID_FIELDS, opts, flags);
 }
 export function registerWorksiteCommands(parent, getClient) {
-    const w = parent.command("worksite").description("Worksite commands");
+    // `tyomaa` — hidden Finnish root alias; `PLURAL_DOMAIN_ALIASES` in
+    // domains.ts maps the token for selective registration.
+    const w = parent.command("worksite").aliases(["tyomaa"]).description("Worksite commands");
     w.command("list")
         .option("--limit <n>", "", cappedInt(500))
         .option("--cursor <c>")

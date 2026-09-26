@@ -175,10 +175,12 @@ export const STATIC_DOMAIN_TOKENS: ReadonlySet<string> = new Set(["reference", "
  * {@link scanArgv} select the canonical domain so a plural invocation loads
  * only that module instead of falling back to the full tree. One row per
  * alias; deliberately curated, not derived (a plural is a vocabulary decision,
- * and only OBSERVED misses earn one).
+ * and only OBSERVED misses earn one). Also holds Finnish domain words that
+ * users observably type as the root (`tyomaa` → `worksite`).
  */
 export const PLURAL_DOMAIN_ALIASES: Readonly<Record<string, string>> = {
   vehicles: "vehicle",
+  tyomaa: "worksite",
 };
 
 /**
