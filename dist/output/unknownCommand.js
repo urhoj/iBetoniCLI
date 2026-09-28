@@ -901,18 +901,25 @@ function excessCauseHint(cmd) {
  *
  * Spec-driven, so it covers every `<id> + --date` command rather than being
  * special-cased to `vehicle timeline`.
+ *
+ * Causes are tried in order, first match leads the hint: a real flag typed
+ * after `--` (fb#2060), then the date, then the command's curated remedy (when
+ * its spec documents one) followed by the PowerShell cause (fb#726).
  */
 export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
     const { command, spec, availableOptions, positionals } = commandSurface(cmd);
-    const dated = dateFlagSuggestion(cmd, excess);
+    const misplaced = flagsAfterTerminator(cmd, excess);
+    // No date suggestion when a misplaced flag leads: didYouMean must never name
+    // a remedy the hint does not (fb#2074).
+    const dated = misplaced.length ? null : dateFlagSuggestion(cmd, excess);
     const didYouMean = dated?.suggestion ?? null;
     const parts = [];
-    const misplaced = flagsAfterTerminator(cmd, excess);
     if (misplaced.length) {
         // The real cause, so neither the --from-json remedy nor the PowerShell
         // quote-split diagnosis applies (fb#2060).
         const names = misplaced.map((f) => `\`${f}\``).join(", ");
-        parts.push(`${names} came after the \`--\` separator, so it was read as a positional argument, not a flag. Move it before \`--\`: everything after \`--\` is literal.`);
+        const [it, was] = misplaced.length > 1 ? ["them", "they were"] : ["it", "it was"];
+        parts.push(`${names} came after the \`--\` separator, so ${was} read as positional text. Move ${it} before \`--\`: everything after \`--\` is literal.`);
     }
     else if (dated) {
         parts.push(`Did you mean \`${dated.suggestion}\`? A date is passed as a FLAG here, not a positional` +

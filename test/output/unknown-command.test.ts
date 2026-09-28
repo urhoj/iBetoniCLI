@@ -29,7 +29,8 @@ import {
 } from "../../src/output/unknownCommand.js";
 
 // Sibling enumeration and did-you-mean read the WHOLE tree, so build it once
-// with no argv hint and inspect it — these assertions never mutate the program.
+// with no argv hint and inspect it. Tests that need parse state seed `.args` /
+// the root's `rawArgs` on this shared tree themselves (fb#2060 restores in `finally`).
 const program = await buildProgram();
 
 const legalOf = () => program.commands.find((c) => c.name() === "legal")!;
@@ -716,12 +717,6 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
   });
 });
 
-// The remedy for a mangled payload was already curated in the command's own
-// ERRORS row and rendered by `--help`, but the runtime hint never reached for
-// it: it spent its whole budget explaining the CAUSE and left the caller with no
-// fix, which cost a filing agent a round-trip (fb#726). Lead with the treatment;
-// the diagnosis follows as explanation. Order is the whole point of these
-// assertions — both sentences were reachable before, only their rank was wrong.
 // fb#2060: everything after a `--` terminator is an operand, so a flag typed
 // there becomes a surplus positional. The hint used to blame PowerShell quote
 // splitting and lead with --from-json; the real fix is to move the flag.
@@ -763,8 +758,33 @@ describe("buildExcessArgumentsEnvelope — a flag after the `--` separator (fb#2
       expect(env.hint).toContain("Extra positional(s)");
     });
   });
+
+  test("two misplaced flags are named together, in the plural", () => {
+    withRawArgs(["dev", "feedback", "create", "--", "text", "--kind", "bug", "--columns", "feedbackId"], () => {
+      const env = buildExcessArgumentsEnvelope(create(), ["--kind", "bug", "--columns", "feedbackId"], "e");
+      expect(env.hint).toContain("`--kind`, `--columns` came after");
+      expect(env.hint).toContain("Move them before `--`");
+    });
+  });
+
+  // fb#2074: a date after `--` beside a misplaced flag used to leave
+  // didYouMean naming `--date …` while the hint talked only about the flag.
+  test("didYouMean never names a date remedy the hint does not mention", () => {
+    const timeline = leafByPath("vehicle", "timeline");
+    withRawArgs(["vehicle", "timeline", "5", "--", "20260101", "--columns", "id"], () => {
+      const env = buildExcessArgumentsEnvelope(timeline, ["20260101", "--columns", "id"], "e");
+      expect(env.hint.startsWith("`--columns` came after")).toBe(true);
+      expect(env.didYouMean).toBeNull();
+    });
+  });
 });
 
+// The remedy for a mangled payload was already curated in the command's own
+// ERRORS row and rendered by `--help`, but the runtime hint never reached for
+// it: it spent its whole budget explaining the CAUSE and left the caller with no
+// fix, which cost a filing agent a round-trip (fb#726). Lead with the treatment;
+// the diagnosis follows as explanation. Order is the whole point of these
+// assertions — both sentences were reachable before, only their rank was wrong.
 describe("buildExcessArgumentsEnvelope — the curated remedy leads (fb#726)", () => {
   /** The remedy opens the hint AND precedes the cause sentence. */
   const leadsWith = (hint: string, remedy: string) =>
