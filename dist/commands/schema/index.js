@@ -432,12 +432,11 @@ const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
 /**
  * Curated fixes for {@link nearestObjectNameSuggestion} guesses that are
  * textually plausible but semantically wrong (fb#1799): the real backing
- * table carries a feature-area prefix (`grid_`) that no prefix/substring/
- * edit-distance pass on the bare typed name can reach — `palkki` (6 chars)
- * is ~5 edits from `grid_palkit`, well past the matcher's
- * `max(2, floor(len/2))=3` threshold, while `palkkiAsiakas`/`palkkiPerson`
- * win the PREFIX pass purely because they happen to literally start with the
- * typed string despite being unrelated junction tables. Keyed by the bare
+ * table carries a feature-area prefix (`grid_`) that {@link nearestNames}
+ * cannot reach from the bare typed name — `palkki` is 6 edits from
+ * `gridpalkit`, past its `max(2, floor(len/2))=3` threshold, and not an
+ * abbreviation of it (one `k`), while `palkkiAsiakas`/`palkkiPerson` extend
+ * the typed string despite being unrelated junction tables. Keyed by the bare
  * (lowercased) typed name; re-validated against the live table/view list at
  * call time in {@link nearestObjectNameSuggestion} so a rename can't leave a
  * dead override suggesting a table that no longer exists.
@@ -474,7 +473,7 @@ async function nearestObjectNameSuggestion(client, badName) {
     // Several candidates, not one (fb#2046): no single ranking picks right for
     // every irregular name, so the caller gets the top 3 to choose from.
     const matches = overrideTarget && names.includes(overrideTarget)
-        ? [overrideTarget, ...nearestNames(bare, names).filter((n) => n !== overrideTarget)].slice(0, 3)
+        ? [...new Set([overrideTarget, ...nearestNames(bare, names)])].slice(0, 3)
         : nearestNames(bare, names);
     return matches.length
         ? `did you mean ${orList(matches.map((m) => `dbo.${m}`))}? (nearest names in the live table/view list)`

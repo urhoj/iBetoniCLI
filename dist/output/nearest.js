@@ -1,7 +1,9 @@
 /**
- * Fuzzy "did you mean" matching — the one implementation behind every
- * near-miss hint the CLI emits: unknown subcommands (`unknownCommand.ts`) and
- * unknown enum-flag values (`targets.ts` `assertEnum`).
+ * Fuzzy "did you mean" matching: {@link closestName} (one best name) behind
+ * unknown subcommands and option names (`unknownCommand.ts`), unknown
+ * enum-flag values (`targets.ts` `assertEnum`) and `--columns` near-misses
+ * (`output/json.ts`); {@link nearestNames} (up to 3) behind the
+ * `ib dev schema query` table/column hints.
  *
  * A LEAF module by design: it imports nothing. Its two consumers sit on
  * opposite sides of a real import cycle — `unknownCommand.ts` needs
@@ -196,7 +198,7 @@ function isSubsequence(a, b) {
     return i === a.length;
 }
 /**
- * Up to `max` near names for an identifier typo (fb#2046) — SQL table and
+ * Up to 3 near names for an identifier typo (fb#2046) — SQL table and
  * column names, where no single rule picks the right one: `grid_palkki` wants
  * the edit-distance winner `grid_palkit`, while `betomikOrderbookRow` wants
  * the name it is an abbreviation of, `betomikOrderbookImportRow`, which edit
@@ -205,7 +207,7 @@ function isSubsequence(a, b) {
  * (letters inserted anywhere) guaranteed a slot. Case and `_` are ignored
  * (`palkkiId` ~ `grid_palkki_Id`). An exact match modulo those returns alone.
  */
-export function nearestNames(target, names, max = 3) {
+export function nearestNames(target, names) {
     const norm = (s) => s.toLowerCase().replace(/_/g, "");
     const t = norm(target);
     if (!t)
@@ -225,7 +227,7 @@ export function nearestNames(target, names, max = 3) {
         .filter((s) => s.ext)
         .sort((a, b) => a.n.length - b.n.length || a.n.localeCompare(b.n))[0];
     const order = [ranked[0], extension, ...ranked.slice(1)].filter(Boolean).map((s) => s.n);
-    return [...new Set(order)].slice(0, max);
+    return [...new Set(order)].slice(0, 3);
 }
 /** `a`, `a or b`, `a, b or c` — the did-you-mean list rendering. */
 export function orList(items) {

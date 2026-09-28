@@ -128,7 +128,9 @@ export async function createCliContext(opts) {
         quiet: opts.global.quiet,
         verbose: opts.global.verbose,
         printPayload: opts.global.printPayload,
-        envToken: auth.source === "env" && process.env.IB_TOKEN !== undefined,
+        // source "env" also covers the embedded caller's token, which WINS over a
+        // host IB_TOKEN — only the IB_TOKEN branch gets the "unset IB_TOKEN" hint (fb#2056).
+        envToken: auth.source === "env" && opts.embeddedToken === undefined,
         // Refresh-and-persist only for the normal (non-ephemeral) session. An
         // ephemeral `--company` token is single-command and bound to a different
         // company — persisting a refreshed copy would clobber the saved active

@@ -69,6 +69,46 @@ describe("createCliContext", () => {
     expect(ctx.personId).toBe(42);
     expect(ctx.ownerAsiakasId).toBe(1349);
   });
+
+  // fb#2033/fb#2056: only a token that really came from IB_TOKEN gets the
+  // "unset IB_TOKEN" 401 hint — an embedded caller's token wins over a host
+  // IB_TOKEN, so unsetting it could not help that caller.
+  describe("401 hint names IB_TOKEN only for an IB_TOKEN session", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJwZXJzb25JZCI6MX0.sig";
+    let savedEnv: string | undefined;
+    beforeEach(() => {
+      savedEnv = process.env.IB_TOKEN;
+      process.env.IB_TOKEN = jwt;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response("{}", { status: 401, headers: { "content-type": "application/json" } }))
+      );
+    });
+    afterEach(() => {
+      if (savedEnv === undefined) delete process.env.IB_TOKEN;
+      else process.env.IB_TOKEN = savedEnv;
+      vi.unstubAllGlobals();
+    });
+
+    async function hintFor(embeddedToken?: string): Promise<string | undefined> {
+      const ctx = await createCliContext({
+        credentialsPath: join(dir, "missing.json"),
+        version: "1.0.0",
+        global: EMPTY_GLOBAL,
+        embeddedToken,
+      });
+      const err = (await ctx.client!.get("/api/x").catch((e) => e)) as CliError;
+      return err.hint;
+    }
+
+    test("IB_TOKEN session → IB_TOKEN hint", async () => {
+      expect(await hintFor()).toMatch(/IB_TOKEN is set and was rejected/);
+    });
+
+    test("embedded caller token with a host IB_TOKEN set → no IB_TOKEN hint", async () => {
+      expect(await hintFor(jwt)).toBeUndefined();
+    });
+  });
 });
 
 // feedback #311: a --company switch 403 must NOT inherit the running command's
