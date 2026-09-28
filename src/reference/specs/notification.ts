@@ -47,7 +47,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
   {
     command: "ib notification email send",
     description:
-      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
+      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute, juha=juha.urho@ibetoni.fi owner-only); --bcc adds one blind copy. One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
     tier: "admin",
     permissions: [
       "company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced)",
@@ -119,7 +119,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       "A SendGrid send failure returns 422 with the real provider message (the CDN masks origin 5xx, so 4xx is used to keep the message readable) — it is NOT a caller auth/validation error despite the 4xx code.",
       "--from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.",
       "Useful for spam-score testing: send to a mail-tester.com address and read the SPF/DKIM/DMARC + SpamAssassin score.",
-      "Deploy-gated: the /api/cli/notification/email/send route must be deployed before this works.",
+      "Deploy-gated: a pre-cbd66b1e1 backend silently drops --bcc and 400s --from-brand juha.",
     ],
     seeAlso: ["ib notification fcm send", "ib person email list"],
     examples: [
