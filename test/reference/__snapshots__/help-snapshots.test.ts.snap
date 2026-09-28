@@ -10478,7 +10478,8 @@ FLAGS
   --body STRING    Plain-text body (auto-wrapped to HTML)
   --html STRING    Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)
   --html-body STRING    Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)
-  --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
+  --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi), betonijerry (noreply@betonijerry.fi), or juha (juha.urho@ibetoni.fi — owner's own account only)
+  --bcc STRING    One blind-copy address (e.g. your own, to keep a copy of what you sent)
   --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
@@ -10492,11 +10493,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)
+  { sent:true, to, from, bcc?, subject } | { dryRun:true, wouldSend:{ to, from, bcc?, subject, hasHtml } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, recipient has no email on file, or both/neither of personId+email → supply --subject, one of --body/--html/--html-body, and a valid --from-brand
-  exit 3 (HTTP 403)  Not Admin/HR/developer → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist, or use a developer/sysadmin token
+  exit 4 (HTTP 400)  Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, invalid --bcc, recipient has no email on file, or both/neither of personId+email → supply --subject, one of --body/--html/--html-body, a valid --from-brand, and a single valid --bcc address
+  exit 3 (HTTP 403)  Not Admin/HR/developer, or --from-brand juha used by anyone but its owner (or under impersonation) → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist, or use a developer/sysadmin token
   exit 5 (HTTP 404)  Recipient personId not found in your company → check the personId / name belongs to your company
   exit 4 (HTTP 422)  Email provider (SendGrid) rejected the send — e.g. the From address/domain is not a verified Sender Identity (notably --from-brand betonijerry until betonijerry.fi is authenticated in SendGrid) → a provider/config issue, not your request — authenticate the sending domain in SendGrid (Sender Authentication); the exact SendGrid reason is in the error message
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10517,6 +10518,7 @@ EXAMPLES
   ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html
   ib notification email send 5351 --subject Raportti --html-body '<h1>Aamuraportti</h1><p>…</p>' --reason 'morning report over MCP'
   ib notification email send 5351 --subject Test --body Hi --dry-run
+  ib notification email send asiakas@example.fi --subject Tarjous --html ./tarjous.html --from-brand juha --bcc juha.urho@ibetoni.fi
 "
 `;
 

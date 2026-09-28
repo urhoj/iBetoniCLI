@@ -151,6 +151,20 @@ describe("runNotificationEmailSend", () => {
       { headers: {} }
     );
   });
+
+  test("--bcc + personal brand are forwarded in the body", async () => {
+    post().mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(
+      c,
+      { recipient: "x@y.fi", subject: "S", text: "B", fromBrand: "juha", bcc: "juha.urho@ibetoni.fi" },
+      {}
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "juha", text: "B", bcc: "juha.urho@ibetoni.fi", email: "x@y.fi" },
+      { headers: {} }
+    );
+  });
 });
 
 describe("resolveEmailHtml", () => {

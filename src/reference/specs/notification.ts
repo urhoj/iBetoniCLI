@@ -78,23 +78,28 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
         name: "from-brand",
         type: "string",
         description:
-          "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
+          "Sender identity: betoni (default, noreply@ibetoni.fi), betonijerry (noreply@betonijerry.fi), or juha (juha.urho@ibetoni.fi — owner's own account only)",
+      },
+      {
+        name: "bcc",
+        type: "string",
+        description: "One blind-copy address (e.g. your own, to keep a copy of what you sent)",
       },
       FROM_JSON_FLAGS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "{ sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)",
+      "{ sent:true, to, from, bcc?, subject } | { dryRun:true, wouldSend:{ to, from, bcc?, subject, hasHtml } } (with --dry-run)",
     errors: [
       apiErr(
         400,
-        "Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, recipient has no email on file, or both/neither of personId+email",
-        "supply --subject, one of --body/--html/--html-body, and a valid --from-brand"
+        "Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, invalid --bcc, recipient has no email on file, or both/neither of personId+email",
+        "supply --subject, one of --body/--html/--html-body, a valid --from-brand, and a single valid --bcc address"
       ),
       apiErr(
         403,
-        "Not Admin/HR/developer",
+        "Not Admin/HR/developer, or --from-brand juha used by anyone but its owner (or under impersonation)",
         "`--company <ownerId>` where you are admin/HR for one command, or `ib company switch` to persist, or use a developer/sysadmin token"
       ),
       apiErr(
@@ -122,6 +127,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       "ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html",
       "ib notification email send 5351 --subject Raportti --html-body '<h1>Aamuraportti</h1><p>…</p>' --reason 'morning report over MCP'",
       "ib notification email send 5351 --subject Test --body Hi --dry-run",
+      "ib notification email send asiakas@example.fi --subject Tarjous --html ./tarjous.html --from-brand juha --bcc juha.urho@ibetoni.fi",
     ],
   },
 ];

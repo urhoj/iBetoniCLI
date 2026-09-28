@@ -51,6 +51,7 @@ export async function runNotificationFcmSend(client, input, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+const EMAIL_BRANDS = ["betoni", "betonijerry", "juha"];
 /**
  * POST /api/cli/notification/email/send — send an email to one person (resolved
  * within the caller's company) or a raw address. Admin/HR/developer-gated
@@ -66,6 +67,8 @@ export async function runNotificationEmailSend(client, input, flags) {
         body.text = input.text;
     if (input.html !== undefined)
         body.html = input.html;
+    if (input.bcc !== undefined)
+        body.bcc = input.bcc;
     const r = input.recipient.trim();
     if (r.includes("@")) {
         body.email = r;
@@ -151,6 +154,7 @@ export function registerNotificationCommands(parent, getClient) {
         .option("--html <file>")
         .option("--html-body <html>")
         .option("--from-brand <brand>", "", "betoni")
+        .option("--bcc <email>")
         .option("--from-json <file>");
     addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts, cmd) => {
         applyFromJson(cmd, opts, EMAIL_SEND_FROM_JSON);
@@ -160,10 +164,10 @@ export function registerNotificationCommands(parent, getClient) {
         }
         // Commander's default ("betoni", registered on the option) makes fromBrand
         // always defined here.
-        assertEnum(opts.fromBrand, ["betoni", "betonijerry"], "--from-brand");
+        assertEnum(opts.fromBrand, EMAIL_BRANDS, "--from-brand");
         const brand = opts.fromBrand;
         const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
-        const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, opts);
+        const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand, bcc: opts.bcc }, opts);
         writeJson(result);
     }));
 }

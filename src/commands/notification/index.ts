@@ -83,8 +83,12 @@ export interface NotifyEmailInput {
   subject: string;
   text?: string;
   html?: string;
-  fromBrand?: "betoni" | "betonijerry";
+  fromBrand?: EmailBrand;
+  bcc?: string;
 }
+
+const EMAIL_BRANDS = ["betoni", "betonijerry", "juha"] as const;
+type EmailBrand = (typeof EMAIL_BRANDS)[number];
 
 /**
  * POST /api/cli/notification/email/send — send an email to one person (resolved
@@ -103,6 +107,7 @@ export async function runNotificationEmailSend(
   };
   if (input.text !== undefined) body.text = input.text;
   if (input.html !== undefined) body.html = input.html;
+  if (input.bcc !== undefined) body.bcc = input.bcc;
 
   const r = input.recipient.trim();
   if (r.includes("@")) {
@@ -223,6 +228,7 @@ export function registerNotificationCommands(
       "",
       "betoni"
     )
+    .option("--bcc <email>")
     .option("--from-json <file>");
   addWriteFlagsToCommand(emailSend).action(
     guarded(async (
@@ -233,6 +239,7 @@ export function registerNotificationCommands(
         html?: string;
         htmlBody?: string;
         fromBrand?: string;
+        bcc?: string;
         fromJson?: string;
       },
       cmd: Command
@@ -244,12 +251,12 @@ export function registerNotificationCommands(
       }
       // Commander's default ("betoni", registered on the option) makes fromBrand
       // always defined here.
-      assertEnum(opts.fromBrand, ["betoni", "betonijerry"], "--from-brand");
-      const brand = opts.fromBrand as "betoni" | "betonijerry";
+      assertEnum(opts.fromBrand, EMAIL_BRANDS, "--from-brand");
+      const brand = opts.fromBrand as EmailBrand;
       const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
       const result = await runNotificationEmailSend(
         await getClient(),
-        { recipient, subject: opts.subject as string, text: opts.body, html, fromBrand: brand },
+        { recipient, subject: opts.subject as string, text: opts.body, html, fromBrand: brand, bcc: opts.bcc },
         opts
       );
       writeJson(result);
