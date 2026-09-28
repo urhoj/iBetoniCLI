@@ -189,6 +189,7 @@ export async function createCliContext(opts: {
     quiet: opts.global.quiet,
     verbose: opts.global.verbose,
     printPayload: opts.global.printPayload,
+    envToken: auth.source === "env" && process.env.IB_TOKEN !== undefined,
     // Refresh-and-persist only for the normal (non-ephemeral) session. An
     // ephemeral `--company` token is single-command and bound to a different
     // company — persisting a refreshed copy would clobber the saved active

@@ -426,6 +426,27 @@ describe("ib schema", () => {
       });
     });
 
+    // fb#2046: a prefix-sharing name used to win over the obviously closer one.
+    test("the closer name is offered alongside the prefix-sharing one", async () => {
+      post().mockRejectedValueOnce(new CliError("SQL error: Invalid object name 'grid_palkki'.", 400, null, 4));
+      get()
+        .mockResolvedValueOnce({ items: [{ name: "grid_palkkiTypes" }, { name: "grid_palkit" }], nextCursor: null, count: 2 })
+        .mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM grid_palkki")).rejects.toMatchObject({
+        hint: expect.stringContaining("did you mean dbo.grid_palkit or dbo.grid_palkkiTypes?"),
+      });
+    });
+
+    test("a column typo ignoring the underscore convention finds grid_palkki_Id (fb#2046)", async () => {
+      post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'palkkiId'.", 400, null, 4));
+      get().mockResolvedValueOnce({ columns: [{ name: "keikkaId" }, { name: "grid_palkki_Id" }] });
+
+      await expect(runSchemaQuery(mockClient, "SELECT * FROM grid_palkit WHERE palkkiId = 1")).rejects.toMatchObject({
+        hint: expect.stringContaining("did you mean grid_palkit.grid_palkki_Id"),
+      });
+    });
+
     // dbo holds ~250 tables against a 200-row default page (fb#1483 follow-up,
     // caught live: the suggestion still "worked" by luck on a name inside the
     // first page, but fired a nonsensical TRUNCATED stderr warning and would
@@ -465,7 +486,7 @@ describe("ib schema", () => {
 
         await expect(runSchemaQuery(mockClient, "SELECT keikkaTila FROM dbo.keikka k")).rejects.toMatchObject({
           message: "SQL error: Invalid column name 'keikkaTila'.",
-          hint: expect.stringContaining("did you mean keikka.keikkaTilaId?"),
+          hint: expect.stringContaining("did you mean keikka.keikkaTilaId"),
         });
         expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/keikka");
       });
@@ -492,7 +513,7 @@ describe("ib schema", () => {
 
         await expect(
           runSchemaQuery(mockClient, "SELECT regNo FROM keikka k JOIN vehicle v ON v.vehicleId = k.vehicleId")
-        ).rejects.toMatchObject({ hint: expect.stringContaining("did you mean vehicle.vehicleRegNo?") });
+        ).rejects.toMatchObject({ hint: expect.stringContaining("did you mean vehicle.vehicleRegNo") });
         expect(get()).toHaveBeenCalledTimes(2);
       });
 

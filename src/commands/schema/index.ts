@@ -10,7 +10,7 @@ import { cappedInt } from "../../targets.js";
 import { foldAliases } from "../_shared/flags.js";
 import { readTextInput } from "../../api/parseBody.js";
 import { failWith } from "../../output/json.js";
-import { closestName } from "../../output/nearest.js";
+import { nearestNames, orList } from "../../output/nearest.js";
 
 export interface SchemaListFilter {
   search?: string;
@@ -508,7 +508,7 @@ const INVALID_OBJECT_NAME_RE = /Invalid object name '([^']+)'/i;
  * textually plausible but semantically wrong (fb#1799): the real backing
  * table carries a feature-area prefix (`grid_`) that no prefix/substring/
  * edit-distance pass on the bare typed name can reach — `palkki` (6 chars)
- * is ~5 edits from `grid_palkit`, well past `closestName`'s
+ * is ~5 edits from `grid_palkit`, well past the matcher's
  * `max(2, floor(len/2))=3` threshold, while `palkkiAsiakas`/`palkkiPerson`
  * win the PREFIX pass purely because they happen to literally start with the
  * typed string despite being unrelated junction tables. Keyed by the bare
@@ -546,12 +546,15 @@ async function nearestObjectNameSuggestion(client: ApiClient, badName: string): 
     .map((r) => (r as Record_).name)
     .filter((n): n is string => typeof n === "string");
   const overrideTarget = OBJECT_NAME_DID_YOU_MEAN_OVERRIDES[bare.toLowerCase()];
-  // {} not the default VERB_SYNONYMS table (add/create/show/get…) — meaningless
-  // for a SQL object name and only ever a copy-paste artifact from the
-  // command-name did-you-mean use case (bug-review finding on fb#1483).
-  const match =
-    overrideTarget && names.includes(overrideTarget) ? overrideTarget : closestName(bare, names, {});
-  return match ? `did you mean dbo.${match}? (nearest name in the live table/view list)` : null;
+  // Several candidates, not one (fb#2046): no single ranking picks right for
+  // every irregular name, so the caller gets the top 3 to choose from.
+  const matches =
+    overrideTarget && names.includes(overrideTarget)
+      ? [overrideTarget, ...nearestNames(bare, names).filter((n) => n !== overrideTarget)].slice(0, 3)
+      : nearestNames(bare, names);
+  return matches.length
+    ? `did you mean ${orList(matches.map((m) => `dbo.${m}`))}? (nearest names in the live table/view list)`
+    : null;
 }
 
 /** SQL Server 207, forwarded verbatim like 208 above — captures the quoted column name. */
@@ -615,8 +618,9 @@ async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: s
   const known = columnsByTable.filter((t) => t.columns.length);
   if (!known.length) return null;
   for (const { table, columns } of known) {
-    const match = closestName(badColumn, columns, {});
-    if (match) return `did you mean ${table}.${match}? (nearest column in ${known.map((t) => t.table).join(", ")})`;
+    const matches = nearestNames(badColumn, columns);
+    if (matches.length)
+      return `did you mean ${orList(matches.map((m) => `${table}.${m}`))}? (nearest columns in ${known.map((t) => t.table).join(", ")})`;
   }
   const listing = known
     .map(({ table, columns }) => {

@@ -77,7 +77,7 @@ export function sanitizeHeaderValue(value) {
  */
 const NETWORK_RETRY_BACKOFF_MS = [250, 750];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, verbose = false, printPayload = false, }) {
+export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, verbose = false, printPayload = false, envToken = false, }) {
     const platform = `${process.platform} node-${process.versions.node}`;
     const userAgent = `ib-cli/${version} (${platform})`;
     let currentToken = token;
@@ -309,7 +309,9 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
                 warnNote(`[ib] HTTP ${res.status} ${method} ${endpoint}${path} · request-id ${lastRequestId}` +
                     (rawBody && rawBody !== "null" ? ` · body ${rawBody}` : ""));
             }
-            throw new CliError(errorMessageFromBody(parsed, res.status, contentType), res.status, parsed, exitCodeFromStatus(res.status));
+            throw new CliError(errorMessageFromBody(parsed, res.status, contentType), res.status, parsed, exitCodeFromStatus(res.status), res.status === 401 && envToken
+                ? `IB_TOKEN is set and was rejected by ${endpoint} — env tokens are not refreshable, and it may have been minted for a different backend (e.g. by mint-local-token.js): pass the matching --endpoint, or unset IB_TOKEN to use your stored session`
+                : undefined);
         }
         // Dry-run post-condition. EVERY handler that honours `X-Dry-Run` answers with
         // a top-level `dryRun: true` — via `middleware/dryRun.js` `respond()` or the

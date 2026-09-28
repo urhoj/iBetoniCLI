@@ -171,9 +171,39 @@ describe("ApiClient auto-refresh on 401", () => {
       onRefresh: vi.fn().mockRejectedValue(mismatch),
     });
 
-    const err = await client.get("/api/something").catch((e) => e);
+    const err = (await client.get("/api/something").catch((e) => e)) as CliError;
     expect(err).toBe(mismatch);
     expect((err as CliError).hint).toContain("ib auth login --endpoint");
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ApiClient 401 on an IB_TOKEN session (fb#2033)", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  const unauthorized = () =>
+    new Response(JSON.stringify({ error: "INVALID_TOKEN" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+
+  test("an env token's 401 names IB_TOKEN and the endpoint, not the dead-end `ib auth refresh`", async () => {
+    mockFetch.mockResolvedValueOnce(unauthorized());
+    const client = createApiClient({ endpoint: "https://api.example.com", token: "eyJenv", version: "1.0.0", envToken: true });
+    const err = (await client.get("/api/something").catch((e) => e)) as CliError;
+    expect(err).toBeInstanceOf(CliError);
+    expect(err.exitCode).toBe(2);
+    expect(err.hint).toMatch(/IB_TOKEN is set and was rejected by https:\/\/api\.example\.com/);
+    expect(err.hint).toMatch(/--endpoint/);
+    expect(err.hint).not.toMatch(/auth refresh/);
+  });
+
+  test("a non-env session without a refresh path keeps the generic 401 remedy", async () => {
+    mockFetch.mockResolvedValueOnce(unauthorized());
+    const client = createApiClient({ endpoint: "https://api.example.com", token: "eyJx", version: "1.0.0" });
+    const err = (await client.get("/api/something").catch((e) => e)) as CliError;
+    expect(err.hint).toBeUndefined();
   });
 });

@@ -188,3 +188,46 @@ export function closestName(
   }
   return null;
 }
+
+/** `a` is `b` with letters only DELETED — i.e. `b` extends what was typed. */
+function isSubsequence(a: string, b: string): boolean {
+  let i = 0;
+  for (const ch of b) if (ch === a[i]) i++;
+  return i === a.length;
+}
+
+/**
+ * Up to `max` near names for an identifier typo (fb#2046) — SQL table and
+ * column names, where no single rule picks the right one: `grid_palkki` wants
+ * the edit-distance winner `grid_palkit`, while `betomikOrderbookRow` wants
+ * the name it is an abbreviation of, `betomikOrderbookImportRow`, which edit
+ * distance ranks below `betomikOrderbookAudit`. So both are offered: the
+ * edit-distance ranking, with the shortest name EXTENDING the typed one
+ * (letters inserted anywhere) guaranteed a slot. Case and `_` are ignored
+ * (`palkkiId` ~ `grid_palkki_Id`). An exact match modulo those returns alone.
+ */
+export function nearestNames(target: string, names: string[], max = 3): string[] {
+  const norm = (s: string) => s.toLowerCase().replace(/_/g, "");
+  const t = norm(target);
+  if (!t) return [];
+  const exact = names.find((n) => norm(n) === t);
+  if (exact) return [exact];
+  const threshold = Math.max(2, Math.floor(t.length / 2));
+  const scored = names.map((n) => {
+    const nn = norm(n);
+    return { n, d: levenshtein(t, nn), ext: t.length >= 2 && isSubsequence(t, nn) };
+  });
+  const ranked = scored
+    .filter((s) => s.d <= threshold)
+    .sort((a, b) => a.d - b.d || Number(b.ext) - Number(a.ext) || a.n.length - b.n.length || a.n.localeCompare(b.n));
+  const extension = scored
+    .filter((s) => s.ext)
+    .sort((a, b) => a.n.length - b.n.length || a.n.localeCompare(b.n))[0];
+  const order = [ranked[0], extension, ...ranked.slice(1)].filter(Boolean).map((s) => s!.n);
+  return [...new Set(order)].slice(0, max);
+}
+
+/** `a`, `a or b`, `a, b or c` — the did-you-mean list rendering. */
+export function orList(items: string[]): string {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+}

@@ -340,7 +340,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
-      "--status takes the numeric keikkaTilaId, NOT a name — e.g. `--status 9` (Toimitettu), `--status 8` (Peruttu), `--status 2` (Lähetetty). See the legend on `ib keikka list --help` or the `tila` GLOSSARY entry on `ib --help`.",
+      "--status takes the numeric keikkaTilaId, NOT a name — e.g. `--status 9` (Toimitettu), `--status 8` (Peruttu), `--status 2` (Lähetetty). See the legend on `ib keikka list --help` or `ib keikka tilat`.",
       "A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.",
       "Time flags read the row first (pvm/time) to fill what you omit: `--date` alone keeps the clock time, `--end` alone recomputes pumppuKesto from the current start. `--vehicle` alone makes no read.",
       "A re-point uses the grid's procs; betoniMatka is recomputed. Unlike a merge, the old customer/worksite is kept.",

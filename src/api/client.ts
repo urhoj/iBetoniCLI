@@ -110,6 +110,13 @@ interface ApiClientOptions {
    * `quiet`.
    */
   printPayload?: boolean;
+  /**
+   * The token came from `IB_TOKEN` (fb#2033). Such a session has no refresh
+   * path, so the generic 401 remedy `ib auth refresh` is a dead end; a 401 is
+   * instead most often a token minted for ANOTHER backend (mint-local-token.js)
+   * left in the env — the error says that and names the way out.
+   */
+  envToken?: boolean;
 }
 
 interface FetchOptions {
@@ -175,6 +182,7 @@ export function createApiClient({
   quiet = false,
   verbose = false,
   printPayload = false,
+  envToken = false,
 }: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
@@ -458,7 +466,10 @@ export function createApiClient({
         errorMessageFromBody(parsed, res.status, contentType),
         res.status,
         parsed,
-        exitCodeFromStatus(res.status)
+        exitCodeFromStatus(res.status),
+        res.status === 401 && envToken
+          ? `IB_TOKEN is set and was rejected by ${endpoint} — env tokens are not refreshable, and it may have been minted for a different backend (e.g. by mint-local-token.js): pass the matching --endpoint, or unset IB_TOKEN to use your stored session`
+          : undefined
       );
     }
     // Dry-run post-condition. EVERY handler that honours `X-Dry-Run` answers with
