@@ -4,6 +4,7 @@ import {
   enableParserThrow,
   handleParseRejection,
   applySpecErrors,
+  glossaryLookupFor,
 } from "../program.js";
 import { getGlobalOptions } from "../globals.js";
 import { enableStats, flushStats } from "../stats.js";
@@ -13,7 +14,6 @@ import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 import { normalizeSingleDashLongFlags } from "../argv.js";
-import { makeGlossaryLookup } from "../output/glossaryRedirect.js";
 
 // Start the credentials read BEFORE the module-loading program build — the two
 // are independent, so the file IO overlaps the imports instead of serializing
@@ -71,11 +71,7 @@ await program.parseAsync(["node", "ib", ...argv]).catch(async (err) => {
   // already failed, so this can only ever affect an error render, never flip a
   // successful command's stdout out of JSON.
   if (program.opts().pretty) setOutputMode("pretty");
-  // The unknown-root-command glossary fallback (fb#2044) needs the session.
-  const auth = await authPromise;
-  const endpoint = (program.opts().endpoint as string | undefined) ?? auth?.endpoint;
-  const glossaryLookup = makeGlossaryLookup(auth && endpoint ? { token: auth.token, endpoint } : null);
-  await handleParseRejection(err, { ...parserHooks, glossaryLookup });
+  await handleParseRejection(err, { ...parserHooks, glossaryLookup: glossaryLookupFor(program) });
 });
 // Same reason: `getGlobalOptions` here threw a raw CliError stack trace past the
 // handled envelope on `ib … --company abc`, clobbering exit 4 with exit 1.

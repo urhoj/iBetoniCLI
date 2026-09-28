@@ -32,7 +32,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
-import { withGlossaryRedirect, type GlossaryLookup } from "./output/glossaryRedirect.js";
+import { withGlossaryRedirect, glossaryLookupVia, type GlossaryLookup } from "./output/glossaryRedirect.js";
 import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
@@ -48,6 +48,18 @@ interface Invocation {
   global: GlobalOptions;
   /** The embedded caller's JWT; absent in normal CLI mode. */
   embeddedToken?: string;
+}
+
+const GLOSSARY_LOOKUPS = new WeakMap<Command, GlossaryLookup>();
+
+/**
+ * The unknown-root-command glossary lookup of a built program, over its own
+ * `getClient` (fb#2044, fb#2058). Opt-in: only bin/ib.ts and runArgv.ts pass it
+ * to {@link handleParseRejection}, so tests that build the real program never
+ * make a live call with the developer's own session.
+ */
+export function glossaryLookupFor(program: Command): GlossaryLookup | undefined {
+  return GLOSSARY_LOOKUPS.get(program);
 }
 
 /**
@@ -176,6 +188,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   }
 
   const getClient = (): Promise<ApiClient> => clientFrom(invocation());
+  GLOSSARY_LOOKUPS.set(program, glossaryLookupVia(getClient));
 
   // A client bound to a SPECIFIC company via an ephemeral switch (never
   // persisted). Reuses the same tested switch path and inherits
@@ -824,6 +837,10 @@ function emitUsageEnvelope<T extends { error: string; hint: string }>(
  *    usage errors ARE validation errors, and agents get one uniform error
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
+ *
+ * ASYNC only for one branch: an unknown ROOT command no offline layer answers
+ * may await the `glossaryLookup` hook (a network GET, fb#2044). Without the
+ * hook every branch completes before the first await, i.e. synchronously.
  */
 export async function handleParseRejection(
   err: unknown,
@@ -871,8 +888,9 @@ export async function handleParseRejection(
           "";
         let envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
         // Last resort, root only (fb#2044): a Finnish domain word the glossary
-        // maps to a command. Skipped without a session, so offline and test
-        // callers stay synchronous.
+        // maps to a command. Only when the caller passes the hook (bin/runArgv);
+        // tests that omit it stay synchronous. Without a session the lookup
+        // throws and answers nothing.
         if (glossaryLookup) envelope = await withGlossaryRedirect(envelope, cmd, glossaryLookup, getCallerTier());
         return emitUsageEnvelope(err, envelope, usageEnvelopeResolves(envelope));
       }

@@ -31,11 +31,21 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT } from "./output/validationEnvelope.js";
-import { withGlossaryRedirect } from "./output/glossaryRedirect.js";
+import { withGlossaryRedirect, glossaryLookupVia } from "./output/glossaryRedirect.js";
 import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
+const GLOSSARY_LOOKUPS = new WeakMap();
+/**
+ * The unknown-root-command glossary lookup of a built program, over its own
+ * `getClient` (fb#2044, fb#2058). Opt-in: only bin/ib.ts and runArgv.ts pass it
+ * to {@link handleParseRejection}, so tests that build the real program never
+ * make a live call with the developer's own session.
+ */
+export function glossaryLookupFor(program) {
+    return GLOSSARY_LOOKUPS.get(program);
+}
 /**
  * Construct the `ib` program with rich (`CommandSpec`-driven) `--help` attached.
  * Does not parse argv.
@@ -154,6 +164,7 @@ export async function buildProgram(argv) {
         return ctx.client;
     }
     const getClient = () => clientFrom(invocation());
+    GLOSSARY_LOOKUPS.set(program, glossaryLookupVia(getClient));
     // A client bound to a SPECIFIC company via an ephemeral switch (never
     // persisted). Reuses the same tested switch path and inherits
     // read-only/endpoint/version — and, in embedded mode, derives from the
@@ -669,6 +680,10 @@ function emitUsageEnvelope(err, env, resolvedUsage = false) {
  *    usage errors ARE validation errors, and agents get one uniform error
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
+ *
+ * ASYNC only for one branch: an unknown ROOT command no offline layer answers
+ * may await the `glossaryLookup` hook (a network GET, fb#2044). Without the
+ * hook every branch completes before the first await, i.e. synchronously.
  */
 export async function handleParseRejection(err, hooks = {}) {
     const { parserText, erroringCommand, dispatchedCommand, glossaryLookup } = hooks;
@@ -714,8 +729,9 @@ export async function handleParseRejection(err, hooks = {}) {
                     "";
                 let envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
                 // Last resort, root only (fb#2044): a Finnish domain word the glossary
-                // maps to a command. Skipped without a session, so offline and test
-                // callers stay synchronous.
+                // maps to a command. Only when the caller passes the hook (bin/runArgv);
+                // tests that omit it stay synchronous. Without a session the lookup
+                // throws and answers nothing.
                 if (glossaryLookup)
                     envelope = await withGlossaryRedirect(envelope, cmd, glossaryLookup, getCallerTier());
                 return emitUsageEnvelope(err, envelope, usageEnvelopeResolves(envelope));
