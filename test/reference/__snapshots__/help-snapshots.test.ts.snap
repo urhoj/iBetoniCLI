@@ -14684,10 +14684,10 @@ OUTPUT (JSON, stdout)
   No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName}], roster[{personId,name}].
 
 ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 3 (HTTP 403)  --iso-week: not a company admin of the active company → log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>
   exit 4 (client-side)  Malformed --iso-week, or combined with --by/--all → pass --iso-week YYYY-WW (e.g. 2026-39) on its own
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
   - Default range is today. Exactly one of --today/--month/--week/(--from & --to).

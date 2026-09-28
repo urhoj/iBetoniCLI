@@ -515,9 +515,9 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     outputShape:
       "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName}], roster[{personId,name}].",
     errors: [
-      ...COMMON_AUTH_ERRORS,
-      { http: 403, exit: 3, meaning: "--iso-week: not a company admin of the active company", remedy: "log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>" },
+      { http: 403, exit: 3, match: "Viikkotilastot", meaning: "--iso-week: not a company admin of the active company", remedy: "log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>" },
       { origin: "client", exit: 4, match: "--iso-week", meaning: "Malformed --iso-week, or combined with --by/--all", remedy: "pass --iso-week YYYY-WW (e.g. 2026-39) on its own" },
+      ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
