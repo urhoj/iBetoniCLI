@@ -154,7 +154,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // 838_000 → 840_000 (2026-09-25): `ib keikka update --customer/--worksite/--plant
 // [--supplier]` (fb#1943, fb#1986) — four flags, five exit-4 rows, one note, two
 // examples (+~1.4 KB). Note trimmed once. Measured 839 337 B. Headroom ~663 B.
-const DUMP_LIMIT_BYTES = 840_000;
+// 840_000 → 841_000 (2026-09-28): `ib stats --iso-week` (GET /api/stat/weekly) —
+// one flag, two exit rows, an expanded outputShape, one example. Measured 840 665 B.
+const DUMP_LIMIT_BYTES = 841_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

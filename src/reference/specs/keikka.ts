@@ -508,12 +508,17 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "today", type: "boolean", description: "Shortcut for --from today --to today" },
       { name: "month", type: "string", description: "Whole calendar month YYYY-MM (expands to first→last day)" },
       { name: "week", type: "date", description: "7-day window starting <start>" },
+      { name: "iso-week", type: "string", description: "ISO week YYYY-WW of the ACTIVE company's own orders (GET /api/stat/weekly, company admins only, Helsinki Mon–Sun); adds days per vehicle/driver, fleet and roster. Excludes the other period flags, --by and --all" },
       { name: "by", type: "string", description: "Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)", allowed: ["customer", "vehicle", "driver", "worksite", "status", "day"] },
       { name: "all", type: "boolean", description: "All tenants (requires developer/system-admin access; 403 otherwise)" },
     ],
     outputShape:
-      "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.",
-    errors: COMMON_AUTH_ERRORS,
+      "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName}], roster[{personId,name}].",
+    errors: [
+      ...COMMON_AUTH_ERRORS,
+      { http: 403, exit: 3, meaning: "--iso-week: not a company admin of the active company", remedy: "log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>" },
+      { origin: "client", exit: 4, match: "--iso-week", meaning: "Malformed --iso-week, or combined with --by/--all", remedy: "pass --iso-week YYYY-WW (e.g. 2026-39) on its own" },
+    ],
     notes: [
       "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
       "Deploy-gated: returns 404 until GET /api/cli/stats is deployed.",
@@ -526,6 +531,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib stats --from 2026-06-01 --to 2026-06-07 --by driver",
       "ib stats --today --pretty",
       "ib stats --today --all",
+      "ib stats --iso-week 2026-39 --company 27",
     ],
   },
 ];

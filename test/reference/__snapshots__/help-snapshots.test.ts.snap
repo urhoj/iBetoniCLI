@@ -14672,6 +14672,7 @@ FLAGS
   --today    Shortcut for --from today --to today
   --month STRING    Whole calendar month YYYY-MM (expands to first→last day)
   --week DATE    7-day window starting <start>
+  --iso-week STRING    ISO week YYYY-WW of the ACTIVE company's own orders (GET /api/stat/weekly, company admins only, Helsinki Mon–Sun); adds days per vehicle/driver, fleet and roster. Excludes the other period flags, --by and --all
   --by STRING    Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)
   --all    All tenants (requires developer/system-admin access; 403 otherwise)
 
@@ -14680,11 +14681,13 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.
+  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName}], roster[{personId,name}].
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  --iso-week: not a company admin of the active company → log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>
+  exit 4 (client-side)  Malformed --iso-week, or combined with --by/--all → pass --iso-week YYYY-WW (e.g. 2026-39) on its own
 
 NOTES
   - Default range is today. Exactly one of --today/--month/--week/(--from & --to).
@@ -14698,6 +14701,7 @@ EXAMPLES
   ib stats --from 2026-06-01 --to 2026-06-07 --by driver
   ib stats --today --pretty
   ib stats --today --all
+  ib stats --iso-week 2026-39 --company 27
 "
 `;
 

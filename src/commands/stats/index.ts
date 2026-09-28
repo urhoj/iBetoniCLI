@@ -13,6 +13,7 @@ export interface StatsOptions {
   today?: boolean;
   month?: string;
   week?: string;
+  isoWeek?: string;
   by?: string;
   all?: boolean;
 }
@@ -27,9 +28,10 @@ export function resolveStatsPeriod(opts: StatsOptions): { from: string; to: stri
     (opts.today ? 1 : 0) +
     (opts.month ? 1 : 0) +
     (opts.week ? 1 : 0) +
+    (opts.isoWeek ? 1 : 0) +
     (opts.from || opts.to ? 1 : 0);
   if (groups > 1) {
-    throw new CliError("Use only one of --today / --month / --week / (--from & --to)", 0, null, 4);
+    throw new CliError("Use only one of --today / --month / --week / --iso-week / (--from & --to)", 0, null, 4);
   }
   // `--today` needs no branch: it is exactly the no-period default below.
   if (opts.month) return monthRange(opts.month);
@@ -46,6 +48,15 @@ export function resolveStatsPeriod(opts: StatsOptions): { from: string; to: stri
 
 /** GET /api/cli/stats. No --by → full bundle object; --by X → list envelope. */
 export async function runStats(client: ApiClient, opts: StatsOptions): Promise<unknown> {
+  if (opts.isoWeek) {
+    // A different route on purpose: the ACTIVE company's own orders only, company admins only,
+    // Helsinki Mon–Sun (GET /api/stat/weekly) — what the weekly viikkokatsaus and the Raportit
+    // Viikkotilastot page read, so the two never disagree.
+    resolveStatsPeriod(opts); // throws on a second period flag
+    if (opts.by || opts.all) throw new CliError("--iso-week cannot be combined with --by or --all", 0, null, 4);
+    if (!/^\d{4}-\d{2}$/.test(opts.isoWeek)) throw new CliError("--iso-week must be YYYY-WW, e.g. 2026-39", 0, null, 4);
+    return client.get<unknown>(`/api/stat/weekly${qs({ week: opts.isoWeek })}`);
+  }
   const { from, to } = resolveStatsPeriod(opts);
   if (opts.by) assertEnum(opts.by, STATS_DIMS, "--by");
   return client.get<unknown>(
@@ -70,6 +81,7 @@ export function registerStatsCommands(parent: Command, getClient: () => Promise<
     .option("--today")
     .option("--month <YYYY-MM>")
     .option("--week <start>")
+    .option("--iso-week <YYYY-WW>")
     .option("--by <dim>")
     .option("--all")
     .action(jsonAction(getClient, (client, opts: StatsOptions) => runStats(client, opts)));

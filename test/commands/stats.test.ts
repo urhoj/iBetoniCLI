@@ -51,3 +51,20 @@ describe("runStats", () => {
     expect(url).not.toContain("all=");
   });
 });
+
+describe("runStats --iso-week (company-scoped weekly route)", () => {
+  test("GETs /api/stat/weekly?week=", async () => {
+    await runStats(mockClient, { isoWeek: "2026-39" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/stat/weekly?week=2026-39");
+  });
+  test("rejects a malformed week before any network call", async () => {
+    await expect(runStats(mockClient, { isoWeek: "2026-9" })).rejects.toThrow(/YYYY-WW/);
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+  test("cannot be combined with another period flag, --by or --all", async () => {
+    expect(() => resolveStatsPeriod({ isoWeek: "2026-39", month: "2026-09" })).toThrow();
+    await expect(runStats(mockClient, { isoWeek: "2026-39", by: "vehicle" })).rejects.toThrow(/--iso-week/);
+    await expect(runStats(mockClient, { isoWeek: "2026-39", all: true })).rejects.toThrow(/--iso-week/);
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+});
