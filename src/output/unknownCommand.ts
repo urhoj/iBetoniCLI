@@ -1044,6 +1044,25 @@ function eatenEmptyStringFlag(cmd: Command): string | null {
 }
 
 /**
+ * Surplus positionals that are really FLAGS typed after a `--` terminator
+ * (fb#2060): everything after `--` is an operand, so `create -- "text"
+ * --columns id` strands `--columns id` as extra positionals. Only a token
+ * naming a real flag of this command chain (globals included) counts, so
+ * prose that merely starts with a dash is never misread as a misplaced flag.
+ */
+function flagsAfterTerminator(cmd: Command, excess: string[]): string[] {
+  const chain: Command[] = [];
+  for (let c: Command | null = cmd; c; c = c.parent) chain.push(c);
+  const root = chain[chain.length - 1];
+  const rawArgs = (root as unknown as { rawArgs?: string[] }).rawArgs ?? [];
+  const terminator = rawArgs.indexOf("--");
+  if (terminator < 0) return [];
+  const after = new Set(rawArgs.slice(terminator + 1));
+  const known = optionNamesIn(chain);
+  return excess.filter((t) => after.has(t) && known.has(t.split("=")[0]));
+}
+
+/**
  * Why the surplus positional exists, in one sentence — the applicable cause
  * ONLY. Both arms name PowerShell because both are PowerShell argument
  * mangling; which one fired is decided by {@link eatenEmptyStringFlag}.
@@ -1080,7 +1099,15 @@ export function buildExcessArgumentsEnvelope(
   const didYouMean = dated?.suggestion ?? null;
 
   const parts: string[] = [];
-  if (dated) {
+  const misplaced = flagsAfterTerminator(cmd, excess);
+  if (misplaced.length) {
+    // The real cause, so neither the --from-json remedy nor the PowerShell
+    // quote-split diagnosis applies (fb#2060).
+    const names = misplaced.map((f) => `\`${f}\``).join(", ");
+    parts.push(
+      `${names} came after the \`--\` separator, so it was read as a positional argument, not a flag. Move it before \`--\`: everything after \`--\` is literal.`
+    );
+  } else if (dated) {
     parts.push(
       `Did you mean \`${dated.suggestion}\`? A date is passed as a FLAG here, not a positional` +
         (dated.token !== dated.date ? ` (and the documented format is YYYY-MM-DD)` : "") +

@@ -722,6 +722,49 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
 // fix, which cost a filing agent a round-trip (fb#726). Lead with the treatment;
 // the diagnosis follows as explanation. Order is the whole point of these
 // assertions — both sentences were reachable before, only their rank was wrong.
+// fb#2060: everything after a `--` terminator is an operand, so a flag typed
+// there becomes a surplus positional. The hint used to blame PowerShell quote
+// splitting and lead with --from-json; the real fix is to move the flag.
+describe("buildExcessArgumentsEnvelope — a flag after the `--` separator (fb#2060)", () => {
+  const withRawArgs = (rawArgs: string[], fn: () => void) => {
+    const root = program as unknown as { rawArgs?: string[] };
+    const saved = root.rawArgs;
+    root.rawArgs = rawArgs;
+    try {
+      fn();
+    } finally {
+      root.rawArgs = saved;
+    }
+  };
+  const create = () => leafByPath("dev", "feedback", "create");
+
+  test("a known flag after `--` is named, with no PowerShell or --from-json diagnosis", () => {
+    withRawArgs(["dev", "feedback", "create", "--kind", "bug", "--", "text", "--columns", "feedbackId"], () => {
+      const env = buildExcessArgumentsEnvelope(create(), ["--columns", "feedbackId"], "too many arguments");
+      expect(env.hint.startsWith("`--columns` came after the `--` separator")).toBe(true);
+      expect(env.hint).toContain("Move it before `--`");
+      expect(env.hint).not.toContain("PowerShell");
+      expect(env.hint).not.toContain("Pass the report via --from-json");
+    });
+  });
+
+  test("a surplus positional with no `--` keeps the existing cause", () => {
+    withRawArgs(["dev", "feedback", "create", "line one", "line two"], () => {
+      const env = buildExcessArgumentsEnvelope(create(), ["line two"], "too many arguments");
+      expect(env.hint).not.toContain("separator");
+      expect(env.hint).toContain("Extra positional(s)");
+    });
+  });
+
+  test("a dash token after `--` that is not a real flag is not misread as a misplaced flag", () => {
+    withRawArgs(["dev", "feedback", "create", "--", "text", "--notaflag"], () => {
+      const env = buildExcessArgumentsEnvelope(create(), ["--notaflag"], "too many arguments");
+      expect(env.hint).not.toContain("separator");
+      expect(env.hint).toContain("Extra positional(s)");
+    });
+  });
+});
+
 describe("buildExcessArgumentsEnvelope — the curated remedy leads (fb#726)", () => {
   /** The remedy opens the hint AND precedes the cause sentence. */
   const leadsWith = (hint: string, remedy: string) =>
