@@ -8,6 +8,7 @@ import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 import { normalizeSingleDashLongFlags } from "../argv.js";
+import { makeGlossaryLookup } from "../output/glossaryRedirect.js";
 // Start the credentials read BEFORE the module-loading program build — the two
 // are independent, so the file IO overlaps the imports instead of serializing
 // after them. Awaited below for the tier. `.catch` here so an early rejection
@@ -51,7 +52,7 @@ try {
 catch {
     setCallerTier("standard");
 }
-await program.parseAsync(["node", "ib", ...argv]).catch((err) => {
+await program.parseAsync(["node", "ib", ...argv]).catch(async (err) => {
     // The preAction hook above never fired (no action ran), so the output mode is
     // still the JSON default — set it here or `--pretty` is a silent no-op on
     // every usage error. Commander consumes ROOT options before subcommand
@@ -63,7 +64,11 @@ await program.parseAsync(["node", "ib", ...argv]).catch((err) => {
     // successful command's stdout out of JSON.
     if (program.opts().pretty)
         setOutputMode("pretty");
-    handleParseRejection(err, parserHooks);
+    // The unknown-root-command glossary fallback (fb#2044) needs the session.
+    const auth = await authPromise;
+    const endpoint = program.opts().endpoint ?? auth?.endpoint;
+    const glossaryLookup = makeGlossaryLookup(auth && endpoint ? { token: auth.token, endpoint } : null);
+    await handleParseRejection(err, { ...parserHooks, glossaryLookup });
 });
 // Same reason: `getGlobalOptions` here threw a raw CliError stack trace past the
 // handled envelope on `ib … --company abc`, clobbering exit 4 with exit 1.

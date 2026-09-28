@@ -412,7 +412,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     notes: [
       "typeName is immutable after creation — choose carefully.",
-      "Deploy-gated: 404 until the backend ships POST /api/legal-documents/types.",
     ],
     seeAlso: ["ib legal type update", "ib legal types", "ib legal save"],
     examples: [
@@ -448,7 +447,6 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Clearing a value to NULL is not supported.",
-      "Deploy-gated: 404 until the backend ships PUT /api/legal-documents/types/:typeName.",
     ],
     seeAlso: ["ib legal type create", "ib legal types", "ib legal acceptances"],
     examples: [

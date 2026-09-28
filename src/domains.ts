@@ -176,7 +176,9 @@ export const STATIC_DOMAIN_TOKENS: ReadonlySet<string> = new Set(["reference", "
  * only that module instead of falling back to the full tree. One row per
  * alias; deliberately curated, not derived (a plural is a vocabulary decision,
  * and only OBSERVED misses earn one). Also holds Finnish domain words that
- * users observably type as the root (`tyomaa` → `worksite`).
+ * users observably type as the root (`tyomaa` → `worksite`). Do not grow the
+ * Finnish half: an unknown root word falls back to the glossary instead
+ * (output/glossaryRedirect.ts, fb#2044), which covers every term it defines.
  */
 export const PLURAL_DOMAIN_ALIASES: Readonly<Record<string, string>> = {
   vehicles: "vehicle",

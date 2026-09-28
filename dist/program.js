@@ -31,6 +31,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT } from "./output/validationEnvelope.js";
+import { withGlossaryRedirect } from "./output/glossaryRedirect.js";
 import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
@@ -669,8 +670,8 @@ function emitUsageEnvelope(err, env, resolvedUsage = false) {
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
  */
-export function handleParseRejection(err, hooks = {}) {
-    const { parserText, erroringCommand, dispatchedCommand } = hooks;
+export async function handleParseRejection(err, hooks = {}) {
+    const { parserText, erroringCommand, dispatchedCommand, glossaryLookup } = hooks;
     if (err instanceof CliError) {
         // A parse-time guard (an option/argument `argParser` calling `failWith`)
         // throws BEFORE the preAction hook that normally runs `applySpecErrors`, so
@@ -711,7 +712,12 @@ export function handleParseRejection(err, hooks = {}) {
                 const token = (Array.isArray(cmd.args) && cmd.args[0]) ||
                     text.match(/unknown command '([^']+)'/)?.[1] ||
                     "";
-                const envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+                let envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+                // Last resort, root only (fb#2044): a Finnish domain word the glossary
+                // maps to a command. Skipped without a session, so offline and test
+                // callers stay synchronous.
+                if (glossaryLookup)
+                    envelope = await withGlossaryRedirect(envelope, cmd, glossaryLookup, getCallerTier());
                 return emitUsageEnvelope(err, envelope, usageEnvelopeResolves(envelope));
             }
         }

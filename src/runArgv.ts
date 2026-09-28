@@ -5,6 +5,7 @@ import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
 import { getGlobalOptions } from "./globals.js";
 import { setListColumns, setProjectionColumns } from "./output/json.js";
 import { normalizeSingleDashLongFlags } from "./argv.js";
+import { makeGlossaryLookup } from "./output/glossaryRedirect.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -72,7 +73,10 @@ export async function runArgv(
     try {
       await program.parseAsync(["node", "ib", ...normArgv]);
     } catch (err) {
-      handleParseRejection(err, parserHooks);
+      await handleParseRejection(err, {
+        ...parserHooks,
+        glossaryLookup: makeGlossaryLookup({ token: opts.token, endpoint: opts.endpoint }),
+      });
     }
   });
 

@@ -5,6 +5,7 @@ import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
 import { getGlobalOptions } from "./globals.js";
 import { setListColumns, setProjectionColumns } from "./output/json.js";
 import { normalizeSingleDashLongFlags } from "./argv.js";
+import { makeGlossaryLookup } from "./output/glossaryRedirect.js";
 /**
  * Run an `ib` argv inside this process and return its captured result instead
  * of writing to stdout/exiting. A FRESH program is built per call: the
@@ -48,7 +49,10 @@ export async function runArgv(argv, opts) {
             await program.parseAsync(["node", "ib", ...normArgv]);
         }
         catch (err) {
-            handleParseRejection(err, parserHooks);
+            await handleParseRejection(err, {
+                ...parserHooks,
+                glossaryLookup: makeGlossaryLookup({ token: opts.token, endpoint: opts.endpoint }),
+            });
         }
     });
     return {

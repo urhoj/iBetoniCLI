@@ -32,6 +32,7 @@ import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, 
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, USAGE_HINT, type FlagProblem } from "./output/validationEnvelope.js";
+import { withGlossaryRedirect, type GlossaryLookup } from "./output/glossaryRedirect.js";
 import { usageEnvelopeResolves, buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, firstUnknownOption, commandPath, specForPath, optionNamesIn, optionsHoldingFlagName, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
@@ -824,11 +825,11 @@ function emitUsageEnvelope<T extends { error: string; hint: string }>(
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
  */
-export function handleParseRejection(
+export async function handleParseRejection(
   err: unknown,
-  hooks: Partial<ParserHooks> = {}
-): void {
-  const { parserText, erroringCommand, dispatchedCommand } = hooks;
+  hooks: Partial<ParserHooks> & { glossaryLookup?: GlossaryLookup } = {}
+): Promise<void> {
+  const { parserText, erroringCommand, dispatchedCommand, glossaryLookup } = hooks;
   if (err instanceof CliError) {
     // A parse-time guard (an option/argument `argParser` calling `failWith`)
     // throws BEFORE the preAction hook that normally runs `applySpecErrors`, so
@@ -868,7 +869,11 @@ export function handleParseRejection(
           (Array.isArray(cmd.args) && cmd.args[0]) ||
           text.match(/unknown command '([^']+)'/)?.[1] ||
           "";
-        const envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+        let envelope = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+        // Last resort, root only (fb#2044): a Finnish domain word the glossary
+        // maps to a command. Skipped without a session, so offline and test
+        // callers stay synchronous.
+        if (glossaryLookup) envelope = await withGlossaryRedirect(envelope, cmd, glossaryLookup, getCallerTier());
         return emitUsageEnvelope(err, envelope, usageEnvelopeResolves(envelope));
       }
     }

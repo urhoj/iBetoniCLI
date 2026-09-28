@@ -8628,7 +8628,6 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - typeName is immutable after creation — choose carefully.
-  - Deploy-gated: 404 until the backend ships POST /api/legal-documents/types.
 
 SEE ALSO
   ib legal type update, ib legal types, ib legal save
@@ -8683,7 +8682,6 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Clearing a value to NULL is not supported.
-  - Deploy-gated: 404 until the backend ships PUT /api/legal-documents/types/:typeName.
 
 SEE ALSO
   ib legal type create, ib legal types, ib legal acceptances
