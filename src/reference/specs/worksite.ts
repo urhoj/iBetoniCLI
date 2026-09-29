@@ -145,6 +145,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       { name: "comment", type: "string", description: "Free-text memo (tyomaaMemo; " + clearHint("--comment") + ")" },
       { name: "invoice-ref", type: "string", description: "Invoice reference (laskuViite)" },
       { name: "contact-person", type: "number", description: "Contact personId (tyomaaContactPersonId; 0 = none)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId; must equal the active company (as on merge)" },
       {
         name: "body",
         type: "json",
@@ -173,6 +174,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       // it shadowed the real "Validation failed" 400 below it.
       { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag or a --body/--from-json patch" },
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
+      { origin: "client", exit: 4, match: "is not the active company", meaning: "--owner is not the active company", remedy: "re-run with --company <ownerAsiakasId>" },
       { origin: "client", exit: 5, match: "not visible to the active company", meaning: "The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale", remedy: "re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)" },
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
@@ -326,6 +328,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       MERGE_DRY_RUN_FIRST_NOTE,
       MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / person / grid rows and the change history; caches are invalidated server-side.",
+      "Fields BLANK on the main are filled from the secondary; --dry-run lists them in validation.data.backfillFields. To keep one empty, blank it on the secondary first.",
     ],
     seeAlso: ["ib worksite duplicates", "ib worksite delete"],
     examples: [

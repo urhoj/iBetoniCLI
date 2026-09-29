@@ -16724,6 +16724,7 @@ NOTES
   - ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.
   - --dry-run issues a read-only POST to /validate (tagged \`read\`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.
   - Affects keikka / person / grid rows and the change history; caches are invalidated server-side.
+  - Fields BLANK on the main are filled from the secondary; --dry-run lists them in validation.data.backfillFields. To keep one empty, blank it on the secondary first.
 
 SEE ALSO
   ib worksite duplicates, ib worksite delete
@@ -17016,6 +17017,7 @@ FLAGS
   --comment STRING    Free-text memo (tyomaaMemo; pass "" to clear — PowerShell DROPS a bare "", so use \`--comment=\` there (same meaning in bash; \`ib help shell-quoting\`))
   --invoice-ref STRING    Invoice reference (laskuViite)
   --contact-person NUMBER    Contact personId (tyomaaContactPersonId; 0 = none)
+  --owner NUMBER    ownerAsiakasId; must equal the active company (as on merge)
   --body JSON    Patch body (JSON, backend column names e.g. tyomaaMemo — NOT the camelCase read keys), merged UNDER the typed flags. Mutually exclusive with --from-json.
   --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --yyyymmdd DATE    Effective date segment YYYYMMDD (defaults to today) (default: today)
@@ -17036,6 +17038,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the contact
+  exit 4 (client-side)  --owner is not the active company → re-run with --company <ownerAsiakasId>
   exit 5 (client-side)  The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale → re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)
   exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId

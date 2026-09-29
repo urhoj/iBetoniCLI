@@ -7,7 +7,10 @@ import {
   runWorksiteSetGeofence,
   runWorksiteHelsinkiFetch,
   buildWorksiteUpdateBody,
+  registerWorksiteCommands,
 } from "../../src/commands/worksite/index.js";
+import { Command } from "commander";
+import { captureActionError } from "../helpers/stderr.js";
 import { ownerAsiakasIdFromToken } from "../../src/owner.js";
 import { todayHelsinki } from "../../src/dates.js";
 import { CliError } from "../../src/api/errors.js";
@@ -186,6 +189,38 @@ describe("ib worksite create/update", () => {
       expect((e as CliError).exitCode).toBe(4);
       expect((e as Error).message).toContain("could not resolve active company");
     }
+  });
+
+  // fb#2091: `update --owner` mirrors `merge --owner`, but update always writes
+  // under the active company, so only a matching owner may proceed.
+  test("update --owner equal to the active company proceeds", async () => {
+    mockClient.get.mockReset();
+    mockClient.getCurrentToken.mockReturnValue("jwt.token.sig");
+    (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 27 });
+    mockClient.get.mockResolvedValue({ tyomaaId: 3557 });
+    mockClient.post.mockResolvedValue({ success: true });
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    await program.parseAsync(["worksite", "update", "3557", "--name", "Hel04", "--owner", "27"], { from: "user" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/tyomaa\/set\/27\/3557\//),
+      expect.objectContaining({ tyomaaNimi: "Hel04", ownerAsiakasId: 27 }),
+      expect.any(Object)
+    );
+  });
+
+  test("update --owner naming another company exits 4 before any request", async () => {
+    mockClient.get.mockReset();
+    mockClient.getCurrentToken.mockReturnValue("jwt.token.sig");
+    (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 27 });
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    const { exitCode } = await captureActionError(() =>
+      program.parseAsync(["worksite", "update", "3557", "--name", "Hel04", "--owner", "8"], { from: "user" })
+    );
+    expect(exitCode).toBe(4);
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.post).not.toHaveBeenCalled();
   });
 });
 

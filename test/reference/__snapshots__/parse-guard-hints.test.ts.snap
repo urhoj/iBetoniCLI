@@ -1767,5 +1767,9 @@ ib worksite search --limit <n>
 
 ib worksite update --contact-person <id>
   ! --contact-person must be an integer >= 0
-  > pass a positive personId, or 0 to clear the contact"
+  > pass a positive personId, or 0 to clear the contact
+
+ib worksite update --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`"
 `;

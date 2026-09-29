@@ -8,7 +8,7 @@ import { todayHelsinki } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, addOwnerOption } from "../../targets.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { registerPersonLinkCommands } from "../_shared/personLink.js";
@@ -382,7 +382,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .option("--comment <s>")
         .option("--invoice-ref <s>")
         .option("--contact-person <id>", "", intFlag("--contact-person", 0));
-    addJsonBodyOptions(updateCmd).option("--yyyymmdd <date>");
+    addJsonBodyOptions(addOwnerOption(updateCmd)).option("--yyyymmdd <date>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         // `opts` IS a WorksiteUpdateFlags (plus the write/body flags); the builder
@@ -393,6 +393,11 @@ export function registerWorksiteCommands(parent, getClient) {
         }
         const client = await getClient();
         const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
+        // fb#2091: accepted for symmetry with `worksite merge --owner`, but update
+        // always writes under the ACTIVE company, so a different owner is refused.
+        if (opts.owner !== undefined && opts.owner !== ownerAsiakasId) {
+            failWith(`--owner ${opts.owner} is not the active company (asiakasId ${ownerAsiakasId}); worksite update writes under the active company`, 4, `re-run as the owner: \`--company ${opts.owner}\` (or \`ib auth switch ${opts.owner}\`)`);
+        }
         const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, opts);
         writeJson(result);
     }));
