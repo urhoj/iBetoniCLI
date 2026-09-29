@@ -310,14 +310,14 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "start", type: "string", description: "New pump start, HH:MM Helsinki" },
       { name: "end", type: "string", description: "New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)" },
       { name: "customer", type: "number", description: "Re-point to this customer (asiakasId) — the tenant's own, or a self-owned company row" },
-      { name: "worksite", type: "number", description: "Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning" },
+      { name: "worksite", type: "number", description: "Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning. The CURRENT worksite re-snapshots it into the keikka and recomputes distances (resnapshot) — use after a worksite edit" },
       { name: "plant", type: "number", description: "Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner" },
       { name: "supplier", type: "number", description: "Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant" },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })",
+      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, resnapshot, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })",
     errors: [
       // The THIRD twin of the fb#668 class, and the client-side shape of it:
       // this command has several exit-4 client guards; a sole matchless client

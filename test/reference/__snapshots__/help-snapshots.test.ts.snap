@@ -8029,7 +8029,7 @@ FLAGS
   --start STRING    New pump start, HH:MM Helsinki
   --end STRING    New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)
   --customer NUMBER    Re-point to this customer (asiakasId) — the tenant's own, or a self-owned company row
-  --worksite NUMBER    Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning
+  --worksite NUMBER    Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning. The CURRENT worksite re-snapshots it into the keikka and recomputes distances (resnapshot) — use after a worksite edit
   --plant NUMBER    Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner
   --supplier NUMBER    Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant
 
@@ -8044,7 +8044,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })
+  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, resnapshot, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag (--vehicle / --date / --start / --end), or a reference flag (--customer / --worksite / --plant)
