@@ -139,6 +139,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
+    notes: [
+      "Draft and deleted rows, and the createdBy/createdByName/notes fields, are returned to developers/sysadmins only; any other caller gets the active + archived rows without them (fb#2087), so `--status draft` answers an empty list there.",
+    ],
     errors: [...TYPE_TARGET_ERRORS, OWNER_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
     examples: ["ib legal versions TOS", "ib legal versions --type TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
@@ -151,6 +154,9 @@ export const LEGAL_SPECS: CommandSpec[] = [
     flags: [],
     outputShape:
       "ListEnvelope<{documentId, typeName, version, title, status, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
+    notes: [
+      "Only developers/sysadmins can see drafts (fb#2087): for any other caller this is ALWAYS an empty list, which does not mean nothing is staged.",
+    ],
     errors: COMMON_AUTH_ERRORS,
     seeAlso: ["ib legal active", "ib legal versions", "ib legal diff"],
     examples: ["ib legal drafts"],
@@ -173,6 +179,7 @@ export const LEGAL_SPECS: CommandSpec[] = [
       "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
     notes: [
       "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
+      "By documentId: a draft or deleted version is a 404 unless the caller is a developer/sysadmin, and only they get createdBy/createdByName/notes. The typeName form never carries those fields (fb#2087).",
     ],
     errors: [
       { origin: "client", exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName, or neither the positional nor --type was given", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY (positionally or via --type)" },

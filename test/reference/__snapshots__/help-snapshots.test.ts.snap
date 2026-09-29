@@ -8396,6 +8396,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Only developers/sysadmins can see drafts (fb#2087): for any other caller this is ALWAYS an empty list, which does not mean nothing is staged.
+
 SEE ALSO
   ib legal active, ib legal versions, ib legal diff
 
@@ -8433,6 +8436,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - The document body is the \`markdownContent\` field — NOT \`content\` or \`body\`. Reading \`.content\` returns undefined (an empty body) with no error: a silent false-negative. \`ib legal show\` uses the same field name.
+  - By documentId: a draft or deleted version is a 404 unless the caller is a developer/sysadmin, and only they get createdBy/createdByName/notes. The typeName form never carries those fields (fb#2087).
 
 SEE ALSO
   ib legal versions, ib legal diff
@@ -8754,6 +8758,9 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Draft and deleted rows, and the createdBy/createdByName/notes fields, are returned to developers/sysadmins only; any other caller gets the active + archived rows without them (fb#2087), so \`--status draft\` answers an empty list there.
 
 SEE ALSO
   ib legal get, ib legal diff, ib legal drafts, ib legal activate

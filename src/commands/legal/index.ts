@@ -207,7 +207,8 @@ export async function runLegalVersions(
     `/api/legal-documents/${encodeURIComponent(typeName)}/versions${q}`
   );
   let items = (Array.isArray(rows) ? rows : []).map(stripContent);
-  // Client-side lifecycle filter — the backend returns the full history. An
+  // Client-side lifecycle filter — the backend returns the full history to
+  // developers/sysadmins, active+archived only to everyone else (fb#2087). An
   // explicit --status is the caller naming exactly what they want and wins
   // outright (so `--status deleted` still selects them); otherwise soft-deleted
   // rows are hidden by DEFAULT (fb#514). `ib legal delete` keeps the row for
@@ -275,7 +276,7 @@ export async function runLegalGet(client: ApiClient, ref: number | string): Prom
         e.statusCode,
         null,
         5,
-        `ib legal versions ${ref} lists drafts/history; ib legal types lists valid typeNames`
+        `ib legal versions ${ref} lists its history (drafts only for developers); ib legal types lists valid typeNames`
       );
     }
     throw e;
