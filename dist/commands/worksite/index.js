@@ -169,8 +169,15 @@ export function buildWorksiteUpdateBody(parsedBody, typed) {
  * role on the worksite's OWNER company, but the CLI injects the ACTIVE company
  * as ownerAsiakasId, under which the geofence UPDATE silently no-ops and the
  * cache sweep misses the owner's keys. Run it under `--company <owner>`.
+ *
+ * `opts.owner` is the optional `--owner` flag (fb#2091), accepted for symmetry
+ * with `worksite merge --owner`. Update always writes under the active company,
+ * so a different owner exits 4 before any request.
  */
 export async function runWorksiteUpdate(client, opts, body, flags) {
+    if (opts.owner !== undefined && opts.owner !== opts.ownerAsiakasId) {
+        failWith(`--owner ${opts.owner} is not the active company (asiakasId ${opts.ownerAsiakasId}); worksite update writes under the active company`, 4, `re-run as the owner: \`--company ${opts.owner}\` (or \`ib auth switch ${opts.owner}\`)`);
+    }
     try {
         await runWorksiteGet(client, opts.tyomaaId);
     }
@@ -298,7 +305,7 @@ export async function runWorksiteDashboard(client, opts) {
  *   - merge           merge two duplicate worksites (--dry-run = /validate; IRREVERSIBLE; requires --reason)
  *
  * The `update` action derives ownerAsiakasId from the session JWT via
- * `ownerAsiakasIdFromToken` — no --owner-asiakas-id flag required.
+ * `ownerAsiakasIdFromToken`; an optional `--owner` must equal it (fb#2091).
  * `--yyyymmdd` defaults to today.
  *
  * Exit codes: 1 = generic API/runtime failure.
@@ -393,12 +400,9 @@ export function registerWorksiteCommands(parent, getClient) {
         }
         const client = await getClient();
         const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-        // fb#2091: accepted for symmetry with `worksite merge --owner`, but update
-        // always writes under the ACTIVE company, so a different owner is refused.
-        if (opts.owner !== undefined && opts.owner !== ownerAsiakasId) {
-            failWith(`--owner ${opts.owner} is not the active company (asiakasId ${ownerAsiakasId}); worksite update writes under the active company`, 4, `re-run as the owner: \`--company ${opts.owner}\` (or \`ib auth switch ${opts.owner}\`)`);
-        }
-        const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, opts);
+        // The empty-patch guard above deliberately runs first: it is a usage
+        // error that needs no session, while the --owner check needs the token.
+        const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd, owner: opts.owner }, patch, opts);
         writeJson(result);
     }));
     addWriteFlagsToCommand(w

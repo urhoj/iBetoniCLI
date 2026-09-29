@@ -10,7 +10,6 @@ import {
   registerWorksiteCommands,
 } from "../../src/commands/worksite/index.js";
 import { Command } from "commander";
-import { captureActionError } from "../helpers/stderr.js";
 import { ownerAsiakasIdFromToken } from "../../src/owner.js";
 import { todayHelsinki } from "../../src/dates.js";
 import { CliError } from "../../src/api/errors.js";
@@ -209,16 +208,11 @@ describe("ib worksite create/update", () => {
     );
   });
 
-  test("update --owner naming another company exits 4 before any request", async () => {
+  test("runWorksiteUpdate: --owner naming another company exits 4 before any request", async () => {
     mockClient.get.mockReset();
-    mockClient.getCurrentToken.mockReturnValue("jwt.token.sig");
-    (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 27 });
-    const program = new Command();
-    registerWorksiteCommands(program, async () => mockClient);
-    const { exitCode } = await captureActionError(() =>
-      program.parseAsync(["worksite", "update", "3557", "--name", "Hel04", "--owner", "8"], { from: "user" })
-    );
-    expect(exitCode).toBe(4);
+    await expect(
+      runWorksiteUpdate(mockClient, { tyomaaId: 3557, ownerAsiakasId: 27, owner: 8 }, { tyomaaNimi: "Hel04" }, {})
+    ).rejects.toMatchObject({ exitCode: 4 });
     expect(mockClient.get).not.toHaveBeenCalled();
     expect(mockClient.post).not.toHaveBeenCalled();
   });
