@@ -1332,6 +1332,13 @@ export function buildUnknownOptionEnvelope(
     redirect || didYouMean || bare !== "asiakas"
       ? null
       : "`--asiakas` names the TENANT and this command has no cross-tenant flag; the global `--company <asiakasId>` runs it as that tenant (`ib help multi-tenancy`).";
+  // A guessed `--help-*` / `--detail` wants the long-form business context,
+  // which lives in its own command rather than a flag (fb#2061). Visible to
+  // every tier, so no gating; a near-spelling on this command still wins.
+  const detailHint =
+    redirect || didYouMean || !(bare.startsWith("help") || bare === "detail")
+      ? null
+      : `\`--help\` is the spec; the on-demand business context for this command is \`ib reference detail get ${canonical.replace(/^ib /, "")}\`.`;
 
   const discover = discoverHint(command);
 
@@ -1339,6 +1346,7 @@ export function buildUnknownOptionEnvelope(
   if (redirect) parts.push(redirect);
   if (idiomHint) parts.push(idiomHint);
   if (tenantHint) parts.push(tenantHint);
+  if (detailHint) parts.push(detailHint);
   if (viaSynonym && acceptedBy.length === 1) {
     parts.push(
       `\`${unknownOption}\` is not accepted here or by any sibling, but \`${viaSynonym.flag}\` is the same thing — send it to \`${acceptedBy[0]}\`.`

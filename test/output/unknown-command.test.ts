@@ -1340,6 +1340,26 @@ describe("root feature-name redirect (fb#1708)", () => {
   });
 });
 
+// fb#2061 — the long-form business context is a separate command, so a guessed
+// `--help-detail` / `--detail` has to be told where it lives.
+describe("--help-* / --detail names `ib reference detail get` (fb#2061)", () => {
+  test.each(["--help-detail", "--detail", "--help-full"])("%s", (flag) => {
+    const env = buildUnknownOptionEnvelope(leafByPath("notification", "email", "send"), flag);
+    expect(env.hint).toContain("`ib reference detail get notification email send`");
+  });
+
+  test("a near-spelling on this command wins: `ib inbox --detail` → `--details`", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("inbox"), "--detail");
+    expect(env.didYouMean).toBe("--details");
+    expect(env.hint).not.toContain("reference detail get");
+  });
+
+  test("an unrelated unknown flag gets no detail hint", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("notification", "email", "send"), "--zzzzzz");
+    expect(env.hint).not.toContain("reference detail get");
+  });
+});
+
 // fb#1363 — `update` owns the row's FIELDS, status lives on `resolve`, and the
 // derived sibling scan named list/resolve/count without saying which one puts
 // a closed row back in the queue.
