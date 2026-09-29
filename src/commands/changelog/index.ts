@@ -156,7 +156,8 @@ export function normalizeSentryRef(raw: string): string {
   // Greedy on trailing hyphen groups (fb#1021): a Sentry short id is
   // <PROJECT-SLUG>-<counter> and the slug itself may contain hyphens (e.g.
   // NODE-EXPRESS-7G), so a non-greedy single "-GROUP" match truncated it.
-  const m = trimmed.match(/[A-Z0-9]{2,}(?:-[A-Z0-9]+)+/);
+  // Slugs may also contain `_` (IBETONI_REACT-G, fb#2073).
+  const m = trimmed.match(/[A-Z0-9_]{2,}(?:-[A-Z0-9_]+)+/);
   return (m ? m[0] : trimmed).slice(0, 64);
 }
 

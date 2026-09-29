@@ -135,6 +135,13 @@ describe("normalizeSentryRef (fb#1021)", () => {
     expect(normalizeSentryRef("https://sentry.io/organizations/x/issues/NODE-EXPRESS-7G/"))
       .toBe("NODE-EXPRESS-7G");
   });
+
+  // fb#2073: Sentry slugs may contain `_` (the frontend project is ibetoni_react),
+  // and the old class stopped at it, storing IBETONI_REACT-G as REACT-G.
+  test("keeps an underscored project slug intact, bare and inside a pasted URL", () => {
+    expect(normalizeSentryRef("IBETONI_REACT-G")).toBe("IBETONI_REACT-G");
+    expect(normalizeSentryRef("https://sentry.io/issues/?query=IBETONI_REACT-G")).toBe("IBETONI_REACT-G");
+  });
 });
 
 describe("normalizeEnumFlag: case-insensitive --area/--bump-level/--source (fb#842)", () => {
