@@ -1131,9 +1131,15 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     // A guessed `--help-*` / `--detail` wants the long-form business context,
     // which lives in its own command rather than a flag (fb#2061). Visible to
     // every tier, so no gating; a near-spelling on this command still wins.
-    const detailHint = redirect || didYouMean || !(bare.startsWith("help") || bare === "detail")
+    // Hedged: only ~40% of commands have a catalog row, and `get` exits 5 on the
+    // rest (fb#2115). `bare` keeps any `=value`, so compare the name alone.
+    const bareName = bare.split("=")[0];
+    const detailHint = redirect ||
+        didYouMean ||
+        canonical === "ib reference detail get" ||
+        !(bareName.startsWith("help") || bareName === "detail")
         ? null
-        : `\`--help\` is the spec; the on-demand business context for this command is \`ib reference detail get ${canonical.replace(/^ib /, "")}\`.`;
+        : `\`--help\` is the self-contained spec; longer business context, where one is recorded, is \`ib reference detail get ${canonical.replace(/^ib /, "")}\`.`;
     const discover = discoverHint(command);
     const parts = [];
     if (redirect)

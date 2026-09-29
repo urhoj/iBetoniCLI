@@ -1354,6 +1354,26 @@ describe("--help-* / --detail names `ib reference detail get` (fb#2061)", () => 
     expect(env.hint).not.toContain("reference detail get");
   });
 
+  test("the `=value` form is recognised too: `--detail=x` (fb#2115)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("notification", "email", "send"), "--detail=x");
+    expect(env.hint).toContain("`ib reference detail get notification email send`");
+  });
+
+  test("a hidden alias path names the CANONICAL command (fb#2115)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("feedback", "list"), "--help-detail");
+    expect(env.hint).toContain("`ib reference detail get dev feedback list`");
+  });
+
+  test("never points `ib reference detail get` at itself (fb#2115)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("reference", "detail", "get"), "--detail");
+    expect(env.hint).not.toContain("reference detail get reference");
+  });
+
+  test("its siblings still get the hint: `ib reference detail list --help-x`", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("reference", "detail", "list"), "--help-x");
+    expect(env.hint).toContain("`ib reference detail get reference detail list`");
+  });
+
   test("an unrelated unknown flag gets no detail hint", () => {
     const env = buildUnknownOptionEnvelope(leafByPath("notification", "email", "send"), "--zzzzzz");
     expect(env.hint).not.toContain("reference detail get");
