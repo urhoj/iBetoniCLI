@@ -327,7 +327,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     notes: [
       MERGE_DRY_RUN_FIRST_NOTE,
       MERGE_VALIDATE_READONLY_NOTE,
-      "Affects keikka / person / grid rows and the change history; caches are invalidated server-side.",
+      "Affects keikka / person / grid rows and the change history; caches are invalidated server-side. Every moved order's worksite snapshot (address, coords) is re-copied from the main and its matkat recomputed; the result names snapshotsRefreshed / snapshotRefreshFailed.",
       "Fields BLANK on the main are filled from the secondary; --dry-run lists them in validation.data.backfillFields. To keep one empty, blank it on the secondary first.",
     ],
     seeAlso: ["ib worksite duplicates", "ib worksite delete"],
