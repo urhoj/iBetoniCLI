@@ -436,7 +436,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "gate-until", type: "string", description: `Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog, validated CLIENT-SIDE (fb#446). ${clearHint("--gate-until")}` },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
-      { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace" },
+      { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it rides on the description: merged into --append-description (deduped if identical), or appended (blank-line separated) to the NEW text of a full --description replace (fb#1974)" },
       { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). A `feedback get`/`list` row round-trips (fb#1814): unchanged or list-shortened columns are dropped; an edited read-only one exits 4. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
@@ -447,7 +447,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // Three client rows share exit 4, so EACH needs `match` — an unmatched row
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
-      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values", "cannot be combined"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason" },
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
       { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644); the backend's own 400 is Finnish and names neither flag nor limit", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in --append-description` },
       { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
@@ -465,7 +465,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     notes: [
       "--description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).",
       "SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see `ib help shell-quoting`.",
-      "--reason has no dedicated audit field here (unlike claim/release) — it merges into --append-description, same idiom `resolve` uses for --reason on its note. Combine it with --description (a full replace) instead and it exits 4.",
+      "--reason has no dedicated audit field here — it rides on the description: merged into --append-description, or appended to the NEW text of a --description replace (fb#1974).",
     ],
     seeAlso: ["ib dev feedback resolve", "ib dev feedback gate-clear"],
     examples: [

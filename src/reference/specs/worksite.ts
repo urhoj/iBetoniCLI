@@ -31,7 +31,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     command: "ib worksite get",
     aliases: ["ib worksite show"],
     description:
-      "Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.",
+      "Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, geocoding quality (accuracy/partialMatch — a partialMatch:true site may be placed in the wrong city), drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.",
     permissions: ["auth.page.tyomaa.read"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to fetch" }],
     flags: [
@@ -49,7 +49,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)",
+      "{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, geocoding:{accuracy,partialMatch,source,updatedAt} (fb#2131, deploy-gated — an older backend omits it), drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.read"),

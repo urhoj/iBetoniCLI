@@ -1779,8 +1779,8 @@ export interface FeedbackUpdateInput {
   /**
    * Audit why-string (fb#801) — `update` has no separate note field to carry it
    * on, so it merges into --append-description the same way `resolve` merges
-   * --reason into its note (mergeNoteFlags dedupes an identical value). Rejected
-   * alongside a full --description replace, where merging would be ambiguous.
+   * --reason into its note (mergeNoteFlags dedupes an identical value). With a
+   * full --description replace it is appended to the NEW text instead (fb#1974).
    */
   reason?: string;
   /** What this row is waiting for; see GATE_KINDS (owner is legacy). `""` clears it. */
@@ -1852,19 +1852,21 @@ export async function runFeedbackUpdate(
   if (input.description !== undefined && input.appendDescription !== undefined) {
     failWith("--description and --append-description are mutually exclusive", 4);
   }
-  // --reason has no field of its own to land on (fb#801) — it can only merge
-  // into the append, not a full replace, where blending in reason text would
-  // silently change what --description was asked to set.
-  if (input.reason !== undefined && input.description !== undefined) {
-    failWith("--reason cannot be combined with --description (a full replace) — use --append-description instead", 4);
-  }
-  const appendDescription = mergeNoteFlags(input.appendDescription?.trim(), input.reason?.trim());
+  // --reason has no field of its own to land on (fb#801), so it rides on the
+  // description: appended to the NEW text on a full replace (fb#1974/fb#1139 —
+  // the most destructive edit is the one that most needs its why recorded),
+  // merged into --append-description otherwise.
+  const replaceReason = input.description !== undefined ? input.reason?.trim() : undefined;
+  const appendDescription =
+    input.description !== undefined
+      ? undefined
+      : mergeNoteFlags(input.appendDescription?.trim(), input.reason?.trim());
   const body: Record<string, unknown> = {};
   if (input.scope !== undefined) body.scope = input.scope;
   if (input.kind !== undefined) body.kind = input.kind;
   if (input.severity !== undefined) body.severity = input.severity;
   if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
-  if (input.description !== undefined) body.description = input.description.trim();
+  if (input.description !== undefined) body.description = mergeNoteFlags(input.description.trim(), replaceReason);
   if (input.gateKind !== undefined) body.gateKind = input.gateKind;
   if (input.gateRef !== undefined) body.gateRef = assertGateRef(input.gateRef);
   if (input.gateUntil !== undefined) body.gateUntil = assertGateUntil(input.gateUntil);
@@ -2474,7 +2476,7 @@ export function registerFeedbackCommands(
     .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
     .option("--body <text>")
     .option("--append-description <text>")
-    .option("--reason <text>", "Audit why-string (fb#801) — merges into --append-description; rejected alongside a full --description replace")
+    .option("--reason <text>", "Audit why-string (fb#801) — merges into --append-description, or is appended to the new text of a full --description replace")
     .option(
       "--from-json <file>"
     )

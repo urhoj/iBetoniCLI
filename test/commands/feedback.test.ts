@@ -1499,6 +1499,17 @@ describe("ib feedback update", () => {
       expect(put).not.toHaveBeenCalled();
     });
 
+    test("--reason with a full --description replace is appended to the NEW text, no read (fb#1974/fb#1139)", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42 });
+      await runFeedbackUpdate(mockClient, 42, { description: " Corrected. ", reason: " fix the count " });
+      expect(get).not.toHaveBeenCalled();
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/42",
+        { description: "Corrected.\n\nfix the count" },
+        expect.anything()
+      );
+    });
+
     test("rejects a blank --append-description", async () => {
       await expect(
         runFeedbackUpdate(mockClient, 42, { appendDescription: "   " })

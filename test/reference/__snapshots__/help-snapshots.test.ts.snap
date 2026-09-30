@@ -4685,7 +4685,7 @@ FLAGS
   --gate-until STRING    Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog, validated CLIENT-SIDE (fb#446). pass "" to clear — PowerShell DROPS a bare "", so use \`--gate-until=\` there (same meaning in bash; \`ib help shell-quoting\`)
   --body STRING    Alias for --description (free text, not JSON); if both are passed, they must match
   --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact
-  --reason STRING    Audit why-string (fb#801) — no dedicated field to carry it, so it merges into --append-description (deduped if identical); rejected alongside a full --description replace
+  --reason STRING    Audit why-string (fb#801) — no dedicated field to carry it, so it rides on the description: merged into --append-description (deduped if identical), or appended (blank-line separated) to the NEW text of a full --description replace (fb#1974)
   --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). A \`feedback get\`/\`list\` row round-trips (fb#1814): unchanged or list-shortened columns are dropped; an edited read-only one exits 4. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell.
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
@@ -4698,7 +4698,7 @@ OUTPUT (JSON, stdout)
   A compact ack { feedbackId, scope, kind, severity, complexity, gateKind, gateRef, gateUntil, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description and with --reason
+  exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
   exit 4 (client-side)  --gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644); the backend's own 400 is Finnish and names neither flag nor limit → shorten to 200 chars; long rationale goes in --append-description
   exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all) → pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it
   exit 4 (client-side)  The shell split the description on its inner double-quotes (typical on Windows PowerShell) → pass the text via --from-json <file|-> instead of argv
@@ -4711,7 +4711,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - --description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).
   - SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see \`ib help shell-quoting\`.
-  - --reason has no dedicated audit field here (unlike claim/release) — it merges into --append-description, same idiom \`resolve\` uses for --reason on its note. Combine it with --description (a full replace) instead and it exits 4.
+  - --reason has no dedicated audit field here — it rides on the description: merged into --append-description, or appended to the NEW text of a --description replace (fb#1974).
 
 SEE ALSO
   ib dev feedback resolve, ib dev feedback gate-clear
@@ -7735,7 +7735,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status, puomi, linja (m), kestoMin, otsikko, comment, ajoOhje (the six pump/free-text fields are null when unset; deploy-gated — an older backend omits them) }
+  { keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status, puomi, linja (m), kestoMin, otsikko, comment, ajoOhje (the six pump/free-text fields are null when unset; deploy-gated — an older backend omits them), orderedVehicleType:{vehicleTypeId,name}|null (the ORDERED 'Tilattu ajoneuvotyyppi' — 1 = Ei tiedossa — that palkki colour ehto formulas test as tilaus.vehicleTypeId, not the assigned vehicle's type; fb#2039, deploy-gated) }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
@@ -16651,7 +16651,7 @@ exports[`Help snapshots — contract stability > help for ib worksite get matche
   (also: ib worksite show)
 
 DESCRIPTION
-  Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.
+  Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, geocoding quality (accuracy/partialMatch — a partialMatch:true site may be placed in the wrong city), drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.
   Permissions: requires auth.page.tyomaa.read.
 
 ARGUMENTS
@@ -16666,7 +16666,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)
+  { tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, geocoding:{accuracy,partialMatch,source,updatedAt} (fb#2131, deploy-gated — an older backend omits it), drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId

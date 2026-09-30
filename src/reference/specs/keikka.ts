@@ -164,7 +164,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
     flags: [],
     outputShape:
-      "{ keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status, puomi, linja (m), kestoMin, otsikko, comment, ajoOhje (the six pump/free-text fields are null when unset; deploy-gated — an older backend omits them) }",
+      "{ keikkaId, ownerAsiakasId, pvm, time (Europe/Helsinki wall clock of pumppuAika, HH:mm — fb#1761), customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, source:{asiakasId,name}|null, betoniSupplier:{asiakasId,name}|null, plant:{sijaintiId,name}|null, m3, status, puomi, linja (m), kestoMin, otsikko, comment, ajoOhje (the six pump/free-text fields are null when unset; deploy-gated — an older backend omits them), orderedVehicleType:{vehicleTypeId,name}|null (the ORDERED 'Tilattu ajoneuvotyyppi' — 1 = Ei tiedossa — that palkki colour ehto formulas test as tilaus.vehicleTypeId, not the assigned vehicle's type; fb#2039, deploy-gated) }",
     errors: [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.read"),
