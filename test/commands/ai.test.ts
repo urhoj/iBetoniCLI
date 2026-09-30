@@ -1,13 +1,63 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
-import { runAiConversation, runAiConversationList } from "../../src/commands/ai/index.js";
+import { runAiAsk, runAiConversation, runAiConversationList } from "../../src/commands/ai/index.js";
 
 const mockClient = mockApiClient();
 
 const get = mockClient.get;
+const post = mockClient.post;
 
 beforeEach(() => {
   get.mockReset();
+  post.mockReset();
+});
+
+describe("ib ai ask", () => {
+  const usage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 };
+
+  test("POSTs /api/ai/ask and projects msg, dropping msgData", async () => {
+    post.mockResolvedValueOnce({
+      msg: { message: "Hei!", conversationId: 7, msgData: [{ role: "user" }], usage, provider: "bedrock", model: "eu.x" },
+    });
+    const out = await runAiAsk(mockClient, "Hei", { provider: "bedrock", conversationId: 7, keikkaId: 9 });
+    expect(post).toHaveBeenCalledWith("/api/ai/ask", {
+      prompt: "Hei",
+      conversationId: 7,
+      keikkaId: 9,
+      provider: "bedrock",
+    });
+    expect(out).toEqual({ text: "Hei!", provider: "bedrock", model: "eu.x", usage, conversationId: 7 });
+  });
+
+  test("surfaces pendingAction and never calls /api/ai/confirm", async () => {
+    const pendingAction = { toolCallId: "t1", argv: ["keikka", "update"], label: "x", command: "ib keikka update" };
+    post.mockResolvedValueOnce({ msg: { message: "Vahvistatko?", conversationId: 8, usage, provider: "anthropic", pendingAction } });
+    const out = await runAiAsk(mockClient, "Muuta keikkaa");
+    expect(out.pendingAction).toEqual(pendingAction);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toBe("/api/ai/ask");
+  });
+
+  test("flags a silent provider fallback (stderr + requestedProvider)", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    post.mockResolvedValueOnce({ msg: { message: "ok", conversationId: 1, usage, provider: "openai-compat" } });
+    const out = await runAiAsk(mockClient, "Hei", { provider: "bedrock" });
+    expect(out).toMatchObject({ provider: "openai-compat", requestedProvider: "bedrock" });
+    expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("--provider bedrock was not used");
+    stderr.mockRestore();
+  });
+
+  test("--dry-run returns the body without sending", async () => {
+    const out = await runAiAsk(mockClient, "Hei", { dryRun: true });
+    expect(out).toMatchObject({ dryRun: true, wouldSend: { method: "POST", path: "/api/ai/ask" } });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("rejects an empty prompt and an unknown provider (exit 4), no POST", async () => {
+    await expect(runAiAsk(mockClient, "  ")).rejects.toMatchObject({ exitCode: 4 });
+    await expect(runAiAsk(mockClient, "Hei", { provider: "gpt" })).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
 });
 
 describe("ib ai conversation", () => {

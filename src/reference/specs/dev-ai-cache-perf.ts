@@ -6,7 +6,7 @@ import type { CommandError, CommandSpec } from "../../output/help.js";
 import { apiErr, COMMON_AUTH_ERRORS, intParseErr } from "./shared.js";
 
 export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
-  // ─── ai (2) — read AI assistant conversations ────────────────────────────
+  // ─── ai (3) — read AI assistant conversations, send one prompt ────────────
   {
     command: "ib dev ai conversations",
     description:
@@ -58,6 +58,42 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib dev ai conversations", "ib dev feedback get", "ib dev feedback list"],
     examples: ["ib dev ai conversation 4321"],
+  },
+  {
+    command: "ib dev ai ask",
+    description:
+      "Send ONE prompt to the /ai assistant (POST /api/ai/ask) — a real, PAID LLM turn, logged as your conversation. For AI provider/SDK smoke tests (--endpoint at staging) and regression prompts. Never executes a write: a proposed write returns as pendingAction, unconfirmed.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    args: [{ name: "prompt", type: "string", description: "The question/instruction, as typed on the /ai page (quote it)" }],
+    flags: [
+      { name: "provider", type: "string", description: "Per-request provider override: anthropic | bedrock | openai-compat (default: the slot's AI_PROVIDER)" },
+      { name: "conversation", type: "number", description: "Continue an existing conversation (conversationId from a previous ask or `ib dev ai conversations`)" },
+      { name: "keikka", type: "number", description: "keikkaId the prompt is about (same context the /ai page sends from an order)" },
+      { name: "dry-run", type: "boolean", description: "Print the request body without sending it (client-side; no LLM call, no cost)" },
+    ],
+    outputShape:
+      "{ text, provider, requestedProvider? (only when --provider was NOT honoured), model, usage: { prompt_tokens, completion_tokens, total_tokens }, conversationId, pendingAction?: { toolCallId, argv, label, command } } | --dry-run: { dryRun:true, wouldSend:{ method, path, body } }",
+    errors: [
+      { origin: "client", exit: 4, match: "prompt must be", meaning: "Empty prompt", remedy: "pass a non-empty, quoted prompt" },
+      { origin: "client", exit: 4, match: "--provider must be", meaning: "Unknown provider", remedy: "use anthropic, bedrock or openai-compat" },
+      intParseErr("--conversation", "pass a positive conversationId"),
+      intParseErr("--keikka", "pass a positive keikkaId"),
+      { origin: "client", exit: 3, match: "read-only mode is active", meaning: "Blocked by read-only mode", remedy: "asking is a POST (paid, logged); run without --read-only/IB_READ_ONLY" },
+      apiErr(429, "Rate limited", "aiAskRateLimit allows 10 asks per minute per person — wait and retry"),
+      apiErr(503, "AI provider unavailable (quota/overload)", "retry later, or try another --provider"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "The backend silently falls back to the slot default for an unconfigured --provider; the CLI then warns on stderr and adds requestedProvider.",
+    ],
+    seeAlso: ["ib dev ai conversation", "ib dev ai conversations"],
+    examples: [
+      'ib dev ai ask "Montako keikkaa huomenna?"',
+      'ib dev ai ask "Hei" --provider bedrock --endpoint https://api-staging.ibetoni.fi',
+      'ib dev ai ask "Entä ylihuomenna?" --conversation 4321',
+    ],
   },
   // ─── cache (6) — Redis inspection and invalidation ───────────────────────
   ...((): CommandSpec[] => {

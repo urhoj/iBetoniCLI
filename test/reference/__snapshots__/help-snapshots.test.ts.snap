@@ -2262,6 +2262,54 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev ai ask matches snapshot 1`] = `
+"USAGE
+  ib dev ai ask <prompt> [flags]
+
+DESCRIPTION
+  Send ONE prompt to the /ai assistant (POST /api/ai/ask) — a real, PAID LLM turn, logged as your conversation. For AI provider/SDK smoke tests (--endpoint at staging) and regression prompts. Never executes a write: a proposed write returns as pendingAction, unconfirmed.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <prompt> STRING    The question/instruction, as typed on the /ai page (quote it) (required)
+
+FLAGS
+  --provider STRING    Per-request provider override: anthropic | bedrock | openai-compat (default: the slot's AI_PROVIDER)
+  --conversation NUMBER    Continue an existing conversation (conversationId from a previous ask or \`ib dev ai conversations\`)
+  --keikka NUMBER    keikkaId the prompt is about (same context the /ai page sends from an order)
+  --dry-run    Print the request body without sending it (client-side; no LLM call, no cost)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { text, provider, requestedProvider? (only when --provider was NOT honoured), model, usage: { prompt_tokens, completion_tokens, total_tokens }, conversationId, pendingAction?: { toolCallId, argv, label, command } } | --dry-run: { dryRun:true, wouldSend:{ method, path, body } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Empty prompt           → pass a non-empty, quoted prompt
+  exit 4 (client-side)  Unknown provider       → use anthropic, bedrock or openai-compat
+  exit 4 (client-side)  --conversation is not an integer >= 1, rejected locally before any request → pass a positive conversationId
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 3 (client-side)  Blocked by read-only mode → asking is a POST (paid, logged); run without --read-only/IB_READ_ONLY
+  exit 4 (HTTP 429)  Rate limited           → aiAskRateLimit allows 10 asks per minute per person — wait and retry
+  exit 6 (HTTP 503)  AI provider unavailable (quota/overload) → retry later, or try another --provider
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The backend silently falls back to the slot default for an unconfigured --provider; the CLI then warns on stderr and adds requestedProvider.
+
+SEE ALSO
+  ib dev ai conversation, ib dev ai conversations
+
+EXAMPLES
+  ib dev ai ask "Montako keikkaa huomenna?"
+  ib dev ai ask "Hei" --provider bedrock --endpoint https://api-staging.ibetoni.fi
+  ib dev ai ask "Entä ylihuomenna?" --conversation 4321
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev ai conversation matches snapshot 1`] = `
 "USAGE
   ib dev ai conversation <conversationId> [flags]

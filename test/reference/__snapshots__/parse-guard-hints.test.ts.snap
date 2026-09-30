@@ -1,7 +1,15 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`parse-time guard → hint pairing > every argParser guard resolves a hint that answers its own message 1`] = `
-"ib attachment attach --asiakas <id>
+"ib ai ask --conversation <conversationId>
+  ! --conversation must be an integer >= 1
+  > pass a positive conversationId
+
+ib ai ask --keikka <keikkaId>
+  ! --keikka must be an integer >= 1
+  > pass a positive keikkaId
+
+ib attachment attach --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass the entity id as a positive integer
 
@@ -440,6 +448,14 @@ ib customer update --contact-person <id>
 ib customer update --type <id>
   ! --type must be an integer >= 1
   > pass a valid asiakasTypeId
+
+ib dev ai ask --conversation <conversationId>
+  ! --conversation must be an integer >= 1
+  > pass a positive conversationId
+
+ib dev ai ask --keikka <keikkaId>
+  ! --keikka must be an integer >= 1
+  > pass a positive keikkaId
 
 ib dev apikey list --asiakas <id>
   ! --asiakas must be an integer >= 1
