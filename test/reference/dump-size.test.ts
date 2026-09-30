@@ -158,7 +158,11 @@ import { buildReference } from "../../src/reference/dump.js";
 // one flag, two exit rows, an expanded outputShape, one example. Measured 840 665 B.
 // 841_000 → 842_000 (2026-09-29): `ib keikka update --worksite` documents the same-worksite
 // re-snapshot + the `resnapshot` output field (fb#2102). Measured 841 126 B.
-const DUMP_LIMIT_BYTES = 842_000;
+// 842_000 → 843_000 (2026-09-30): `ib palkki create/update/delete` permissions + 403 row now
+// name keikkaHandler — the backend palkki tier moved edit → keikkaEdit (fb#2139, cl#2749);
+// the old text was wrong, not merely short. Trimmed once (dropped the tier parenthetical).
+// Measured 842 057 B.
+const DUMP_LIMIT_BYTES = 843_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

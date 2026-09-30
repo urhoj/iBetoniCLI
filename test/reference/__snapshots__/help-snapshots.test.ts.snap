@@ -11480,7 +11480,7 @@ exports[`Help snapshots — contract stability > help for ib palkki create match
 
 DESCRIPTION
   Create a grid bar on a vehicle-day. POST /api/cli/palkki/create. REQUIRED: --vehicle, --type; --date defaults to today, --start/--end to 07:00–16:00 Helsinki. The type is resolved by NAME within the owner company (+ the shared owner-0 catalogue); a miss 400s listing the valid names. The bar's day driver is auto-assigned from the vehicle's personPvm, exactly like the web grid.
-  Permissions: requires edit role in the owner company (requireCompanyRole tier edit).
+  Permissions: requires edit-tier or keikkaHandler role in the owner company.
 
 FLAGS
   --body JSON    JSON body (optional if typed flags given) — PowerShell mangles inline quotes, use --from-json there.
@@ -11517,7 +11517,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 4 (HTTP 400)  Unknown palkki type for the owner company (the message lists valid names), timeStart >= timeEnd, or a missing field → pick a name from \`ib palkki type list\`; create one with \`ib palkki type create\`
-  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 3 (HTTP 403)  No edit-tier or keikkaHandler role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -11540,7 +11540,7 @@ exports[`Help snapshots — contract stability > help for ib palkki delete match
 
 DESCRIPTION
   Soft-delete a grid bar (sets deletedTime; DELETE /api/cli/palkki/delete/:id). Broadcasts palkki:deleted to open grids.
-  Permissions: requires edit role in the bar's company.
+  Permissions: requires edit-tier or keikkaHandler role in the bar's company.
 
 ARGUMENTS
   <palkkiId> NUMBER    grid_palkki_Id (required)
@@ -11562,7 +11562,7 @@ OUTPUT (JSON, stdout)
   { deleted: true, palkkiId } — --dry-run returns { dryRun:true, wouldDelete:{ palkkiId }, validation }
 
 ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 3 (HTTP 403)  No edit-tier or keikkaHandler role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -11855,7 +11855,7 @@ exports[`Help snapshots — contract stability > help for ib palkki update match
 
 DESCRIPTION
   PARTIAL update of a grid bar — only the flags you pass change (the backend read-merges over the row). POST /api/cli/palkki/update/:id. A time move (--date/--start/--end) reads the current bar first to fill the components you did not pass.
-  Permissions: requires edit role in the bar's company (and in --owner's, when re-homing).
+  Permissions: requires edit-tier or keikkaHandler role in the bar's company (and in --owner's, when re-homing).
 
 ARGUMENTS
   <palkkiId> NUMBER    grid_palkki_Id (required)
@@ -11870,7 +11870,7 @@ FLAGS
   --text STRING    Bar text
   --keikka NUMBER    attachedKeikkaId — link the bar to a keikka
   --worksite NUMBER    tyomaaId — destination for an inventory-transfer type
-  --owner NUMBER    Re-home to ownerAsiakasId (needs an edit role in BOTH companies)
+  --owner NUMBER    Re-home to ownerAsiakasId (needs an edit-tier or keikkaHandler role in BOTH companies)
   --style STRING    style — CSS-in-JS fragment for this bar
   --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
@@ -11896,7 +11896,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId
   exit 5 (HTTP 404)  Palkki not found, soft-deleted, or outside your companies → verify with \`ib palkki get\`
   exit 4 (HTTP 400)  Unknown palkki type, or timeStart >= timeEnd after the merge → check \`ib palkki type list\` / the times
-  exit 3 (HTTP 403)  No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
+  exit 3 (HTTP 403)  No edit-tier or keikkaHandler role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED) → check \`ib company\` membership / role; verify the palkkiId with \`ib palkki get\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

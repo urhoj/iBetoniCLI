@@ -15,7 +15,7 @@ const BODY_FLAG: CommandFlag = {
 };
 
 const PALKKI_EDIT_ERRORS: CommandError[] = [
-  apiErr(403, "No edit role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED)", "check `ib company` membership / role; verify the palkkiId with `ib palkki get`"),
+  apiErr(403, "No edit-tier or keikkaHandler role in the bar's company (or, on delete/update, no such palkki — the owner lookup fails CLOSED)", "check `ib company` membership / role; verify the palkkiId with `ib palkki get`"),
   ...authErrors(),
 ];
 
@@ -31,7 +31,7 @@ function palkkiFlags(isUpdate: boolean): CommandFlag[] {
     { name: "text", type: "string", description: "Bar text" },
     { name: "keikka", type: "number", description: "attachedKeikkaId — link the bar to a keikka" },
     { name: "worksite", type: "number", description: "tyomaaId — destination for an inventory-transfer type" },
-    { name: "owner", type: "number", description: isUpdate ? "Re-home to ownerAsiakasId (needs an edit role in BOTH companies)" : "ownerAsiakasId (default: active company)" },
+    { name: "owner", type: "number", description: isUpdate ? "Re-home to ownerAsiakasId (needs an edit-tier or keikkaHandler role in BOTH companies)" : "ownerAsiakasId (default: active company)" },
     { name: "style", type: "string", description: "style — CSS-in-JS fragment for this bar" },
     FROM_JSON_BODY_FLAG,
   ];
@@ -191,7 +191,7 @@ export const PALKKI_SPECS: CommandSpec[] = [
     command: "ib palkki create",
     description:
       "Create a grid bar on a vehicle-day. POST /api/cli/palkki/create. REQUIRED: --vehicle, --type; --date defaults to today, --start/--end to 07:00–16:00 Helsinki. The type is resolved by NAME within the owner company (+ the shared owner-0 catalogue); a miss 400s listing the valid names. The bar's day driver is auto-assigned from the vehicle's personPvm, exactly like the web grid.",
-    permissions: ["edit role in the owner company (requireCompanyRole tier edit)"],
+    permissions: ["edit-tier or keikkaHandler role in the owner company"],
     flags: palkkiFlags(false),
     writeFlags: true,
     dryRunKind: "server",
@@ -218,7 +218,7 @@ export const PALKKI_SPECS: CommandSpec[] = [
     command: "ib palkki update",
     description:
       "PARTIAL update of a grid bar — only the flags you pass change (the backend read-merges over the row). POST /api/cli/palkki/update/:id. A time move (--date/--start/--end) reads the current bar first to fill the components you did not pass.",
-    permissions: ["edit role in the bar's company (and in --owner's, when re-homing)"],
+    permissions: ["edit-tier or keikkaHandler role in the bar's company (and in --owner's, when re-homing)"],
     args: [{ name: "palkkiId", type: "number", description: "grid_palkki_Id" }],
     flags: palkkiFlags(true),
     writeFlags: true,
@@ -238,7 +238,7 @@ export const PALKKI_SPECS: CommandSpec[] = [
   {
     command: "ib palkki delete",
     description: "Soft-delete a grid bar (sets deletedTime; DELETE /api/cli/palkki/delete/:id). Broadcasts palkki:deleted to open grids.",
-    permissions: ["edit role in the bar's company"],
+    permissions: ["edit-tier or keikkaHandler role in the bar's company"],
     args: [{ name: "palkkiId", type: "number", description: "grid_palkki_Id" }],
     flags: [],
     writeFlags: true,
