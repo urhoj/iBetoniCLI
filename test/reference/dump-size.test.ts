@@ -164,7 +164,9 @@ import { buildReference } from "../../src/reference/dump.js";
 // Measured 842 057 B.
 // 843_000 → 846_000 (2026-09-30): new leaf `ib dev ai ask` (fb#2149); description/notes trimmed
 // once, the business context lives in `ib reference detail`. Measured 845 449 B.
-const DUMP_LIMIT_BYTES = 846_000;
+// 846_000 → 848_000 (2026-09-30): new leaf `ib dev migration run` (fb#1851); spec trimmed
+// once. Measured 847 141 B.
+const DUMP_LIMIT_BYTES = 848_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

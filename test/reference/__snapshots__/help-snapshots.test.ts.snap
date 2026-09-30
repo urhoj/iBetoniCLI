@@ -4842,6 +4842,51 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev migration run matches snapshot 1`] = `
+"USAGE
+  ib dev migration run <basename> [flags]
+
+DESCRIPTION
+  Run a committed, DEPLOYED puminet5api migrations/run-*.js runner on the backend — applies a data fix from a session with no DB access (fb#1851). Only --dry-run / --expect-db reach the runner; its own assertDbTarget still decides. --dry-run first: it prints the database to pass as --expect-db.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <basename> STRING    Runner name without .js (required)
+
+FLAGS
+  --expect-db STRING    Database the runner must see to write
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { basename, dryRun, expectDb, exitCode, stdout, stderr, timedOut, runLog } — commit a prod apply's runLog as migrations/<basename>-output.txt.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither --dry-run nor --expect-db → --dry-run first, then --expect-db=<db it printed>
+  exit 1 (client-side)  The runner failed or refused; JSON still printed → read stdout/stderr
+  exit 4 (HTTP 400)  Not a run-*.js name, runner lacks the assertDbTarget guard, or bad --expect-db → unguarded runners must run locally
+  exit 5 (HTTP 404)  No such runner in the deployed backend → commit AND deploy it to the --endpoint slot first
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - ~200 s limit (Azure cuts at 230 s): long backfills still run locally.
+
+EXAMPLES
+  ib dev migration run run-2026-09-18-restore-lost-push-optouts --dry-run --reason "check"
+  ib dev migration run run-2026-09-18-restore-lost-push-optouts --expect-db puminet --reason "apply"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev perf clear matches snapshot 1`] = `
 "USAGE
   ib dev perf clear [flags]

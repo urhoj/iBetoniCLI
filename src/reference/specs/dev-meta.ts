@@ -377,4 +377,34 @@ export const DEV_META_SPECS: CommandSpec[] = [
     seeAlso: ["ib dev apikey set", "ib dev apikey list"],
     examples: ["ib dev apikey revoke --asiakas 8 --source 18 --name MAPON_APIKEY --reason \"credential rotated\""],
   },
+
+  // ─── migration (1) ─────────────────────────────────────────────────────────
+  {
+    command: "ib dev migration run",
+    description:
+      "Run a committed, DEPLOYED puminet5api migrations/run-*.js runner on the backend — applies a data fix from a session with no DB access (fb#1851). Only --dry-run / --expect-db reach the runner; its own assertDbTarget still decides. --dry-run first: it prints the database to pass as --expect-db.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    writeFlags: true,
+    dryRunKind: "server",
+    reasonPolicy: "always",
+    args: [{ name: "basename", type: "string", description: "Runner name without .js" }],
+    flags: [
+      { name: "expect-db", type: "string", description: "Database the runner must see to write" },
+    ],
+    outputShape: "{ basename, dryRun, expectDb, exitCode, stdout, stderr, timedOut, runLog } — commit a prod apply's runLog as migrations/<basename>-output.txt.",
+    errors: [
+      { origin: "client", exit: 4, match: "pass --dry-run first", meaning: "Neither --dry-run nor --expect-db", remedy: "--dry-run first, then --expect-db=<db it printed>" },
+      { origin: "client", exit: 1, match: "exitCode", meaning: "The runner failed or refused; JSON still printed", remedy: "read stdout/stderr" },
+      apiErr(400, "Not a run-*.js name, runner lacks the assertDbTarget guard, or bad --expect-db", "unguarded runners must run locally"),
+      apiErr(404, "No such runner in the deployed backend", "commit AND deploy it to the --endpoint slot first"),
+      ...permErrors("isSystemAdmin or isDeveloper"),
+    ],
+    notes: ["~200 s limit (Azure cuts at 230 s): long backfills still run locally."],
+    examples: [
+      "ib dev migration run run-2026-09-18-restore-lost-push-optouts --dry-run --reason \"check\"",
+      "ib dev migration run run-2026-09-18-restore-lost-push-optouts --expect-db puminet --reason \"apply\"",
+    ],
+  },
 ];
