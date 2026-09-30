@@ -1231,6 +1231,9 @@ export function shellSplitHint(token: string, availableOptions: string[]): strin
   ];
 }
 
+/** Rejected flag names that mean "project the output" — answered by the global `--columns` (fb#2100). */
+const PROJECTION_FLAG_GUESSES = new Set(["fields", "field", "select", "only"]);
+
 /**
  * Enriched "unknown option" error envelope — the flag analogue of
  * {@link buildUnknownCommandEnvelope}. When Commander rejects a guessed flag
@@ -1345,6 +1348,13 @@ export function buildUnknownOptionEnvelope(
     !(bareName.startsWith("help") || bareName === "detail")
       ? null
       : `\`--help\` is the self-contained spec; longer business context, where one is recorded, is \`ib reference detail get ${canonical.replace(/^ib /, "")}\`.`;
+  // `--fields`/`--select`/`--only` is the common spelling for an output
+  // projection (gh, kubectl, REST), and the capability here is the GLOBAL
+  // `--columns` — which no per-command candidate list can name (fb#2100).
+  const projectionHint =
+    redirect || didYouMean || !PROJECTION_FLAG_GUESSES.has(bareName)
+      ? null
+      : "Output projection is the global `--columns <csv>` flag (works on every command, e.g. `--columns keikkaId,ownerAsiakasId`).";
 
   const discover = discoverHint(command);
 
@@ -1353,6 +1363,7 @@ export function buildUnknownOptionEnvelope(
   if (idiomHint) parts.push(idiomHint);
   if (tenantHint) parts.push(tenantHint);
   if (detailHint) parts.push(detailHint);
+  if (projectionHint) parts.push(projectionHint);
   if (viaSynonym && acceptedBy.length === 1) {
     parts.push(
       `\`${unknownOption}\` is not accepted here or by any sibling, but \`${viaSynonym.flag}\` is the same thing — send it to \`${acceptedBy[0]}\`.`
@@ -1377,7 +1388,7 @@ export function buildUnknownOptionEnvelope(
   parts.push(
     availableOptions.length
       ? `Accepted flags: ${availableOptions.join(", ")}.`
-      : "This command takes no command-specific flags."
+      : "This command takes no command-specific flags (global flags such as `--columns` still apply)."
   );
   parts.push(`Run ${discover} for the full spec.`);
 

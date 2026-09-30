@@ -505,6 +505,18 @@ describe("ib schema", () => {
         expect(get()).toHaveBeenCalledWith("/api/cli/schema/table/vehicle");
       });
 
+      // fb#2090: `id` was answered with unrelated short names (m3, aiModel).
+      test("a guessed `id` ranks the table's own <table>Id key first", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'id'.", 400, null, 4));
+        get().mockResolvedValueOnce(cols("m3", "aiModel", "betomikOrderbookImportRowId", "runId"));
+
+        await expect(
+          runSchemaQuery(mockClient, "SELECT id FROM dbo.betomikOrderbookImportRow")
+        ).rejects.toMatchObject({
+          hint: expect.stringMatching(/^did you mean betomikOrderbookImportRow\.betomikOrderbookImportRowId\b/),
+        });
+      });
+
       test("an unqualified column searches every FROM/JOIN table; the first table (in query order) with a near column answers", async () => {
         post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'regNo'.", 400, null, 4));
         get()

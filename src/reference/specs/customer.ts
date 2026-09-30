@@ -284,6 +284,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.",
+      "A SUBSET of the tenant's flags: invoicing (HAS_LASKUTUS, HAS_FENNOA, HAS_NETVISOR, HAS_TUOTTEET, …) is not reported, so absence here does NOT mean disabled — read `ib customer settings <asiakasId>` for the full set.",
       "Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
       "The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one — including for your own company, whose id is `ib company current`.",
     ],

@@ -1380,6 +1380,26 @@ describe("--help-* / --detail names `ib reference detail get` (fb#2061)", () => 
   });
 });
 
+// fb#2100 — `--fields` is the common projection spelling; the capability is the
+// global `--columns`, which no per-command candidate list can name.
+describe("--fields / --select / --only names the global --columns (fb#2100)", () => {
+  test.each(["--fields", "--select", "--only", "--fields=keikkaId"])("%s on `ib keikka get`", (flag) => {
+    const env = buildUnknownOptionEnvelope(leafByPath("keikka", "get"), flag);
+    expect(env.hint).toContain("global `--columns <csv>`");
+  });
+
+  test("a command owning its own --fields is never shadowed: `ib customer list --field`", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "list"), "--field");
+    expect(env.didYouMean).toBe("--fields");
+    expect(env.hint).not.toContain("global `--columns");
+  });
+
+  test("an unrelated unknown flag gets no projection hint", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("keikka", "get"), "--zzzzzz");
+    expect(env.hint).not.toContain("global `--columns <csv>`");
+  });
+});
+
 // fb#1363 — `update` owns the row's FIELDS, status lives on `resolve`, and the
 // derived sibling scan named list/resolve/count without saying which one puts
 // a closed row back in the queue.

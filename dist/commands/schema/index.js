@@ -539,7 +539,11 @@ async function columnNameSuggestion(client, sql, badColumn) {
     if (!known.length)
         return null;
     for (const { table, columns } of known) {
-        const matches = nearestNames(badColumn, columns);
+        // A guessed `id` means the key, which is spelled `<table>Id` here; edit
+        // distance ranks unrelated short names (`m3`) above it (fb#2090).
+        const pk = columns.find((c) => c.toLowerCase() === `${table.toLowerCase()}id`);
+        const near = nearestNames(badColumn, columns);
+        const matches = pk && badColumn.toLowerCase() === "id" ? [...new Set([pk, ...near])].slice(0, 3) : near;
         if (matches.length)
             return `did you mean ${orList(matches.map((m) => `${table}.${m}`))}? (nearest columns in ${known.map((t) => t.table).join(", ")})`;
     }

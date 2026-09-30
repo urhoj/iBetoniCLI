@@ -203,7 +203,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "--dry-run short-circuits BEFORE the upsert, ledger writes, AI extraction, and --digest — it validates and returns only { wouldSync }, never touching the DB. Unlike `resync`'s dry run, no ledger state is written and no extraction runs.",
       "--digest only fires on a REAL (non-dry-run) sync — a dry run's wouldSync response never reaches it.",
     ],
-    outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, renamed, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, unmatched: [{ plate, cell, days }], errors } }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
+    outputShape: "{ upsert: { importRunId, inserted, updated, unchanged, untouched, renamed, gone }, summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, moved, unmatched: [{ plate, cell, days }], errors } }, digest } — --dry-run returns { dryRun: true, wouldSync: { isoYear, isoWeek, rows, mode, provider }, validation }",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
       { http: 400, exit: 4, meaning: "Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider", remedy: "Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local" },
@@ -230,7 +230,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "--dry-run STILL WRITES LEDGER STATE (syncStatus/plannedAction/blockReason) for every row — only the keikka/palkki writes and the auto-creates are suppressed.",
       "A dry run WITH --provider still performs (and pays for) the AI cell extractions and stores extractedJson.",
     ],
-    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, unmatched: [{ plate, cell, days }], errors } } } — --dry-run returns { dryRun: true, summary }",
+    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, moved, unmatched: [{ plate, cell, days }], errors } } } — --dry-run returns { dryRun: true, summary }",
     errors: [
       { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
