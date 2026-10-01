@@ -34,6 +34,10 @@ import { getEmbeddedCtx } from "../../embedded.js";
 import { CliError, errorMessage } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
+import { runLogEntity } from "../log/index.js";
+
+/** PumiNet Oy — mirrors PUMINET.OWNER_ASIAKAS_ID, the tenant feedback audit rows are pinned to (fb#1139). */
+const FEEDBACK_AUDIT_OWNER_ASIAKAS_ID = 26;
 
 // Exported for specs.ts: the spec flags declare these as machine-readable
 // `allowed:` sets (validation envelopes), single-sourced from here.
@@ -1583,10 +1587,11 @@ function warnClaimAdvisory(row: Record<string, unknown>): void {
 async function putWithClaimAdvisory(
   client: ApiClient,
   id: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  reason?: string
 ): Promise<Record<string, unknown>> {
   const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body, {
-    headers: { "x-claim-id": resolveClaimId(undefined) },
+    headers: { "x-claim-id": resolveClaimId(undefined), ...writeFlagsToHeaders({ reason }) },
   });
   warnClaimAdvisory(row);
   return row;
@@ -1777,10 +1782,8 @@ export interface FeedbackUpdateInput {
   /** Text appended to the CURRENT description (read-merge-write) — never replaces it. */
   appendDescription?: string;
   /**
-   * Audit why-string (fb#801) — `update` has no separate note field to carry it
-   * on, so it merges into --append-description the same way `resolve` merges
-   * --reason into its note (mergeNoteFlags dedupes an identical value). With a
-   * full --description replace it is appended to the NEW text instead (fb#1974).
+   * Audit why-string, sent as X-Action-Reason and stored per changed field in
+   * changeTracker (fb#1139) — the same meaning --reason has on every other write.
    */
   reason?: string;
   /** What this row is waiting for; see GATE_KINDS (owner is legacy). `""` clears it. */
@@ -1852,21 +1855,16 @@ export async function runFeedbackUpdate(
   if (input.description !== undefined && input.appendDescription !== undefined) {
     failWith("--description and --append-description are mutually exclusive", 4);
   }
-  // --reason has no field of its own to land on (fb#801), so it rides on the
-  // description: appended to the NEW text on a full replace (fb#1974/fb#1139 —
-  // the most destructive edit is the one that most needs its why recorded),
-  // merged into --append-description otherwise.
-  const replaceReason = input.description !== undefined ? input.reason?.trim() : undefined;
-  const appendDescription =
-    input.description !== undefined
-      ? undefined
-      : mergeNoteFlags(input.appendDescription?.trim(), input.reason?.trim());
+  // --reason is the standard X-Action-Reason audit header (fb#1139): the backend
+  // records every field change old→new in changeTracker with it, so it is no
+  // longer merged into the description (`ib dev feedback log <id>` reads it back).
+  const appendDescription = input.appendDescription?.trim();
   const body: Record<string, unknown> = {};
   if (input.scope !== undefined) body.scope = input.scope;
   if (input.kind !== undefined) body.kind = input.kind;
   if (input.severity !== undefined) body.severity = input.severity;
   if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
-  if (input.description !== undefined) body.description = mergeNoteFlags(input.description.trim(), replaceReason);
+  if (input.description !== undefined) body.description = input.description.trim();
   if (input.gateKind !== undefined) body.gateKind = input.gateKind;
   if (input.gateRef !== undefined) body.gateRef = assertGateRef(input.gateRef);
   if (input.gateUntil !== undefined) body.gateUntil = assertGateUntil(input.gateUntil);
@@ -1880,14 +1878,14 @@ export async function runFeedbackUpdate(
   }
   if (Object.keys(body).length === 0) {
     failWith(
-      "Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --reason / --gate-kind / --gate-ref / --gate-until",
+      "Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description / --gate-kind / --gate-ref / --gate-until (--reason alone changes nothing — it only annotates a change)",
       4
     );
   }
   if (input.dryRun) {
     return wouldSend("PUT", `/api/feedback/${id}`, body);
   }
-  const row = await putWithClaimAdvisory(client, id, body);
+  const row = await putWithClaimAdvisory(client, id, body, input.reason);
   return input.full ? row : compactUpdateAck(row);
 }
 
@@ -2460,6 +2458,21 @@ export function registerFeedbackCommands(
       })
     );
 
+  // fb#1139: the edit history `update`/`resolve` write to changeTracker. Always
+  // read from PumiNet Oy — the backend pins feedback audit rows there
+  // (PUMINET.OWNER_ASIAKAS_ID), never the row's own tenant.
+  f.command("log <feedbackId>")
+    .option("--limit <n>", "", cappedInt(500), 100)
+    .option("--field <name>", "Filter by field (description, status, severity, …)")
+    .action(
+      jsonAction(getClient, (client, idStr: string, opts: { limit: number; field?: string }) =>
+        runLogEntity(client, "feedback", parseRefId(idStr, "feedback", "log"), opts.limit, {
+          owner: FEEDBACK_AUDIT_OWNER_ASIAKAS_ID,
+          field: opts.field,
+        })
+      )
+    );
+
   f.command("update <id>")
     .option("--scope <scope>")
     .option("--kind <kind>")
@@ -2471,7 +2484,7 @@ export function registerFeedbackCommands(
     .option("--gate-until <date>", "Wake date (ISO) for --gate-kind soak|backlog")
     .option("--body <text>")
     .option("--append-description <text>")
-    .option("--reason <text>", "Audit why-string (fb#801) — merges into --append-description, or is appended to the new text of a full --description replace")
+    .option("--reason <text>", "Free-text justification, stored in the audit log (ib dev feedback log <id>)")
     .option(
       "--from-json <file>"
     )

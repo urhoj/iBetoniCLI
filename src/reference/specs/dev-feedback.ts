@@ -417,6 +417,29 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib dev feedback log",
+    description:
+      "Audit trail for one feedback row: every `update`/`resolve` edit — field, old→new, who, when, --reason (fb#1139). Alias of `ib log entity feedback <id> --owner 26`: the rows live under PumiNet Oy, not the row's tenant. GET /api/changes/feedback/:feedbackId/26.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    auth: "any",
+    args: [{ name: "feedbackId", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
+    flags: [
+      { name: "limit", type: "number", description: "Max rows (default 100, max 500)" },
+      { name: "field", type: "string", description: "Filter by field (description, status, severity, …) — client-side, over the fetched page" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
+    errors: [
+      limitErr("pass a positive integer, max 500"),
+      apiErr(403, "Not a developer / system admin, or no access to PumiNet Oy (26)", "use a developer token"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: ["Only edits made after the fb#1139 backend deploy are recorded; earlier history does not exist."],
+    seeAlso: ["ib dev feedback update", "ib log entity"],
+    examples: ["ib dev feedback log 2131", "ib dev feedback log fb#1955 --field description"],
+  },
+  {
     command: "ib dev feedback update",
     description:
       "Edit a filed row's classification (--scope/--kind/--severity/--complexity/--gate-kind/--gate-ref/--gate-until) or its --description (developer-only). The correction twin of `resolve` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.",
@@ -436,7 +459,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "gate-until", type: "string", description: `Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog, validated CLIENT-SIDE (fb#446). ${clearHint("--gate-until")}` },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
-      { name: "reason", type: "string", description: "Audit why-string (fb#801) — no dedicated field to carry it, so it rides on the description: merged into --append-description (deduped if identical), or appended (blank-line separated) to the NEW text of a full --description replace (fb#1974)" },
+      { name: "reason", type: "string", description: "Free-text justification, sent as X-Action-Reason and stored with every changed field in the audit log — read it back with `ib dev feedback log <id>` (fb#1139). Annotates a change; alone it changes nothing" },
       { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription, gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). A `feedback get`/`list` row round-trips (fb#1814): unchanged or list-shortened columns are dropped; an edited read-only one exits 4. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
@@ -447,7 +470,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // Three client rows share exit 4, so EACH needs `match` — an unmatched row
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
-      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--reason/--gate-kind/--gate-ref/--gate-until; enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
       { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644); the backend's own 400 is Finnish and names neither flag nor limit", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in --append-description` },
       { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
@@ -465,7 +488,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     notes: [
       "--description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).",
       "SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see `ib help shell-quoting`.",
-      "--reason has no dedicated audit field here — it rides on the description: merged into --append-description, or appended to the NEW text of a --description replace (fb#1974).",
+      "Every edit is audited old→new per field in changeTracker, with --reason (fb#1139) — so even a --description replace is recoverable: `ib dev feedback log <id> --field description`.",
     ],
     seeAlso: ["ib dev feedback resolve", "ib dev feedback gate-clear"],
     examples: [

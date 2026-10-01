@@ -1499,15 +1499,19 @@ describe("ib feedback update", () => {
       expect(put).not.toHaveBeenCalled();
     });
 
-    test("--reason with a full --description replace is appended to the NEW text, no read (fb#1974/fb#1139)", async () => {
+    test("--reason travels as the X-Action-Reason audit header, never into the description (fb#1139)", async () => {
       put.mockResolvedValueOnce({ feedbackId: 42 });
-      await runFeedbackUpdate(mockClient, 42, { description: " Corrected. ", reason: " fix the count " });
+      await runFeedbackUpdate(mockClient, 42, { description: " Corrected. ", reason: "fix the count" });
       expect(get).not.toHaveBeenCalled();
-      expect(put).toHaveBeenCalledWith(
-        "/api/feedback/42",
-        { description: "Corrected.\n\nfix the count" },
-        expect.anything()
-      );
+      const [path, body, opts] = put.mock.calls[0];
+      expect(path).toBe("/api/feedback/42");
+      expect(body).toEqual({ description: "Corrected." });
+      expect(JSON.stringify(opts)).toMatch(/fix the count/);
+    });
+
+    test("--reason alone is not an edit (exit 4, nothing sent)", async () => {
+      await expect(runFeedbackUpdate(mockClient, 42, { reason: "why" })).rejects.toThrowError(/only annotates|annotates a change/);
+      expect(put).not.toHaveBeenCalled();
     });
 
     test("rejects a blank --append-description", async () => {

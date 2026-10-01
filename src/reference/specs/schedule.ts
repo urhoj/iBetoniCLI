@@ -32,7 +32,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     permissions: ["auth.page.grid.tilaus.read"],
     flags: [],
     outputShape:
-      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
+      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time, orderedVehicleType:{vehicleTypeId,name}|null }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
     notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
@@ -45,7 +45,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     args: [{ name: "date", type: "date", description: "date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
     flags: [],
     outputShape:
-      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
+      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time, orderedVehicleType:{vehicleTypeId,name}|null }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
     notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
@@ -59,7 +59,7 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     args: [{ name: "start", type: "date", description: "week start date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
     flags: [],
     outputShape:
-      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { scope: { asiakasId } }",
+      "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time, orderedVehicleType:{vehicleTypeId,name}|null }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
     notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],

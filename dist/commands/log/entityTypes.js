@@ -23,6 +23,12 @@ export const CHANGE_ENTITY_TYPES = [
         notes: "Day-driver assignments (driver reassign / personPvm writes).",
     },
     {
+        entityType: "feedback",
+        entityIdMeaning: "feedbackId (dbo.cliFeedback)",
+        gate: "developer",
+        notes: "ib feedback rows — every update/resolve edit old→new with --reason (fb#1139). Stored under PumiNet Oy (owner 26), not the row's tenant. Same data as `ib dev feedback log`.",
+    },
+    {
         entityType: "keikka",
         entityIdMeaning: "keikkaId",
         gate: "member",

@@ -12,6 +12,7 @@ describe("log entityType catalog", () => {
     expect(names).toEqual([
       "asiakas",
       "dayDriver",
+      "feedback",
       "keikka",
       "keikkaBetoni",
       "keikkaLasku",

@@ -15,7 +15,7 @@ export interface EntityTypeInfo {
   /** What the entityId column means for this type (which table PK). */
   entityIdMeaning: string;
   /** Server-side read gate on GET /api/changes/:entityType/:entityId/:owner. */
-  gate: "member" | "admin";
+  gate: "member" | "admin" | "developer";
   notes: string;
   deprecated?: boolean;
 }
@@ -32,6 +32,12 @@ export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
     entityIdMeaning: "vehicleId",
     gate: "member",
     notes: "Day-driver assignments (driver reassign / personPvm writes).",
+  },
+  {
+    entityType: "feedback",
+    entityIdMeaning: "feedbackId (dbo.cliFeedback)",
+    gate: "developer",
+    notes: "ib feedback rows — every update/resolve edit old→new with --reason (fb#1139). Stored under PumiNet Oy (owner 26), not the row's tenant. Same data as `ib dev feedback log`.",
   },
   {
     entityType: "keikka",
