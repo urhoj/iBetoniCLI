@@ -126,6 +126,18 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.didYouMean).toBe("log");
     expect(env.hint).toContain("Did you mean `ib log`?");
   });
+  // A wrapper that splits a command string badly hands Commander `" tyomaa"`;
+  // exact matching then misses even a registered alias (fb#2162).
+  test("whitespace-padded token names its trimmed command, alias → canonical (fb#2162)", () => {
+    const env = buildUnknownCommandEnvelope(program, " tyomaa", "developer");
+    expect(env.didYouMean).toBe("worksite");
+    expect(env.hint).toContain("Did you mean `ib worksite`?");
+    expect(env.hint).toContain("surrounding whitespace");
+    expect(buildUnknownCommandEnvelope(program, "keikka ", "developer").didYouMean).toBe("keikka");
+  });
+  test("padded token whose trimmed form is no command keeps the normal matcher (fb#2162)", () => {
+    expect(buildUnknownCommandEnvelope(program, " xyzzyq", "developer").didYouMean).toBeNull();
+  });
 });
 
 describe("buildUnknownOptionEnvelope (#235/#236)", () => {

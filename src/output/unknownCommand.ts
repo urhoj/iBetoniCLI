@@ -549,10 +549,22 @@ export function buildUnknownCommandEnvelope(
     return Boolean(spec && isWriteSpec(spec));
   };
   const candidates = [...available.filter((n) => !isWrite(n)), ...available.filter(isWrite)];
-  const didYouMean = compoundChildOf(unknownToken, available) ?? closestName(unknownToken, candidates);
+  // A badly split command string hands Commander `" tyomaa"`, which exact
+  // matching misses even when the trimmed token is a registered name or alias
+  // (fb#2162). Suggest its canonical name, never run it: a mangled argv must
+  // not execute something the caller did not type.
+  const trimmed = unknownToken.trim();
+  const padded =
+    trimmed !== unknownToken
+      ? cmd.commands.find((c) => c.name() === trimmed || c.aliases().includes(trimmed))?.name()
+      : undefined;
+  const paddedMatch = padded && available.includes(padded) ? padded : null;
+  const didYouMean =
+    paddedMatch ?? compoundChildOf(unknownToken, available) ?? closestName(unknownToken, candidates);
   const discover = discoverHint(group);
   const writeTag = didYouMean && isWrite(didYouMean) ? " (a WRITE command)" : "";
-  const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`${writeTag}? ` : "";
+  const paddedTag = paddedMatch ? " (the token had surrounding whitespace)" : "";
+  const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`${writeTag}?${paddedTag} ` : "";
   const availableStr =
     available.length > 0
       ? `Available ${cmd.name()} subcommands: ${available.join(", ")}. `
