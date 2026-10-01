@@ -138,6 +138,29 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
   test("padded token whose trimmed form is no command keeps the normal matcher (fb#2162)", () => {
     expect(buildUnknownCommandEnvelope(program, " xyzzyq", "developer").didYouMean).toBeNull();
   });
+  // The padded match IS the answer, so no redirect layer may add a sentence
+  // beside it: the compound layer once split ` mark-read` and could name a
+  // deeper `read` owner next to "Did you mean mark-read?" (fb#2177).
+  test("every visible subcommand, padded, answers with itself and nothing else (fb#2177)", () => {
+    const offenders: string[] = [];
+    const walk = (group: Command) => {
+      for (const name of visibleSubcommands(group, "developer")) {
+        const env = buildUnknownCommandEnvelope(group, ` ${name}`, "developer");
+        if (env.didYouMean !== name || env.availableElsewhere.length || env.hint.includes("does not exist")) {
+          offenders.push(`${env.group} ' ${name}'`);
+        }
+      }
+      for (const child of group.commands) if (child.commands.length) walk(child);
+    };
+    walk(program);
+    expect(offenders).toEqual([]);
+  });
+  test("a padded tier-hidden command is not suggested to a standard caller (fb#2177)", () => {
+    const env = buildUnknownCommandEnvelope(program, " task", "standard");
+    expect(env.available).not.toContain("task");
+    expect(env.didYouMean).not.toBe("task");
+    expect(env.hint).not.toContain("surrounding whitespace");
+  });
 });
 
 describe("buildUnknownOptionEnvelope (#235/#236)", () => {
