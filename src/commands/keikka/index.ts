@@ -357,10 +357,13 @@ export interface KeikkaUpdateFields {
   worksite?: number;
   plant?: number;
   supplier?: number;
+  drivingInstructions?: string;
+  comment?: string;
+  title?: string;
 }
 
 /**
- * Update a keikka. Three flag groups, three routes, one group per call (no atomicity
+ * Update a keikka. Four flag groups, four routes, one group per call (no atomicity
  * across routes, so mixing is refused):
  *   - `--status` posts the numeric keikkaTilaId to /api/keikka/tila/set;
  *   - the move flags (`--vehicle/--date/--start/--end` — the grid's drag-and-drop) post
@@ -368,7 +371,10 @@ export interface KeikkaUpdateFields {
  *     server-side and re-derives the driver like a grid drop;
  *   - the reference flags (`--customer/--worksite/--plant [--supplier]`) post to
  *     /api/cli/keikka/refs/:id, which re-points them through the grid's own procs,
- *     read-merged server-side (fb#1943, fb#1986).
+ *     read-merged server-side (fb#1943, fb#1986);
+ *   - the text flags (`--driving-instructions/--comment/--title`) post to
+ *     /api/cli/keikka/info/:id; "" clears a field. The ajo-ohje writer is the blanket
+ *     keikka_tyomaa_set, so the server writes varmenne + ids back (fb#2045).
  */
 export async function runKeikkaUpdate(
   client: ApiClient,
@@ -379,20 +385,28 @@ export async function runKeikkaUpdate(
   const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
   const isMove = needsRow || fields.vehicle !== undefined;
   const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined;
+  const isInfo = fields.drivingInstructions !== undefined || fields.comment !== undefined || fields.title !== undefined;
   if (fields.supplier !== undefined && fields.plant === undefined) {
     failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
   }
-  if ([fields.status !== undefined, isMove, isRefs].filter(Boolean).length > 1) {
+  if ([fields.status !== undefined, isMove, isRefs, isInfo].filter(Boolean).length > 1) {
     failWith(
-      "--status, the move flags (--vehicle/--date/--start/--end) and the reference flags (--customer/--worksite/--plant) cannot be combined — run one command per group",
+      "--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant) and the text flags (--driving-instructions/--comment/--title) cannot be combined — run one command per group",
       4
     );
   }
-  if (fields.status === undefined && !isMove && !isRefs) {
+  if (fields.status === undefined && !isMove && !isRefs && !isInfo) {
     failWith(
-      "Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), or a reference flag (--customer/--worksite/--plant)",
+      "Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant), or a text flag (--driving-instructions/--comment/--title)",
       4
     );
+  }
+  if (isInfo) {
+    const body: { keikkaAjoOhje?: string; keikkaComment?: string; keikkaOtsikko?: string } = {};
+    if (fields.drivingInstructions !== undefined) body.keikkaAjoOhje = fields.drivingInstructions;
+    if (fields.comment !== undefined) body.keikkaComment = fields.comment;
+    if (fields.title !== undefined) body.keikkaOtsikko = fields.title;
+    return client.post<unknown>(`/api/cli/keikka/info/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
   }
   if (isRefs) {
     const body: { asiakasId?: number; tyomaaId?: number; betoniSijaintiId?: number; betoniAsiakasId?: number } = {};
@@ -945,7 +959,10 @@ export function registerKeikkaCommands(
     .option("--customer <asiakasId>", "Re-point to this customer (asiakasId)", intFlag("--customer"))
     .option("--worksite <tyomaaId>", "Re-point to this worksite (tyomaaId)", intFlag("--worksite"))
     .option("--plant <sijaintiId>", "Set the concrete plant (betoniSijaintiId); the supplier is its owner", intFlag("--plant"))
-    .option("--supplier <asiakasId>", "Assert the plant's supplier (betoniAsiakasId); must own --plant", intFlag("--supplier"));
+    .option("--supplier <asiakasId>", "Assert the plant's supplier (betoniAsiakasId); must own --plant", intFlag("--supplier"))
+    .option("--driving-instructions <text>", 'Set the driving instructions (ajo-ohje); "" clears')
+    .option("--comment <text>", 'Set the order comment (kommentti); "" clears')
+    .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears');
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (idStr: string, opts: WriteFlags & KeikkaUpdateFields) => {
       const client = await getClient();
@@ -962,6 +979,9 @@ export function registerKeikkaCommands(
           worksite: opts.worksite,
           plant: opts.plant,
           supplier: opts.supplier,
+          drivingInstructions: opts.drivingInstructions,
+          comment: opts.comment,
+          title: opts.title,
         },
         opts
       );

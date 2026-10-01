@@ -296,7 +296,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka update",
     description:
-      "Update a keikka: `--status` (numeric keikkaTilaId → POST /api/keikka/tila/set), MOVE it like the grid's drag-and-drop — `--vehicle`/`--date`/`--start`/`--end` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side), or RE-POINT it — `--customer`/`--worksite`/`--plant` → POST /api/cli/keikka/refs/:id. Three routes: one group per call.",
+      "Update a keikka: `--status` (numeric keikkaTilaId → POST /api/keikka/tila/set), MOVE it like the grid's drag-and-drop — `--vehicle`/`--date`/`--start`/`--end` → POST /api/cli/keikka/move/:id (driver re-derived from the target vehicle's day driver; the rest of the row read-merged server-side), RE-POINT it — `--customer`/`--worksite`/`--plant` → POST /api/cli/keikka/refs/:id, or set its TEXT — `--driving-instructions`/`--comment`/`--title` → POST /api/cli/keikka/info/:id. Four routes: one group per call.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to update" }],
     flags: [
@@ -313,18 +313,21 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "worksite", type: "number", description: "Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning. The CURRENT worksite re-snapshots it into the keikka and recomputes distances (resnapshot) — use after a worksite edit" },
       { name: "plant", type: "number", description: "Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner" },
       { name: "supplier", type: "number", description: "Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant" },
+      { name: "driving-instructions", type: "string", description: 'Driving instructions (keikkaAjoOhje, max 2500); "" clears' },
+      { name: "comment", type: "string", description: 'Comment (keikkaComment); "" clears' },
+      { name: "title", type: "string", description: 'Title (keikkaOtsikko, max 100); "" clears' },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, resnapshot, plantChanged, warnings:[string] } (--dry-run: { dryRun:true, wouldUpdate, validation })",
+      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId}, to:{…}, siteChanged, resnapshot, plantChanged, warnings:[string] }. Text: { keikkaId, from, to, changed:[field] }, unchanged fields skipped (--dry-run: { dryRun:true, wouldUpdate, validation })",
     errors: [
       // The THIRD twin of the fb#668 class, and the client-side shape of it:
       // this command has several exit-4 client guards; a sole matchless client
       // row is `matchClientRow`'s fallback, so every row carries a `match` and
       // each guard reaches its own remedy.
-      { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status <keikkaTilaId>, or a move flag (--vehicle / --date / --start / --end), or a reference flag (--customer / --worksite / --plant)" },
-      { origin: "client", exit: 4, match: "cannot be combined", meaning: "Flags from two groups (status / move / reference) — separate routes, no atomicity", remedy: "run one command per group" },
+      { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status <keikkaTilaId>, or a move flag (--vehicle / --date / --start / --end), a reference flag (--customer / --worksite / --plant) or a text flag (--driving-instructions / --comment / --title)" },
+      { origin: "client", exit: 4, match: "cannot be combined", meaning: "Flags from two groups (status / move / reference / text) — separate routes, no atomicity", remedy: "run one command per group" },
       { origin: "client", exit: 4, match: "--supplier needs --plant", meaning: "--supplier alone — the supplier is derived from the plant", remedy: "pass --plant <sijaintiId> (with or without --supplier)" },
       intParseErr("--customer", "pass a positive asiakasId"),
       intParseErr("--worksite", "pass a positive tyomaaId"),
@@ -335,7 +338,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "must be after the start", meaning: "--end is not after the (new or current) start; same-day only", remedy: "pass an --end later than the start, or move --start first" },
       { origin: "client", exit: 4, match: "no pumppuAika to move from", meaning: "The row has no pumppuAika, so a partial time flag has nothing to fill from", remedy: "pass both --date and --start" },
       { origin: "client", exit: 4, match: "--vehicle must be an integer", meaning: "--vehicle is not an integer >= 1, rejected locally before any request", remedy: "pass a positive vehicleId" },
-      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant)", "check the flags — the message names the plant's real supplier"),
+      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap)", "check the flags — the message names the plant's real supplier"),
       apiErr(404, "Keikka, or a --customer/--worksite/--plant target, not found, soft-deleted, OR outside your visible scope", "the message names which id — verify it; another tenant's customer/worksite/keikka 404s identically to a missing one"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
@@ -354,6 +357,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka update 9001 --start 09:00 --end 11:30",
       "ib keikka update 12118 --customer 1482 --worksite 3438 --dry-run",
       "ib keikka update 12147 --plant 45 --reason 'Swerock Lohja ok'",
+      "ib keikka update 12276 --driving-instructions 'Portti 2, soita 15 min ennen' --dry-run",
     ],
   },
   {

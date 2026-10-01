@@ -121,7 +121,18 @@ describe("ib keikka create/update/drivers", () => {
     await expect(runKeikkaUpdate(mockClient, 9001, { customer: 1482, vehicle: 54 }, {})).rejects.toThrow(/cannot be combined/);
     await expect(runKeikkaUpdate(mockClient, 9001, { status: "9", plant: 45 }, {})).rejects.toThrow(/cannot be combined/);
     await expect(runKeikkaUpdate(mockClient, 9001, { supplier: 28 }, {})).rejects.toThrow(/--supplier needs --plant/);
+    await expect(runKeikkaUpdate(mockClient, 9001, { title: "x", worksite: 3438 }, {})).rejects.toThrow(/cannot be combined/);
     expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("runKeikkaUpdate text flags post to /api/cli/keikka/info/:id; \"\" is sent, not dropped (fb#2045)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12276, changed: ["keikkaAjoOhje"] });
+    await runKeikkaUpdate(mockClient, 12276, { drivingInstructions: "Portti 2", comment: "", title: "Valu" }, { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/info/12276",
+      { keikkaAjoOhje: "Portti 2", keikkaComment: "", keikkaOtsikko: "Valu" },
+      { headers: { "X-Dry-Run": "1" } }
+    );
   });
 
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {
