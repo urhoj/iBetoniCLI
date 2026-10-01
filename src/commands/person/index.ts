@@ -1006,6 +1006,25 @@ export function registerPersonCommands(
     writeJson(result);
   }));
 
+  addWriteFlagsToCommand(
+    p
+      .command("login-phone <personId>")
+      .option("--on")
+      .option("--off")
+      .option("--take-over")
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { on?: boolean; off?: boolean; takeOver?: boolean }) => {
+    if (!!opts.on === !!opts.off) {
+      failWith("Pass exactly one of --on / --off", 4);
+    }
+    if (opts.takeOver && opts.off) {
+      failWith("--take-over only applies with --on", 4);
+    }
+    const client = await getClient();
+    writeJson(
+      await runPersonLoginPhone(client, parseId(personIdStr, "personId"), !!opts.on, !!opts.takeOver, opts)
+    );
+  }));
+
   // ─── person default-company subgroup ─────────────────────────────────────
   const personDefaultCompany = p
     .command("default-company")
@@ -1289,6 +1308,27 @@ export async function runPersonSetOwner(
   return client.post(
     `/api/person/setOwner/${personId}`,
     { ownerAsiakasId },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * PUT /api/person/:personId/login-phone — turn phone/SMS login on or off for the
+ * person's SAVED personPhone (the admin tick in EditPerson). The server gates it
+ * to a company admin of any company the person belongs to (or developer). A 409
+ * means another account already logs in with the number: re-run with
+ * takeOver=true to move it. Write-flag headers (incl. X-Dry-Run) are forwarded.
+ */
+export async function runPersonLoginPhone(
+  client: ApiClient,
+  personId: number,
+  enabled: boolean,
+  takeOver: boolean,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.put(
+    `/api/person/${personId}/login-phone`,
+    { enabled, takeOver },
     { headers: writeFlagsToHeaders(flags) }
   );
 }

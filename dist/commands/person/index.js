@@ -656,6 +656,20 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         const result = await runPersonSetOwner(client, parseId(personIdStr, "personId"), ownerAsiakasId, opts);
         writeJson(result);
     }));
+    addWriteFlagsToCommand(p
+        .command("login-phone <personId>")
+        .option("--on")
+        .option("--off")
+        .option("--take-over")).action(guarded(async (personIdStr, opts) => {
+        if (!!opts.on === !!opts.off) {
+            failWith("Pass exactly one of --on / --off", 4);
+        }
+        if (opts.takeOver && opts.off) {
+            failWith("--take-over only applies with --on", 4);
+        }
+        const client = await getClient();
+        writeJson(await runPersonLoginPhone(client, parseId(personIdStr, "personId"), !!opts.on, !!opts.takeOver, opts));
+    }));
     // ─── person default-company subgroup ─────────────────────────────────────
     const personDefaultCompany = p
         .command("default-company")
@@ -842,6 +856,16 @@ export async function runPersonUpdate(client, personId, patch, flags) {
  */
 export async function runPersonSetOwner(client, personId, ownerAsiakasId, flags) {
     return client.post(`/api/person/setOwner/${personId}`, { ownerAsiakasId }, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * PUT /api/person/:personId/login-phone — turn phone/SMS login on or off for the
+ * person's SAVED personPhone (the admin tick in EditPerson). The server gates it
+ * to a company admin of any company the person belongs to (or developer). A 409
+ * means another account already logs in with the number: re-run with
+ * takeOver=true to move it. Write-flag headers (incl. X-Dry-Run) are forwarded.
+ */
+export async function runPersonLoginPhone(client, personId, enabled, takeOver, flags) {
+    return client.put(`/api/person/${personId}/login-phone`, { enabled, takeOver }, { headers: writeFlagsToHeaders(flags) });
 }
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so the
 // ESM build doesn't need a default-export shim. A plain property read on an

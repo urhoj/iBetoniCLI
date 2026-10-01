@@ -167,7 +167,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 846_000 → 848_000 (2026-09-30): new leaf `ib dev migration run` (fb#1851); spec trimmed
 // once. Measured 847 141 B.
 // 848_000 → 849_000 (2026-10-01): `ib keikka update --driving-instructions/--comment/--title` (fb#2045); spec trimmed. Measured 848 202 B.
-const DUMP_LIMIT_BYTES = 849_000;
+// 849_000 → 852_000 (2026-10-01): new `ib person login-phone` (phone/SMS login enrolment). Measured 851 009 B.
+const DUMP_LIMIT_BYTES = 852_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

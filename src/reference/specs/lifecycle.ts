@@ -342,6 +342,41 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib person login-phone",
+    description:
+      "Turn phone/SMS login on or off for a person's SAVED phone number (personLoginPhone) — the admin tick in EditPerson. Once on, the person can log in at betoni.online with a one-time SMS code to that number. Exactly one of --on / --off.",
+    permissions: [
+      "company admin (asiakasAdmin / hrAdmin / asiakasOwner) of ANY company the person belongs to",
+      "developer/system-admin: any person",
+    ],
+    args: [{ name: "personId", type: "number", description: "personId whose phone login to change" }],
+    flags: [
+      { name: "on", type: "boolean", description: "Enable login with the person's current phone number" },
+      { name: "off", type: "boolean", description: "Disable it" },
+      { name: "take-over", type: "boolean", description: "With --on: move the number from the account that currently logs in with it" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape:
+      "{ personId, phoneLoginEnabled, takenOver } or { dryRun: true, wouldSetLoginPhone: { personId, enabled } }",
+    errors: [
+      { origin: "client", exit: 4, match: ["exactly one of --on", "--take-over only"], meaning: "Neither/both of --on/--off, or --take-over with --off", remedy: "pass exactly one of --on / --off; --take-over only with --on" },
+      apiErr(400, "The saved phone is not a Finnish mobile number (04x / 050)", "fix the number with `ib person update <id> --phone`, then retry"),
+      apiErr(403, "Not a company admin of any company this person belongs to", "see the permissions above"),
+      apiErr(404, "Person not found", "verify personId"),
+      apiErr(409, "Another account already logs in with this number (LOGIN_PHONE_TAKEN)", "re-run with --take-over to move it here; the other account then loses login by that number"),
+    ],
+    notes: [
+      "One active account per number. The number is always the person's SAVED personPhone; changing that phone later turns phone login off again automatically (a DB trigger). The person can also enable it themselves by entering an SMS code in their own profile.",
+    ],
+    seeAlso: ["ib person update"],
+    examples: [
+      "ib person login-phone 6361 --on --reason 'driver logs in by SMS'",
+      "ib person login-phone 6361 --on --take-over --reason 'number moved to the new account'",
+      "ib person login-phone 6361 --off --reason 'left the company'",
+    ],
+  },
+  {
     command: "ib person delete",
     description: "Delete a person. Requires --reason.",
     permissions: ["auth.page.person.edit"],

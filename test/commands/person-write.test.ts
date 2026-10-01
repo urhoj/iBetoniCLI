@@ -5,6 +5,7 @@ import {
   runPersonUpdate,
   runPersonDelete,
   runPersonSetOwner,
+  runPersonLoginPhone,
   buildPersonCreateBody,
   buildPersonUpdateBody,
   missingPersonCreateFields,
@@ -203,5 +204,26 @@ describe("runPersonSetOwner", () => {
       { ownerAsiakasId: null },
       { headers: { "X-Action-Reason": "make global" } }
     );
+  });
+});
+
+describe("runPersonLoginPhone", () => {
+  beforeEach(() => { mockClient.put.mockReset(); });
+
+  test("--on --take-over: PUTs /api/person/<id>/login-phone with both booleans and write headers", async () => {
+    mockClient.put.mockResolvedValueOnce({ personId: 6361, phoneLoginEnabled: true, takenOver: true });
+    const result = await runPersonLoginPhone(mockClient, 6361, true, true, { reason: "moved", dryRun: true });
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/person/6361/login-phone",
+      { enabled: true, takeOver: true },
+      { headers: { "X-Action-Reason": "moved", "X-Dry-Run": "1" } }
+    );
+    expect(result).toEqual({ personId: 6361, phoneLoginEnabled: true, takenOver: true });
+  });
+
+  test("--off: enabled false, takeOver false", async () => {
+    mockClient.put.mockResolvedValueOnce({ personId: 6361, phoneLoginEnabled: false });
+    await runPersonLoginPhone(mockClient, 6361, false, false, {});
+    expect(mockClient.put).toHaveBeenCalledWith("/api/person/6361/login-phone", { enabled: false, takeOver: false }, { headers: {} });
   });
 });
