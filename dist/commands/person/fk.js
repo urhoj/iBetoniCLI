@@ -257,13 +257,7 @@ export function registerPersonFkCommands(person, getClient) {
     }));
     addWriteFlagsToCommand(addOwnerWithAlias(fk.command("import <file>").option("--source <ref>"))).action(guarded(async (file, opts) => {
         foldOwnerAlias(opts);
-        let arr;
-        try {
-            arr = readJsonInput(file);
-        }
-        catch {
-            failWith("import: file is not valid JSON", 4);
-        }
+        const arr = readJsonInput(file, "import file");
         if (!Array.isArray(arr))
             failWith("import: JSON root must be an array of { personId, key, source?, text?, disabled? }", 4);
         writeJson(await runPersonFkImport(await getClient(), arr, opts, opts));

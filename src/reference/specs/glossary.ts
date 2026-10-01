@@ -117,7 +117,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       // catch-all (fb#668).
       { http: 404, exit: 5, match: "append/add/remove requires an existing term", meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
       { http: 400, exit: 4, meaning: "definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length)", remedy: "Shorten the definition" },
-      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is not valid JSON/readable, or the object has an unknown key or a wrong-typed value (e.g. `\"synonyms\": 123`)", remedy: "The message names the key; fix it in the file — nothing is silently dropped" },
+      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, empty, not valid JSON, not a JSON object, or the object has an unknown key or a wrong-typed value (e.g. `\"synonyms\": 123`)", remedy: "The error says WHICH (fb#2174): an unopenable path, an empty file, a JSON syntax error (no field read yet, so not the key names), a non-object root, or an unknown / wrong-typed key it names. Only the last is about field names; nothing is silently dropped" },
       AI_CONFIDENCE_PARSE_ERR,
     ],
     examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"', "echo '{\"appendDefinition\":\" Eräpäivä = laskun viimeinen maksupäivä.\",\"addSynonyms\":[\"eräpvm\"]}' | ib glossary set eräpäivä --from-json - --update-only --reason groom"],
@@ -142,7 +142,7 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
     ],
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
-      { origin: "client", exit: 4, meaning: "File is not valid JSON or root is not an array", remedy: "Check the file path and JSON syntax" },
+      { origin: "client", exit: 4, meaning: "File is unreadable, empty, not valid JSON, or its root is not an array", remedy: "The error says which (fb#2174): fix the path, the JSON syntax, or wrap the entries in [ ]" },
     ],
     examples: ['ib glossary import terms.json --reason "bulk groom"', 'echo \'[{"term":"loma","definition":"Vapaapaiva"}]\' | ib glossary import - --reason "test"'],
   },

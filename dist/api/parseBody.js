@@ -138,20 +138,13 @@ export function readTextInput(pathOrDash) {
     }
 }
 /**
- * Read and JSON-parse a file (or stdin when the path is `-`), returning whatever
- * shape the document holds — object OR array. The raw fs / `SyntaxError` is left
- * to escape: every caller wraps this in its own catch with a command-specific
- * message, so mapping the failure here would flatten those.
- * Use {@link readJsonObjectInput} when the value must be a JSON object.
- */
-export function readJsonInput(path) {
-    return JSON.parse(readRawInput(path));
-}
-/**
- * Read a JSON object from a file path, or from stdin when the path is `-`.
- * Strips a leading BOM. This is the shell-safe alternative to inline `--body`
- * (a shell can strip its inner quotes), and mirrors `ib glossary import`'s
- * file/stdin pattern. Read/parse/shape failures all map to exit 4.
+ * Read and JSON-parse a file, or stdin when the path is `-`, returning whatever
+ * shape it holds (object OR array). Strips a leading BOM. `label` names the flag
+ * or argument in the message (`--from-json`, `--map`, `import file`).
+ *
+ * Read, empty-file and syntax failures each map to exit 4 with their OWN message
+ * and hint. Callers used to wrap this in a bare `catch` that reported every one
+ * of them, a missing file included, as "not valid JSON" (fb#2174).
  *
  * These are LOCAL failures, so they carry `statusCode: 0` — the documented
  * client-origin marker — not a fabricated HTTP status. They used to throw 400,
@@ -161,7 +154,7 @@ export function readJsonInput(path) {
  * on `changelog add`), and (c) logged the same lie to the friction store.
  * Feedback #305/#307 — keep these at 0.
  */
-export function readJsonObjectInput(pathOrDash) {
+export function readJsonInput(pathOrDash, label = "--from-json") {
     let raw;
     try {
         raw = readRawInput(pathOrDash);
@@ -175,7 +168,7 @@ export function readJsonObjectInput(pathOrDash) {
         const hint = pathOrDash === "-"
             ? "Nothing readable arrived on stdin. Pipe the JSON in (`… | ib … --from-json -`) or pass a file path instead of `-`."
             : "Could not open that path. Check it exists and is readable; the argument is a file path, or `-` to read stdin.";
-        throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4, hint);
+        throw new CliError(`Could not read ${label} ${pathOrDash}: ${detail}`, 0, null, 4, hint);
     }
     // A distinct cause from a syntax error: the file WAS read, it just holds
     // nothing — commonly a stale 0-byte file from an earlier attempt, or a path
@@ -183,7 +176,7 @@ export function readJsonObjectInput(pathOrDash) {
     // resolving to two different directories on Windows/Git Bash). The syntax-error
     // hint below explicitly rules out "the path", which is exactly wrong here (fb#768).
     if (raw.trim() === "") {
-        throw new CliError(`--from-json ${pathOrDash} is empty (0 bytes)`, 0, null, 4, "The file was read successfully but holds no content. Check you wrote to this exact path — a stale 0-byte file from an earlier attempt, or a tool resolving the same path string to a different location than the CLI (e.g. /tmp on Windows/Git Bash), are the common causes.");
+        throw new CliError(`${label} ${pathOrDash} is empty (0 bytes)`, 0, null, 4, "The file was read successfully but holds no content. Check you wrote to this exact path — a stale 0-byte file from an earlier attempt, or a tool resolving the same path string to a different location than the CLI (e.g. /tmp on Windows/Git Bash), are the common causes.");
     }
     let parsed;
     try {
@@ -191,8 +184,15 @@ export function readJsonObjectInput(pathOrDash) {
     }
     catch (e) {
         const detail = errorMessage(e);
-        throw new CliError(`--from-json ${pathOrDash} (${raw.length} bytes) is not valid JSON: ${detail}`, 0, null, 4, fromJsonParseHint(raw, detail));
+        throw new CliError(`${label} ${pathOrDash} (${raw.length} bytes) is not valid JSON: ${detail}`, 0, null, 4, fromJsonParseHint(raw, detail));
     }
+    return parsed;
+}
+/**
+ * {@link readJsonInput}, then require the root to be a JSON object.
+ */
+export function readJsonObjectInput(pathOrDash) {
+    const parsed = readJsonInput(pathOrDash);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
         // Name what the root ACTUALLY was: "must contain a JSON object" alone leaves
         // the caller re-reading a document that is valid JSON, just the wrong shape.

@@ -24,7 +24,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     flags: [{ name: "dry-run", type: "boolean", description: "Resolve client-side: print what each entry would send, never send" }],
     outputShape: "{ results: [{index, feedbackId, ok, error?}], ok, failed }",
     errors: [
-      { origin: "client", exit: 4, match: "not valid JSON", meaning: "The file could not be parsed at all", remedy: "Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem" },
+      { origin: "client", exit: 4, match: "import file", meaning: "The file could not be read (missing path, empty) or parsed at all; the message says which (fb#2174)", remedy: "Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem" },
       { origin: "client", exit: 4, match: "root must be an array", meaning: "The JSON root is an object, not an array", remedy: "A single entry goes to `ib dev feedback create --from-json`, which takes an object; wrap it in [ ] only if you really mean a batch" },
       ...COMMON_AUTH_ERRORS,
     ],

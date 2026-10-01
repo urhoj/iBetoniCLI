@@ -355,8 +355,7 @@ export function registerCustomerFkCommands(customer: Command, getClient: () => P
 
   addWriteFlagsToCommand(addOwnerOption(fk.command("import <file>").option("--source <ref>"))).action(
     guarded(async (file: string, opts: WriteFlags & { source?: string; owner?: number }) => {
-      let arr: unknown;
-      try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }
+      const arr: unknown = readJsonInput(file, "import file");
       if (!Array.isArray(arr)) failWith("import: JSON root must be an array of { asiakasId, key, source? }", 4);
       writeJson(await runCustomerFkImport(await getClient(), arr, opts, opts));
     })

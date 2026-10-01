@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { CliError } from "../../src/api/errors.js";
 import {
   parseJsonBodyFlag,
+  readJsonInput,
   readJsonObjectInput,
   resolveJsonObjectBody,
 } from "../../src/api/parseBody.js";
@@ -308,6 +309,51 @@ describe("locally-raised parse failures declare client origin (statusCode 0)", (
       expect(captured(() => readJsonObjectInput(file)).statusCode).toBe(0);
       writeFileSync(file, "[1,2,3]", "utf8");
       expect(captured(() => readJsonObjectInput(file)).statusCode).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// fb#2174: every array reader (glossary/fk/feedback import, changelog --map) and
+// `glossary set --from-json` wrapped readJsonInput in a bare catch that reported a
+// MISSING file as "not valid JSON". The reader now names the real cause itself.
+describe("readJsonInput (labelled, object OR array)", () => {
+  const fail = (fn: () => unknown): CliError => {
+    try {
+      fn();
+    } catch (e) {
+      return e as CliError;
+    }
+    throw new Error("should have thrown");
+  };
+
+  test("a MISSING file says it could not be read, under the caller's label", () => {
+    const err = fail(() => readJsonInput(join(tmpdir(), "does-not-exist-ib.json"), "import file"));
+    expect(err.exitCode).toBe(4);
+    expect(err.message).toMatch(/^Could not read import file .*ENOENT/);
+    expect(err.message).not.toContain("not valid JSON");
+    expect(err.hint).toContain("Could not open that path");
+  });
+
+  test("a syntax error says not valid JSON, under the caller's label", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-rji-"));
+    try {
+      const p = join(dir, "bad.json");
+      writeFileSync(p, "[1,");
+      const err = fail(() => readJsonInput(p, "--map"));
+      expect(err.message).toMatch(/^--map .* is not valid JSON: /);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an array root is returned as is", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-rji-"));
+    try {
+      const p = join(dir, "arr.json");
+      writeFileSync(p, "[1,2]");
+      expect(readJsonInput(p, "import file")).toEqual([1, 2]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

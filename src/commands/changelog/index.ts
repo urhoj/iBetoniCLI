@@ -1378,8 +1378,7 @@ export function registerChangelogCommands(
       failWith("provide exactly one of --vtag or --map", 4);
     }
     if (o.map) {
-      let arr: unknown;
-      try { arr = readJsonInput(o.map); } catch { failWith("--map: not valid JSON", 4); }
+      const arr: unknown = readJsonInput(o.map, "--map");
       if (!Array.isArray(arr)) failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
       writeJson(await runChangelogReleaseMap(
         await getClient(),

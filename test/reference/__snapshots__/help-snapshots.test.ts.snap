@@ -1486,7 +1486,7 @@ OUTPUT (JSON, stdout)
   { dryRun?, results:[{ asiakasId, key, ok, action?, error? }] (input order), ok, failed, inserted, unchanged }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  File is not valid JSON, or its root is not an array → pass a JSON array of { asiakasId, key, source? } (or - for stdin)
+  exit 4 (client-side)  File is unreadable, empty or not valid JSON (the message says which, fb#2174), or its root is not an array → pass a JSON array of { asiakasId, key, source? } (or - for stdin)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
@@ -4304,7 +4304,7 @@ OUTPUT (JSON, stdout)
   { results: [{index, feedbackId, ok, error?}], ok, failed }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  The file could not be parsed at all → Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem
+  exit 4 (client-side)  The file could not be read (missing path, empty) or parsed at all; the message says which (fb#2174) → Check the file is UTF-8 JSON; no entry has been read yet, so the key names are not the problem
   exit 4 (client-side)  The JSON root is an object, not an array → A single entry goes to \`ib dev feedback create --from-json\`, which takes an object; wrap it in [ ] only if you really mean a batch
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5683,7 +5683,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required
-  exit 4 (client-side)  File is not valid JSON or root is not an array → Check the file path and JSON syntax
+  exit 4 (client-side)  File is unreadable, empty, not valid JSON, or its root is not an array → The error says which (fb#2174): fix the path, the JSON syntax, or wrap the entries in [ ]
 
 NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
@@ -5879,7 +5879,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Term not found (with --update-only) → Omit --update-only to create the entry
   exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
   exit 4 (HTTP 400)  definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length) → Shorten the definition
-  exit 4 (client-side)  --from-json file is not valid JSON/readable, or the object has an unknown key or a wrong-typed value (e.g. \`"synonyms": 123\`) → The message names the key; fix it in the file — nothing is silently dropped
+  exit 4 (client-side)  --from-json file is unreadable, empty, not valid JSON, not a JSON object, or the object has an unknown key or a wrong-typed value (e.g. \`"synonyms": 123\`) → The error says WHICH (fb#2174): an unopenable path, an empty file, a JSON syntax error (no field read yet, so not the key names), a non-object root, or an unknown / wrong-typed key it names. Only the last is about field names; nothing is silently dropped
   exit 4 (client-side)  --ai-confidence is not an integer 0–100, rejected locally before any request → pass an integer 0-100
 
 NOTES
@@ -12737,7 +12737,7 @@ OUTPUT (JSON, stdout)
   { dryRun?, results:[{ personId, key, ok, action?, error? }] (input order), ok, failed, inserted, updated, unchanged }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  File is not valid JSON, or its root is not an array → pass a JSON array of { personId, key, source?, text?, disabled? } (or - for stdin)
+  exit 4 (client-side)  File is unreadable, empty or not valid JSON (the message says which, fb#2174), or its root is not an array → pass a JSON array of { personId, key, source?, text?, disabled? } (or - for stdin)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)

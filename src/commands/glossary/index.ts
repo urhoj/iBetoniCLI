@@ -17,7 +17,7 @@ import { intFlag, cappedInt } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
-import { readJsonInput } from "../../api/parseBody.js";
+import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
 import { payloadKeyMap, normalizeFromJson } from "../_shared/fromJson.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
@@ -494,9 +494,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       };
       let merged: GlossarySetFields = flagFields;
       if (opts.fromJson) {
-        let json: Record<string, unknown>;
-        try { json = readJsonInput(opts.fromJson) as Record<string, unknown>; }
-        catch { failWith("--from-json: not valid JSON", 4); }
+        const json = readJsonObjectInput(opts.fromJson);
         merged = mergeSetInput(canonicalGlossarySetJson(json, glossarySetJsonKeys(set), term), flagFields);
       }
       // Validate the MERGED score, not just the flag — a --from-json object can
@@ -513,8 +511,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
   addWriteFlagsToCommand(imp)
     .option("--update-only")
     .action(guarded(async (file: string, opts: WriteFlags & { updateOnly?: boolean }) => {
-      let arr: unknown;
-      try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }
+      const arr: unknown = readJsonInput(file, "import file");
       if (!Array.isArray(arr)) { failWith("import: JSON root must be an array", 4); }
       writeJson(await runGlossaryImport(await getClient(), arr as Array<Record<string, unknown>>, opts, glossarySetJsonKeys(set)));
     }));

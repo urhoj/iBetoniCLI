@@ -208,13 +208,7 @@ export function registerCustomerFkCommands(customer, getClient) {
         writeJson(await runCustomerFkRemove(await getClient(), parseId(idStr, "asiakasId"), fkId, opts, opts));
     }));
     addWriteFlagsToCommand(addOwnerOption(fk.command("import <file>").option("--source <ref>"))).action(guarded(async (file, opts) => {
-        let arr;
-        try {
-            arr = readJsonInput(file);
-        }
-        catch {
-            failWith("import: file is not valid JSON", 4);
-        }
+        const arr = readJsonInput(file, "import file");
         if (!Array.isArray(arr))
             failWith("import: JSON root must be an array of { asiakasId, key, source? }", 4);
         writeJson(await runCustomerFkImport(await getClient(), arr, opts, opts));

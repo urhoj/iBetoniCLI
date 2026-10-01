@@ -2252,12 +2252,7 @@ export function registerFeedbackCommands(
     .option("--dry-run")
     .action(
       guarded(async (file: string, opts: { dryRun?: boolean }) => {
-        let arr: unknown;
-        try {
-          arr = readJsonInput(file);
-        } catch {
-          failWith("import: file is not valid JSON", 4);
-        }
+        const arr = readJsonInput(file, "import file");
         // Mirrors create's own root-shape message, in the other direction: there
         // the array is wrong and an object is wanted, here the reverse. Both name
         // the sibling that takes the shape the caller actually has.

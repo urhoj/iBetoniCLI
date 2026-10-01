@@ -176,7 +176,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ dryRun?, results:[{ personId, key, ok, action?, error? }] (input order), ok, failed, inserted, updated, unchanged }",
     errors: [
-      { origin: "client", exit: 4, match: "import:", meaning: "File is not valid JSON, or its root is not an array", remedy: "pass a JSON array of { personId, key, source?, text?, disabled? } (or - for stdin)" },
+      { origin: "client", exit: 4, match: "import", meaning: "File is unreadable, empty or not valid JSON (the message says which, fb#2174), or its root is not an array", remedy: "pass a JSON array of { personId, key, source?, text?, disabled? } (or - for stdin)" },
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
@@ -311,7 +311,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "{ dryRun?, results:[{ asiakasId, key, ok, action?, error? }] (input order), ok, failed, inserted, unchanged }",
     errors: [
-      { origin: "client", exit: 4, match: "import:", meaning: "File is not valid JSON, or its root is not an array", remedy: "pass a JSON array of { asiakasId, key, source? } (or - for stdin)" },
+      { origin: "client", exit: 4, match: "import", meaning: "File is unreadable, empty or not valid JSON (the message says which, fb#2174), or its root is not an array", remedy: "pass a JSON array of { asiakasId, key, source? } (or - for stdin)" },
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
