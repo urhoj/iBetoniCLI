@@ -76,6 +76,22 @@ export function resolveDate(input: string | undefined): string | undefined {
   return input;
 }
 
+const ISO_DATE_OR_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/**
+ * `YYYY-MM-DD` or a full ISO datetime that names a REAL instant. Two checks,
+ * because each misses what the other catches: `Date.parse` ROLLS a day overflow
+ * over (`2026-02-30` parses as 2 March), and only `Date.parse` rejects a bad
+ * time part (`T25:00`). Same rule as the backend's feedback gate guard (fb#2192/2193).
+ */
+export function isIsoDateOrDateTime(value: string): boolean {
+  const m = ISO_DATE_OR_DATETIME_RE.exec(value);
+  if (!m || Number.isNaN(Date.parse(value))) return false;
+  const [y, mo, d] = [m[1], m[2], m[3]].map(Number);
+  const day = new Date(Date.UTC(y, mo - 1, d));
+  return day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d;
+}
+
 /** Already carries a zone: trailing `Z` or a `±HH:MM` / `±HHMM` offset. */
 const ZONED_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 

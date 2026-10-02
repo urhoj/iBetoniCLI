@@ -1661,7 +1661,16 @@ describe("ib feedback update — gate fields (fb#446)", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  test("a valid --gate-until (today) resolves and is sent, unlike the unvalidated backend", async () => {
+  // fb#2193: Date.parse ROLLS a day overflow over, so the old regex+Date.parse
+  // guard sent "2026-02-30" to the server.
+  test("a day-overflow --gate-until (2026-02-30) exits 4 CLIENT-SIDE, no PUT", async () => {
+    await expect(runFeedbackUpdate(mockClient, 1, { gateUntil: "2026-02-30" })).rejects.toMatchObject({
+      exitCode: 4,
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("a valid --gate-until (today) resolves and is sent", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42 });
     await runFeedbackUpdate(mockClient, 42, { gateKind: "soak", gateUntil: "today" });
     const body = put.mock.calls[0][1];

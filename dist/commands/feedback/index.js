@@ -26,7 +26,7 @@ import { readJsonInput } from "../../api/parseBody.js";
 import { getEmbeddedCtx } from "../../embedded.js";
 import { CliError, errorMessage } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
-import { resolveDate } from "../../dates.js";
+import { isIsoDateOrDateTime, resolveDate } from "../../dates.js";
 import { runLogEntity } from "../log/index.js";
 /** PumiNet Oy — mirrors PUMINET.OWNER_ASIAKAS_ID, the tenant feedback audit rows are pinned to (fb#1139). */
 const FEEDBACK_AUDIT_OWNER_ASIAKAS_ID = 26;
@@ -191,22 +191,20 @@ function validateComplexity(value, flag = "--complexity") {
     }
     return n;
 }
-/** `YYYY-MM-DD` or a full ISO datetime — mirrors `ib log`'s local assertIsoDate. */
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
 /**
- * Validate `--gate-until` CLIENT-SIDE (fb#446): the backend does not validate
- * it at all — a malformed date reaches SQL and surfaces as a 500 + a Sentry
- * event where a 400 was meant, and the CLI is the real caller. `today` /
- * `yesterday` / `tomorrow` expand via the shared `resolveDate`; an
- * explicitly-passed EMPTY string is the documented "clear this field"
- * convention (see `clearHint`) and passes through unchecked — there is
- * nothing to validate about clearing a field.
+ * Validate `--gate-until` CLIENT-SIDE (fb#446). The backend re-validates since
+ * fb#1058/fb#2192 (400), so this guard is no longer the only line: it exits 4
+ * before the network, names the flag, and covers the client-side `--dry-run`,
+ * which never reaches the server. `today` / `yesterday` / `tomorrow` expand
+ * via the shared `resolveDate`; an explicitly-passed EMPTY string is the
+ * documented "clear this field" convention (see `clearHint`) and passes
+ * through unchecked — there is nothing to validate about clearing a field.
  */
 function assertGateUntil(value) {
     if (!value)
         return value;
     const resolved = resolveDate(value) ?? value;
-    if (!ISO_DATE_RE.test(resolved) || Number.isNaN(Date.parse(resolved))) {
+    if (!isIsoDateOrDateTime(resolved)) {
         failWith(`--gate-until must be YYYY-MM-DD or an ISO datetime (got '${value}').`, 4);
     }
     return resolved;
@@ -214,10 +212,10 @@ function assertGateUntil(value) {
 /** Column width of cliFeedback.gateRef (nvarchar(200)). */
 export const GATE_REF_MAX = 200;
 /**
- * Validate `--gate-ref` length CLIENT-SIDE (fb#1644): the backend enforces the
- * column width, but as a Finnish SQL-shaped 400 ("Arvo on liian pitkä
- * sarakkeeseen 'gateRef'") that names neither the flag nor the limit. An empty
- * string is the CLEAR convention (see `clearHint`) and passes through.
+ * Validate `--gate-ref` length CLIENT-SIDE (fb#1644): the backend also rejects
+ * it (a 400 naming `gateRef`, since fb#1058), but only this guard names the
+ * FLAG and works under the client-side `--dry-run`. An empty string is the
+ * CLEAR convention (see `clearHint`) and passes through.
  */
 function assertGateRef(value) {
     if (value && value.length > GATE_REF_MAX) {

@@ -1,6 +1,31 @@
 import { describe, test, expect, afterEach, vi } from "vitest";
-import { resolveDate, resolveDateTime, todayHelsinki, addDaysISO, monthRange, weekRange } from "../src/dates.js";
+import {
+  isIsoDateOrDateTime,
+  resolveDate,
+  resolveDateTime,
+  todayHelsinki,
+  addDaysISO,
+  monthRange,
+  weekRange,
+} from "../src/dates.js";
 import { CliError } from "../src/api/errors.js";
+
+describe("isIsoDateOrDateTime — a REAL date or ISO datetime (fb#2193)", () => {
+  test.each(["2026-10-15", "2024-02-29", "2026-10-15T06:00:00Z", "2026-10-15T06:00:00.123+03:00", "2026-10-15T06:00"])(
+    "accepts %s",
+    (v) => expect(isIsoDateOrDateTime(v)).toBe(true)
+  );
+
+  test.each([
+    ["day overflow (Date.parse rolls it to March)", "2026-02-30"],
+    ["day overflow in a datetime", "2026-04-31T06:00:00Z"],
+    ["non-leap Feb 29", "2026-02-29"],
+    ["month overflow", "2026-13-01"],
+    ["bad time part (only Date.parse catches it)", "2026-10-15T25:00"],
+    ["garbage", "next week"],
+    ["space-separated datetime", "2026-10-15 06:00"],
+  ])("rejects %s", (_label, v) => expect(isIsoDateOrDateTime(v)).toBe(false));
+});
 
 describe("resolveDate / todayHelsinki — Europe/Helsinki calendar date", () => {
   afterEach(() => {

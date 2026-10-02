@@ -1,6 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith, warnNote } from "../../output/json.js";
-import { resolveDate } from "../../dates.js";
+import { isIsoDateOrDateTime, resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId, cappedInt, intFlag, addOwnerOption } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -19,10 +19,9 @@ function assertKnownEntityType(entityType) {
         warnNote(`note: entityType '${entityType}' is deprecated — ${info.notes}`);
     }
 }
-/** Accepts YYYY-MM-DD or a full ISO datetime; anything else is exit 4. */
+/** Accepts a real YYYY-MM-DD or full ISO datetime; anything else is exit 4. */
 function assertIsoDate(value, flag) {
-    if (!/^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(value) ||
-        isNaN(Date.parse(value))) {
+    if (!isIsoDateOrDateTime(value)) {
         failWith(`${flag} must be YYYY-MM-DD or an ISO datetime (got '${value}').`, 4);
     }
 }
