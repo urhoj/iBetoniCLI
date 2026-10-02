@@ -59,7 +59,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
       { name: "details", type: "boolean", description: "Include slimmed top-items per signal, not just counts" },
     ],
     outputShape:
-      "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }; every feedback item also carries { gateKind, gateRef, gateUntil } (null when ungated); jerry.items carry an `expired` flag).",
+      "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }; every feedback item also carries { gateKind, gateRef, gateUntil } (null when ungated); jerry.items carry an `expired` flag), and a top-level `sms` block — the GatewayAPI prepaid balance: { credit, currency, low, lowThreshold } (low = credit < lowThreshold EUR), or { error } when it could not be read. `sms` never counts toward needsYou.",
     errors: authErrors(
       apiErr(403, "Developer access required", "inbox is developer-gated; use a developer/sysadmin token")
     ),

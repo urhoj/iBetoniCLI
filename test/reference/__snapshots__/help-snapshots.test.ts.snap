@@ -4866,7 +4866,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an \`items\` array (feedback.items splits into { open, reviewed }; every feedback item also carries { gateKind, gateRef, gateUntil } (null when ungated); jerry.items carry an \`expired\` flag).
+  { generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an \`items\` array (feedback.items splits into { open, reviewed }; every feedback item also carries { gateKind, gateRef, gateUntil } (null when ungated); jerry.items carry an \`expired\` flag), and a top-level \`sms\` block — the GatewayAPI prepaid balance: { credit, currency, low, lowThreshold } (low = credit < lowThreshold EUR), or { error } when it could not be read. \`sms\` never counts toward needsYou.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

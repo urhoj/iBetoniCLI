@@ -30,6 +30,10 @@ export interface InboxRollup {
     noSupplyExpired: number;
     items?: unknown[];
   };
+  /** GatewayAPI prepaid balance; `--details` only, never part of needsYou. */
+  sms?:
+    | { credit: number; currency: string; low: boolean; lowThreshold: number }
+    | { error: string };
 }
 
 /**
