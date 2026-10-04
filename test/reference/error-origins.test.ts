@@ -505,3 +505,18 @@ describe("feedback create/update answer the pre-split gateKind 400 (fb#1224)", (
     }
   );
 });
+
+/**
+ * fb#2224 — a pre-fb#2221 backend answers an email ARRAY with "provide exactly
+ * one of personId or email", which read like a CLI input mistake. The CLI never
+ * sends both/neither, so that 400 is deploy skew and must say so.
+ */
+describe("notification email send answers the pre-multi-recipient 400 (fb#2224)", () => {
+  test("reaches the deploy-skew remedy, not the generic input one", () => {
+    const rows = rowsOf("ib notification email send");
+    expect(hintForError(server("provide exactly one of personId or email", 400), rows)).toMatch(
+      /deploy skew.*nothing was sent/
+    );
+    expect(hintForError(server("subject is required", 400), rows)).toBe("fix that input");
+  });
+});

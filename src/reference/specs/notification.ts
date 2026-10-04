@@ -95,8 +95,16 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
     errors: [
       apiErr(
         400,
-        "Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, recipient has no email on file, or both/neither of personId+email",
+        "Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, or recipient has no email on file",
         "fix that input"
+      ),
+      // The CLI always sends exactly one of personId/email, so this 400 only comes
+      // from a backend that rejects the email ARRAY — deploy skew, not input (fb#2224).
+      apiErr(
+        400,
+        "Backend predates multi-recipient send",
+        "deploy skew: backend predates several recipients/--bcc (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent",
+        "exactly one of personId or email"
       ),
       {
         origin: "client",
@@ -126,7 +134,6 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       "Recipient: '@' values are raw addresses (comma-separated → one mail, all on To, visible to each other); else a personId or a name resolved in your company (0 matches → exit 5, >1 → exit 4).",
       "A SendGrid failure returns 422 with the provider message (the CDN masks origin 5xx) — NOT a caller auth/validation error.",
       "--from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.",
-      "Deploy-gated: a pre-fb#2221 backend 400s several recipients/--bcc addresses (never sends).",
     ],
     seeAlso: ["ib notification fcm send", "ib person email list"],
     examples: [

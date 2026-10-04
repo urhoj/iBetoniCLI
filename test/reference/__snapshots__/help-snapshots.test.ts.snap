@@ -10639,7 +10639,8 @@ OUTPUT (JSON, stdout)
   { sent:true, to, from, bcc?, subject } | { dryRun:true, wouldSend:{ to, from, bcc?, subject, hasHtml } } (--dry-run); to/bcc are arrays when several
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, recipient has no email on file, or both/neither of personId+email → fix that input
+  exit 4 (HTTP 400)  Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, or recipient has no email on file → fix that input
+  exit 4 (HTTP 400)  Backend predates multi-recipient send → deploy skew: backend predates several recipients/--bcc (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent
   exit 4 (client-side)  A name/personId among several emails → list only emails, or send to the person alone
   exit 3 (HTTP 403)  Not Admin/HR/developer, or --from-brand juha used by anyone but its owner (or under impersonation) → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist, or use a developer/sysadmin token
   exit 5 (HTTP 404)  Recipient personId not found in your company → check the personId / name belongs to your company
@@ -10651,7 +10652,6 @@ NOTES
   - Recipient: '@' values are raw addresses (comma-separated → one mail, all on To, visible to each other); else a personId or a name resolved in your company (0 matches → exit 5, >1 → exit 4).
   - A SendGrid failure returns 422 with the provider message (the CDN masks origin 5xx) — NOT a caller auth/validation error.
   - --from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.
-  - Deploy-gated: a pre-fb#2221 backend 400s several recipients/--bcc addresses (never sends).
 
 SEE ALSO
   ib notification fcm send, ib person email list

@@ -169,7 +169,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 848_000 → 849_000 (2026-10-01): `ib keikka update --driving-instructions/--comment/--title` (fb#2045); spec trimmed. Measured 848 202 B.
 // 849_000 → 852_000 (2026-10-01): new `ib person login-phone` (phone/SMS login enrolment). Measured 851 009 B.
 // 852_000 → 853_000 (2026-10-01): new `ib dev feedback log` (fb#1139 audit trail) + orderedVehicleType on keikka list/schedule shapes (fb#2039). Measured 852 722 B.
-const DUMP_LIMIT_BYTES = 853_000;
+// 853_000 → 854_000 (2026-10-04): `ib notification email send` deploy-skew 400 row (fb#2224); its redundant deploy-gated note dropped. Measured 853 138 B.
+const DUMP_LIMIT_BYTES = 854_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
