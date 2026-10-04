@@ -47,7 +47,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
   {
     command: "ib notification email send",
     description:
-      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute, juha=juha.urho@ibetoni.fi owner-only); --bcc adds one blind copy. One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
+      "Send ONE email to a person (resolved in your company) or to raw addresses (comma-separated, all on To). Admin/HR/developer-gated server-side. Pick the sender with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute, juha=juha.urho@ibetoni.fi owner-only); --bcc adds blind copies (repeatable). One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
     tier: "admin",
     permissions: [
       "company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced)",
@@ -57,7 +57,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
         name: "recipient",
         type: "string",
         description:
-          "personId, a name resolved within your company, or a raw email address (contains '@')",
+          "personId, a name resolved within your company, or one or more raw email addresses (contain '@'), comma-separated",
       },
     ],
     flags: [
@@ -83,20 +83,28 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       {
         name: "bcc",
         type: "string",
-        description: "One blind-copy address (e.g. your own, to keep a copy of what you sent)",
+        description:
+          "Blind-copy address(es) — repeatable or comma-separated (e.g. your own, to keep a copy of what you sent)",
       },
       FROM_JSON_FLAGS_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "{ sent:true, to, from, bcc?, subject } | { dryRun:true, wouldSend:{ to, from, bcc?, subject, hasHtml } } (with --dry-run)",
+      "{ sent:true, to, from, bcc?, subject } | { dryRun:true, wouldSend:{ to, from, bcc?, subject, hasHtml } } (--dry-run); to/bcc are arrays when several",
     errors: [
       apiErr(
         400,
-        "Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, invalid --bcc, recipient has no email on file, or both/neither of personId+email",
-        "supply --subject, one of --body/--html/--html-body, a valid --from-brand, and a single valid --bcc address"
+        "Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, recipient has no email on file, or both/neither of personId+email",
+        "fix that input"
       ),
+      {
+        origin: "client",
+        exit: 4,
+        match: "several recipients must all be email addresses",
+        meaning: "A name/personId among several emails",
+        remedy: "list only emails, or send to the person alone",
+      },
       apiErr(
         403,
         "Not Admin/HR/developer, or --from-brand juha used by anyone but its owner (or under impersonation)",
@@ -115,19 +123,18 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Recipient: a value containing '@' is sent as a raw address; otherwise it is a personId or a name resolved via the company-scoped person search (0 matches → exit 5, >1 → exit 4).",
-      "A SendGrid send failure returns 422 with the real provider message (the CDN masks origin 5xx, so 4xx is used to keep the message readable) — it is NOT a caller auth/validation error despite the 4xx code.",
+      "Recipient: '@' values are raw addresses (comma-separated → one mail, all on To, visible to each other); else a personId or a name resolved in your company (0 matches → exit 5, >1 → exit 4).",
+      "A SendGrid failure returns 422 with the provider message (the CDN masks origin 5xx) — NOT a caller auth/validation error.",
       "--from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.",
-      "Useful for spam-score testing: send to a mail-tester.com address and read the SPF/DKIM/DMARC + SpamAssassin score.",
-      "Deploy-gated: a pre-cbd66b1e1 backend silently drops --bcc and 400s --from-brand juha.",
+      "Deploy-gated: a pre-fb#2221 backend 400s several recipients/--bcc addresses (never sends).",
     ],
     seeAlso: ["ib notification fcm send", "ib person email list"],
     examples: [
       "ib notification email send web-xxxxx@srv1.mail-tester.com --subject 'deliverability test' --body 'testing' --from-brand betonijerry --reason 'spam check'",
       "ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html",
       "ib notification email send 5351 --subject Raportti --html-body '<h1>Aamuraportti</h1><p>…</p>' --reason 'morning report over MCP'",
-      "ib notification email send 5351 --subject Test --body Hi --dry-run",
       "ib notification email send asiakas@example.fi --subject Tarjous --html ./tarjous.html --from-brand juha --bcc juha.urho@ibetoni.fi",
+      "ib notification email send 'a@x.fi,b@x.fi' --from-json ./mail.json --bcc me@x.fi --dry-run",
     ],
   },
 ];

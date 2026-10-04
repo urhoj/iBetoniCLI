@@ -165,6 +165,27 @@ describe("runNotificationEmailSend", () => {
       { headers: {} }
     );
   });
+
+  test("comma-separated recipients + repeated/comma --bcc post arrays (fb#2221)", async () => {
+    post().mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(
+      c,
+      { recipient: "a@x.fi, b@y.fi,", subject: "S", text: "B", bcc: ["m@i.fi,n@i.fi", "o@i.fi"] },
+      {}
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betoni", text: "B", bcc: ["m@i.fi", "n@i.fi", "o@i.fi"], email: ["a@x.fi", "b@y.fi"] },
+      { headers: {} }
+    );
+  });
+
+  test("a name inside a multi-recipient list → exit 4, no POST", async () => {
+    await expect(
+      runNotificationEmailSend(c, { recipient: "a@x.fi,Juha Urho", subject: "S", text: "B" }, {})
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.post).not.toHaveBeenCalled();
+  });
 });
 
 describe("resolveEmailHtml", () => {
