@@ -108,11 +108,11 @@ const EMAIL_BRANDS = ["betoni", "betonijerry", "juha"] as const;
 type EmailBrand = (typeof EMAIL_BRANDS)[number];
 
 /**
- * POST /api/cli/notification/email/send — send an email to one person (resolved
- * within the caller's company) or a raw address. Admin/HR/developer-gated
- * server-side. A recipient containing "@" is sent as a raw address; otherwise it
- * is resolved to a personId. Comma-separated addresses become one mail with all
- * of them on To (fb#2221) — a name/personId is only valid as a single recipient.
+ * POST /api/cli/notification/email/send — send ONE email to one person (resolved
+ * within the caller's company) or to one or more raw addresses. Admin/HR/developer-gated
+ * server-side. A recipient without "@" is ONE person ref (a name may itself hold
+ * a comma) resolved to a personId; otherwise it is split on commas into raw
+ * addresses, all on To of one mail (fb#2221) — a name/personId among them exits 4.
  * `--from-brand` picks the (whitelisted) sender.
  */
 export async function runNotificationEmailSend(
@@ -126,10 +126,20 @@ export async function runNotificationEmailSend(
   };
   if (input.text !== undefined) body.text = input.text;
   if (input.html !== undefined) body.html = input.html;
-  if (input.bcc !== undefined) body.bcc = oneOrList(splitEmails(input.bcc));
+  if (input.bcc !== undefined) {
+    const bcc = splitEmails(input.bcc);
+    // Caught locally: an all-separators --bcc (",") is a caller mistake; the backend
+    // also 400s bcc:[] (fb#2223), but an older one sent with no copy, silently.
+    if (bcc.length === 0) failWith("--bcc names no address", 4);
+    body.bcc = oneOrList(bcc);
+  }
 
-  const recipients = splitEmails(input.recipient);
-  if (recipients.length > 1) {
+  const ref = input.recipient.trim();
+  if (!ref.includes("@")) {
+    if (!ref.replace(/,/g, "").trim()) failWith("recipient is empty", 4);
+    body.personId = await resolvePersonRef(client, ref);
+  } else {
+    const recipients = splitEmails(ref);
     const notEmail = recipients.find((r) => !r.includes("@"));
     if (notEmail) {
       failWith(
@@ -137,11 +147,7 @@ export async function runNotificationEmailSend(
         4
       );
     }
-    body.email = recipients;
-  } else if (recipients[0]?.includes("@")) {
-    body.email = recipients[0];
-  } else {
-    body.personId = await resolvePersonRef(client, input.recipient.trim());
+    body.email = oneOrList(recipients);
   }
   return client.post("/api/cli/notification/email/send", body, {
     headers: writeFlagsToHeaders(flags),
@@ -190,6 +196,7 @@ export function registerNotificationCommands(
   };
   const EMAIL_SEND_FROM_JSON: FromJsonConfig = {
     nonPayload: new Set(["fromJson", "dryRun", "reason", "idempotencyKey", "help"]),
+    csvFields: new Set(["bcc"]),
   };
   const fcm = n
     .command("fcm")

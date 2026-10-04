@@ -180,6 +180,42 @@ describe("runNotificationEmailSend", () => {
     );
   });
 
+  test("a name containing a comma (no '@') is still ONE person ref (fb#2223)", async () => {
+    post()
+      .mockResolvedValueOnce([{ personId: 6233, personFirstName: "Juha", personLastName: "Urho" }])
+      .mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(c, { recipient: "Urho, Juha", subject: "S", text: "B" }, {});
+    expect(c.post).toHaveBeenLastCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betoni", text: "B", personId: 6233 },
+      { headers: {} }
+    );
+  });
+
+  test("trailing comma on one address sends that one address", async () => {
+    post().mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(c, { recipient: "a@x.fi,", subject: "S", text: "B" }, {});
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betoni", text: "B", email: "a@x.fi" },
+      { headers: {} }
+    );
+  });
+
+  test.each([[" , "], [""]])("empty recipient %j → exit 4, no POST (fb#2223)", async (recipient) => {
+    await expect(
+      runNotificationEmailSend(c, { recipient, subject: "S", text: "B" }, {})
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
+  test("--bcc that splits to nothing → exit 4 instead of a silent no-copy send (fb#2223)", async () => {
+    await expect(
+      runNotificationEmailSend(c, { recipient: "a@x.fi", subject: "S", text: "B", bcc: [","] }, {})
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
   test("a name inside a multi-recipient list → exit 4, no POST", async () => {
     await expect(
       runNotificationEmailSend(c, { recipient: "a@x.fi,Juha Urho", subject: "S", text: "B" }, {})
