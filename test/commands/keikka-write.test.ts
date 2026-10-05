@@ -117,6 +117,13 @@ describe("ib keikka create/update/drivers", () => {
     );
   });
 
+  test("runKeikkaUpdate --source posts sourceAsiakasId to the refs route (fb#2158)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12286, sourceChanged: true });
+    await runKeikkaUpdate(mockClient, 12286, { source: 27 }, {});
+    expect(mockClient.post).toHaveBeenCalledWith("/api/cli/keikka/refs/12286", { sourceAsiakasId: 27 }, { headers: {} });
+    await expect(runKeikkaUpdate(mockClient, 9001, { source: 27, title: "x" }, {})).rejects.toThrow(/cannot be combined/);
+  });
+
   test("runKeikkaUpdate refuses mixing groups and a lone --supplier before any POST", async () => {
     await expect(runKeikkaUpdate(mockClient, 9001, { customer: 1482, vehicle: 54 }, {})).rejects.toThrow(/cannot be combined/);
     await expect(runKeikkaUpdate(mockClient, 9001, { status: "9", plant: 45 }, {})).rejects.toThrow(/cannot be combined/);

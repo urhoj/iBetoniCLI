@@ -857,6 +857,10 @@ ib keikka update --plant <sijaintiId>
   ! --plant must be an integer >= 1
   > pass a positive sijaintiId (find plants with \`ib sijainti plants --search <name>\`)
 
+ib keikka update --source <asiakasId>
+  ! --source must be an integer >= 1
+  > pass a positive asiakasId
+
 ib keikka update --supplier <asiakasId>
   ! --supplier must be an integer >= 1
   > pass a positive asiakasId

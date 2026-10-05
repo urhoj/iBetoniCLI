@@ -232,9 +232,9 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
  *   - the move flags (`--vehicle/--date/--start/--end` — the grid's drag-and-drop) post
  *     to /api/cli/keikka/move/:id, which read-merges over the blanket keikka_saveAika proc
  *     server-side and re-derives the driver like a grid drop;
- *   - the reference flags (`--customer/--worksite/--plant [--supplier]`) post to
+ *   - the reference flags (`--customer/--worksite/--plant [--supplier]/--source`) post to
  *     /api/cli/keikka/refs/:id, which re-points them through the grid's own procs,
- *     read-merged server-side (fb#1943, fb#1986);
+ *     read-merged server-side (fb#1943, fb#1986, fb#2158);
  *   - the text flags (`--driving-instructions/--comment/--title`) post to
  *     /api/cli/keikka/info/:id; "" clears a field. The ajo-ohje writer is the blanket
  *     keikka_tyomaa_set, so the server writes varmenne + ids back (fb#2045);
@@ -245,7 +245,7 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
     const isMove = needsRow || fields.vehicle !== undefined;
-    const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined;
+    const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined || fields.source !== undefined;
     const isInfo = fields.drivingInstructions !== undefined || fields.comment !== undefined || fields.title !== undefined;
     const isBetoni = fields.m3 !== undefined || fields.betoniComment !== undefined;
     if (fields.supplier !== undefined && fields.plant === undefined) {
@@ -255,10 +255,10 @@ export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
         failWith("--betoni-line needs --m3 and/or --betoni-comment — it only picks which concrete line they write", 4);
     }
     if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni].filter(Boolean).length > 1) {
-        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant), the text flags (--driving-instructions/--comment/--title) and the concrete flags (--m3/--betoni-comment) cannot be combined — run one command per group", 4);
+        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title) and the concrete flags (--m3/--betoni-comment) cannot be combined — run one command per group", 4);
     }
     if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni) {
-        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant), a text flag (--driving-instructions/--comment/--title) or a concrete flag (--m3/--betoni-comment)", 4);
+        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title) or a concrete flag (--m3/--betoni-comment)", 4);
     }
     if (isBetoni) {
         const body = {};
@@ -290,6 +290,8 @@ export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
             body.betoniSijaintiId = fields.plant;
         if (fields.supplier !== undefined)
             body.betoniAsiakasId = fields.supplier;
+        if (fields.source !== undefined)
+            body.sourceAsiakasId = fields.source;
         return client.post(`/api/cli/keikka/refs/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
     }
     if (isMove) {
@@ -532,7 +534,7 @@ export async function runKeikkaTilat(client, opts = {}) {
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
  *   - copy     POST /api/keikka/copy — duplicate onto an optional --date (client-side dry-run)
  *   - update   --status → POST /api/keikka/tila/set; --vehicle/--date/--start/--end → POST /api/cli/keikka/move/:id;
- *              --customer/--worksite/--plant/--supplier → POST /api/cli/keikka/refs/:id
+ *              --customer/--worksite/--plant/--supplier/--source → POST /api/cli/keikka/refs/:id
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
  *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
  *
@@ -655,6 +657,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--worksite <tyomaaId>", "Re-point to this worksite (tyomaaId)", intFlag("--worksite"))
         .option("--plant <sijaintiId>", "Set the concrete plant (betoniSijaintiId); the supplier is its owner", intFlag("--plant"))
         .option("--supplier <asiakasId>", "Assert the plant's supplier (betoniAsiakasId); must own --plant", intFlag("--supplier"))
+        .option("--source <asiakasId>", "Set the source company (lähdeasiakas, sourceAsiakasId)", intFlag("--source"))
         .option("--driving-instructions <text>", 'Set the driving instructions (ajo-ohje); "" clears')
         .option("--comment <text>", 'Set the order comment (kommentti); "" clears')
         .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears')
@@ -673,6 +676,7 @@ export function registerKeikkaCommands(parent, getClient) {
             worksite: opts.worksite,
             plant: opts.plant,
             supplier: opts.supplier,
+            source: opts.source,
             drivingInstructions: opts.drivingInstructions,
             comment: opts.comment,
             title: opts.title,
