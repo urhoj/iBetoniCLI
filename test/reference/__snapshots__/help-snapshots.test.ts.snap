@@ -8175,7 +8175,7 @@ FLAGS
   --driving-instructions STRING    Driving instructions (keikkaAjoOhje, max 2500); "" clears
   --comment STRING    Comment (keikkaComment); "" clears
   --title STRING    Title (keikkaOtsikko, max 100); "" clears
-  --m3 NUMBER    Concrete volume of one line (keikkaBetoni.m3, 0..10000); the keikka's m3 is the sum of its lines
+  --m3 NUMBER    Concrete volume of one line (keikkaBetoni.m3, decimal(6,2): 0..9999.99, rounded to 2 decimals); the keikka's m3 is the sum of its lines
   --betoni-comment STRING    Comment on one concrete line (betoniComment); "" clears
   --betoni-line NUMBER    keikkaBetoniId of the line --m3/--betoni-comment write — optional on a single-line keikka; a multi-line keikka is refused with its lines listed
 
@@ -8196,7 +8196,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No field flags given at all → pass --status <keikkaTilaId>, or a move flag (--vehicle / --date / --start / --end), a reference flag (--customer / --worksite / --plant), a text flag (--driving-instructions / --comment / --title) or a concrete flag (--m3 / --betoni-comment)
   exit 4 (client-side)  Flags from two groups (status / move / reference / text / concrete) — separate routes, no atomicity → run one command per group
   exit 4 (client-side)  --betoni-line alone — it only picks the line --m3/--betoni-comment write → add --m3 <n> and/or --betoni-comment <text>
-  exit 4 (client-side)  --m3 is not a number, rejected locally before any request → pass a number 0..10000, e.g. --m3 15
+  exit 4 (client-side)  --m3 is not a number, rejected locally before any request → pass a number 0..9999.99, e.g. --m3 15
   exit 4 (client-side)  --betoni-line is not an integer >= 1, rejected locally before any request → pass a positive keikkaBetoniId (a refused multi-line call lists them)
   exit 4 (client-side)  --supplier alone — the supplier is derived from the plant → pass --plant <sijaintiId> (with or without --supplier)
   exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
@@ -8209,7 +8209,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  The row has no pumppuAika, so a partial time flag has nothing to fill from → pass both --date and --start
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
   exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line) → check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)
-  exit 5 (HTTP 404)  Keikka, or a --customer/--worksite/--plant/--betoni-line target, not found, soft-deleted, OR outside your visible scope → the message names which id — verify it; another tenant's customer/worksite/keikka 404s identically to a missing one
+  exit 5 (HTTP 404)  Keikka, or a --customer/--worksite/--plant/--betoni-line target, not found, soft-deleted, OR outside your visible scope → the message names which id — verify it; another tenant's customer/worksite/keikka 404s identically to a missing one; a --betoni-line of another keikka 404s too
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

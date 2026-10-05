@@ -850,8 +850,8 @@ ib keikka update --customer <asiakasId>
   > pass a positive asiakasId
 
 ib keikka update --m3 <n>
-  ! --m3 must be a number in 0..10000
-  > pass a number 0..10000, e.g. --m3 15
+  ! --m3 must be a number in 0..9999.99
+  > pass a number 0..9999.99, e.g. --m3 15
 
 ib keikka update --plant <sijaintiId>
   ! --plant must be an integer >= 1

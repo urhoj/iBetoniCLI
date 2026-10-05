@@ -366,7 +366,7 @@ export interface KeikkaUpdateFields {
 }
 
 /**
- * Update a keikka. Four flag groups, four routes, one group per call (no atomicity
+ * Update a keikka. Five flag groups, five routes, one group per call (no atomicity
  * across routes, so mixing is refused):
  *   - `--status` posts the numeric keikkaTilaId to /api/keikka/tila/set;
  *   - the move flags (`--vehicle/--date/--start/--end` — the grid's drag-and-drop) post
@@ -980,7 +980,7 @@ export function registerKeikkaCommands(
     .option("--driving-instructions <text>", 'Set the driving instructions (ajo-ohje); "" clears')
     .option("--comment <text>", 'Set the order comment (kommentti); "" clears')
     .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears')
-    .option("--m3 <n>", "Set the concrete line's volume (m3, 0..10000)", numFlag("--m3", 0, 10000))
+    .option("--m3 <n>", "Set the concrete line's volume (m3, 0..9999.99)", numFlag("--m3", 0, 9999.99))
     .option("--betoni-comment <text>", 'Set the concrete line comment; "" clears')
     .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"));
   addWriteFlagsToCommand(updateCmd).action(
