@@ -1439,6 +1439,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
   exit 4 (client-side)  --key is empty after trimming → pass the spelling to add
   exit 4 (HTTP 409)  The key already belongs to ANOTHER customer of this owner (the message names it) → remove it there first (\`ib customer fk remove <other> --key <text>\`) or use a different key
+  exit 5 (HTTP 404)  Customer neither owned by --owner nor self-owned (fb#2034) → use a customer of --owner, or a company's own row
   exit 5 (HTTP 404)  The backend predates fb#1975 (no /foreignKey/customer/add route) → wait for the next backend deploy — do NOT fall back to \`fk set\`, which replaces the existing key
   exit 4 (HTTP 400)  Missing asiakasId / source / key / owner → pass all four
   exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
@@ -1496,7 +1497,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`--owner\` is the tenant the keys belong to (default: the active company). Betomik order-book driver nicknames live on \`--owner 27 --source betomik-orderbook\`.
-  - Per-row errors (incl. a 409 or a pre-fb#1975 backend's 404) are reported in \`results\`, not thrown; an unknown --source DEFAULT exits 4 before any request.
+  - Per-row errors (incl. a 409, or a 404: customer outside --owner, or a pre-fb#1975 backend) are reported in \`results\`, not thrown; an unknown --source DEFAULT exits 4 before any request.
 
 SEE ALSO
   ib customer fk add, ib person fk import
@@ -1637,6 +1638,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
   exit 6 (client-side)  The backend answered 200 with { success:false } — usually the UNIQUE (foreignKey, owner) index: that key already belongs to another customer of this owner → find the holder with \`ib customer fk list <other> --owner <id>\` and remove it, or use a different key
+  exit 5 (HTTP 404)  Customer neither owned by --owner nor self-owned (fb#2034) → use a customer of --owner, or a company's own row
   exit 4 (HTTP 400)  Missing asiakasId / source / key / owner → pass all four
   exit 3 (HTTP 403)  No edit role on the owner tenant → requires an edit-tier company role on --owner (asiakasAdmin / the entity's handler role); sysadmin bypass
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

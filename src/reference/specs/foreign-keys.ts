@@ -37,6 +37,13 @@ const idParseErr = (name: string): CommandError => ({
   remedy: `pass a numeric ${name}`,
 });
 const PERSON_ARG: CommandArg = { name: "person", type: "string", description: "personId or a name resolved within your active company" };
+// fb#2034: the set/add routes refuse a target customer that the owner may not key.
+const FOREIGN_TENANT_404 = apiErr(
+  404,
+  "Customer neither owned by --owner nor self-owned (fb#2034)",
+  "use a customer of --owner, or a company's own row",
+  "not found for this tenant"
+);
 const NO_PERSON_ERR: CommandError = { origin: "client", exit: 5, match: "No person matches", meaning: "The <person> name resolved to nobody in your active company", remedy: PERSON_SCOPE_404_REMEDY };
 const VEHICLE_ID_ARG: CommandArg = { name: "vehicleId", type: "number", description: "vehicle id" };
 const VEHICLE_ID_ERR = idParseErr("vehicleId");
@@ -223,6 +230,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
       { origin: "client", exit: 6, match: "customer foreign key write failed", meaning: "The backend answered 200 with { success:false } — usually the UNIQUE (foreignKey, owner) index: that key already belongs to another customer of this owner", remedy: "find the holder with `ib customer fk list <other> --owner <id>` and remove it, or use a different key" },
+      FOREIGN_TENANT_404,
       apiErr(400, "Missing asiakasId / source / key / owner", "pass all four"),
       EDIT_403,
       ...COMMON_AUTH_ERRORS,
@@ -248,6 +256,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
       SOURCE_UNKNOWN_ERR,
       { origin: "client", exit: 4, match: "--key must not be blank", meaning: "--key is empty after trimming", remedy: "pass the spelling to add" },
       apiErr(409, "The key already belongs to ANOTHER customer of this owner (the message names it)", "remove it there first (`ib customer fk remove <other> --key <text>`) or use a different key"),
+      FOREIGN_TENANT_404,
       apiErr(404, "The backend predates fb#1975 (no /foreignKey/customer/add route)", "wait for the next backend deploy — do NOT fall back to `fk set`, which replaces the existing key"),
       apiErr(400, "Missing asiakasId / source / key / owner", "pass all four"),
       EDIT_403,
@@ -318,7 +327,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
       EDIT_403,
       ...COMMON_AUTH_ERRORS,
     ],
-    notes: [OWNER_NOTE, "Per-row errors (incl. a 409 or a pre-fb#1975 backend's 404) are reported in `results`, not thrown; an unknown --source DEFAULT exits 4 before any request."],
+    notes: [OWNER_NOTE, "Per-row errors (incl. a 409, or a 404: customer outside --owner, or a pre-fb#1975 backend) are reported in `results`, not thrown; an unknown --source DEFAULT exits 4 before any request."],
     seeAlso: ["ib customer fk add", "ib person fk import"],
     examples: [
       "ib customer fk import aliases.json --source betomik-orderbook --owner 27 --reason 'sheet spellings'",
