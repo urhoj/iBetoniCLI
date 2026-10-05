@@ -276,6 +276,15 @@ export async function runWorksiteUpdate(
       `re-run as the owner: \`--company ${opts.owner}\` (or \`ib auth switch ${opts.owner}\`)`
     );
   }
+  // fb#2160: tyomaa_save binds @asiakasId but never writes it, so the backend
+  // answered success while the worksite stayed on its old customer.
+  if ("asiakasId" in body) {
+    failWith(
+      "asiakasId is not writable on worksite update: the save proc never writes tyomaa.asiakasId, so the write would report success without moving the worksite",
+      4,
+      "drop asiakasId from the patch; re-pointing a worksite to another customer needs a migration runner"
+    );
+  }
   try {
     await runWorksiteGet(client, opts.tyomaaId);
   } catch (err) {

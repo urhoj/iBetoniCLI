@@ -16531,7 +16531,7 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
   ib worksite create [flags]
 
 DESCRIPTION
-  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on \`ib worksite update\` instead.
+  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and \`ib worksite update\` refuses it too (fb#2160) — no API path sets a worksite's linked customer.
   Permissions: requires keikkaEdit company-role tier on --body.ownerAsiakasId.
 
 FLAGS
@@ -17231,6 +17231,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
+  exit 4 (client-side)  The patch sets asiakasId, which the save proc silently ignores (fb#2160) → drop asiakasId from the patch; re-pointing a worksite to another customer needs a migration runner
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the contact
   exit 4 (client-side)  --owner is not the active company → re-run with --company <ownerAsiakasId>
   exit 5 (client-side)  The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale → re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)
@@ -17241,7 +17242,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).
+  - Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON).
   - Address changes re-geocode the worksite server-side (lat/lng refresh).
   - Partial-update safety is server-side (tyomaa.setData read-merge, fb#234) — against an older backend without it, a partial body NULLs omitted columns. Verify with --dry-run first.
 

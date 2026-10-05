@@ -100,7 +100,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   {
     command: "ib worksite create",
     description:
-      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it) — the worksite's linked customer is set on `ib worksite update` instead.",
+      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and `ib worksite update` refuses it too (fb#2160) — no API path sets a worksite's linked customer.",
     // `auth.page.tyomaa.edit` is a FRONTEND-only shape and is never evaluated
     // here — POST /api/tyomaa/new is gated by `requireCompanyRole({ tier:
     // "keikkaEdit", resolveTenant: body.ownerAsiakasId })` (fb#1434), satisfied
@@ -173,6 +173,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       // the fb#280 rule (a client failure can only be matched via `origin`), AND
       // it shadowed the real "Validation failed" 400 below it.
       { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag or a --body/--from-json patch" },
+      { origin: "client", exit: 4, match: "asiakasId is not writable", meaning: "The patch sets asiakasId, which the save proc silently ignores (fb#2160)", remedy: "drop asiakasId from the patch; re-pointing a worksite to another customer needs a migration runner" },
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the contact", 0),
       { origin: "client", exit: 4, match: "is not the active company", meaning: "--owner is not the active company", remedy: "re-run with --company <ownerAsiakasId>" },
       { origin: "client", exit: 5, match: "not visible to the active company", meaning: "The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale", remedy: "re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)" },
@@ -181,7 +182,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     notes: [
-      "Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).",
+      "Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON).",
       "Address changes re-geocode the worksite server-side (lat/lng refresh).",
       "Partial-update safety is server-side (tyomaa.setData read-merge, fb#234) — against an older backend without it, a partial body NULLs omitted columns. Verify with --dry-run first.",
     ],

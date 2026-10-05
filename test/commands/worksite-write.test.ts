@@ -216,6 +216,15 @@ describe("ib worksite create/update", () => {
     expect(mockClient.get).not.toHaveBeenCalled();
     expect(mockClient.post).not.toHaveBeenCalled();
   });
+
+  test("runWorksiteUpdate: asiakasId in the patch exits 4 before any request (tyomaa_save ignores it, fb#2160)", async () => {
+    mockClient.get.mockReset();
+    await expect(
+      runWorksiteUpdate(mockClient, { tyomaaId: 3602, ownerAsiakasId: 27 }, { asiakasId: 1451 }, {})
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/asiakasId is not writable/) });
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
 });
 
 describe("buildWorksiteUpdateBody (typed-flag merge, fb#234)", () => {
