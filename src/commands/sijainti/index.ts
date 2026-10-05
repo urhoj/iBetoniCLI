@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage, warnNote } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
@@ -317,6 +317,30 @@ export function mergeSijaintiUpdateBody(
   delete base.lng;
   delete base.placeId;
   return { ...base, ...sparse };
+}
+
+/**
+ * Fields `sijainti update` actually persists: the server's extractSijaintiBody
+ * whitelist (puminet5api modules/geocode/geocode.js — SIJAINTI_PASSTHROUGH_KEYS
+ * plus the flags/bounds it reads by name, geofenceRadius included on update),
+ * plus lat/lng, which this CLI persists via updateLatLng. Keep in step with
+ * that whitelist: anything else the caller sends is dropped server-side.
+ */
+const SIJAINTI_SAVED_KEYS = new Set([
+  "sijaintiId", "asiakasId", "sijaintiNimi", "sijaintiTypeId", "sijaintiOsoite1",
+  "sijaintiOsoite2", "sijaintiLyh", "sijaintiPhone", "sijaintiComment",
+  "maxDeliveryDistance", "startDate", "endDate", "jerryActiveUntil", "isVarasto",
+  "isPublic", "showOnMap", "puomiMin", "puomiMax", "geofenceRadius", "lat", "lng",
+]);
+
+/**
+ * Keys of the CALLER's sparse update body that the save path never writes
+ * (fb#2208: `sijaintiUrl` printed `true` and stayed null). Checked against the
+ * sparse body, not the merged one — the merged body always carries read-only
+ * columns from the GET (coords, sijaintiUrl, …) that the caller never asked to change.
+ */
+export function sijaintiIgnoredFields(sparse: Record<string, unknown>): string[] {
+  return Object.keys(sparse).filter((k) => !SIJAINTI_SAVED_KEYS.has(k));
 }
 
 /** Did the sparse update change an address line? (null/undefined normalised) */
@@ -1326,12 +1350,23 @@ export function registerSijaintiCommands(
         { lat: merged.lat, lng: merged.lng },
         opts
       );
-      if (geocodeFailed) {
+      // fb#2208: report (never refuse) fields the save path drops, so a caller
+      // replaying a fetched row keeps working while a typo'd/read-only field
+      // no longer reads as saved.
+      const ignoredFields = sijaintiIgnoredFields(body);
+      if (ignoredFields.length > 0) {
+        warnNote(`[ib] sijainti update: not saved (the save path does not write them): ${ignoredFields.join(", ")}`);
+      }
+      if (geocodeFailed || ignoredFields.length > 0) {
         const base =
           echo && typeof echo === "object"
             ? (echo as Record<string, unknown>)
             : { result: echo };
-        writeJson({ ...base, coordsPersisted: false, geocodeFailed });
+        writeJson({
+          ...base,
+          ...(geocodeFailed ? { coordsPersisted: false, geocodeFailed } : {}),
+          ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
+        });
       } else {
         writeJson(echo);
       }

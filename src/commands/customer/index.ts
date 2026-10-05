@@ -8,7 +8,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage, setExitCode, warnNote } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -34,7 +34,7 @@ import {
 } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { registerCustomerFkCommands } from "./fk.js";
+import { registerCustomerFkCommands, runCustomerFkList } from "./fk.js";
 import {
   projectHistoryRow,
   type ChangeHistoryItem,
@@ -766,8 +766,14 @@ export async function runCustomerUpdate(
 }
 
 /**
- * DELETE /api/asiakas/delete/:asiakasId/:ownerAsiakasId. Universal write flags
- * surface as headers; `--reason` is enforced by the CLI layer.
+ * DELETE /api/asiakas/delete/:asiakasId/:ownerAsiakasId — a SOFT delete
+ * (asiakas_delete sets deletedTime). Universal write flags surface as headers;
+ * `--reason` is enforced by the CLI layer.
+ *
+ * fb#2159: the row's worksites and foreign keys stay attached, so they are
+ * read BEFORE the delete and echoed as `leftAttached` (dry-run included). The
+ * lookup is best-effort — a failed read yields `leftAttached: null` plus a
+ * stderr note, never a failed delete.
  */
 export async function runCustomerDelete(
   client: ApiClient,
@@ -775,10 +781,22 @@ export async function runCustomerDelete(
   ownerAsiakasId: number,
   flags: WriteFlags
 ): Promise<unknown> {
-  return client.delete(
+  let leftAttached: { worksites: unknown[]; foreignKeys: unknown[] } | null = null;
+  try {
+    const [worksites, fks] = await Promise.all([
+      runCustomerWorksites(client, asiakasId),
+      runCustomerFkList(client, asiakasId, ownerAsiakasId),
+    ]);
+    leftAttached = { worksites: worksites.items, foreignKeys: fks.items };
+  } catch (e) {
+    warnNote(`[ib] customer delete: could not list dependents (${errorMessage(e)}) — leftAttached is null`);
+  }
+  const result = await client.delete<unknown>(
     `/api/asiakas/delete/${asiakasId}/${ownerAsiakasId}`,
     { headers: writeFlagsToHeaders(flags) }
   );
+  const base = result && typeof result === "object" ? (result as Record<string, unknown>) : { result };
+  return { ...base, leftAttached };
 }
 
 /**

@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { projectPersonName } from "../_shared/personRow.js";
 import { listEnvelope, unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage, setExitCode, warnNote } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions } from "../_shared/jsonBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -19,7 +19,7 @@ import { registerPersonLinkCommands } from "../_shared/personLink.js";
 import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { registerCustomerFkCommands } from "./fk.js";
+import { registerCustomerFkCommands, runCustomerFkList } from "./fk.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
 export { runCustomerPrhById, runCustomerPrhSearch };
 /**
@@ -480,11 +480,30 @@ export async function runCustomerUpdate(client, asiakasId, body, flags) {
     });
 }
 /**
- * DELETE /api/asiakas/delete/:asiakasId/:ownerAsiakasId. Universal write flags
- * surface as headers; `--reason` is enforced by the CLI layer.
+ * DELETE /api/asiakas/delete/:asiakasId/:ownerAsiakasId — a SOFT delete
+ * (asiakas_delete sets deletedTime). Universal write flags surface as headers;
+ * `--reason` is enforced by the CLI layer.
+ *
+ * fb#2159: the row's worksites and foreign keys stay attached, so they are
+ * read BEFORE the delete and echoed as `leftAttached` (dry-run included). The
+ * lookup is best-effort — a failed read yields `leftAttached: null` plus a
+ * stderr note, never a failed delete.
  */
 export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags) {
-    return client.delete(`/api/asiakas/delete/${asiakasId}/${ownerAsiakasId}`, { headers: writeFlagsToHeaders(flags) });
+    let leftAttached = null;
+    try {
+        const [worksites, fks] = await Promise.all([
+            runCustomerWorksites(client, asiakasId),
+            runCustomerFkList(client, asiakasId, ownerAsiakasId),
+        ]);
+        leftAttached = { worksites: worksites.items, foreignKeys: fks.items };
+    }
+    catch (e) {
+        warnNote(`[ib] customer delete: could not list dependents (${errorMessage(e)}) — leftAttached is null`);
+    }
+    const result = await client.delete(`/api/asiakas/delete/${asiakasId}/${ownerAsiakasId}`, { headers: writeFlagsToHeaders(flags) });
+    const base = result && typeof result === "object" ? result : { result };
+    return { ...base, leftAttached };
 }
 /**
  * POST /api/asiakas/person/add — attach a person to a customer.

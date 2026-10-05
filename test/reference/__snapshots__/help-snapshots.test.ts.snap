@@ -1333,7 +1333,7 @@ exports[`Help snapshots — contract stability > help for ib customer delete mat
   ib customer delete <asiakasId> [flags]
 
 DESCRIPTION
-  Delete a customer (asiakas). Requires --reason; --dry-run available.
+  SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason; --dry-run available.
   Permissions: requires auth.page.asiakas.edit.
 
 ARGUMENTS
@@ -1353,7 +1353,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { deleted: number } or { dryRun: true, wouldDelete: number }
+  { success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
@@ -14819,7 +14819,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)
+  { ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL); ignoredFields: sent fields the save path never writes (e.g. sijaintiUrl) — the rest still saved, exit 0
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields

@@ -13,7 +13,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   // ─── v1.0.1 additions: customer/worksite/person lifecycle (11) ──────────
   {
     command: "ib customer delete",
-    description: "Delete a customer (asiakas). Requires --reason; --dry-run available.",
+    description: "SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason; --dry-run available.",
     permissions: ["auth.page.asiakas.edit"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
     flags: [
@@ -22,7 +22,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
-    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
+    outputShape: "{ success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),

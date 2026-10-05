@@ -238,7 +238,7 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)",
+    outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL); ignoredFields: sent fields the save path never writes (e.g. sijaintiUrl) — the rest still saved, exit 0",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
       // Client-side — see the twin on `sijainti create` (fb#668 follow-up).
