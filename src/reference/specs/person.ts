@@ -34,7 +34,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       LIMIT_500_FLAG,
     ],
     outputShape:
-      "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ personId, name, email, roles:number[] (distinct roles held in the scope company; [] for an --owned non-member) }>" + TRUNCATED_NOTE,
     errors: [
       ASIAKAS_FLAG_ERR,
       limitErr("pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap"),
