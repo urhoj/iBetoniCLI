@@ -517,6 +517,16 @@ describe("ib schema", () => {
         });
       });
 
+      // fb#2157: a field copied from `ib palkki get` output is a renamed column.
+      test("a CLI-renamed field (timeStart) suggests the real column (starttime) first", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'timeStart'.", 400, null, 4));
+        get().mockResolvedValueOnce(cols("grid_palkki_Id", "starttime", "endtime", "deletedTime"));
+
+        await expect(
+          runSchemaQuery(mockClient, "SELECT p.timeStart FROM grid_palkit p")
+        ).rejects.toMatchObject({ hint: expect.stringMatching(/^did you mean grid_palkit\.starttime\b/) });
+      });
+
       test("an unqualified column searches every FROM/JOIN table; the first table (in query order) with a near column answers", async () => {
         post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'regNo'.", 400, null, 4));
         get()

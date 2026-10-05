@@ -1405,7 +1405,10 @@ export function parseAlsoIds(raw, excludeId) {
  */
 export async function runFeedbackResolve(client, id, input) {
     assertEnum(input.status, STATUSES, "--status", STATUS_SYNONYMS);
-    if (input.status === undefined && input.note === undefined) {
+    if (input.gateKind)
+        assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
+    const gated = input.gateKind !== undefined || input.gateRef !== undefined || input.gateUntil !== undefined;
+    if (input.status === undefined && input.note === undefined && !gated) {
         failWith("Provide --status and/or --note", 4);
     }
     const body = {};
@@ -1413,6 +1416,12 @@ export async function runFeedbackResolve(client, id, input) {
         body.status = input.status;
     if (input.note !== undefined)
         body.resolution = input.note;
+    if (input.gateKind !== undefined)
+        body.gateKind = input.gateKind;
+    if (input.gateRef !== undefined)
+        body.gateRef = assertGateRef(input.gateRef);
+    if (input.gateUntil !== undefined)
+        body.gateUntil = assertGateUntil(input.gateUntil);
     if (input.dryRun) {
         const preview = wouldSend("PUT", `/api/feedback/${id}`, body);
         if (input.also?.length) {
@@ -1425,7 +1434,11 @@ export async function runFeedbackResolve(client, id, input) {
         return preview;
     }
     const row = await putWithClaimAdvisory(client, id, body);
-    const out = input.full ? { ...row } : compactAck(row);
+    const out = input.full
+        ? { ...row }
+        : gated
+            ? buildAck(row, ["feedbackId", "status", "gateKind", "gateRef", "gateUntil", "updatedAt"], "resolution")
+            : compactAck(row);
     if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
         out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
     }
@@ -1956,6 +1969,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--reason <text>")
         .option("--resolution <text>")
         .option("--also <ids>", "Comma-separated feedback ids to apply the same status/note to")
+        .option("--gate-kind <kind>")
+        .option("--gate-ref <ref>")
+        .option("--gate-until <date>")
         .option("--from-json <file>")
         .option("--dry-run")
         .option("--full")
@@ -1983,6 +1999,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
             // text positionally AND as --note stores it once.
             note: mergeNoteFlags(notePositional, opts.note, opts.resolution, opts.reason),
             also,
+            gateKind: opts.gateKind,
+            gateRef: opts.gateRef,
+            gateUntil: opts.gateUntil,
             dryRun: opts.dryRun,
             full: opts.full,
         })));

@@ -5,6 +5,11 @@
 import type { CommandSpec } from "../../output/help.js";
 import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBACK_STATUSES, SEVERITIES as FEEDBACK_SEVERITIES, SEVERITY_FILTERS as FEEDBACK_SEVERITY_FILTERS, GATE_KINDS as FEEDBACK_GATE_KINDS, GATED_FILTERS as FEEDBACK_GATED_FILTERS, AUTO_CLOSE_GATE_KINDS as FEEDBACK_AUTO_CLOSE_GATE_KINDS, RELATION_TYPES as FEEDBACK_RELATION_TYPES, GATE_REF_MAX as FEEDBACK_GATE_REF_MAX } from "../../commands/feedback/index.js";
 import { apiErr, clearHint, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
+import type { CommandError } from "../../output/help.js";
+
+// Shared by `update` and `resolve` (fb#2186), which validate gates identically.
+const GATE_REF_LENGTH_ERR: CommandError = { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644); the backend's own 400 is Finnish and names neither flag nor limit", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in the row's description or note` };
+const GATE_UNTIL_ERR: CommandError = { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" };
 
 export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
   // ─── feedback (5) ────────────────────────────────────────────────────────
@@ -288,21 +293,26 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
-      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell." },
+      { name: "gate-kind", type: "string", description: `Gate set in the SAME write as --status (fb#2186); values as on \`ib dev feedback update\`. ${clearHint("--gate-kind")}`, allowed: [...FEEDBACK_GATE_KINDS] },
+      { name: "gate-ref", type: "string", description: `Gate pointer (legal: TYPE@version being superseded). Max ${FEEDBACK_GATE_REF_MAX} chars. ${clearHint("--gate-ref")}` },
+      { name: "gate-until", type: "string", description: `Wake date for --gate-kind soak|backlog. ${clearHint("--gate-until")}` },
+      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution), gateKind, gateRef, gateUntil. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell." },
       { name: "also", type: "string", description: "Comma-separated feedback ids to apply the SAME --status/--note to (relations design 2026-08-31). A row held LIVE by another agent is skipped and reported, not fatal — check `failed` in the output, not just the exit code." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
-      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --also: also: [{feedbackId, ok, status?, error?}], failed (count). With --dry-run: { dryRun:true, wouldSend:{ method, path, body }, alsoWouldSend? }.",
+      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full); a call with a --gate-* flag adds gateKind, gateRef, gateUntil. A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --also: also: [{feedbackId, ok, status?, error?}], failed (count). With --dry-run: { dryRun:true, wouldSend:{ method, path, body }, alsoWouldSend? }.",
     errors: [
       // Both client rows sit at exit 4, so EACH must carry `match` — an
       // unmatched row would win by exit alone and serve the wrong remedy
       // (the fb#305/#306 ambiguity).
-      { origin: "client", exit: 4, match: ["provide --status", "--status must be one of"], meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value — 'resolved' means applied, the did-you-mean names it but does not accept it" },
+      { origin: "client", exit: 4, match: ["provide --status", "--status must be one of", "--gate-kind must be one of"], meaning: "Validation", remedy: "provide --status, --note, --gate-kind, --gate-ref or --gate-until; status and gate kind must be known values — 'resolved' means applied, the did-you-mean names it but does not accept it" },
       // Since fb#583 ONE excess positional is the note, so reaching this row
       // takes TWO or more — which on Windows PowerShell means the shell split
       // the note rather than the caller passing two notes on purpose.
+      GATE_REF_LENGTH_ERR,
+      GATE_UNTIL_ERR,
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the note on its inner double-quotes (typical on Windows PowerShell) — a single positional note is accepted", remedy: "pass the note via --from-json <file|-> instead of argv" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
@@ -324,6 +334,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "ib dev feedback resolve 42 --from-json ./resolution.json",
       "ib dev feedback resolve 42 --from-json ./resolution.json --status dismissed",
       'ib dev feedback resolve 42 --status applied --note "fixed together" --also 43,44',
+      'ib dev feedback resolve 42 --status reviewed --gate-kind legal --gate-ref PRIVACY@privacy-2026-09-19 --note "draft saved"',
     ],
   },
   {
@@ -471,8 +482,8 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
       { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
-      { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644); the backend's own 400 is Finnish and names neither flag nor limit", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in --append-description` },
-      { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446), before the backend (which does not validate it at all)", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" },
+      GATE_REF_LENGTH_ERR,
+      GATE_UNTIL_ERR,
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, carries an unknown / wrong-typed key, or (a read row) edits a read-only column or a list row's shortened copy", remedy: "the error says WHICH: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, an unknown / wrong-typed key, or a read-row column this command cannot write (the message names the command that writes it, or `get` for a shortened copy — otherwise drop the key)" },
       apiErr(

@@ -506,6 +506,14 @@ export function queryTables(sql) {
 /** Column names listed per table when nothing is near — the rest is one `schema table` away. */
 const COLUMN_HINT_MAX_COLUMNS = 40;
 /**
+ * Fields the CLI's own output renames, keyed lower-case table → lower-case
+ * field → real column (fb#2157). Only names spelling distance cannot reach:
+ * `palkkiId` already matches `grid_palkki_Id` (see `nearestNames`).
+ */
+const CLI_FIELD_ALIASES = {
+    grid_palkit: { timestart: "starttime", timeend: "endtime", deleted: "deletedTime", typeid: "grid_palkkiTypeId" },
+};
+/**
  * Help for an `Invalid column name` failure (fb#1788): three consecutive
  * exit-4s guessing `vehicle.plate` (real: `vehicleRegNo`) was the cost of a
  * hint that only said "run `schema table` by hand". The tables come from the
@@ -542,8 +550,17 @@ async function columnNameSuggestion(client, sql, badColumn) {
         // A guessed `id` means the key, which is spelled `<table>Id` here; edit
         // distance ranks unrelated short names (`m3`) above it (fb#2090).
         const pk = columns.find((c) => c.toLowerCase() === `${table.toLowerCase()}id`);
+        // A field name copied from the CLI's own output, which renames columns
+        // (fb#2157); spelling distance cannot bridge timeStart → starttime.
+        const alias = CLI_FIELD_ALIASES[table.toLowerCase()]?.[badColumn.toLowerCase()];
         const near = nearestNames(badColumn, columns);
-        const matches = pk && badColumn.toLowerCase() === "id" ? [...new Set([pk, ...near])].slice(0, 3) : near;
+        const matches = [
+            ...new Set([
+                ...(alias && columns.includes(alias) ? [alias] : []),
+                ...(pk && badColumn.toLowerCase() === "id" ? [pk] : []),
+                ...near,
+            ]),
+        ].slice(0, 3);
         if (matches.length)
             return `did you mean ${orList(matches.map((m) => `${table}.${m}`))}? (nearest columns in ${known.map((t) => t.table).join(", ")})`;
     }

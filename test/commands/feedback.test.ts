@@ -935,6 +935,30 @@ describe("ib feedback resolve", () => {
     expect(out).toMatchObject({ status: "applied" });
   });
 
+  // fb#2186: closing a legal proposal as reviewed + gated took update THEN resolve.
+  test("--gate-* flags ride the SAME PUT as the status, and the ack echoes the gate", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "reviewed", gateKind: "legal", gateRef: "PRIVACY@v1", gateUntil: null });
+    const out = await runFeedbackResolve(mockClient, 42, {
+      status: "reviewed",
+      gateKind: "legal",
+      gateRef: "PRIVACY@v1",
+    });
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { status: "reviewed", gateKind: "legal", gateRef: "PRIVACY@v1" },
+      expect.anything()
+    );
+    expect(out).toMatchObject({ status: "reviewed", gateKind: "legal", gateRef: "PRIVACY@v1" });
+  });
+
+  test("an unknown --gate-kind exits 4 before any PUT", async () => {
+    await expect(
+      runFeedbackResolve(mockClient, 1, { status: "reviewed", gateKind: "bogus" })
+    ).rejects.toThrow(/--gate-kind/);
+    expect(put).not.toHaveBeenCalled();
+  });
+
   test("rejects an unknown status (exit 4), no PUT", async () => {
     await expect(
       runFeedbackResolve(mockClient, 1, { status: "bogus" })
@@ -1010,7 +1034,7 @@ describe("ib feedback resolve", () => {
         );
         expect(exitCode).toBe(4);
         expect(String(envelope.error)).toMatch(/unknown key resolutionNote/);
-        expect(String(envelope.error)).toMatch(/accepted: note, reason, resolution, status/);
+        expect(String(envelope.error)).toMatch(/accepted: gateKind, gateRef, gateUntil, note, reason, resolution, status/);
       });
       expect(put).not.toHaveBeenCalled();
     });
