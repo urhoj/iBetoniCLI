@@ -1357,18 +1357,15 @@ export function registerSijaintiCommands(
       if (ignoredFields.length > 0) {
         warnNote(`[ib] sijainti update: not saved (the save path does not write them): ${ignoredFields.join(", ")}`);
       }
-      if (geocodeFailed || ignoredFields.length > 0) {
-        const base =
-          echo && typeof echo === "object"
-            ? (echo as Record<string, unknown>)
-            : { result: echo };
-        writeJson({
-          ...base,
-          ...(geocodeFailed ? { coordsPersisted: false, geocodeFailed } : {}),
-          ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
-        });
-      } else {
+      const extra = {
+        ...(geocodeFailed ? { coordsPersisted: false, geocodeFailed } : {}),
+        ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
+      };
+      if (Object.keys(extra).length === 0) {
         writeJson(echo);
+      } else {
+        const base = echo && typeof echo === "object" ? (echo as Record<string, unknown>) : { result: echo };
+        writeJson({ ...base, ...extra });
       }
     })
   );

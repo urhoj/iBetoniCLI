@@ -961,18 +961,16 @@ export function registerSijaintiCommands(parent, getClient) {
         if (ignoredFields.length > 0) {
             warnNote(`[ib] sijainti update: not saved (the save path does not write them): ${ignoredFields.join(", ")}`);
         }
-        if (geocodeFailed || ignoredFields.length > 0) {
-            const base = echo && typeof echo === "object"
-                ? echo
-                : { result: echo };
-            writeJson({
-                ...base,
-                ...(geocodeFailed ? { coordsPersisted: false, geocodeFailed } : {}),
-                ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
-            });
+        const extra = {
+            ...(geocodeFailed ? { coordsPersisted: false, geocodeFailed } : {}),
+            ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
+        };
+        if (Object.keys(extra).length === 0) {
+            writeJson(echo);
         }
         else {
-            writeJson(echo);
+            const base = echo && typeof echo === "object" ? echo : { result: echo };
+            writeJson({ ...base, ...extra });
         }
     }));
     const setJerryCmd = s

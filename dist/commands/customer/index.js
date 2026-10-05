@@ -19,7 +19,7 @@ import { registerPersonLinkCommands } from "../_shared/personLink.js";
 import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { registerCustomerFkCommands, runCustomerFkList } from "./fk.js";
+import { registerCustomerFkCommands, fetchCustomerFks } from "./fk.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
 export { runCustomerPrhById, runCustomerPrhSearch };
 /**
@@ -492,11 +492,8 @@ export async function runCustomerUpdate(client, asiakasId, body, flags) {
 export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags) {
     let leftAttached = null;
     try {
-        const [worksites, fks] = await Promise.all([
-            runCustomerWorksites(client, asiakasId),
-            runCustomerFkList(client, asiakasId, ownerAsiakasId),
-        ]);
-        leftAttached = { worksites: worksites.items, foreignKeys: fks.items };
+        const [worksites, foreignKeys] = await bothInOrder(runCustomerWorksites(client, asiakasId), fetchCustomerFks(client, asiakasId, ownerAsiakasId));
+        leftAttached = { worksites: worksites.items, foreignKeys };
     }
     catch (e) {
         warnNote(`[ib] customer delete: could not list dependents (${errorMessage(e)}) — leftAttached is null`);

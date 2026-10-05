@@ -34,7 +34,7 @@ import {
 } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { registerCustomerFkCommands, runCustomerFkList } from "./fk.js";
+import { registerCustomerFkCommands, fetchCustomerFks } from "./fk.js";
 import {
   projectHistoryRow,
   type ChangeHistoryItem,
@@ -783,11 +783,11 @@ export async function runCustomerDelete(
 ): Promise<unknown> {
   let leftAttached: { worksites: unknown[]; foreignKeys: unknown[] } | null = null;
   try {
-    const [worksites, fks] = await Promise.all([
+    const [worksites, foreignKeys] = await bothInOrder(
       runCustomerWorksites(client, asiakasId),
-      runCustomerFkList(client, asiakasId, ownerAsiakasId),
-    ]);
-    leftAttached = { worksites: worksites.items, foreignKeys: fks.items };
+      fetchCustomerFks(client, asiakasId, ownerAsiakasId)
+    );
+    leftAttached = { worksites: worksites.items, foreignKeys };
   } catch (e) {
     warnNote(`[ib] customer delete: could not list dependents (${errorMessage(e)}) — leftAttached is null`);
   }

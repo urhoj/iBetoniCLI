@@ -41,7 +41,7 @@ export interface CustomerFkRow {
   entryTime: string | null;
 }
 
-async function fetchCustomerFks(client: ApiClient, asiakasId: number, owner: number): Promise<CustomerFkRow[]> {
+export async function fetchCustomerFks(client: ApiClient, asiakasId: number, owner: number): Promise<CustomerFkRow[]> {
   const rows = unwrapRows(await client.get(`/api/foreignKey/customer/${asiakasId}/${owner}`));
   return rows.map((r) => ({
     asiakasForeignKeyId: Number(r.asiakasForeignKeyId),

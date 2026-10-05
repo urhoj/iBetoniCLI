@@ -6,7 +6,7 @@ import { failWith, writeJson } from "../../output/json.js";
 import { addAsiakasTargetOption, addOwnerOption, parseId, resolveAsiakasTarget } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { dryRunOr, fetchFkSources, normKey, pickFkSource, registerFkSourcesLeaf, resolveFkSource, resolveOwner, } from "../_shared/foreignKeys.js";
-async function fetchCustomerFks(client, asiakasId, owner) {
+export async function fetchCustomerFks(client, asiakasId, owner) {
     const rows = unwrapRows(await client.get(`/api/foreignKey/customer/${asiakasId}/${owner}`));
     return rows.map((r) => ({
         asiakasForeignKeyId: Number(r.asiakasForeignKeyId),
