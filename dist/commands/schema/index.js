@@ -553,14 +553,8 @@ async function columnNameSuggestion(client, sql, badColumn) {
         // A field name copied from the CLI's own output, which renames columns
         // (fb#2157); spelling distance cannot bridge timeStart → starttime.
         const alias = CLI_FIELD_ALIASES[table.toLowerCase()]?.[badColumn.toLowerCase()];
-        const near = nearestNames(badColumn, columns);
-        const matches = [
-            ...new Set([
-                ...(alias && columns.includes(alias) ? [alias] : []),
-                ...(pk && badColumn.toLowerCase() === "id" ? [pk] : []),
-                ...near,
-            ]),
-        ].slice(0, 3);
+        const lead = alias ?? (badColumn.toLowerCase() === "id" ? pk : undefined);
+        const matches = [...new Set([lead, ...nearestNames(badColumn, columns)].filter((m) => !!m))].slice(0, 3);
         if (matches.length)
             return `did you mean ${orList(matches.map((m) => `${table}.${m}`))}? (nearest columns in ${known.map((t) => t.table).join(", ")})`;
     }

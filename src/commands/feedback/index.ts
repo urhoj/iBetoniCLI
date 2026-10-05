@@ -254,6 +254,16 @@ function assertGateRef(value: string | undefined): string | undefined {
   return value;
 }
 
+/** Validated gate fields for an update/resolve PUT body; `""` is kept, since it clears the column. */
+function gateFields(input: { gateKind?: string; gateRef?: string; gateUntil?: string }): Record<string, unknown> {
+  if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
+  const out: Record<string, unknown> = {};
+  if (input.gateKind !== undefined) out.gateKind = input.gateKind;
+  if (input.gateRef !== undefined) out.gateRef = assertGateRef(input.gateRef);
+  if (input.gateUntil !== undefined) out.gateUntil = assertGateUntil(input.gateUntil);
+  return out;
+}
+
 const MAX_FREETEXT = 200;
 /** Head/tail split for a truncated field (fb#714): appended updates land at the
  *  TAIL (`--append-description`), so a head-only cut discarded exactly the
@@ -1614,10 +1624,6 @@ function buildAck(
   return ack;
 }
 
-/** Project a resolved row to the compact write-ack fields (resolution capped). */
-function compactAck(row: Record<string, unknown>): Record<string, unknown> {
-  return buildAck(row, ["feedbackId", "status", "updatedAt"], "resolution");
-}
 
 export interface FeedbackResolveInput {
   status?: string;
@@ -1687,8 +1693,8 @@ export function parseAlsoIds(raw: string | undefined, excludeId: number): number
 }
 
 /**
- * PUT /api/feedback/:id — developer triage (status and/or resolution note).
- * A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
+ * PUT /api/feedback/:id — developer triage (status, resolution note and/or
+ * gate fields — the gate rides the same PUT as the status, fb#2186). A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
  * body client-side without sending.
  *
  * A note-only call (no --status) does NOT close the row — the name "resolve"
@@ -1703,17 +1709,15 @@ export async function runFeedbackResolve(
   input: FeedbackResolveInput
 ): Promise<Record<string, unknown>> {
   assertEnum(input.status, STATUSES, "--status", STATUS_SYNONYMS);
-  if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
-  const gated = input.gateKind !== undefined || input.gateRef !== undefined || input.gateUntil !== undefined;
+  const gate = gateFields(input);
+  const gated = Object.keys(gate).length > 0;
   if (input.status === undefined && input.note === undefined && !gated) {
-    failWith("Provide --status and/or --note", 4);
+    failWith("Provide --status, --note and/or --gate-kind/--gate-ref/--gate-until", 4);
   }
   const body: Record<string, unknown> = {};
   if (input.status !== undefined) body.status = input.status;
   if (input.note !== undefined) body.resolution = input.note;
-  if (input.gateKind !== undefined) body.gateKind = input.gateKind;
-  if (input.gateRef !== undefined) body.gateRef = assertGateRef(input.gateRef);
-  if (input.gateUntil !== undefined) body.gateUntil = assertGateUntil(input.gateUntil);
+  Object.assign(body, gate);
   if (input.dryRun) {
     const preview = wouldSend("PUT", `/api/feedback/${id}`, body);
     if (input.also?.length) {
@@ -1726,11 +1730,8 @@ export async function runFeedbackResolve(
     return preview;
   }
   const row = await putWithClaimAdvisory(client, id, body);
-  const out = input.full
-    ? { ...row }
-    : gated
-      ? buildAck(row, ["feedbackId", "status", "gateKind", "gateRef", "gateUntil", "updatedAt"], "resolution")
-      : compactAck(row);
+  const ackKeys = ["feedbackId", "status", ...(gated ? ["gateKind", "gateRef", "gateUntil"] : []), "updatedAt"];
+  const out = input.full ? { ...row } : buildAck(row, ackKeys, "resolution");
   if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
     out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
   }
@@ -1850,9 +1851,9 @@ export async function runFeedbackUpdate(
   assertEnum(input.scope, SCOPES, "--scope");
   assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
   assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
-  // Empty string is the documented CLEAR convention (clearHint) — only a
-  // non-empty value is validated against the enum, mirroring assertGateUntil.
-  if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
+  // Empty string is the documented CLEAR convention (clearHint) — gateFields
+  // validates only a non-empty --gate-kind, mirroring assertGateUntil.
+  const gate = gateFields(input);
   if (input.description !== undefined && !input.description.trim()) {
     failWith("--description must be non-empty", 4);
   }
@@ -1875,9 +1876,7 @@ export async function runFeedbackUpdate(
   if (input.severity !== undefined) body.severity = input.severity;
   if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
   if (input.description !== undefined) body.description = input.description.trim();
-  if (input.gateKind !== undefined) body.gateKind = input.gateKind;
-  if (input.gateRef !== undefined) body.gateRef = assertGateRef(input.gateRef);
-  if (input.gateUntil !== undefined) body.gateUntil = assertGateUntil(input.gateUntil);
+  Object.assign(body, gate);
   // Read-merge-write: --description REPLACES the filed report, which is the
   // destructive half of feedback #332. Appending keeps the original text and
   // adds to it, so later commentary can never overwrite the evidence.
