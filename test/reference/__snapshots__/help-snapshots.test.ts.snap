@@ -10640,7 +10640,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Missing --subject or body, --html with --html-body, bad --from-brand, invalid or >50 recipient/--bcc addresses, or recipient has no email on file → fix that input
-  exit 4 (HTTP 400)  Backend predates multi-recipient send → deploy skew: backend predates several recipients/--bcc (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent
+  exit 4 (HTTP 400)  Backend predates multi-recipient send → deploy skew: backend predates several recipients (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent
   exit 4 (client-side)  A name/personId among several emails → list only emails, or send to the person alone
   exit 3 (HTTP 403)  Not Admin/HR/developer, or --from-brand juha used by anyone but its owner (or under impersonation) → \`--company <ownerId>\` where you are admin/HR for one command, or \`ib company switch\` to persist, or use a developer/sysadmin token
   exit 5 (HTTP 404)  Recipient personId not found in your company → check the personId / name belongs to your company

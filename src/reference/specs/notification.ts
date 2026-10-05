@@ -103,7 +103,7 @@ export const NOTIFICATION_SPECS: CommandSpec[] = [
       apiErr(
         400,
         "Backend predates multi-recipient send",
-        "deploy skew: backend predates several recipients/--bcc (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent",
+        "deploy skew: backend predates several recipients (fb#2221, puminet5api 1.46.4) — deploy + swap, or one address per call; nothing was sent",
         "exactly one of personId or email"
       ),
       {
