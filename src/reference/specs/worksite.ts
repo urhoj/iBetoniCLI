@@ -100,7 +100,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   {
     command: "ib worksite create",
     description:
-      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and `ib worksite update` refuses it too (fb#2160) — no API path sets a worksite's linked customer.",
+      "Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and `ib worksite update` refuses it too (fb#2160) — only a customer merge re-points worksites.",
     // `auth.page.tyomaa.edit` is a FRONTEND-only shape and is never evaluated
     // here — POST /api/tyomaa/new is gated by `requireCompanyRole({ tier:
     // "keikkaEdit", resolveTenant: body.ownerAsiakasId })` (fb#1434), satisfied
