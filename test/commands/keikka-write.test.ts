@@ -135,6 +135,22 @@ describe("ib keikka create/update/drivers", () => {
     );
   });
 
+  test("runKeikkaUpdate concrete flags post to /api/cli/keikka/betoni/:id with the line id (fb#2070)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12278, changed: ["m3"] });
+    await runKeikkaUpdate(mockClient, 12278, { m3: 15, betoniComment: "", betoniLine: 900 }, { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/betoni/12278",
+      { m3: 15, betoniComment: "", keikkaBetoniId: 900 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("runKeikkaUpdate concrete flags: --betoni-line alone and mixing with a text flag exit 4 before any POST", async () => {
+    await expect(runKeikkaUpdate(mockClient, 12278, { betoniLine: 900 }, {})).rejects.toThrow(/--betoni-line needs/);
+    await expect(runKeikkaUpdate(mockClient, 12278, { m3: 15, comment: "x" }, {})).rejects.toThrow(/cannot be combined/);
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {
     mockClient.post.mockResolvedValueOnce({
       assigned: true,

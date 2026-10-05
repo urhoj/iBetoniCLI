@@ -171,7 +171,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 852_000 → 853_000 (2026-10-01): new `ib dev feedback log` (fb#1139 audit trail) + orderedVehicleType on keikka list/schedule shapes (fb#2039). Measured 852 722 B.
 // 853_000 → 854_000 (2026-10-04): `ib notification email send` deploy-skew 400 row (fb#2224); its redundant deploy-gated note dropped. Measured 853 138 B.
 // 854_000 → 856_000 (2026-10-05): `ib dev feedback resolve --gate-kind/--gate-ref/--gate-until` (fb#2186; gate error rows shared with `update`) + phone/phoneLoginEnabled on `ib person list` (fb#2218). Measured 855 790 B.
-const DUMP_LIMIT_BYTES = 856_000;
+// 856_000 → 858_000 (2026-10-05): `ib keikka update --m3/--betoni-comment/--betoni-line`, a fifth flag group (fb#2070). Measured 857 394 B.
+const DUMP_LIMIT_BYTES = 858_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

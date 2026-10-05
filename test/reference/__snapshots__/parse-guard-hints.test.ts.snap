@@ -841,9 +841,17 @@ ib keikka search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 100
 
+ib keikka update --betoni-line <keikkaBetoniId>
+  ! --betoni-line must be an integer >= 1
+  > pass a positive keikkaBetoniId (a refused multi-line call lists them)
+
 ib keikka update --customer <asiakasId>
   ! --customer must be an integer >= 1
   > pass a positive asiakasId
+
+ib keikka update --m3 <n>
+  ! --m3 must be a number in 0..10000
+  > pass a number 0..10000, e.g. --m3 15
 
 ib keikka update --plant <sijaintiId>
   ! --plant must be an integer >= 1

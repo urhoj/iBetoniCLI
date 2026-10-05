@@ -11,7 +11,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween } from "../../dates.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag, numFlag } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { ownerAsiakasIdFromToken, personIdFromClaims } from "../../owner.js";
@@ -360,6 +360,9 @@ export interface KeikkaUpdateFields {
   drivingInstructions?: string;
   comment?: string;
   title?: string;
+  m3?: number;
+  betoniComment?: string;
+  betoniLine?: number;
 }
 
 /**
@@ -374,7 +377,10 @@ export interface KeikkaUpdateFields {
  *     read-merged server-side (fb#1943, fb#1986);
  *   - the text flags (`--driving-instructions/--comment/--title`) post to
  *     /api/cli/keikka/info/:id; "" clears a field. The ajo-ohje writer is the blanket
- *     keikka_tyomaa_set, so the server writes varmenne + ids back (fb#2045).
+ *     keikka_tyomaa_set, so the server writes varmenne + ids back (fb#2045);
+ *   - the concrete flags (`--m3/--betoni-comment [--betoni-line]`) post to
+ *     /api/cli/keikka/betoni/:id, which picks the keikka's only concrete line or the
+ *     named one, and refuses to guess between several (fb#2070).
  */
 export async function runKeikkaUpdate(
   client: ApiClient,
@@ -386,20 +392,31 @@ export async function runKeikkaUpdate(
   const isMove = needsRow || fields.vehicle !== undefined;
   const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined;
   const isInfo = fields.drivingInstructions !== undefined || fields.comment !== undefined || fields.title !== undefined;
+  const isBetoni = fields.m3 !== undefined || fields.betoniComment !== undefined;
   if (fields.supplier !== undefined && fields.plant === undefined) {
     failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
   }
-  if ([fields.status !== undefined, isMove, isRefs, isInfo].filter(Boolean).length > 1) {
+  if (fields.betoniLine !== undefined && !isBetoni) {
+    failWith("--betoni-line needs --m3 and/or --betoni-comment — it only picks which concrete line they write", 4);
+  }
+  if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni].filter(Boolean).length > 1) {
     failWith(
-      "--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant) and the text flags (--driving-instructions/--comment/--title) cannot be combined — run one command per group",
+      "--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant), the text flags (--driving-instructions/--comment/--title) and the concrete flags (--m3/--betoni-comment) cannot be combined — run one command per group",
       4
     );
   }
-  if (fields.status === undefined && !isMove && !isRefs && !isInfo) {
+  if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni) {
     failWith(
-      "Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant), or a text flag (--driving-instructions/--comment/--title)",
+      "Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant), a text flag (--driving-instructions/--comment/--title) or a concrete flag (--m3/--betoni-comment)",
       4
     );
+  }
+  if (isBetoni) {
+    const body: { m3?: number; betoniComment?: string; keikkaBetoniId?: number } = {};
+    if (fields.m3 !== undefined) body.m3 = fields.m3;
+    if (fields.betoniComment !== undefined) body.betoniComment = fields.betoniComment;
+    if (fields.betoniLine !== undefined) body.keikkaBetoniId = fields.betoniLine;
+    return client.post<unknown>(`/api/cli/keikka/betoni/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
   }
   if (isInfo) {
     const body: { keikkaAjoOhje?: string; keikkaComment?: string; keikkaOtsikko?: string } = {};
@@ -962,7 +979,10 @@ export function registerKeikkaCommands(
     .option("--supplier <asiakasId>", "Assert the plant's supplier (betoniAsiakasId); must own --plant", intFlag("--supplier"))
     .option("--driving-instructions <text>", 'Set the driving instructions (ajo-ohje); "" clears')
     .option("--comment <text>", 'Set the order comment (kommentti); "" clears')
-    .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears');
+    .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears')
+    .option("--m3 <n>", "Set the concrete line's volume (m3, 0..10000)", numFlag("--m3", 0, 10000))
+    .option("--betoni-comment <text>", 'Set the concrete line comment; "" clears')
+    .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"));
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (idStr: string, opts: WriteFlags & KeikkaUpdateFields) => {
       const client = await getClient();
@@ -982,6 +1002,9 @@ export function registerKeikkaCommands(
           drivingInstructions: opts.drivingInstructions,
           comment: opts.comment,
           title: opts.title,
+          m3: opts.m3,
+          betoniComment: opts.betoniComment,
+          betoniLine: opts.betoniLine,
         },
         opts
       );
