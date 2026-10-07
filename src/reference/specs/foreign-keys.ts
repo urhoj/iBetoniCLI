@@ -292,7 +292,7 @@ export const CUSTOMER_FK_SPECS: CommandSpec[] = [
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
-      { origin: "client", exit: 4, match: "pass exactly one of", meaning: "Neither or both of <asiakasForeignKeyId> and --key were given", remedy: "name the row by id OR by --key" },
+      { origin: "client", exit: 4, match: "pass exactly one of", meaning: "Neither or both of <asiakasForeignKeyId> and --key were given", remedy: "name the row by id OR by --key; a lone number is the <asiakasId> — `ib customer fk remove <asiakasId> <asiakasForeignKeyId>`" },
       { origin: "client", exit: 4, match: "--source only narrows --key", meaning: "--source was given with an id", remedy: "drop --source when removing by id" },
       { origin: "client", exit: 4, match: "matches", meaning: "--key matches rows on several sources", remedy: "add --source, or remove by id" },
       { origin: "client", exit: 5, match: "is not on customer", meaning: "No row with that id / key on this customer for this owner", remedy: "`ib customer fk list <asiakasId> --owner <id>` shows the rows" },

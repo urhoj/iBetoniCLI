@@ -163,8 +163,11 @@ function pickRowToRemove(rows, id, opts, where) {
     return hits[0];
 }
 export async function runCustomerFkRemove(client, asiakasId, idStr, opts, flags) {
-    if ((idStr === undefined) === (opts.key === undefined)) {
-        failWith("pass exactly one of <asiakasForeignKeyId> or --key <text>", 4);
+    if (idStr !== undefined && opts.key !== undefined) {
+        failWith("pass exactly one of <asiakasForeignKeyId> or --key <text>, not both", 4);
+    }
+    if (idStr === undefined && opts.key === undefined) {
+        failWith(`pass exactly one of <asiakasForeignKeyId> or --key <text> — a lone number is read as <asiakasId> (${asiakasId}); usage: ib customer fk remove <asiakasId> <asiakasForeignKeyId>`, 4);
     }
     if (idStr !== undefined && opts.source !== undefined) {
         failWith("--source only narrows --key; drop it when removing by id", 4);

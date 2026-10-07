@@ -1585,7 +1585,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
-  exit 4 (client-side)  Neither or both of <asiakasForeignKeyId> and --key were given → name the row by id OR by --key
+  exit 4 (client-side)  Neither or both of <asiakasForeignKeyId> and --key were given → name the row by id OR by --key; a lone number is the <asiakasId> — \`ib customer fk remove <asiakasId> <asiakasForeignKeyId>\`
   exit 4 (client-side)  --source was given with an id → drop --source when removing by id
   exit 4 (client-side)  --key matches rows on several sources → add --source, or remove by id
   exit 5 (client-side)  No row with that id / key on this customer for this owner → \`ib customer fk list <asiakasId> --owner <id>\` shows the rows

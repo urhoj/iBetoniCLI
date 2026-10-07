@@ -143,8 +143,12 @@ describe("customer fk remove --key", () => {
 
   test("usage errors (neither / both of id and --key, --source with an id) exit 4 before any request (fb#2036)", async () => {
     const c = aliasClient([alias(60, "vepe")]);
-    await expect(runCustomerFkRemove(c, 1496, undefined, { owner: 27 }, {})).rejects.toMatchObject({ exitCode: 4 });
-    await expect(runCustomerFkRemove(c, 1496, "60", { owner: 27, key: "vepe" }, {})).rejects.toMatchObject({ exitCode: 4 });
+    // fb#2290: a lone number is the <asiakasId>, so the error must say so and show the two-positional usage.
+    await expect(runCustomerFkRemove(c, 1475, undefined, { owner: 27 }, {})).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/read as <asiakasId> \(1475\).*fk remove <asiakasId> <asiakasForeignKeyId>/),
+    });
+    await expect(runCustomerFkRemove(c, 1496, "60", { owner: 27, key: "vepe" }, {})).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining("not both") });
     await expect(runCustomerFkRemove(c, 1496, "60", { owner: 27, source: "betomik-orderbook" }, {})).rejects.toMatchObject({ exitCode: 4 });
     expect(c.get).not.toHaveBeenCalled();
   });
