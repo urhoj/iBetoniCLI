@@ -29,8 +29,9 @@ export const PROVIDER_LIST_TABS = ["avoimet", "tarjotut", "voitetut", "paattynee
  *   --mine     â†’ GET /api/pumppuRequests/mine          (the caller's own requests; default)
  *   --open     â†’ GET /api/pumppuRequests/open          (provider inbox; isProvider; PII masked until your offer is accepted)
  *   --provider â†’ GET /api/pumppuRequests/provider-list (provider lifecycle; isProvider; incl. your sent offers),
- *                filtered by --tab (default avoimet): avoimet=open to bid on, tarjotut=offered (pending),
- *                voitetut=won (offer accepted/confirmed), paattyneet=ended (expired/no_supply/lost).
+ *                filtered by --tab (default avoimet): avoimet=open to bid on, tarjotut=offered (pending)
+ *                on a still-live request, voitetut=won (offer accepted/confirmed), paattyneet=ended
+ *                (expired/no_supply/lost/declined/withdrawn, or pending on an ended request; 30 days).
  * `--status` (CSV) and `--limit` apply to the --mine view only. Projected into
  * the universal list envelope.
  */
