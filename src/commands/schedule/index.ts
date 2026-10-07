@@ -3,8 +3,10 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
-import { jsonAction } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { writeJson } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
+import { resolveDateInput } from "../../targets.js";
 
 /** Schedule result shape: the keikka envelope plus which tenant it was scoped to. */
 type ScheduleResult = ListEnvelope<Record<string, unknown>> & {
@@ -76,9 +78,16 @@ export function registerScheduleCommands(
   s.command("today")
     .action(jsonAction(getClient, runScheduleToday));
 
-  s.command("day <date>")
-    .action(jsonAction(getClient, (client, date: string) => runScheduleDay(client, date)));
+  // fb#1978: the day also arrives as `--date`, the flag `ib palkki list` takes,
+  // so an agent moving between the two date-scoped reads does not burn an exit 4.
+  // The date is resolved BEFORE getClient(), so a missing one exits 4 on its own terms.
+  const dateAction = (run: (client: ApiClient, date: string) => Promise<ScheduleResult>) =>
+    guarded(async (date: string | undefined, opts: { date?: string }) => {
+      const day = resolveDateInput(date, opts.date);
+      writeJson(await run(await getClient(), day));
+    });
 
-  s.command("week <start>")
-    .action(jsonAction(getClient, (client, start: string) => runScheduleWeek(client, start)));
+  s.command("day [date]").option("--date <date>").action(dateAction(runScheduleDay));
+
+  s.command("week [start]").option("--date <date>").action(dateAction(runScheduleWeek));
 }

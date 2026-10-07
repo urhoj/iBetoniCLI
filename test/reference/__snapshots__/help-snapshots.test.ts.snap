@@ -14075,7 +14075,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib schedule day matches snapshot 1`] = `
 "USAGE
-  ib schedule day <date> [flags]
+  ib schedule day [<date>] [flags]
 
 DESCRIPTION
   List keikkas for a specific day.
@@ -14083,10 +14083,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> DATE    date (YYYY-MM-DD or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -14111,6 +14111,7 @@ SEE ALSO
 EXAMPLES
   ib schedule day 2026-06-01
   ib schedule day tomorrow
+  ib schedule day --date 2026-06-01
 "
 `;
 
@@ -14153,7 +14154,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib schedule week matches snapshot 1`] = `
 "USAGE
-  ib schedule week <start> [flags]
+  ib schedule week [<start>] [flags]
 
 DESCRIPTION
   List keikkas for a 7-day window starting at the given date.
@@ -14161,10 +14162,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <start> DATE    week start date (YYYY-MM-DD or today/yesterday/tomorrow) (required)
+  <start> DATE    week start date (YYYY-MM-DD or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Week start YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <start> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -14189,6 +14190,7 @@ SEE ALSO
 EXAMPLES
   ib schedule week 2026-06-01
   ib schedule week today
+  ib schedule week --date 2026-06-01
 "
 `;
 

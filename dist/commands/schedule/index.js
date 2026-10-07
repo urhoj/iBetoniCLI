@@ -1,7 +1,9 @@
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
-import { jsonAction } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { writeJson } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
+import { resolveDateInput } from "../../targets.js";
 /**
  * Attach the queried tenant to a schedule result (fb#777): `schedule` answers
  * for the ACTIVE company only — unlike its sibling `ib stats`, which offers
@@ -50,9 +52,14 @@ export function registerScheduleCommands(parent, getClient) {
     const s = parent.command("schedule").description("Schedule (keikka window) commands");
     s.command("today")
         .action(jsonAction(getClient, runScheduleToday));
-    s.command("day <date>")
-        .action(jsonAction(getClient, (client, date) => runScheduleDay(client, date)));
-    s.command("week <start>")
-        .action(jsonAction(getClient, (client, start) => runScheduleWeek(client, start)));
+    // fb#1978: the day also arrives as `--date`, the flag `ib palkki list` takes,
+    // so an agent moving between the two date-scoped reads does not burn an exit 4.
+    // The date is resolved BEFORE getClient(), so a missing one exits 4 on its own terms.
+    const dateAction = (run) => guarded(async (date, opts) => {
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await run(await getClient(), day));
+    });
+    s.command("day [date]").option("--date <date>").action(dateAction(runScheduleDay));
+    s.command("week [start]").option("--date <date>").action(dateAction(runScheduleWeek));
 }
 //# sourceMappingURL=index.js.map

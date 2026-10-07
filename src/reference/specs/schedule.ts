@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { permErrors } from "./shared.js";
+import { permErrors, DRIVER_DATE_ARG, DRIVER_DATE_FLAG } from "./shared.js";
 
 // fb#777: schedule answers for the ACTIVE company only, unlike its sibling
 // `ib stats` (which offers --all for a cross-tenant rollup) — a bare 0-row
@@ -42,27 +42,27 @@ export const SCHEDULE_SPECS: CommandSpec[] = [
     command: "ib schedule day",
     description: "List keikkas for a specific day.",
     permissions: ["auth.page.grid.tilaus.read"],
-    args: [{ name: "date", type: "date", description: "date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
-    flags: [],
+    args: [DRIVER_DATE_ARG],
+    flags: [DRIVER_DATE_FLAG],
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time, orderedVehicleType:{vehicleTypeId,name}|null }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
     notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
-    examples: ["ib schedule day 2026-06-01", "ib schedule day tomorrow"],
+    examples: ["ib schedule day 2026-06-01", "ib schedule day tomorrow", "ib schedule day --date 2026-06-01"],
   },
   {
     command: "ib schedule week",
     description:
       "List keikkas for a 7-day window starting at the given date.",
     permissions: ["auth.page.grid.tilaus.read"],
-    args: [{ name: "start", type: "date", description: "week start date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
-    flags: [],
+    args: [{ name: "start", type: "date", required: false, description: "week start date (YYYY-MM-DD or today/yesterday/tomorrow) — or pass it as --date" }],
+    flags: [{ name: "date", type: "date", description: "Week start YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <start> positional" }],
     outputShape:
       "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time, orderedVehicleType:{vehicleTypeId,name}|null }> & { scope: { asiakasId } }",
     errors: permErrors("auth.page.grid.tilaus.read"),
     notes: [SCHEDULE_SCOPE_NOTE, SCHEDULE_TILA_NOTE, SCHEDULE_TILA_COUNT_NOTE],
     seeAlso: ["ib stats"],
-    examples: ["ib schedule week 2026-06-01", "ib schedule week today"],
+    examples: ["ib schedule week 2026-06-01", "ib schedule week today", "ib schedule week --date 2026-06-01"],
   },
 ];
