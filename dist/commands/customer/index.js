@@ -500,6 +500,11 @@ export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags
     }
     const result = await client.delete(`/api/asiakas/delete/${asiakasId}/${ownerAsiakasId}`, { headers: writeFlagsToHeaders(flags) });
     const base = result && typeof result === "object" ? result : { result };
+    // fb#2341: an older backend answers {success:true, rowsAffected:0} when nothing matched
+    // (wrong owner, already deleted) — that is not-found, never success.
+    if (base.rowsAffected === 0) {
+        failWith(`asiakas ${asiakasId} was not deleted (0 rows affected) — not found, already deleted, or owned by another tenant`, 5);
+    }
     return { ...base, leftAttached };
 }
 /**

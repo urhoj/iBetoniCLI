@@ -1353,7 +1353,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed
+  { success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } (ownerAsiakasId = the row's real owner) — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId

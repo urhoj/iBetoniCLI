@@ -64,6 +64,13 @@ describe("runCustomerDelete", () => {
     });
   });
 
+  // fb#2341: a 0-row delete used to come back as success.
+  test("0 rows affected is an error (exit 5), not success", async () => {
+    mockDependents();
+    mockClient.delete.mockResolvedValueOnce({ success: true, rowsAffected: 0 });
+    await expect(runCustomerDelete(mockClient, 9001, 1349, { reason: "x" })).rejects.toMatchObject({ exitCode: 5 });
+  });
+
   test("a failed dependent lookup still deletes, with leftAttached: null", async () => {
     mockClient.get.mockRejectedValue(new Error("boom"));
     mockClient.delete.mockResolvedValueOnce({ success: true, rowsAffected: 1 });

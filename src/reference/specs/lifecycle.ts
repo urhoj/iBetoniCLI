@@ -22,7 +22,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
-    outputShape: "{ success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed",
+    outputShape: "{ success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } (ownerAsiakasId = the row's real owner) — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
