@@ -15,6 +15,16 @@ import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 import { normalizeSingleDashLongFlags } from "../argv.js";
 
+// A reader that closes early (`ib … | head`) is a normal end of output, not a
+// CLI defect: swallow EPIPE instead of letting the unhandled 'error' event
+// crash Node with a stack trace (fb#2331). No process.exit() — Windows-unsafe;
+// the destroyed stream drops later writes and the loop drains on its own.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EPIPE") throw err;
+  });
+}
+
 // Start the credentials read BEFORE the module-loading program build — the two
 // are independent, so the file IO overlaps the imports instead of serializing
 // after them. Awaited below for the tier. `.catch` here so an early rejection

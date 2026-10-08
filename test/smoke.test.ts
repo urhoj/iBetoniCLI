@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -31,4 +31,20 @@ describe("ib CLI smoke", () => {
     // JSON import assertion survives the tsc ESM emit.
     expect(result.stdout.trim(), detail).toBe(packageJson.version);
   });
+
+  // fb#2331: a reader that closes early (`ib … | head`) crashed Node with an
+  // unhandled 'error' event (EPIPE) and a stack trace from emitStdout. The
+  // ~800 KB offline `reference dump` is far larger than one pipe buffer, so
+  // closing stdout after the first chunk guarantees a write into a dead pipe.
+  test("a stdout reader that closes early is not a crash (EPIPE swallowed)", async () => {
+    const child = spawn(process.execPath, [IB_BIN, "reference", "dump"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    child.stdout.once("data", () => child.stdout.destroy());
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(stderr, stderr).not.toMatch(/Unhandled 'error' event|EPIPE/);
+    expect(code, stderr).toBe(0);
+  }, 30_000);
 });

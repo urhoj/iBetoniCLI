@@ -50,7 +50,8 @@ export interface GlossarySetFields {
   related?: string;
   entity?: string;
   domain?: string;
-  aiConfidence?: number;
+  /** `null` (JSON only) clears the stored score (fb#1707, fb#2323). */
+  aiConfidence?: number | null;
   needsHumanReview?: boolean;
   /** Merge twins of definition/synonyms (fb#1712) — CSV, like the flags. */
   addSynonyms?: string;
@@ -335,7 +336,7 @@ export async function runGlossarySet(
   client: ApiClient,
   term: string,
   opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; domain?: string;
-    addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string; aiConfidence?: number; needsHumanReview?: boolean },
+    addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string; aiConfidence?: number | null; needsHumanReview?: boolean },
   flags: WriteFlags = {}
 ): Promise<unknown> {
   // Append flags edit in place; they cannot combine with their overwrite twin.

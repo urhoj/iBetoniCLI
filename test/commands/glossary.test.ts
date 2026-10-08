@@ -308,6 +308,17 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
     expect(put.mock.calls[0][1]).toMatchObject({ definition: "d", aiConfidence: 90 });
   });
 
+  test("set --from-json PUTs a JSON aiConfidence: null as the documented clear (fb#2323)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ definition: "d", aiConfidence: null }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+    });
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][1]).toMatchObject({ definition: "d", aiConfidence: null });
+  });
+
   test("an explicit --ai-confidence overrides the JSON key", async () => {
     const put = vi.fn().mockResolvedValue({ term: "x" });
     await withJsonFile({ definition: "d", aiConfidence: 90 }, async (p) => {

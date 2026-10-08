@@ -13,10 +13,11 @@ export interface AssessFlags {
 /**
  * Validate a self-assessed confidence: an integer 0–100, or undefined (the flag
  * was omitted — a human edit that resets the score). `failWith` throws a CliError
- * mapped to exit 4.
+ * mapped to exit 4. A JSON `null` (`glossary set --from-json`) is the documented
+ * CLEAR, not an invalid score (fb#2323).
  */
-export function assertAiConfidence(v: number | undefined): void {
-  if (v === undefined) return;
+export function assertAiConfidence(v: number | null | undefined): void {
+  if (v == null) return;
   if (!Number.isInteger(v) || v < 0 || v > 100) {
     failWith("--ai-confidence must be an integer 0–100", 4);
   }
