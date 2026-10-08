@@ -343,6 +343,29 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
   },
   {
+    command: "ib vehicle route-plan",
+    description:
+      "Per-day route plan (reittisuunnitelma) for a vehicle: planned legs with driving km from the night spot through the day's orders (by pumppuAika) and back, plus the actual GPS route (stops, km, waste-station visits) for today/past days. A Pumi (type 2) drives via each order's plant to the site unless the order is ≥30 m3 (mixers bring the concrete); a Pumppu (type 3) drives site to site.",
+    permissions: ["auth.page.vehicle.read"],
+    args: [{ name: "vehicleId", type: "number", description: "vehicleId to plan" }],
+    flags: [
+      { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+    ],
+    outputShape:
+      "{ vehicle:{ vehicleId, vehicleNo, plate, name, vehicleTypeId, typeName }, date, isFuture, gpsAvailable, start:Point|null, end:Point|null, keikat:[{ keikkaId, time, m3, siteName, plantName, plantLyh, skipsPlant }], planned:{ legs:[{ from:Point, to:Point, km|null, min|null, source:\"sql|google\"|null }], totalKm, totalMin, missingLegs, lookupErrors }, actual:null|{ stops:[{ kind, name, lat, lng, arrived, departed, durationMin, kmFromPrevious }], totalKm (= odometerKm ?? trackKm), trackKm, odometerKm|null, odometerError, wasteVisits }, rules:{ pumiSkipPlantM3 } } — Point = { kind:\"night|night-mode|varikko|plant|site\", name, lat, lng, sijaintiId?, tyomaaId?, keikkaId? }. --pretty renders only the planned legs (from, to, km, min) with the totals (incl. missingLegs, lookupErrors) above.",
+    errors: [
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    notes: [
+      "start = where the truck spent the previous night (GPS, kind night); future days use the most frequent night spot of the last 7 nights (night-mode); no GPS → the vehicle/company varikko. For today and future days end = start (planned return). Wash/plant stops at day end and waste stations are never planned — they show up only in `actual`.",
+      "km:null on a leg: a point had no coordinates (e.g. an order with no plant) or Google cannot route the pair (both counted in missingLegs, stable), or the distance lookup failed transiently (counted in lookupErrors — re-run); all are left out of totalKm.",
+      "keikat follow the caller's keikka visibility (same rule as ib keikka list): a driver without company-wide read sees only their own orders planned.",
+    ],
+    seeAlso: ["ib vehicle timeline", "ib keikka list"],
+    examples: ["ib vehicle route-plan 7", "ib vehicle route-plan 7 --date yesterday --pretty"],
+  },
+  {
     command: "ib vehicle visits",
     description:
       "The active company's own vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). Results are filtered to the caller's own fleet — other tenants' vehicles at a shared sijainti are not returned; a tyomaa must belong to the active company (else 404).",

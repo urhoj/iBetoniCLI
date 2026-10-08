@@ -14895,7 +14895,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName,km}], roster[{personId,name}], byVehicle rows + km, totals + km,kmError. km = driven km from GPS (Mapon only): null = unknown (no tracker / no GPS data / other provider), never 0; kmError:true = the GPS vendor call failed (response not cached — re-run).
+  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers,deleted,cancelled}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay } (byVehicle/byDriver rows carry days). With --by: ListEnvelope of that one breakdown. With --iso-week: the same bundle + week, fleet[{vehicleId,vehicleNo,name,typeName,km}], roster[{personId,name}], byVehicle rows + km, totals + km,kmError,wasteError, wasteVisits[{vehicleTypeId,typeName,visits,orders}]|null (GPS waste-station visits per vehicle type; wasteError:true = not cached, re-run). km = driven km from GPS (Mapon only): null = unknown (no tracker / no GPS data / other provider), never 0; kmError:true = the GPS vendor call failed (response not cached — re-run).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  --iso-week: not a company admin of the active company → log in as an asiakasAdmin of that company, or pick it with --company <asiakasId>
@@ -16254,6 +16254,48 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle route 7
   ib vehicle route 7 --date 2026-05-31
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle route-plan matches snapshot 1`] = `
+"USAGE
+  ib vehicle route-plan <vehicleId> [flags]
+
+DESCRIPTION
+  Per-day route plan (reittisuunnitelma) for a vehicle: planned legs with driving km from the night spot through the day's orders (by pumppuAika) and back, plus the actual GPS route (stops, km, waste-station visits) for today/past days. A Pumi (type 2) drives via each order's plant to the site unless the order is ≥30 m3 (mixers bring the concrete); a Pumppu (type 3) drives site to site.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicleId to plan (required)
+
+FLAGS
+  --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { vehicle:{ vehicleId, vehicleNo, plate, name, vehicleTypeId, typeName }, date, isFuture, gpsAvailable, start:Point|null, end:Point|null, keikat:[{ keikkaId, time, m3, siteName, plantName, plantLyh, skipsPlant }], planned:{ legs:[{ from:Point, to:Point, km|null, min|null, source:"sql|google"|null }], totalKm, totalMin, missingLegs, lookupErrors }, actual:null|{ stops:[{ kind, name, lat, lng, arrived, departed, durationMin, kmFromPrevious }], totalKm (= odometerKm ?? trackKm), trackKm, odometerKm|null, odometerError, wasteVisits }, rules:{ pumiSkipPlantM3 } } — Point = { kind:"night|night-mode|varikko|plant|site", name, lat, lng, sijaintiId?, tyomaaId?, keikkaId? }. --pretty renders only the planned legs (from, to, km, min) with the totals (incl. missingLegs, lookupErrors) above.
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - start = where the truck spent the previous night (GPS, kind night); future days use the most frequent night spot of the last 7 nights (night-mode); no GPS → the vehicle/company varikko. For today and future days end = start (planned return). Wash/plant stops at day end and waste stations are never planned — they show up only in \`actual\`.
+  - km:null on a leg: a point had no coordinates (e.g. an order with no plant) or Google cannot route the pair (both counted in missingLegs, stable), or the distance lookup failed transiently (counted in lookupErrors — re-run); all are left out of totalKm.
+  - keikat follow the caller's keikka visibility (same rule as ib keikka list): a driver without company-wide read sees only their own orders planned.
+
+SEE ALSO
+  ib vehicle timeline, ib keikka list
+
+EXAMPLES
+  ib vehicle route-plan 7
+  ib vehicle route-plan 7 --date yesterday --pretty
 "
 `;
 

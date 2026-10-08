@@ -176,6 +176,64 @@ export const runVehicleTimeline = gpsDayRead("timeline");
 /** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
 export const runVehicleRoute = gpsDayRead("route");
 
+/** A route-plan point (night spot / varikko / plant / site); only the fields the pretty table reads. */
+type RoutePlanPoint = { kind: string; name: string | null } | null;
+
+/** The route-plan payload, typed only as far as the pretty projection reads it. */
+export interface VehicleRoutePlan {
+  vehicle?: { vehicleNo?: unknown; plate?: unknown };
+  date?: string;
+  planned?: {
+    legs: { from: RoutePlanPoint; to: RoutePlanPoint; km: number | null; min: number | null }[];
+    totalKm: number;
+    totalMin: number;
+    missingLegs: number;
+    lookupErrors: number;
+  };
+  actual?: { totalKm: number; trackKm?: number; odometerKm?: number | null; wasteVisits: number } | null;
+  [k: string]: unknown;
+}
+
+/**
+ * GET /api/cli/vehicle/route-plan/:vehicleId?date= — the vehicle-day route plan
+ * (planned legs with km between night spot, plants and sites) plus the actual
+ * GPS route for today/past days. Pass-through: the backend builds everything.
+ */
+export async function runVehicleRoutePlan(
+  client: ApiClient,
+  vehicleId: number,
+  opts: VehicleDayFilter
+): Promise<VehicleRoutePlan> {
+  return client.get<VehicleRoutePlan>(
+    `/api/cli/vehicle/route-plan/${vehicleId}${qs({ date: opts.date || undefined })}`
+  );
+}
+
+const pointLabel = (p: RoutePlanPoint): string => (p ? `${p.name ?? "?"} (${p.kind})` : "—");
+
+/**
+ * `--pretty` projection of a route plan: the planned legs as a list envelope
+ * (from, to, km, min); the day totals ride as scalar envelope keys, which the
+ * pretty renderer prints as one context line above the table.
+ */
+export function routePlanLegsTable(plan: VehicleRoutePlan): ListEnvelope<Record<string, unknown>> & Record<string, unknown> {
+  const legs = plan.planned?.legs ?? [];
+  return {
+    items: legs.map((l) => ({ from: pointLabel(l.from), to: pointLabel(l.to), km: l.km, min: l.min })),
+    nextCursor: null,
+    count: legs.length,
+    vehicle: [plan.vehicle?.vehicleNo, plan.vehicle?.plate].filter((v) => v != null).join(" "),
+    date: plan.date,
+    totalKm: plan.planned?.totalKm,
+    totalMin: plan.planned?.totalMin,
+    missingLegs: plan.planned?.missingLegs,
+    lookupErrors: plan.planned?.lookupErrors,
+    actualKm: plan.actual?.totalKm,
+    actualKmSource: plan.actual ? (plan.actual.odometerKm != null ? "odometer" : "gps-track") : undefined,
+    wasteVisits: plan.actual?.wasteVisits,
+  };
+}
+
 /**
  * GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that
  * visited a site. `opts.date` filters the visits to one Europe/Helsinki day
@@ -777,6 +835,16 @@ export function registerVehicleCommands(
       jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
         runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
       )
+    );
+
+  v.command("route-plan <vehicleId>")
+    .option("--date <date>", "", "today")
+    .action(
+      jsonAction(getClient, async (client, idStr: string, opts: VehicleDayFilter) => {
+        const plan = await runVehicleRoutePlan(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) });
+        // --pretty: the legs table + totals; JSON (the AI contract) = the full payload.
+        return parent.opts().pretty ? routePlanLegsTable(plan) : plan;
+      })
     );
 
   v.command("visits <filterType> <id>")
