@@ -17257,7 +17257,7 @@ exports[`Help snapshots — contract stability > help for ib worksite set-locati
   ib worksite set-location <tyomaaId> [flags]
 
 DESCRIPTION
-  Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). An address edit or refresh-location re-geocodes over it.
+  Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). Address edits keep it; only refresh-location re-geocodes over it.
   Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 ARGUMENTS

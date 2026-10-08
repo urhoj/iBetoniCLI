@@ -151,7 +151,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib worksite set-location",
-    description: "Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). An address edit or refresh-location re-geocodes over it.",
+    description: "Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). Address edits keep it; only refresh-location re-geocodes over it.",
     permissions: [WORKSITE_EDIT_PERMISSION],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [
