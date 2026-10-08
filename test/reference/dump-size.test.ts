@@ -174,7 +174,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 856_000 → 858_000 (2026-10-05): `ib keikka update --m3/--betoni-comment/--betoni-line`, a fifth flag group (fb#2070). Measured 857 394 B.
 // 858_000 → 859_000 (2026-10-05): `ib customer fk set/add` 404 row for the fb#2034 tenant rule (the old fb#1975 row was the only 404 and named the wrong remedy). Measured 858 381 B.
 // 859_000 → 860_000 (2026-10-08): `ib dev schema proc` aliases function/fn/udf (fb#2310) + did-you-mean 404 remedy (fb#2339). Measured 859 132 B.
-const DUMP_LIMIT_BYTES = 860_000;
+// 860_000 → 861_000 (2026-10-08): new leaf `ib worksite set-location` (manual MANUAL coordinate pin). Measured 860 448 B.
+const DUMP_LIMIT_BYTES = 861_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

@@ -17210,6 +17210,47 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite set-location matches snapshot 1`] = `
+"USAGE
+  ib worksite set-location <tyomaaId> [flags]
+
+DESCRIPTION
+  Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). An address edit or refresh-location re-geocodes over it.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
+
+ARGUMENTS
+  <tyomaaId> NUMBER    tyomaaId (required)
+
+FLAGS
+  --lat NUMBER    Latitude -90..90
+  --lng NUMBER    Longitude -180..180
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, tyomaaId, lat, lng, geocodingAccuracy, geocodingSource }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --lat is not a number, rejected locally before any request → pass -90..90
+  exit 4 (client-side)  --lng is not a number, rejected locally before any request → pass -180..180
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite set-location 3371 --lat 60.1472 --lng 24.554
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite update matches snapshot 1`] = `
 "USAGE
   ib worksite update <tyomaaId> [flags]

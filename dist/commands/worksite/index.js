@@ -8,7 +8,7 @@ import { todayHelsinki } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, addOwnerOption } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption } from "../../targets.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { registerPersonLinkCommands } from "../_shared/personLink.js";
@@ -232,6 +232,12 @@ export async function runWorksiteSetGeofence(client, tyomaaId, radius, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+/** POST /api/tyomaa/:tyomaaId/location — pin coordinates by hand (saved as MANUAL). */
+export async function runWorksiteSetLocation(client, tyomaaId, lat, lng, flags) {
+    return client.post(`/api/tyomaa/${tyomaaId}/location`, { lat, lng }, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
 /** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
 export async function runWorksiteHelsinkiFetch(client, tyomaaId, flags) {
     return client.post(`/api/tyomaa/helsinki/fetch/${tyomaaId}`, {}, {
@@ -425,6 +431,9 @@ export function registerWorksiteCommands(parent, getClient) {
         const client = await getClient();
         writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
     }));
+    addWriteFlagsToCommand(w.command("set-location <tyomaaId>")
+        .requiredOption("--lat <n>", "", numFlag("--lat", -90, 90))
+        .requiredOption("--lng <n>", "", numFlag("--lng", -180, 180))).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteSetLocation(client, parseId(idStr, "tyomaaId"), opts.lat, opts.lng, opts)));
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts)));
     const worksitePerson = w
         .command("person")

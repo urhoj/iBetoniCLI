@@ -14,7 +14,7 @@ import { todayHelsinki } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, addOwnerOption } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption } from "../../targets.js";
 import {
   runAddressDashboard,
   registerDashboardCommand,
@@ -366,6 +366,15 @@ export async function runWorksiteSetGeofence(
   });
 }
 
+/** POST /api/tyomaa/:tyomaaId/location — pin coordinates by hand (saved as MANUAL). */
+export async function runWorksiteSetLocation(
+  client: ApiClient, tyomaaId: number, lat: number, lng: number, flags: WriteFlags
+): Promise<unknown> {
+  return client.post(`/api/tyomaa/${tyomaaId}/location`, { lat, lng }, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 /** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
 export async function runWorksiteHelsinkiFetch(
   client: ApiClient, tyomaaId: number, flags: WriteFlags
@@ -689,6 +698,16 @@ export function registerWorksiteCommands(
     const client = await getClient();
     writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
   }));
+
+  addWriteFlagsToCommand(
+    w.command("set-location <tyomaaId>")
+      .requiredOption("--lat <n>", "", numFlag("--lat", -90, 90))
+      .requiredOption("--lng <n>", "", numFlag("--lng", -180, 180))
+  ).action(
+    jsonAction(getClient, (client, idStr: string, opts: WriteFlags & { lat: number; lng: number }) =>
+      runWorksiteSetLocation(client, parseId(idStr, "tyomaaId"), opts.lat, opts.lng, opts)
+    )
+  );
 
   addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteFlags) =>

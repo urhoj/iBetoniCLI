@@ -162,6 +162,33 @@ describe("ib worksite create/update", () => {
     );
   });
 
+  test("set-location: POST location with { lat, lng } + write flags", async () => {
+    mockClient.post.mockResolvedValueOnce({ success: true });
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["worksite", "set-location", "3371", "--lat", "60.1472", "--lng", "24.5540", "--reason", "GPS stops"],
+      { from: "user" }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/3371/location",
+      { lat: 60.1472, lng: 24.554 },
+      { headers: { "X-Action-Reason": "GPS stops" } }
+    );
+  });
+
+  test.each([
+    ["--lat", "91"],
+    ["--lng", "abc"],
+  ])("set-location: %s %s exits 4 before any request", async (flag, value) => {
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    const argv = ["worksite", "set-location", "3371", "--lat", "60.1", "--lng", "24.5"];
+    argv[argv.indexOf(flag) + 1] = value;
+    await expect(program.parseAsync(argv, { from: "user" })).rejects.toMatchObject({ exitCode: 4 });
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runWorksiteHelsinkiFetch: POST helsinki/fetch", async () => {
     mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteHelsinkiFetch(mockClient, 42, {});

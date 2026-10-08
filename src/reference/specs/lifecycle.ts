@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr, numParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
 
 /** The `--contact-type` parse-guard row every customer/worksite person add/remove leaf shares (its `--person` sibling is PERSON_PARSE_ERR, shared cross-domain via shared.ts). */
 const CONTACT_TYPE_PARSE_ERR = intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)");
@@ -148,6 +148,26 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     ],
     notes: ["The UPDATE is scoped to your active company's ownerAsiakasId and answers { success: true } even when it matched 0 rows — a foreign or unknown tyomaaId is a SILENT no-op. Confirm with `ib worksite get <id>` afterwards."],
     examples: ["ib worksite set-geofence 99 --radius 300"],
+  },
+  {
+    command: "ib worksite set-location",
+    description: "Pin worksite coordinates by hand (saved as MANUAL, Google placeId cleared, change-logged). An address edit or refresh-location re-geocodes over it.",
+    permissions: [WORKSITE_EDIT_PERMISSION],
+    args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+    flags: [
+      { name: "lat", type: "number", description: "Latitude -90..90" },
+      { name: "lng", type: "number", description: "Longitude -180..180" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ success, tyomaaId, lat, lng, geocodingAccuracy, geocodingSource }",
+    errors: [
+      numParseErr("--lat", "pass -90..90"),
+      numParseErr("--lng", "pass -180..180"),
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
+      ...permErrors(WORKSITE_EDIT_PERMISSION),
+    ],
+    examples: ["ib worksite set-location 3371 --lat 60.1472 --lng 24.554"],
   },
   {
     command: "ib worksite helsinki-fetch",
