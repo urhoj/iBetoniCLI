@@ -105,14 +105,15 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev schema proc",
-        description: "Signature (parameters) and full definition (T-SQL) for one dbo proc/function — or several at once via a comma-separated list (read the procs you're about to CREATE OR ALTER in one call). Developer-only.",
+        aliases: ["ib dev schema function", "ib dev schema fn", "ib dev schema udf"],
+        description: "Signature (parameters) and full definition (T-SQL) for one dbo proc or scalar/table function — or several at once via a comma-separated list (read the procs you're about to CREATE OR ALTER in one call). Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
         outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
         notes: [renamedNote],
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "a single-name 404 names the nearest live names (word order ignored); else `ib dev schema procs --search <word>` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema proc asiakas_find", "ib dev schema proc sijainti_save,sijainti_add,asiakas_sijainnit_get"],
       },
       {

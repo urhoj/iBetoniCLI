@@ -203,6 +203,42 @@ export async function runSchemaView(client: ApiClient, name: string): Promise<Re
 export async function runSchemaProc(client: ApiClient, name: string): Promise<Record_> {
   return withRenameNote(await client.get<Record_>(`/api/cli/schema/proc/${name}`));
 }
+
+/** A name's words, sorted — `asiakas_combinator_validate` and
+ *  `combinator_asiakas_validate` share one key (fb#2339). */
+const wordSetKey = (s: string) =>
+  s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/_+/).filter(Boolean).sort().join("_");
+
+/**
+ * Single-name `schema proc` with a did-you-mean on 404 (fb#2339): the nearest
+ * live proc/function names, word-order-insensitive first, then edit distance.
+ * Skipped when the backend's 404 already names the object's real class (a
+ * trigger etc.); a failed list fetch keeps the original error. Single-name only
+ * — the batch path tolerates 404s and would pay one list fetch per miss.
+ */
+export async function runSchemaProcSuggesting(client: ApiClient, name: string): Promise<Record_> {
+  try {
+    return await runSchemaProc(client, name);
+  } catch (e) {
+    if (e instanceof CliError && e.statusCode === 404 && !/object exists in dbo/i.test(e.message)) {
+      const suggestion = await nearestProcNames(client, name).catch(() => []);
+      if (suggestion.length) {
+        throw new CliError(e.message, e.statusCode, e.body, e.exitCode,
+          `did you mean ${orList(suggestion)}? (nearest names in the live proc/function list)`);
+      }
+    }
+    throw e;
+  }
+}
+
+async function nearestProcNames(client: ApiClient, badName: string): Promise<string[]> {
+  // 1000, not the 200 default: dbo holds ~520 procs+functions.
+  const names = (await runSchemaProcs(client, { limit: 1000 })).items
+    .map((r) => (r as Record_).name)
+    .filter((n): n is string => typeof n === "string");
+  const key = wordSetKey(badName);
+  return [...new Set([...names.filter((n) => wordSetKey(n) === key), ...nearestNames(badName, names)])].slice(0, 3);
+}
 export async function runSchemaTrigger(client: ApiClient, name: string): Promise<Record_> {
   return withRenameNote(await client.get<Record_>(`/api/cli/schema/trigger/${name}`));
 }
@@ -759,14 +795,17 @@ export function registerSchemaCommands(
 
   // Single object by default; a comma in <name> switches to batch mode
   // (`ib dev schema proc a,b,c`) — parallel fan-out, deduped, 404-tolerant.
-  const runOneOrBatch = (fn: (c: ApiClient, name: string) => Promise<Record_>) =>
+  const runOneOrBatch = (
+    fn: (c: ApiClient, name: string) => Promise<Record_>,
+    one: (c: ApiClient, name: string) => Promise<Record_> = fn
+  ) =>
     guarded(async (name: string) => {
       const client = await getClient();
       if (name.includes(",")) {
         const names = [...new Set(name.split(",").map((n) => n.trim()).filter(Boolean))];
         writeJson(await runSchemaBatch(client, fn, names));
       } else {
-        writeJson(await fn(client, name));
+        writeJson(await one(client, name));
       }
     });
 
@@ -792,8 +831,10 @@ export function registerSchemaCommands(
     .action(runOneOrBatch(runSchemaTable));
   s.command("view <name>")
     .action(runOneOrBatch(runSchemaView));
+  // function/fn/udf: `proc` already reads scalar + table functions (fb#2310).
   s.command("proc <name>")
-    .action(runOneOrBatch(runSchemaProc));
+    .aliases(["function", "fn", "udf"])
+    .action(runOneOrBatch(runSchemaProc, runSchemaProcSuggesting));
   s.command("trigger <name>")
     .action(runOneOrBatch(runSchemaTrigger));
 

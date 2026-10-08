@@ -10,6 +10,7 @@ import {
   runSchemaView,
   runSchemaProcs,
   runSchemaProc,
+  runSchemaProcSuggesting,
   runSchemaDump,
   runSchemaBatch,
   runSchemaTriggers,
@@ -1035,5 +1036,48 @@ describe("ib schema", () => {
       expect(byName.a_proc.renamedFrom).toBe("old_a");
       expect("renamedFrom" in byName.b_proc).toBe(false);
     });
+  });
+});
+
+// fb#2339: a single-name proc 404 names the nearest live proc/function names.
+describe("runSchemaProcSuggesting", () => {
+  const notFound = (msg: string) => new CliError(msg, 404, null, 5);
+  const procs = { items: [{ name: "combinator_asiakas_validate", type: "P" }, { name: "asiakas_find", type: "P" }, { name: "fn_isDayDriver", type: "FN" }], nextCursor: null, count: 3 };
+  beforeEach(() => {
+    mockClient.get.mockReset();
+  });
+
+  test("swapped word order hits the real name", async () => {
+    mockClient.get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/cli/schema/procs")) return procs;
+      throw notFound("Proc/function not found: asiakas_combinator_validate");
+    });
+    await expect(runSchemaProcSuggesting(mockClient, "asiakas_combinator_validate")).rejects.toMatchObject({
+      statusCode: 404,
+      hint: expect.stringMatching(/^did you mean combinator_asiakas_validate/),
+    });
+  });
+
+  test("a typo falls back to edit distance", async () => {
+    mockClient.get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/cli/schema/procs")) return procs;
+      throw notFound("Proc/function not found: fn_isDayDrivr");
+    });
+    await expect(runSchemaProcSuggesting(mockClient, "fn_isDayDrivr")).rejects.toMatchObject({
+      hint: expect.stringContaining("fn_isDayDriver"),
+    });
+  });
+
+  test("a wrong-class 404 passes through without a list fetch", async () => {
+    const err = notFound("Proc/function not found: t — object exists in dbo but is a TRIGGER; read it with ib dev schema trigger t");
+    mockClient.get.mockRejectedValue(err);
+    await expect(runSchemaProcSuggesting(mockClient, "t")).rejects.toBe(err);
+    expect(mockClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  test("a failed list fetch keeps the original 404", async () => {
+    const err = notFound("Proc/function not found: x");
+    mockClient.get.mockRejectedValue(err);
+    await expect(runSchemaProcSuggesting(mockClient, "x")).rejects.toBe(err);
   });
 });

@@ -4,11 +4,13 @@ import { runCustomerDelete } from "../../src/commands/customer/index.js";
 
 const mockClient = mockApiClient();
 
-/** Route the two pre-delete dependent reads (fb#2159) by path. */
-function mockDependents(worksites: unknown[] = [], fks: unknown[] = []) {
+/** Route the pre-delete dependent reads (fb#2159) by path; `realOwner` is the
+ *  customer's own ownerAsiakasId (fb#2342), absent = an older backend. */
+function mockDependents(worksites: unknown[] = [], fks: unknown[] = [], realOwner?: number) {
   mockClient.get.mockImplementation(async (path: string) => {
     if (path === "/api/tyomaa/asiakasTyomaaList/9001") return worksites;
-    if (path === "/api/foreignKey/customer/9001/1349") return fks;
+    if (path === "/api/cli/customer/get/9001") return realOwner ? { asiakasId: 9001, ownerAsiakasId: realOwner } : { asiakasId: 9001 };
+    if (path === `/api/foreignKey/customer/9001/${realOwner ?? 1349}`) return fks;
     throw new Error(`unexpected GET ${path}`);
   });
 }
@@ -62,6 +64,17 @@ describe("runCustomerDelete", () => {
       worksites: [{ tyomaaId: 3602, name: "Työmaa", address: "Katu 1", city: "Espoo" }],
       foreignKeys: [{ asiakasForeignKeyId: 77, key: "ALIAS", source: "betomik-orderbook", sourceId: 5, entryTime: null }],
     });
+  });
+
+  // fb#2342: FK rows are owner-scoped, so a sysadmin acting as 8 deleting an
+  // umbrella-owned customer must read them under 1349, not under 8.
+  test("reads foreign keys under the customer's real owner, not the active company", async () => {
+    const fk = { asiakasForeignKeyId: 77, foreignKey: "ALIAS", foreignKeySourceName: "src", foreignKeySourceId: 5, entryTime: null };
+    mockDependents([], [fk], 1349);
+    mockClient.delete.mockResolvedValueOnce({ success: true, rowsAffected: 1 });
+    const result = (await runCustomerDelete(mockClient, 9001, 8, { reason: "x" })) as Record<string, unknown>;
+    expect(mockClient.get).toHaveBeenCalledWith("/api/foreignKey/customer/9001/1349");
+    expect((result.leftAttached as { foreignKeys: unknown[] }).foreignKeys).toHaveLength(1);
   });
 
   // fb#2341: a 0-row delete used to come back as success.

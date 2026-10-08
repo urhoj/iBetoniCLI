@@ -5151,9 +5151,10 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev schema proc matches snapshot 1`] = `
 "USAGE
   ib dev schema proc <name> [flags]
+  (also: ib dev schema function · ib dev schema fn · ib dev schema udf)
 
 DESCRIPTION
-  Signature (parameters) and full definition (T-SQL) for one dbo proc/function — or several at once via a comma-separated list (read the procs you're about to CREATE OR ALTER in one call). Developer-only.
+  Signature (parameters) and full definition (T-SQL) for one dbo proc or scalar/table function — or several at once via a comma-separated list (read the procs you're about to CREATE OR ALTER in one call). Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
@@ -5174,7 +5175,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib dev schema procs\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+  exit 5 (HTTP 404)  Proc/function not found → a single-name 404 names the nearest live names (word order ignored); else \`ib dev schema procs --search <word>\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
 
 NOTES
   - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`renameNote\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).

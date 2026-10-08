@@ -492,7 +492,13 @@ export async function runCustomerUpdate(client, asiakasId, body, flags) {
 export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags) {
     let leftAttached = null;
     try {
-        const [worksites, foreignKeys] = await bothInOrder(runCustomerWorksites(client, asiakasId), fetchCustomerFks(client, asiakasId, ownerAsiakasId));
+        const [worksites, foreignKeys] = await bothInOrder(runCustomerWorksites(client, asiakasId), 
+        // fb#2342: FK rows are owner-scoped — read them under the customer's REAL
+        // owner, not the active company (a sysadmin deleting another tenant's row).
+        // A failed/older get falls back to the active company, as before.
+        runCustomerGet(client, asiakasId)
+            .catch(() => null)
+            .then((c) => fetchCustomerFks(client, asiakasId, c?.ownerAsiakasId ?? ownerAsiakasId)));
         leftAttached = { worksites: worksites.items, foreignKeys };
     }
     catch (e) {

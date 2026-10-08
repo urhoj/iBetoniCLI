@@ -785,7 +785,12 @@ export async function runCustomerDelete(
   try {
     const [worksites, foreignKeys] = await bothInOrder(
       runCustomerWorksites(client, asiakasId),
-      fetchCustomerFks(client, asiakasId, ownerAsiakasId)
+      // fb#2342: FK rows are owner-scoped — read them under the customer's REAL
+      // owner, not the active company (a sysadmin deleting another tenant's row).
+      // A failed/older get falls back to the active company, as before.
+      runCustomerGet(client, asiakasId)
+        .catch(() => null)
+        .then((c) => fetchCustomerFks(client, asiakasId, c?.ownerAsiakasId ?? ownerAsiakasId))
     );
     leftAttached = { worksites: worksites.items, foreignKeys };
   } catch (e) {
