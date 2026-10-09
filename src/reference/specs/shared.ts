@@ -417,6 +417,23 @@ export const ASIAKAS_TARGET_ERR: CommandError = {
   meaning: "No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target",
   remedy: "pass <asiakasId> positionally or via --asiakas <id>",
 };
+/**
+ * `<personId>` / `--person` dual-target (fb#1735/fb#1511): `person day *`
+ * required the flag while every other person leaf took a positional, so each
+ * side now accepts the other's spelling.
+ */
+export const PERSON_TARGET_FLAG: CommandFlag = {
+  name: "person",
+  type: "number",
+  description: "Target personId (alias for the positional)",
+};
+export const PERSON_TARGET_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "missing or invalid target",
+  meaning: "No personId given (or not a positive integer)",
+  remedy: "pass <personId> positionally or via --person <id>",
+};
 /** The standard list `--limit`: default 100, server cap 500. */
 export const LIMIT_500_FLAG: CommandFlag = {
   name: "limit",

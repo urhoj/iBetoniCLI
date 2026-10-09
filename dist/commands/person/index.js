@@ -9,7 +9,7 @@ import { resolveActiveOwnerAsiakasId, personIdFromClaims } from "../../owner.js"
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { projectHistoryRow, } from "../log/changeRow.js";
-import { intFlag, parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, queryAliasOption, } from "../../targets.js";
+import { intFlag, parseId, parseOptionalId, resolvePersonTarget, resolveSearchQuery, cappedInt, addOwnerOption, queryAliasOption, } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
@@ -695,11 +695,13 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("role")
         .description("Manage a person's per-company roles (asiakasPersonSettings)");
     personRole
-        .command("list <personId>")
+        .command("list [personId]")
+        .option("--person <id>", "", intFlag("--person"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
-        .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)));
+        .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, resolvePersonTarget(personIdStr, opts.person), opts.asiakas)));
     // grant/revoke share the whole registration; only the run fn differs.
     const roleWriteAction = (run) => guarded(async (personIdStr, opts) => {
+        const personId = resolvePersonTarget(personIdStr, opts.person);
         let roleTypeId;
         try {
             roleTypeId = resolveRoleTypeId(opts.role);
@@ -714,14 +716,15 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             failWith("--role must not be empty", 4);
         }
         const client = await getClient();
-        writeJson(await run(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts));
+        writeJson(await run(client, personId, opts.asiakas, roleTypeId, opts));
     });
     for (const [name, run] of [
         ["grant", runPersonRoleGrant],
         ["revoke", runPersonRoleRevoke],
     ]) {
         addWriteFlagsToCommand(personRole
-            .command(`${name} <personId>`)
+            .command(`${name} [personId]`)
+            .option("--person <id>", "", intFlag("--person"))
             .requiredOption("--role <name>")
             .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))).action(roleWriteAction(run));
     }

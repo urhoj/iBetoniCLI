@@ -34,6 +34,7 @@ import {
   intFlag,
   parseId,
   parseOptionalId,
+  resolvePersonTarget,
   resolveSearchQuery,
   cappedInt,
   addOwnerOption,
@@ -1072,11 +1073,12 @@ export function registerPersonCommands(
     .description("Manage a person's per-company roles (asiakasPersonSettings)");
 
   personRole
-    .command("list <personId>")
+    .command("list [personId]")
+    .option("--person <id>", "", intFlag("--person"))
     .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
-      jsonAction(getClient, (client, personIdStr: string, opts: { asiakas?: number }) =>
-        runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)
+      jsonAction(getClient, (client, personIdStr: string | undefined, opts: { person?: number; asiakas?: number }) =>
+        runPersonRoleList(client, resolvePersonTarget(personIdStr, opts.person), opts.asiakas)
       )
     );
 
@@ -1090,7 +1092,8 @@ export function registerPersonCommands(
       flags: WriteFlags
     ) => Promise<unknown>
   ) =>
-    guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+    guarded(async (personIdStr: string | undefined, opts: WriteFlags & { person?: number; role: string; asiakas: number }) => {
+      const personId = resolvePersonTarget(personIdStr, opts.person);
       let roleTypeId: number;
       try {
         roleTypeId = resolveRoleTypeId(opts.role);
@@ -1104,7 +1107,7 @@ export function registerPersonCommands(
         failWith("--role must not be empty", 4);
       }
       const client = await getClient();
-      writeJson(await run(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts));
+      writeJson(await run(client, personId, opts.asiakas, roleTypeId, opts));
     });
 
   for (const [name, run] of [
@@ -1113,7 +1116,8 @@ export function registerPersonCommands(
   ] as const) {
     addWriteFlagsToCommand(
       personRole
-        .command(`${name} <personId>`)
+        .command(`${name} [personId]`)
+        .option("--person <id>", "", intFlag("--person"))
         .requiredOption("--role <name>")
         .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
     ).action(roleWriteAction(run));

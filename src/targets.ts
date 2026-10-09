@@ -421,6 +421,15 @@ export function resolveTarget(
 }
 
 /**
+ * `<personId>` / `--person` dual-target (fb#1735/fb#1511): `person day *`
+ * required the flag while every other person leaf took a positional, so both
+ * sides accept both spellings.
+ */
+export function resolvePersonTarget(positional: string | undefined, flag: number | undefined): number {
+  return resolveTarget(positional, flag, "personId", "person");
+}
+
+/**
  * Resolve a DATE that may arrive as a positional arg OR a `--date` flag — the
  * date twin of {@link resolveTarget} (feedback #393: `ib vehicle driver board`
  * took a positional while its `vehicle timeline`/`route`/`visits` siblings take

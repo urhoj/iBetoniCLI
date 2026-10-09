@@ -12,7 +12,7 @@ import {
 } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { intFlag } from "../../targets.js";
+import { intFlag, resolvePersonTarget } from "../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -227,38 +227,38 @@ export function registerPersonDayCommands(
     );
 
   day
-    .command("get")
+    .command("get [personId]")
     // `show` — the reflex spelling for read-one-row (fb#836).
     .alias("show")
-    .requiredOption("--person <id>", "", intFlag("--person", 1))
+    .option("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--from <date>")
     .option("--to <date>")
     .action(
-      jsonAction(getClient, (client, opts: { person: number; from: string; to?: string }) =>
-        runPersonDayGet(client, opts.person, opts.from, opts.to)
+      jsonAction(getClient, (client, personId: string | undefined, opts: { person?: number; from: string; to?: string }) =>
+        runPersonDayGet(client, resolvePersonTarget(personId, opts.person), opts.from, opts.to)
       )
     );
 
   const setCmd = day
-    .command("set")
-    .requiredOption("--person <id>", "", intFlag("--person", 1))
+    .command("set [personId]")
+    .option("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--date <date>")
     .requiredOption("--status <id|name>")
     .option("--text <s>");
   addWriteFlagsToCommand(setCmd).action(
-    guarded(async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
-      const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
+    guarded(async (personId: string | undefined, opts: WriteFlags & { person?: number; date: string; status: string; text?: string }) => {
+      const result = await runPersonDaySet(await getClient(), resolvePersonTarget(personId, opts.person), opts.date, opts.status, opts);
       writeJson(result);
     })
   );
 
   const clearCmd = day
-    .command("clear")
-    .requiredOption("--person <id>", "", intFlag("--person", 1))
+    .command("clear [personId]")
+    .option("--person <id>", "", intFlag("--person", 1))
     .requiredOption("--date <date>");
   addWriteFlagsToCommand(clearCmd).action(
-    guarded(async (opts: WriteFlags & { person: number; date: string }) => {
-      const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
+    guarded(async (personId: string | undefined, opts: WriteFlags & { person?: number; date: string }) => {
+      const result = await runPersonDayClear(await getClient(), resolvePersonTarget(personId, opts.person), opts.date, opts);
       writeJson(result);
     })
   );

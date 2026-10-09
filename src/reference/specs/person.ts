@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, PERSON_PARSE_ERR, OTHER_TENANT_403_REMEDY } from "./shared.js";
+import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, PERSON_PARSE_ERR, PERSON_TARGET_ERR, PERSON_TARGET_FLAG, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
 export const PERSON_SPECS: CommandSpec[] = [
 
@@ -205,26 +205,30 @@ export const PERSON_SPECS: CommandSpec[] = [
     description:
       "List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, `--asiakas` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.",
     permissions: ["company role read on the target tenant"],
-    args: [{ name: "personId", type: "number", description: "personId" }],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person, like `person day`)" }],
     flags: [
+      PERSON_TARGET_FLAG,
       { name: "asiakas", type: "number", description: "Target asiakasId — defaults to the acting company (the global --company <id>, else the session's active company); pass it to read another tenant's roles (fb#1783)" },
     ],
     outputShape:
       "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
     errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
       ASIAKAS_FLAG_ERR,
       { origin: "client", exit: 4, match: "could not resolve active company", meaning: "No --asiakas and the token has no active company to default to", remedy: "pass --asiakas <id> or --company <id>, or `ib auth switch <asiakasId>`" },
       ...permErrors("company role access on the tenant"),
     ],
-    examples: ["ib person role list 5351 --asiakas 26", "ib person role list 316 --company 27"],
+    examples: ["ib person role list 5351 --asiakas 26", "ib person role list --person 5351 --asiakas 26", "ib person role list 316 --company 27"],
   },
   {
     command: "ib person role grant",
     description:
       "Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).",
     permissions: ["company admin on the target tenant (tier per role)"],
-    args: [{ name: "personId", type: "number", description: "personId" }],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [
+      PERSON_TARGET_FLAG,
       { name: "role", type: "string", description: "Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin" },
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
@@ -233,6 +237,8 @@ export const PERSON_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
       ROLE_NAME_CLIENT_ERROR,
       ASIAKAS_FLAG_ERR,
       apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
@@ -252,8 +258,9 @@ export const PERSON_SPECS: CommandSpec[] = [
     description:
       "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Resolves the grant and deletes it in ONE server-side request (DELETE /api/asiakasPersonSettings/byRole/...), reading the row straight from SQL rather than the cached role list — so { removed:0 } means genuinely absent, never a stale read reporting a revocation that did not happen (fb#1537). --dry-run previews via the backend and is the only place the resolved asiakasPersonSettingId is visible before the write.",
     permissions: ["company admin on the target tenant (tier per role)"],
-    args: [{ name: "personId", type: "number", description: "personId" }],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [
+      PERSON_TARGET_FLAG,
       { name: "role", type: "string", description: "Role name (REQUIRED)" },
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
@@ -263,6 +270,8 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape:
       "{ removed: 1, asiakasPersonSettingId } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId }, validation }",
     errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
       ROLE_NAME_CLIENT_ERROR,
       ASIAKAS_FLAG_ERR,
       // ONE row per HTTP status — hintForError matches server errors by `http`,
@@ -456,26 +465,28 @@ export const PERSON_SPECS: CommandSpec[] = [
     aliases: ["ib person day show"],
     description: "List a person's day rows (status / vehicle / text) over a date range",
     auth: "any",
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [
-      { name: "person", type: "number", description: "personId", required: true },
+      PERSON_TARGET_FLAG,
       { name: "from", type: "date", description: "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
       { name: "to", type: "date", description: "End date YYYY-MM-DD (default: --from)" },
     ],
     outputShape: "ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>",
-    errors: [PERSON_PARSE_ERR, ...COMMON_AUTH_ERRORS],
+    errors: [PERSON_TARGET_ERR, PERSON_PARSE_ERR, ...COMMON_AUTH_ERRORS],
     notes: [
       "Scoped to the active company (same-tenant).",
       "`status` is the personPvmStatus code; map statusId→friendly name via `ib person day statuses`.",
     ],
     seeAlso: ["ib person day set", "ib vehicle driver who"],
-    examples: ["ib person day get --person 555 --from today", "ib person day get --person 555 --from 2026-06-01 --to 2026-06-30"],
+    examples: ["ib person day get 555 --from today", "ib person day get --person 555 --from 2026-06-01 --to 2026-06-30"],
   },
   {
     command: "ib person day set",
     description: "Set a person's day availability status (vacation/sick/free/…). Requires --reason unless --dry-run.",
     auth: "any",
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [
-      { name: "person", type: "number", description: "personId", required: true },
+      PERSON_TARGET_FLAG,
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
       { name: "status", type: "string", description: "personPvmStatusId or status name (see `ib person day statuses`)", required: true },
       { name: "text", type: "string", description: "Free-text note on the day row" },
@@ -485,6 +496,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
+      PERSON_TARGET_ERR,
       PERSON_PARSE_ERR,
       apiErr(400, "Missing --reason or unknown/ambiguous --status", "supply --reason; check `ib person day statuses`"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
@@ -506,8 +518,9 @@ export const PERSON_SPECS: CommandSpec[] = [
     command: "ib person day clear",
     description: "Delete a person's day row for a date (remove status entry). Requires --reason unless --dry-run.",
     auth: "any",
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [
-      { name: "person", type: "number", description: "personId", required: true },
+      PERSON_TARGET_FLAG,
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
     ],
     writeFlags: true,
@@ -515,6 +528,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [
+      PERSON_TARGET_ERR,
       PERSON_PARSE_ERR,
       apiErr(400, "Missing --reason", "supply --reason"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
@@ -576,8 +590,9 @@ export const PERSON_SPECS: CommandSpec[] = [
       "Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.",
     permissions: ["developer access (isSystemAdmin or isDeveloper)"],
     tier: "developer",
-    args: [{ name: "personId", type: "number", description: "person.personId" }],
+    args: [{ name: "personId", type: "number", required: false, description: "person.personId (or pass --person)" }],
     flags: [
+      PERSON_TARGET_FLAG,
       { name: "limit", type: "number", default: "100", description: "Max rows per list (capped at 1000)" },
       { name: "from", type: "date", description: "Start, Helsinki: YYYY-MM-DD[THH:mm] (default: end − 90 d)" },
       { name: "to", type: "date", description: "End, Helsinki, exclusive; a bare date = whole day (default: now)" },
@@ -585,6 +600,8 @@ export const PERSON_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, email, lastLoginTime, window:{fromUtc,toUtc}, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }",
     errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
       limitErr("pass a positive integer; this command caps at 1000"),
       apiErr(400, "bad personId, or --from/--to malformed / not in order", "numeric personId; dates YYYY-MM-DD[THH:mm], --from before --to"),
       apiErr(404, "no person with that id", "check the id with `ib person get <id>`"),

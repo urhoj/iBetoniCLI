@@ -1,10 +1,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
-import { parseId, cappedInt } from "../../targets.js";
+import { cappedInt, intFlag, resolvePersonTarget } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 import { resolveDate } from "../../dates.js";
 export interface PersonActivityOpts {
+  person?: number;
   limit?: number;
   from?: string;
   to?: string;
@@ -33,13 +34,14 @@ export function registerPersonActivityCommand(
   getClient: () => Promise<ApiClient>
 ): void {
   parent
-    .command("activity <personId>")
+    .command("activity [personId]")
+    .option("--person <id>", "", intFlag("--person"))
     .option("--limit <n>", "", cappedInt(1000))
     .option("--from <date>")
     .option("--to <date>")
     .action(
-      guarded(async (personIdStr: string, opts: PersonActivityOpts) => {
-        const personId = parseId(personIdStr, "personId");
+      guarded(async (personIdStr: string | undefined, opts: PersonActivityOpts) => {
+        const personId = resolvePersonTarget(personIdStr, opts.person);
         writeJson(await runPersonActivity(await getClient(), personId, opts));
       })
     );

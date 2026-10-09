@@ -183,7 +183,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 870_000 → 871_000 (2026-10-09): `ib worksite delete` 409 row — the route now refuses a worksite with active orders (fb#2372). Measured 870 115 B.
 // 871_000 → 872_000 (2026-10-09): `ib dev betomik-orderbook audit --entity/--id` + its audit→row note (fb#2347), landing on fb#2370's person fk alias. Measured 871 520 B.
 // 872_000 → 873_000 (2026-10-09): betomik-orderbook run sync lock — 409 rows on sync/resync/sync-row, `review --read-at` + its 409, readAt/syncLocked* in output shapes (fb#1824). Measured 872 627 B.
-const DUMP_LIMIT_BYTES = 873_000;
+// 873_000 → 874_000 (2026-10-09): `--person` alias + PERSON_TARGET_ERR on person role list/grant/revoke, activity and day get/set/clear (fb#1735/fb#1511), landing on fb#1824. Measured 873 702 B.
+const DUMP_LIMIT_BYTES = 874_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

@@ -1289,6 +1289,10 @@ ib person activity --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 1000
 
+ib person activity --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib person create --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
@@ -1401,13 +1405,25 @@ ib person role grant --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
+ib person role grant --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib person role list --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
+ib person role list --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib person role revoke --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+
+ib person role revoke --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
 
 ib person search --asiakas <id>
   ! --asiakas must be an integer >= 1

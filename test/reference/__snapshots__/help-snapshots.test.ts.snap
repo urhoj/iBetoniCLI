@@ -12160,7 +12160,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person activity matches snapshot 1`] = `
 "USAGE
-  ib person activity <personId> [flags]
+  ib person activity [<personId>] [flags]
 
 DESCRIPTION
   Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.
@@ -12168,9 +12168,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <personId> NUMBER    person.personId (required)
+  <personId> NUMBER    person.personId (or pass --person) (optional)
 
 FLAGS
+  --person NUMBER    Target personId (alias for the positional)
   --limit NUMBER    Max rows per list (capped at 1000) (default: 100)
   --from DATE    Start, Helsinki: YYYY-MM-DD[THH:mm] (default: end − 90 d)
   --to DATE    End, Helsinki, exclusive; a bare date = whole day (default: now)
@@ -12183,6 +12184,8 @@ OUTPUT (JSON, stdout)
   { personId, email, lastLoginTime, window:{fromUtc,toUtc}, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 1000
   exit 4 (HTTP 400)  bad personId, or --from/--to malformed / not in order → numeric personId; dates YYYY-MM-DD[THH:mm], --from before --to
   exit 5 (HTTP 404)  no person with that id → check the id with \`ib person get <id>\`
@@ -12340,15 +12343,18 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day clear matches snapshot 1`] = `
 "USAGE
-  ib person day clear --person <person> --date <date> [flags]
+  ib person day clear [<personId>] --date <date> [flags]
 
 DESCRIPTION
   Delete a person's day row for a date (remove status entry). Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
 FLAGS
-  --person NUMBER    personId (required)
+  --person NUMBER    Target personId (alias for the positional)
   --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 WRITE-SAFETY FLAGS
@@ -12364,6 +12370,7 @@ OUTPUT (JSON, stdout)
   delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing --reason       → supply --reason
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
@@ -12385,7 +12392,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day get matches snapshot 1`] = `
 "USAGE
-  ib person day get --person <person> --from <from> [flags]
+  ib person day get [<personId>] --from <from> [flags]
   (also: ib person day show)
 
 DESCRIPTION
@@ -12393,8 +12400,11 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
 FLAGS
-  --person NUMBER    personId (required)
+  --person NUMBER    Target personId (alias for the positional)
   --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
   --to DATE    End date YYYY-MM-DD (default: --from)
 
@@ -12406,6 +12416,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -12418,22 +12429,25 @@ SEE ALSO
   ib person day set, ib vehicle driver who
 
 EXAMPLES
-  ib person day get --person 555 --from today
+  ib person day get 555 --from today
   ib person day get --person 555 --from 2026-06-01 --to 2026-06-30
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib person day set matches snapshot 1`] = `
 "USAGE
-  ib person day set --person <person> --date <date> --status <status> [flags]
+  ib person day set [<personId>] --date <date> --status <status> [flags]
 
 DESCRIPTION
   Set a person's day availability status (vacation/sick/free/…). Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
 FLAGS
-  --person NUMBER    personId (required)
+  --person NUMBER    Target personId (alias for the positional)
   --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
   --status STRING    personPvmStatusId or status name (see \`ib person day statuses\`) (required)
   --text STRING    Free-text note on the day row
@@ -12451,6 +12465,7 @@ OUTPUT (JSON, stdout)
   personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Missing --reason or unknown/ambiguous --status → supply --reason; check \`ib person day statuses\`
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
@@ -13475,16 +13490,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person role grant matches snapshot 1`] = `
 "USAGE
-  ib person role grant <personId> [flags]
+  ib person role grant [<personId>] [flags]
 
 DESCRIPTION
   Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).
   Permissions: requires company admin on the target tenant (tier per role).
 
 ARGUMENTS
-  <personId> NUMBER    personId (required)
+  <personId> NUMBER    personId (or pass --person) (optional)
 
 FLAGS
+  --person NUMBER    Target personId (alias for the positional)
   --role STRING    Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin
   --asiakas NUMBER    Target asiakasId (REQUIRED)
 
@@ -13502,6 +13518,8 @@ OUTPUT (JSON, stdout)
   { granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME
@@ -13520,16 +13538,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person role list matches snapshot 1`] = `
 "USAGE
-  ib person role list <personId> [flags]
+  ib person role list [<personId>] [flags]
 
 DESCRIPTION
   List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, \`--asiakas\` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.
   Permissions: requires company role read on the target tenant.
 
 ARGUMENTS
-  <personId> NUMBER    personId (required)
+  <personId> NUMBER    personId (or pass --person, like \`person day\`) (optional)
 
 FLAGS
+  --person NUMBER    Target personId (alias for the positional)
   --asiakas NUMBER    Target asiakasId — defaults to the acting company (the global --company <id>, else the session's active company); pass it to read another tenant's roles (fb#1783)
 
 GLOBAL FLAGS
@@ -13540,6 +13559,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  No --asiakas and the token has no active company to default to → pass --asiakas <id> or --company <id>, or \`ib auth switch <asiakasId>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -13548,22 +13569,24 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person role list 5351 --asiakas 26
+  ib person role list --person 5351 --asiakas 26
   ib person role list 316 --company 27
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib person role revoke matches snapshot 1`] = `
 "USAGE
-  ib person role revoke <personId> [flags]
+  ib person role revoke [<personId>] [flags]
 
 DESCRIPTION
   Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Resolves the grant and deletes it in ONE server-side request (DELETE /api/asiakasPersonSettings/byRole/...), reading the row straight from SQL rather than the cached role list — so { removed:0 } means genuinely absent, never a stale read reporting a revocation that did not happen (fb#1537). --dry-run previews via the backend and is the only place the resolved asiakasPersonSettingId is visible before the write.
   Permissions: requires company admin on the target tenant (tier per role).
 
 ARGUMENTS
-  <personId> NUMBER    personId (required)
+  <personId> NUMBER    personId (or pass --person) (optional)
 
 FLAGS
+  --person NUMBER    Target personId (alias for the positional)
   --role STRING    Role name (REQUIRED)
   --asiakas NUMBER    Target asiakasId (REQUIRED)
 
@@ -13581,6 +13604,8 @@ OUTPUT (JSON, stdout)
   { removed: 1, asiakasPersonSettingId } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId }, validation }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (HTTP 400)  Unknown role, or an id that is not a positive integer → use a name from ROLE_TYPEID_BY_NAME; the byRole route also validates asiakasId/personId/personSettingTypeId server-side, so pass a positive personId and --asiakas
