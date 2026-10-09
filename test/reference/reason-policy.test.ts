@@ -60,22 +60,32 @@ function reasonError(cmd: Command): CliError {
 describe("enforceSpecReasonPolicy", () => {
   test('an "always" command without --reason exits 4', () => {
     // Real spec path with reasonPolicy: "always".
-    const err = reasonError(fake("ib person delete", {}));
+    const err = reasonError(fake("ib customer person add", {}));
     expect(err.exitCode).toBe(4);
     expect(err.statusCode).toBe(0); // client-origin, matches the origin:"client" spec rows
     expect(err.message).toContain("Missing required flag: --reason");
   });
 
   test('an "always" command is NOT exempted by --dry-run', () => {
-    const err = reasonError(fake("ib person delete", { dryRun: true }));
+    const err = reasonError(fake("ib customer person add", { dryRun: true }));
     expect(err.exitCode).toBe(4);
   });
 
   test('an "always" command with --reason passes', () => {
     expect(() =>
-      enforceSpecReasonPolicy(fake("ib person delete", { reason: "cleanup" }))
+      enforceSpecReasonPolicy(fake("ib customer person add", { reason: "cleanup" }))
     ).not.toThrow();
   });
+
+  // fb#2362: a delete preview writes nothing (each backend handler returns on
+  // X-Dry-Run before its write), so it must not demand an audit reason.
+  test.each(["ib worksite delete", "ib customer delete", "ib person delete"])(
+    "%s: --dry-run stands in for --reason; the real delete still requires it",
+    (path) => {
+      expect(() => enforceSpecReasonPolicy(fake(path, { dryRun: true }))).not.toThrow();
+      expect(reasonError(fake(path, {})).exitCode).toBe(4);
+    }
+  );
 
   test('an "unless-dry-run" command with --dry-run passes', () => {
     // Real spec path with reasonPolicy: "unless-dry-run".

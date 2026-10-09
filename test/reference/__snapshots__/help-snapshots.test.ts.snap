@@ -1333,20 +1333,20 @@ exports[`Help snapshots — contract stability > help for ib customer delete mat
   ib customer delete <asiakasId> [flags]
 
 DESCRIPTION
-  SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason; --dry-run available.
+  SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason (not with --dry-run).
   Permissions: requires auth.page.asiakas.edit.
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -1362,6 +1362,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
+  ib customer delete 9001 --dry-run
   ib customer delete 9001 --reason "lifecycle cleanup"
 "
 `;
@@ -12538,20 +12539,20 @@ exports[`Help snapshots — contract stability > help for ib person delete match
   ib person delete <personId> [flags]
 
 DESCRIPTION
-  Delete a person. Requires --reason.
+  Delete a person. Requires --reason (not with --dry-run).
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
   <personId> NUMBER    personId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12567,6 +12568,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
+  ib person delete 5351 --dry-run
   ib person delete 5351 --reason "departed"
 "
 `;
@@ -16732,20 +16734,20 @@ exports[`Help snapshots — contract stability > help for ib worksite delete mat
   ib worksite delete <tyomaaId> [flags]
 
 DESCRIPTION
-  Delete a worksite (tyomaa). Requires --reason.
+  Delete a worksite (tyomaa). Requires --reason (not with --dry-run).
   Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -16761,6 +16763,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
+  ib worksite delete 99 --dry-run
   ib worksite delete 99 --reason "lifecycle cleanup"
 "
 `;

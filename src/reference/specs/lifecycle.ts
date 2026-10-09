@@ -13,21 +13,19 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   // ─── v1.0.1 additions: customer/worksite/person lifecycle (11) ──────────
   {
     command: "ib customer delete",
-    description: "SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason; --dry-run available.",
+    description: "SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason (not with --dry-run).",
     permissions: ["auth.page.asiakas.edit"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
-    flags: [
-      REASON_REQUIRED_FLAG,
-    ],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } (ownerAsiakasId = the row's real owner) — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
-    examples: ['ib customer delete 9001 --reason "lifecycle cleanup"'],
+    examples: ["ib customer delete 9001 --dry-run", 'ib customer delete 9001 --reason "lifecycle cleanup"'],
   },
   {
     command: "ib customer person add",
@@ -100,21 +98,19 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   // Worksite write gates are single-sourced in shared.ts (WORKSITE_*).
   {
     command: "ib worksite delete",
-    description: "Delete a worksite (tyomaa). Requires --reason.",
+    description: "Delete a worksite (tyomaa). Requires --reason (not with --dry-run).",
     permissions: [WORKSITE_EDIT_PERMISSION],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
-    flags: [
-      REASON_REQUIRED_FLAG,
-    ],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
-    examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
+    examples: ["ib worksite delete 99 --dry-run", 'ib worksite delete 99 --reason "lifecycle cleanup"'],
   },
   {
     command: "ib worksite refresh-location",
@@ -398,20 +394,18 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person delete",
-    description: "Delete a person. Requires --reason.",
+    description: "Delete a person. Requires --reason (not with --dry-run).",
     permissions: ["auth.page.person.edit"],
     args: [{ name: "personId", type: "number", description: "personId to delete" }],
-    flags: [
-      REASON_REQUIRED_FLAG,
-    ],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       ...permErrors("auth.page.person.edit"),
     ],
-    examples: ['ib person delete 5351 --reason "departed"'],
+    examples: ["ib person delete 5351 --dry-run", 'ib person delete 5351 --reason "departed"'],
   },
 ];
