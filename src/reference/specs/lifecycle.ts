@@ -103,9 +103,10 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
-    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
+    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId }, validation }",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
+      apiErr(409, "Worksite has active orders (fb#2372)", "move them or `ib worksite merge`"),
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     examples: ["ib worksite delete 99 --dry-run", 'ib worksite delete 99 --reason "lifecycle cleanup"'],

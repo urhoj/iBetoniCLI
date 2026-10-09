@@ -16786,10 +16786,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }
+  { deleted: number } or { dryRun: true, wouldDelete: { tyomaaId }, validation }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 4 (HTTP 409)  Worksite has active orders (fb#2372) → move them or \`ib worksite merge\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
