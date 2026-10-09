@@ -63,7 +63,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
     command: "ib dev ai ask",
     description:
       "Send ONE prompt to the /ai assistant (POST /api/ai/ask) — a real, PAID LLM turn, logged as your conversation. For AI provider/SDK smoke tests (--endpoint at staging) and regression prompts. Never executes a write: a proposed write returns as pendingAction, unconfirmed.",
-    permissions: ["isSystemAdmin or isDeveloper"],
+    permissions: ["isSystemAdmin or isDeveloper (the backend also admits an admin or keikka handler of a company with the AI module — the /ai page's own rule)"],
     tier: "developer",
     mutates: true,
     args: [{ name: "prompt", type: "string", description: "The question/instruction, as typed on the /ai page (quote it)" }],

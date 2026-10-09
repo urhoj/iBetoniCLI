@@ -2269,7 +2269,7 @@ exports[`Help snapshots — contract stability > help for ib dev ai ask matches 
 
 DESCRIPTION
   Send ONE prompt to the /ai assistant (POST /api/ai/ask) — a real, PAID LLM turn, logged as your conversation. For AI provider/SDK smoke tests (--endpoint at staging) and regression prompts. Never executes a write: a proposed write returns as pendingAction, unconfirmed.
-  Permissions: requires isSystemAdmin or isDeveloper.
+  Permissions: requires isSystemAdmin or isDeveloper (the backend also admits an admin or keikka handler of a company with the AI module — the /ai page's own rule).
 
 ARGUMENTS
   <prompt> STRING    The question/instruction, as typed on the /ai page (quote it) (required)
