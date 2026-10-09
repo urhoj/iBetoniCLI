@@ -498,6 +498,24 @@ export async function runKeikkaDriversAssign(
 }
 
 /**
+ * POST /api/keikka/:keikkaId/betoni-matka — betoni (plant → site) driving distance
+ * computed server-side with the same rule as the grid editor and the save path.
+ * Default mode "preview" never writes; --refresh sends mode "refresh" (stored
+ * inputs, forced Google, writes; honours X-Dry-Run from the write flags).
+ */
+export async function runKeikkaBetoniMatka(
+  client: ApiClient,
+  keikkaId: number,
+  flags: WriteFlags & { refresh?: boolean }
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/keikka/${keikkaId}/betoni-matka`,
+    { mode: flags.refresh ? "refresh" : "preview" },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * POST /api/keikka/copy — duplicates a keikka (customer/worksite/vehicle/concrete
  * lines) into a new row in the SOURCE keikka's own tenant. `newDate`, if given,
  * is a plain date: the backend proc keeps the source's original time-of-day and
@@ -812,6 +830,7 @@ export async function runKeikkaTilat(
  *   - update   --status → POST /api/keikka/tila/set; --vehicle/--date/--start/--end → POST /api/cli/keikka/move/:id;
  *              --customer/--worksite/--plant/--supplier/--source → POST /api/cli/keikka/refs/:id
  *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
+ *   - betoni-matka  <keikkaId> [--refresh] → POST /api/keikka/:id/betoni-matka (preview, or forced Google + write)
  *   - person   person list <keikkaId> → raw keikkaPerson rows (GET /api/cli/keikka/persons/:id)
  *
  * Date aliases (today/yesterday/tomorrow) are resolved before the API call.
@@ -1029,6 +1048,15 @@ export function registerKeikkaCommands(
   addWriteFlagsToCommand(assignCmd).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteFlags) =>
       runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), opts)
+    )
+  );
+
+  const betoniMatkaCmd = k
+    .command("betoni-matka <keikkaId>")
+    .option("--refresh", "Re-fetch from Google and store it (default: read-only preview)");
+  addWriteFlagsToCommand(betoniMatkaCmd).action(
+    jsonAction(getClient, (client, idStr: string, opts: WriteFlags & { refresh?: boolean }) =>
+      runKeikkaBetoniMatka(client, parseId(idStr, "keikkaId"), opts)
     )
   );
 

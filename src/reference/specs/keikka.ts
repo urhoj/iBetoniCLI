@@ -391,6 +391,22 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib keikka betoni-matka",
+    description:
+      "Betoni (plant → site) driving distance of a keikka, computed server-side — the same rule the grid editor and save path use (tyhjänä orders start from the vehicle's home). Default: read-only preview. --refresh forces a Google lookup and stores betoniMatkaM/betoniMatkaAika. POST /api/keikka/:keikkaId/betoni-matka.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    args: [{ name: "keikkaId", type: "number", description: "keikkaId" }],
+    flags: [{ name: "refresh", type: "boolean", description: "Force Google and write (otherwise preview, no write)" }],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ betoniMatkaM, betoniMatkaAika, origin:{lat,lng,kind:'plant'|'varikko'}, site:{lat,lng}, written } | { unresolved:true, written:false }",
+    errors: [
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — results mirror your permissions"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    examples: ["ib keikka betoni-matka 9001", "ib keikka betoni-matka 9001 --refresh --reason \"plant moved\""],
+  },
+  {
     command: "ib keikka copy",
     description:
       "Duplicate a keikka (customer, worksite, vehicle, concrete lines) as a new row in your ACTIVE company; --date moves it to another day, keeping time-of-day. The target day's day-driver is auto-assigned.",

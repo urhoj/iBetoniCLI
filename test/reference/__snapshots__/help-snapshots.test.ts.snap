@@ -7681,6 +7681,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka betoni-matka matches snapshot 1`] = `
+"USAGE
+  ib keikka betoni-matka <keikkaId> [flags]
+
+DESCRIPTION
+  Betoni (plant → site) driving distance of a keikka, computed server-side — the same rule the grid editor and save path use (tyhjänä orders start from the vehicle's home). Default: read-only preview. --refresh forces a Google lookup and stores betoniMatkaM/betoniMatkaAika. POST /api/keikka/:keikkaId/betoni-matka.
+  Permissions: requires auth.page.grid.tilaus.edit.
+
+ARGUMENTS
+  <keikkaId> NUMBER    keikkaId (required)
+
+FLAGS
+  --refresh    Force Google and write (otherwise preview, no write)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { betoniMatkaM, betoniMatkaAika, origin:{lat,lng,kind:'plant'|'varikko'}, site:{lat,lng}, written } | { unresolved:true, written:false }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — results mirror your permissions
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka betoni-matka 9001
+  ib keikka betoni-matka 9001 --refresh --reason "plant moved"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka copy matches snapshot 1`] = `
 "USAGE
   ib keikka copy <keikkaId> [flags]
