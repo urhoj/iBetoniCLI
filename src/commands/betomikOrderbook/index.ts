@@ -99,6 +99,40 @@ export async function runBetomikOrderbookRows(
   return page(items, filter);
 }
 
+export interface BetomikFindFilter {
+  keikka?: number;
+  worksite?: number;
+  search?: string;
+  limit?: number;
+  /** false (`--no-raw`) drops rawJson from every row. */
+  raw?: boolean;
+}
+
+/**
+ * Ledger rows ACROSS every run by keikka / worksite / text (GET
+ * /api/betomik-orderbook/rows, fb#2364) — "what did the sheet say for this
+ * order" in one call. Filtered and capped server-side, removed rows included.
+ */
+export async function runBetomikOrderbookFind(
+  client: ApiClient,
+  filter: BetomikFindFilter
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  const search = filter.search?.trim();
+  if (filter.keikka === undefined && filter.worksite === undefined && !search) {
+    failWith("find: pass at least one of --keikka, --worksite, --search", 4);
+  }
+  if (search !== undefined && search.length < 2) failWith("--search: at least 2 characters", 4);
+  const qs = new URLSearchParams();
+  if (filter.keikka !== undefined) qs.set("keikka", String(filter.keikka));
+  if (filter.worksite !== undefined) qs.set("worksite", String(filter.worksite));
+  if (search) qs.set("search", search);
+  if (filter.limit !== undefined) qs.set("limit", String(filter.limit));
+  const raw = await client.get<unknown>(`/api/betomik-orderbook/rows?${qs}`);
+  let items = itemsOf<Record<string, unknown>>(raw);
+  if (filter.raw === false) items = items.map(({ rawJson: _raw, ...rest }) => rest);
+  return listEnvelope(items);
+}
+
 /**
  * One ledger row whatever its syncStatus (GET /api/betomik-orderbook/rows/:rowId,
  * fb#1977) — the only way to read a row that reached the terminal 'removed',
@@ -381,6 +415,16 @@ export function registerBetomikOrderbookCommands(
         runBetomikOrderbookRows(client, parseId(idStr, "runId"), opts)
       )
     );
+
+  group
+    .command("find")
+    .description("Ledger rows across ALL runs by keikka / worksite / text — what the sheet said for an order")
+    .option("--keikka <id>", "Rows synced to this keikkaId", intFlag("--keikka"))
+    .option("--worksite <id>", "Rows whose keikka is on this worksite (tyomaaId)", intFlag("--worksite"))
+    .option("--search <text>", "Substring over the raw sheet cells, siteText and customerGuess (min 2 chars)")
+    .option("--limit <n>", "Max rows (server default 50, max 500)", intFlag("--limit"))
+    .option("--no-raw", "Drop rawJson (the sheet cells) from every row")
+    .action(jsonAction(getClient, (client, opts: BetomikFindFilter) => runBetomikOrderbookFind(client, opts)));
 
   group
     .command("row <rowId>")

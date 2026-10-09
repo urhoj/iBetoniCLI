@@ -2703,6 +2703,47 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook find matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook find [flags]
+
+DESCRIPTION
+  Ledger rows across ALL import runs by keikka, worksite or text (GET /api/betomik-orderbook/rows, fb#2364) — answers "what did the sheet say for this order" without walking \`runs\` + \`rows\`. Filters are ANDed and applied server-side; \`removed\` rows are INCLUDED (the history is the point — read syncStatus). Newest run first.
+  Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
+
+FLAGS
+  --keikka NUMBER    Rows synced to this keikkaId
+  --worksite NUMBER    Rows whose keikka is on this worksite (tyomaaId) — matched through the row's keikka, so a row never synced to a keikka cannot match
+  --search STRING    Case-insensitive substring over the raw sheet cells (rawJson), siteText and customerGuess; min 2 chars
+  --limit NUMBER    Max rows (server default 50, capped at 500)
+  --no-raw    Drop rawJson (the raw sheet cells) from every row
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, sheetLabel, isoYear, isoWeek, jobDate, plate, driverName, customerGuess, siteText, rowKind, rowKey, syncStatus, keikkaId, palkkiId, tyomaaId, m3, rawJson, ...every \`rows\` column }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  None of --keikka/--worksite/--search given → Pass at least one filter; to list a whole run use \`ib dev betomik-orderbook rows <runId>\`
+  exit 4 (client-side)  --search shorter than 2 characters → Pass a longer substring
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
+  exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer (server caps at 500)
+  exit 4 (HTTP 400)  Backend rejected a filter (non-numeric id, short search, or none given) → Check the flag values
+  exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+SEE ALSO
+  ib dev betomik-orderbook rows, ib dev betomik-orderbook row
+
+EXAMPLES
+  ib dev betomik-orderbook find --worksite 3604 --no-raw
+  ib dev betomik-orderbook find --search Kilonkuja
+  ib dev betomik-orderbook find --keikka 123456
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook fleet matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook fleet <runId> [flags]
@@ -2980,7 +3021,7 @@ NOTES
   - rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via \`review\`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see \`propose\`/\`ai-stats\`.
 
 SEE ALSO
-  ib dev betomik-orderbook row
+  ib dev betomik-orderbook row, ib dev betomik-orderbook find
 
 EXAMPLES
   ib dev betomik-orderbook rows 1

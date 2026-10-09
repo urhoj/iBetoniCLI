@@ -5,6 +5,7 @@ import {
   runBetomikOrderbookRuns,
   runBetomikOrderbookRows,
   runBetomikOrderbookRow,
+  runBetomikOrderbookFind,
   runBetomikOrderbookReview,
   runBetomikOrderbookPropose,
   runBetomikOrderbookAiStats,
@@ -142,6 +143,26 @@ describe("ib dev betomik-orderbook runs / rows", () => {
     test("--status removed is refused: the route excludes removed rows (fb#1722), so it can never match", async () => {
       await expect(runBetomikOrderbookRows(mockClient, 7, { status: "removed" })).rejects.toMatchObject({ exitCode: 4 });
     });
+  });
+});
+
+describe("ib dev betomik-orderbook find (fb#2364)", () => {
+  beforeEach(() => mockClient.get.mockReset());
+
+  test("sends the filters as a query string; --no-raw drops rawJson", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [{ betomikOrderbookImportRowId: 1, tyomaaId: 3604, rawJson: "{}" }] });
+    const out = await runBetomikOrderbookFind(mockClient, { worksite: 3604, search: " Kilonkuja ", limit: 5, raw: false });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?worksite=3604&search=Kilonkuja&limit=5");
+    expect(out.items).toEqual([{ betomikOrderbookImportRowId: 1, tyomaaId: 3604 }]);
+  });
+
+  test.each([
+    ["no filter", {}],
+    ["blank search", { search: "  " }],
+    ["one-char search", { search: "a" }],
+  ])("exit 4 without a request: %s", async (_label, filter) => {
+    await expect(runBetomikOrderbookFind(mockClient, filter)).rejects.toMatchObject({ exitCode: 4 });
+    expect(mockClient.get).not.toHaveBeenCalled();
   });
 });
 

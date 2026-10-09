@@ -485,6 +485,18 @@ ib dev apikey verify --source <id>
   ! --source must be an integer >= 1
   > pass a positive apiKeySourceId
 
+ib dev betomik-orderbook find --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass a positive keikkaId
+
+ib dev betomik-orderbook find --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer (server caps at 500)
+
+ib dev betomik-orderbook find --worksite <id>
+  ! --worksite must be an integer >= 1
+  > pass a positive tyomaaId
+
 ib dev betomik-orderbook rows --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; it slices the fetched run client-side, so any size works

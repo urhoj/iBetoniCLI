@@ -177,7 +177,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 860_000 → 861_000 (2026-10-08): new leaf `ib worksite set-location` (manual MANUAL coordinate pin). Measured 860 448 B.
 // 861_000 → 864_000 (2026-10-08): new `ib vehicle route-plan` (per-vehicle-day route plan + actual GPS route, odometer km) + wasteVisits on `ib stats --iso-week`. Measured 863 087 B.
 // 864_000 → 866_000 (2026-10-09): new leaf `ib worksite gps-check` (GPS-stop worksite pin proposals, fb#2361), on top of fb#2362's delete --dry-run row. Measured 865 075 B.
-const DUMP_LIMIT_BYTES = 866_000;
+// 866_000 → 868_000 (2026-10-09): new leaf `ib dev betomik-orderbook find` (cross-run ledger lookup by keikka/worksite/text, fb#2364). Measured 867 486 B.
+const DUMP_LIMIT_BYTES = 868_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them
