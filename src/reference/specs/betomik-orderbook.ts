@@ -348,13 +348,23 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     description: "Entities the sync AUTO-CREATED (customers, worksites, contact persons) — one row each; `digestedAt` = already included in a sent digest (GET /api/betomik-orderbook/audit), newest first; --since narrows to entities created at/after that ISO timestamp.",
     tier: "developer",
     permissions: [BETOMIK_VIEW_PERMISSION],
-    flags: [{ name: "since", type: "string", description: "ISO timestamp — only rows created at/after it" }],
+    flags: [
+      { name: "since", type: "string", description: "ISO timestamp — only rows created at/after it" },
+      { name: "entity", type: "string", description: "Only asiakas | tyomaa | person (client-side)" },
+      { name: "id", type: "number", description: "Only this entityId (client-side)" },
+    ],
     args: [],
     outputShape: "ListEnvelope<{ auditId, importRowId, entity: 'asiakas'|'tyomaa'|'person', entityId, label, createdAt, digestedAt }>",
+    notes: [
+      "Why does a record exist? `--entity tyomaa --id <n>` → importRowId → `row <importRowId>`: sheet cells (rawJson) + LLM extraction (extractedJson).",
+    ],
     errors: [
+      { origin: "client", exit: 4, match: "--entity must be one of", meaning: "--entity is not asiakas, tyomaa or person", remedy: "Use one of the listed entity kinds" },
+      intParseErr("--id", "pass a positive entityId"),
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
     ],
-    examples: ["ib dev betomik-orderbook audit --since 2026-09-01"],
+    seeAlso: ["ib dev betomik-orderbook row"],
+    examples: ["ib dev betomik-orderbook audit --since 2026-09-01", "ib dev betomik-orderbook audit --entity tyomaa --id 3797"],
   },
   {
     command: "ib dev betomik-orderbook tick-report",

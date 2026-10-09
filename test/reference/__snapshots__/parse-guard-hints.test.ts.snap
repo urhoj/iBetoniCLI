@@ -485,6 +485,10 @@ ib dev apikey verify --source <id>
   ! --source must be an integer >= 1
   > pass a positive apiKeySourceId
 
+ib dev betomik-orderbook audit --id <n>
+  ! --id must be an integer >= 1
+  > pass a positive entityId
+
 ib dev betomik-orderbook find --keikka <id>
   ! --keikka must be an integer >= 1
   > pass a positive keikkaId

@@ -108,7 +108,16 @@ export function assertKnownDomain(specs, domain, tier = getCallerTier()) {
         // callers that hit the validator directly (`ib reference dump <sub>`, and
         // subgroups that live under more than one domain). Tier-filtered so a
         // developer-only subgroup is never suggested to a standard caller.
-        const subgroups = nestedSubgroupPrefixes(visible).get(domain);
+        // A TRUNCATED subgroup name (`betomik` → `dev betomik-orderbook`, fb#2347)
+        // is retried as a hyphen/case-insensitive prefix, ≥ 4 chars, and answers
+        // only when it resolves to exactly ONE subgroup path.
+        const bySubgroup = nestedSubgroupPrefixes(visible);
+        const flat = (s) => s.toLowerCase().replace(/-/g, "");
+        const t = flat(domain);
+        const prefixed = new Set(t.length >= 4
+            ? [...bySubgroup].filter(([name]) => flat(name).startsWith(t)).flatMap(([, p]) => [...p])
+            : []);
+        const subgroups = bySubgroup.get(domain) ?? (prefixed.size === 1 ? prefixed : undefined);
         const didYouMean = subgroups && subgroups.size
             ? ` Did you mean: ${[...subgroups].map((p) => `\`${p}\``).join(" or ")}?`
             : "";

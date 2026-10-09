@@ -3,7 +3,7 @@ import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { listEnvelope } from "../../api/envelopes.js";
-import { parseId, intFlag } from "../../targets.js";
+import { parseId, intFlag, assertEnum } from "../../targets.js";
 export async function runBetomikOrderbookImport(client, body, flags) {
     return client.post("/api/betomik-orderbook/import", body, {
         headers: writeFlagsToHeaders(flags),
@@ -208,11 +208,15 @@ export async function runBetomikOrderbookExceptions(client, runId) {
 export async function runBetomikOrderbookFleet(client, runId) {
     return client.get(`/api/betomik-orderbook/runs/${runId}/fleet`);
 }
-/** Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit). */
-export async function runBetomikOrderbookAudit(client, { since }) {
+export const AUDIT_ENTITIES = ["asiakas", "tyomaa", "person"];
+/**
+ * Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit).
+ * --entity/--id filter CLIENT-SIDE (fb#2347): "which sheet row created tyomaa 3797" was a ~960-row dump.
+ */
+export async function runBetomikOrderbookAudit(client, { since, entity, id }) {
     const qs = since ? `?since=${encodeURIComponent(since)}` : "";
     const raw = await client.get(`/api/betomik-orderbook/audit${qs}`);
-    return listEnvelope(itemsOf(raw));
+    return listEnvelope(itemsOf(raw).filter((r) => (entity === undefined || r.entity === entity) && (id === undefined || r.entityId === id)));
 }
 /** One tick run's report, stored by the scheduled tick (POST /api/betomik-orderbook/tick-runs). */
 export async function runBetomikOrderbookTickReport(client, body, flags) {
@@ -370,7 +374,12 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .command("audit")
         .description("Sync audit trail (entities written/digested), optionally since a given ISO timestamp")
         .option("--since <iso>", "Only rows created at/after this ISO timestamp")
-        .action(jsonAction(getClient, (client, opts) => runBetomikOrderbookAudit(client, { since: opts.since })));
+        .option("--entity <kind>", "Only this entity kind: asiakas | tyomaa | person")
+        .option("--id <n>", "Only this entityId (asiakasId / tyomaaId / personId)", intFlag("--id"))
+        .action(jsonAction(getClient, (client, opts) => {
+        assertEnum(opts.entity, AUDIT_ENTITIES, "--entity");
+        return runBetomikOrderbookAudit(client, opts);
+    }));
     const tickReportCmd = addJsonBodyOptions(group.command("tick-report")).description("Store one scheduled-tick run report (the tick script calls this from its EXIT trap; developer only)");
     addWriteFlagsToCommand(tickReportCmd).action(guarded(async (opts) => {
         const body = resolveJsonBody(tickReportCmd, opts, { required: true });

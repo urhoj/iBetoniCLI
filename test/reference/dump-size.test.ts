@@ -181,7 +181,8 @@ import { buildReference } from "../../src/reference/dump.js";
 // 868_000 → 869_000 (2026-10-09): new leaf `ib worksite set-customer` (move a worksite to another customer, fb#2365). Measured 868 393 B.
 // 869_000 → 870_000 (2026-10-09): `ib worksite gps-check` exit-1 note + failedTimelineReads in its output shape (fb#2378). Measured 869 065 B.
 // 870_000 → 871_000 (2026-10-09): `ib worksite delete` 409 row — the route now refuses a worksite with active orders (fb#2372). Measured 870 115 B.
-const DUMP_LIMIT_BYTES = 871_000;
+// 871_000 → 872_000 (2026-10-09): `ib dev betomik-orderbook audit --entity/--id` + its audit→row note (fb#2347), landing on fb#2370's person fk alias. Measured 871 520 B.
+const DUMP_LIMIT_BYTES = 872_000;
 // Largest on 2026-08-19 (post fb#780 trim): ib dev changelog add 11,501 B and
 // ib dev changelog update 10,849 B — the known ceiling-setters (their flag
 // surface IS the contract; fb#747/fb#757 resolutions should shrink them

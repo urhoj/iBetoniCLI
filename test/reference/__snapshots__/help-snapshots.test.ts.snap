@@ -2629,6 +2629,8 @@ DESCRIPTION
 
 FLAGS
   --since STRING    ISO timestamp — only rows created at/after it
+  --entity STRING    Only asiakas | tyomaa | person (client-side)
+  --id NUMBER    Only this entityId (client-side)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2638,10 +2640,19 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ auditId, importRowId, entity: 'asiakas'|'tyomaa'|'person', entityId, label, createdAt, digestedAt }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --entity is not asiakas, tyomaa or person → Use one of the listed entity kinds
+  exit 4 (client-side)  --id is not an integer >= 1, rejected locally before any request → pass a positive entityId
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
+
+NOTES
+  - Why does a record exist? \`--entity tyomaa --id <n>\` → importRowId → \`row <importRowId>\`: sheet cells (rawJson) + LLM extraction (extractedJson).
+
+SEE ALSO
+  ib dev betomik-orderbook row
 
 EXAMPLES
   ib dev betomik-orderbook audit --since 2026-09-01
+  ib dev betomik-orderbook audit --entity tyomaa --id 3797
 "
 `;
 

@@ -1518,4 +1518,20 @@ describe("nested-group redirect at the root (fb#1909)", () => {
     expect(owners.size).toBeGreaterThan(1);
     expect(descendantsOwningGroup("ib", "dates", "developer")).toEqual([]);
   });
+
+  // fb#2347 — `ib betomik` got `didYouMean: betoni`; a truncated group name now
+  // resolves as a prefix when it names exactly one group.
+  test("a truncated group name resolves as a unique prefix (fb#2347)", () => {
+    expect(descendantsOwningGroup("ib", "betomik", "developer").map((m) => m.path)).toEqual(["ib dev betomik-orderbook"]);
+    const env = buildUnknownCommandEnvelope(program, "betomik", "developer");
+    expect(env.availableElsewhere).toEqual(["ib dev betomik-orderbook"]);
+    expect(env.hint).toContain("`ib dev betomik-orderbook` does");
+    expect(descendantsOwningGroup("ib", "betomik", "standard")).toEqual([]);
+  });
+
+  test("the prefix pass stays silent under 4 chars and on an ambiguous prefix", () => {
+    expect(descendantsOwningGroup("ib", "bet", "developer")).toEqual([]);
+    // `defa` prefixes both `vehicle driver default` and `person default-company`
+    expect(descendantsOwningGroup("ib", "defa", "developer")).toEqual([]);
+  });
 });

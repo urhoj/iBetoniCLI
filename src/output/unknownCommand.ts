@@ -183,6 +183,12 @@ export function nestedGroupTwins(
  * short, unique and right (fb#1912). Tier-gated: a hidden
  * developer group must not be confirmed to exist by the hint (enumeration
  * secrecy, same rule as every other redirect).
+ *
+ * When no group matches exactly, a TRUNCATED name is retried as a prefix
+ * (fb#2347: `ib betomik` got `didYouMean: betoni` while `ib dev
+ * betomik-orderbook` was the answer). The prefix pass needs ≥ 4 characters,
+ * because the single-owner rule is a weaker guard for a prefix than for a
+ * whole name.
  */
 export function descendantsOwningGroup(
   group: string,
@@ -193,14 +199,19 @@ export function descendantsOwningGroup(
   const t = flat(token);
   if (!t) return [];
   const base = canonicalPath(group);
-  const paths = new Set<string>();
-  for (const s of COMMAND_SPECS) {
-    if (!s.command.startsWith(`${base} `) || isHiddenAtTier(s, tier)) continue;
-    const rest = s.command.slice(base.length + 1).split(" ");
-    for (let i = 1; i < rest.length - 1; i++) {
-      if (flat(rest[i]) === t) paths.add(`${base} ${rest.slice(0, i + 1).join(" ")}`);
+  const groupPaths = (matches: (seg: string) => boolean): Set<string> => {
+    const paths = new Set<string>();
+    for (const s of COMMAND_SPECS) {
+      if (!s.command.startsWith(`${base} `) || isHiddenAtTier(s, tier)) continue;
+      const rest = s.command.slice(base.length + 1).split(" ");
+      for (let i = 1; i < rest.length - 1; i++) {
+        if (matches(flat(rest[i]))) paths.add(`${base} ${rest.slice(0, i + 1).join(" ")}`);
+      }
     }
-  }
+    return paths;
+  };
+  let paths = groupPaths((seg) => seg === t);
+  if (paths.size === 0 && t.length >= 4) paths = groupPaths((seg) => seg.startsWith(t));
   if (paths.size !== 1) return [];
   const path = [...paths][0];
   const cut = path.lastIndexOf(" ");

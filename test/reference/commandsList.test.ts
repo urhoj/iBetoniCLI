@@ -326,6 +326,17 @@ describe("assertKnownDomain nested-subgroup did-you-mean", () => {
     try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "developer"); } catch (e) { msg = (e as Error).message; }
     expect(msg).not.toContain("Did you mean");
   });
+  test("a truncated subgroup name suggests its unique prefix owner (fb#2347)", () => {
+    const msgFor = (token: string, tier: "developer" | "standard") => {
+      try { assertKnownDomain(COMMAND_SPECS, token, tier); } catch (e) { return (e as Error).message; }
+      return "";
+    };
+    expect(msgFor("betomik", "developer")).toContain("Did you mean: `dev betomik-orderbook`?");
+    expect(msgFor("betomik", "standard")).not.toContain("betomik-orderbook");
+    // under 4 chars, and `driv` (vehicle driver + keikka drivers) is ambiguous
+    expect(msgFor("bet", "developer")).not.toContain("Did you mean");
+    expect(msgFor("driv", "developer")).not.toContain("Did you mean");
+  });
 });
 
 describe("tier filtering — domain index", () => {

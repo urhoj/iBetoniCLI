@@ -316,6 +316,20 @@ describe("ib dev betomik-orderbook sync / resync / extract-prompt / exceptions /
     await runBetomikOrderbookAudit(mockClient, {});
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/audit");
   });
+
+  // fb#2347 — "which sheet row created tyomaa 3797" was a ~960-row dump.
+  test("audit: --entity/--id filter client-side and recount", async () => {
+    const row = (auditId: number, entity: string, entityId: number) =>
+      ({ auditId, importRowId: auditId + 1000, entity, entityId, label: "x", createdAt: "2026-10-05T05:00:00Z", digestedAt: null });
+    const items = [row(1, "tyomaa", 3797), row(2, "tyomaa", 3730), row(3, "asiakas", 3797), row(4, "person", 9)];
+    mockClient.get.mockResolvedValue({ items });
+    const both = await runBetomikOrderbookAudit(mockClient, { entity: "tyomaa", id: 3797 });
+    expect(both.items.map((r) => r.auditId)).toEqual([1]);
+    expect(both.count).toBe(1);
+    expect(mockClient.get).toHaveBeenLastCalledWith("/api/betomik-orderbook/audit");
+    expect((await runBetomikOrderbookAudit(mockClient, { entity: "tyomaa" })).count).toBe(2);
+    expect((await runBetomikOrderbookAudit(mockClient, { id: 3797 })).items.map((r) => r.auditId)).toEqual([1, 3]);
+  });
 });
 
 // fb#1681 — `sync`'s single combined 400 row used to mix four causes into one

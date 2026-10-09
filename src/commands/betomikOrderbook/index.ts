@@ -5,7 +5,7 @@ import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_sha
 import { guarded, jsonAction } from "../_shared/action.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { parseId, intFlag } from "../../targets.js";
+import { parseId, intFlag, assertEnum } from "../../targets.js";
 
 export async function runBetomikOrderbookImport(
   client: ApiClient,
@@ -333,14 +333,23 @@ export interface BetomikAuditRow {
   digestedAt: string | null;
 }
 
-/** Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit). */
+export const AUDIT_ENTITIES = ["asiakas", "tyomaa", "person"] as const;
+
+/**
+ * Sync audit trail (entities written/digested), optionally since a given ISO timestamp (GET /api/betomik-orderbook/audit).
+ * --entity/--id filter CLIENT-SIDE (fb#2347): "which sheet row created tyomaa 3797" was a ~960-row dump.
+ */
 export async function runBetomikOrderbookAudit(
   client: ApiClient,
-  { since }: { since?: string }
+  { since, entity, id }: { since?: string; entity?: string; id?: number }
 ): Promise<ListEnvelope<BetomikAuditRow>> {
   const qs = since ? `?since=${encodeURIComponent(since)}` : "";
   const raw = await client.get<unknown>(`/api/betomik-orderbook/audit${qs}`);
-  return listEnvelope(itemsOf<BetomikAuditRow>(raw));
+  return listEnvelope(
+    itemsOf<BetomikAuditRow>(raw).filter(
+      (r) => (entity === undefined || r.entity === entity) && (id === undefined || r.entityId === id)
+    )
+  );
 }
 
 /** One tick run's report, stored by the scheduled tick (POST /api/betomik-orderbook/tick-runs). */
@@ -593,10 +602,13 @@ export function registerBetomikOrderbookCommands(
     .command("audit")
     .description("Sync audit trail (entities written/digested), optionally since a given ISO timestamp")
     .option("--since <iso>", "Only rows created at/after this ISO timestamp")
+    .option("--entity <kind>", "Only this entity kind: asiakas | tyomaa | person")
+    .option("--id <n>", "Only this entityId (asiakasId / tyomaaId / personId)", intFlag("--id"))
     .action(
-      jsonAction(getClient, (client, opts: { since?: string }) =>
-        runBetomikOrderbookAudit(client, { since: opts.since })
-      )
+      jsonAction(getClient, (client, opts: { since?: string; entity?: string; id?: number }) => {
+        assertEnum(opts.entity, AUDIT_ENTITIES, "--entity");
+        return runBetomikOrderbookAudit(client, opts);
+      })
     );
 
   const tickReportCmd = addJsonBodyOptions(group.command("tick-report")).description(
