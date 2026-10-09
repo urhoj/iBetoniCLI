@@ -319,7 +319,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
       { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
     ],
     outputShape:
-      "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
+      "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, locationLat?, locationLng?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
@@ -329,13 +329,13 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle route",
     description:
-      "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).",
+      "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API); ts = each fix's GPS time.",
     permissions: ["auth.page.vehicle.read"],
     args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
     flags: [
       { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
     ],
-    outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
+    outputShape: "ListEnvelope<{ lat, lng, ts }> & { gpsAvailable }",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
