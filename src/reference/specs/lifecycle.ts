@@ -176,14 +176,14 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }>",
+    outputShape: "ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }> + failedTimelineReads",
     errors: [
       apiErr(400, "Bad --from/--to", "pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart"),
       { origin: "client", exit: 4, match: "--min-confidence must be one of", meaning: "unknown --min-confidence", remedy: "high or medium" },
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     notes: [
-      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply.",
+      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ separate visits within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply. Exits 1 when a pin failed (applied:false) or failedTimelineReads > 0.",
     ],
     seeAlso: ["ib worksite set-location", "ib vehicle timeline"],
     examples: [

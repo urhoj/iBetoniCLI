@@ -16894,7 +16894,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }>
+  ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }> + failedTimelineReads
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Bad --from/--to        → pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart
@@ -16904,7 +16904,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply.
+  - Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ separate visits within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply. Exits 1 when a pin failed (applied:false) or failedTimelineReads > 0.
 
 SEE ALSO
   ib worksite set-location, ib vehicle timeline

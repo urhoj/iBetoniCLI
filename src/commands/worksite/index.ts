@@ -399,7 +399,7 @@ export const GPS_MIN_CONFIDENCE = ["high", "medium"] as const;
  * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
  * truck's pour stop. `apply` pins every autoApplicable row at or above
  * `minConfidence` through set-location (MANUAL, change-logged); one failed pin
- * is reported on its row, not thrown. The default is "high" (2+ agreeing pours):
+ * is reported on its row, not thrown. The default is "high" (2+ separate visits that agree):
  * a MANUAL pin survives address edits and the order-book sync, so a single-pour
  * guess at the wrong stop would stick until someone noticed.
  */
@@ -409,8 +409,8 @@ export async function runWorksiteGpsCheck(
   apply: boolean,
   flags: WriteFlags,
   minConfidence: (typeof GPS_MIN_CONFIDENCE)[number] = "high"
-): Promise<ListEnvelope<WorksiteGpsProposal>> {
-  const res = await client.get<ListEnvelope<WorksiteGpsProposal>>(
+): Promise<WorksiteGpsCheckResult> {
+  const res = await client.get<WorksiteGpsCheckResult>(
     `/api/cli/worksite/gps-check${qs({ from: range.from, to: range.to })}`
   );
   if (!apply) return res;
@@ -427,6 +427,18 @@ export async function runWorksiteGpsCheck(
     }
   }
   return res;
+}
+
+/** The gps-check envelope; `failedTimelineReads` counts vehicle-days the backend had to skip. */
+export type WorksiteGpsCheckResult = ListEnvelope<WorksiteGpsProposal> & { failedTimelineReads?: number };
+
+/**
+ * True when a gps-check run is incomplete — a pin failed or a vehicle-day
+ * timeline could not be read — so the action exits 1 instead of a clean 0 a
+ * scheduled caller would read as "all done" (fb#2378).
+ */
+export function gpsCheckIncomplete(res: WorksiteGpsCheckResult): boolean {
+  return (res.failedTimelineReads ?? 0) > 0 || res.items.some((p) => p.applied === false);
 }
 
 /** POST /api/tyomaa/:tyomaaId/customer — re-point a worksite to another customer of its company (fb#2365). */
@@ -779,15 +791,17 @@ export function registerWorksiteCommands(
       .option("--apply")
       .option("--min-confidence <level>")
   ).action(
-    jsonAction(getClient, (client, opts: WriteFlags & { from: string; to?: string; apply?: boolean; minConfidence?: string }) => {
+    guarded(async (opts: WriteFlags & { from: string; to?: string; apply?: boolean; minConfidence?: string }) => {
       assertEnum(opts.minConfidence, GPS_MIN_CONFIDENCE, "--min-confidence");
-      return runWorksiteGpsCheck(
-        client,
+      const res = await runWorksiteGpsCheck(
+        await getClient(),
         { from: resolveDate(opts.from)!, to: resolveDate(opts.to) },
         !!opts.apply,
         opts,
         opts.minConfidence as (typeof GPS_MIN_CONFIDENCE)[number] | undefined
       );
+      writeJson(res);
+      if (gpsCheckIncomplete(res)) process.exitCode = 1;
     })
   );
 

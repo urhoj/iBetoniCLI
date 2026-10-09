@@ -244,7 +244,7 @@ export const GPS_MIN_CONFIDENCE = ["high", "medium"];
  * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
  * truck's pour stop. `apply` pins every autoApplicable row at or above
  * `minConfidence` through set-location (MANUAL, change-logged); one failed pin
- * is reported on its row, not thrown. The default is "high" (2+ agreeing pours):
+ * is reported on its row, not thrown. The default is "high" (2+ separate visits that agree):
  * a MANUAL pin survives address edits and the order-book sync, so a single-pour
  * guess at the wrong stop would stick until someone noticed.
  */
@@ -267,6 +267,14 @@ export async function runWorksiteGpsCheck(client, range, apply, flags, minConfid
         }
     }
     return res;
+}
+/**
+ * True when a gps-check run is incomplete — a pin failed or a vehicle-day
+ * timeline could not be read — so the action exits 1 instead of a clean 0 a
+ * scheduled caller would read as "all done" (fb#2378).
+ */
+export function gpsCheckIncomplete(res) {
+    return (res.failedTimelineReads ?? 0) > 0 || res.items.some((p) => p.applied === false);
 }
 /** POST /api/tyomaa/:tyomaaId/customer — re-point a worksite to another customer of its company (fb#2365). */
 export async function runWorksiteSetCustomer(client, tyomaaId, asiakasId, flags) {
@@ -474,9 +482,12 @@ export function registerWorksiteCommands(parent, getClient) {
         .requiredOption("--from <date>")
         .option("--to <date>")
         .option("--apply")
-        .option("--min-confidence <level>")).action(jsonAction(getClient, (client, opts) => {
+        .option("--min-confidence <level>")).action(guarded(async (opts) => {
         assertEnum(opts.minConfidence, GPS_MIN_CONFIDENCE, "--min-confidence");
-        return runWorksiteGpsCheck(client, { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts, opts.minConfidence);
+        const res = await runWorksiteGpsCheck(await getClient(), { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts, opts.minConfidence);
+        writeJson(res);
+        if (gpsCheckIncomplete(res))
+            process.exitCode = 1;
     }));
     addWriteFlagsToCommand(w.command("set-customer <tyomaaId>")
         .requiredOption("--customer <asiakasId>", "", intFlag("--customer", 1))).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteSetCustomer(client, parseId(idStr, "tyomaaId"), opts.customer, opts)));

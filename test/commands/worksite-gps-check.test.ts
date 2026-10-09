@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
-import { runWorksiteGpsCheck } from "../../src/commands/worksite/index.js";
+import { runWorksiteGpsCheck, gpsCheckIncomplete } from "../../src/commands/worksite/index.js";
 import { CliError } from "../../src/api/errors.js";
 
 const mockClient = mockApiClient();
@@ -61,5 +61,14 @@ describe("ib worksite gps-check (fb#2361)", () => {
     mockClient.get.mockResolvedValueOnce(rows());
     const loose = await runWorksiteGpsCheck(mockClient, { from: "2026-10-01" }, true, {}, "medium");
     expect(loose.items.map((p) => p.applied)).toEqual([true, true, undefined]);
+  });
+
+  test("a run is incomplete (exit 1) on a failed pin or a skipped timeline read (fb#2378)", () => {
+    const ok = { ...proposal(1, true), applied: true };
+    const failed = { ...proposal(2, true), applied: false };
+    expect(gpsCheckIncomplete({ ...envelope([ok]), failedTimelineReads: 0 })).toBe(false);
+    expect(gpsCheckIncomplete(envelope([proposal(3, false)]))).toBe(false);
+    expect(gpsCheckIncomplete(envelope([ok, failed]))).toBe(true);
+    expect(gpsCheckIncomplete({ ...envelope([ok]), failedTimelineReads: 1 })).toBe(true);
   });
 });
