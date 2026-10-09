@@ -1,9 +1,12 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
+import { Command } from "commander";
 import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
+import { captureActionError } from "../helpers/stderr.js";
 import { CliError } from "../../src/api/errors.js";
 import {
   foldOwnerAlias,
   planPersonFkSet,
+  registerPersonFkCommands,
   runPersonFkImport,
   runPersonFkList,
   runPersonFkListSource,
@@ -96,6 +99,41 @@ describe("person fk list-source (fb#1740)", () => {
       message: expect.stringContaining("betomik-orderbook (42)"),
     });
     expect(c.get).not.toHaveBeenCalledWith(expect.stringContaining("/api/person/getForeignKeysBySource/"));
+  });
+
+  describe("--source aliases the positional (fb#2370)", () => {
+    async function parse(c: MockApiClient, args: string[]): Promise<void> {
+      const program = new Command("ib").exitOverride();
+      registerPersonFkCommands(program.command("person"), async () => c);
+      const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      try {
+        await program.parseAsync(["node", "ib", "person", "fk", "list-source", ...args]);
+      } finally {
+        out.mockRestore();
+      }
+    }
+    const LIST_PATH = "/api/person/getForeignKeysBySource/27/42";
+
+    test.each([
+      ["positional", ["betomik-orderbook"]],
+      ["--source", ["--source", "betomik-orderbook"]],
+      ["both, agreeing", ["betomik-orderbook", "--source", "betomik-orderbook"]],
+    ])("%s → lists the source", async (_label, args) => {
+      const c = client([]);
+      await parse(c, [...args, "--owner", "27"]);
+      expect(c.get).toHaveBeenCalledWith(LIST_PATH);
+    });
+
+    test.each([
+      ["neither", [], "missing source"],
+      ["both, disagreeing", ["betomik-orderbook", "--source", "6"], "differ"],
+    ])("%s → exit 4, no list GET", async (_label, args, msg) => {
+      const c = client([]);
+      const { exitCode, envelope } = await captureActionError(() => parse(c, [...args, "--owner", "27"]));
+      expect(exitCode).toBe(4);
+      expect(String(envelope.error)).toContain(msg);
+      expect(c.get).not.toHaveBeenCalledWith(LIST_PATH);
+    });
   });
 });
 

@@ -94,10 +94,24 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     description:
       "List EVERY taught foreign key of one source for an owner, across ALL persons (fb#1740) — the aggregate counterpart to `fk list`, which is scoped to one person. Reviewing a whole source's taught vocabulary (e.g. every betomik-orderbook driver nickname under an owner) otherwise required a raw dbo query.",
     permissions: ["membership of the owner tenant (read)"],
-    args: [{ name: "source", type: "string", description: "foreignKeySources row, by NAME (case-insensitive) or numeric id — `fk sources` lists them" }],
-    flags: [OWNER_ASIAKAS_FLAG],
+    args: [{ name: "source", type: "string", required: false, description: "foreignKeySources row, by NAME (case-insensitive) or numeric id — `fk sources` lists them. Alias: --source <ref>, the spelling siblings `fk set` / `fk import` use — exactly one is required, both only if they agree." }],
+    flags: [{ name: "source", type: "string", description: "foreignKeySources row (alias for the positional)" }, OWNER_ASIAKAS_FLAG],
     outputShape: "ListEnvelope<{ personForeignKeyId, personId, name, key, text, isDisabled, entryTime }>",
     errors: [
+      {
+        origin: "client",
+        exit: 4,
+        match: "missing source",
+        meaning: "No source given, positionally or via --source",
+        remedy: "pass it positionally (`ib person fk list-source betomik-orderbook`) or as --source betomik-orderbook",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        match: "differ",
+        meaning: "The positional source and --source were both given and disagree",
+        remedy: "pass the source ONCE",
+      },
       OWNER_PARSE_ERR,
       OWNER_UNRESOLVED_ERR,
       SOURCE_UNKNOWN_ERR,
@@ -106,7 +120,7 @@ export const PERSON_FK_SPECS: CommandSpec[] = [
     ],
     notes: [OWNER_NOTE, PERSON_OWNER_ALIAS_NOTE, "The person column is `name` (first + last), the canonical person vocabulary of every CLI list (fb#692); it was `personName` before 2026-09-25."],
     seeAlso: ["ib person fk list", "ib person fk sources"],
-    examples: ["ib person fk list-source betomik-orderbook --owner 27", "ib person fk list-source 6 --owner 27"],
+    examples: ["ib person fk list-source betomik-orderbook --owner 27", "ib person fk list-source --source 6 --owner 27"],
   },
   {
     command: "ib person fk set",

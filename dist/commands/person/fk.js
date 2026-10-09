@@ -16,7 +16,7 @@ import { errorMessage } from "../../api/errors.js";
 import { readJsonInput } from "../../api/parseBody.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { failWith, writeJson } from "../../output/json.js";
-import { addOwnerOption, intFlag, parseId } from "../../targets.js";
+import { addOwnerOption, intFlag, parseId, resolveDualString } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { dryRunOr, fetchFkSources, normKey, pickFkSource, registerFkSourcesLeaf, resolveFkSource, resolveOwner, sourceNameOf, } from "../_shared/foreignKeys.js";
 import { resolvePersonRef } from "../notification/index.js";
@@ -239,9 +239,10 @@ export function registerPersonFkCommands(person, getClient) {
         foldOwnerAlias(opts);
         return runPersonFkList(client, personRef, opts.owner);
     }));
-    addOwnerWithAlias(fk.command("list-source <source>")).action(jsonAction(getClient, (client, source, opts) => {
+    // --source aliases the positional (fb#2370): siblings `set` / `import` spell it as the flag.
+    addOwnerWithAlias(fk.command("list-source [source]").option("--source <ref>")).action(jsonAction(getClient, (client, source, opts) => {
         foldOwnerAlias(opts);
-        return runPersonFkListSource(client, source, opts.owner);
+        return runPersonFkListSource(client, resolveDualString(source, opts.source, "source", "source"), opts.owner);
     }));
     addWriteFlagsToCommand(addOwnerWithAlias(fk.command("set <person>")
         .requiredOption("--source <ref>")

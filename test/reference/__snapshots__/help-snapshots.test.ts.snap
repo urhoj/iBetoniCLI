@@ -12899,16 +12899,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person fk list-source matches snapshot 1`] = `
 "USAGE
-  ib person fk list-source <source> [flags]
+  ib person fk list-source [<source>] [flags]
 
 DESCRIPTION
   List EVERY taught foreign key of one source for an owner, across ALL persons (fb#1740) — the aggregate counterpart to \`fk list\`, which is scoped to one person. Reviewing a whole source's taught vocabulary (e.g. every betomik-orderbook driver nickname under an owner) otherwise required a raw dbo query.
   Permissions: requires membership of the owner tenant (read).
 
 ARGUMENTS
-  <source> STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
+  <source> STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them. Alias: --source <ref>, the spelling siblings \`fk set\` / \`fk import\` use — exactly one is required, both only if they agree. (optional)
 
 FLAGS
+  --source STRING    foreignKeySources row (alias for the positional)
   --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 GLOBAL FLAGS
@@ -12919,6 +12920,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personForeignKeyId, personId, name, key, text, isDisabled, entryTime }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No source given, positionally or via --source → pass it positionally (\`ib person fk list-source betomik-orderbook\`) or as --source betomik-orderbook
+  exit 4 (client-side)  The positional source and --source were both given and disagree → pass the source ONCE
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
@@ -12936,7 +12939,7 @@ SEE ALSO
 
 EXAMPLES
   ib person fk list-source betomik-orderbook --owner 27
-  ib person fk list-source 6 --owner 27
+  ib person fk list-source --source 6 --owner 27
 "
 `;
 
