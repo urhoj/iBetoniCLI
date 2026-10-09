@@ -1895,7 +1895,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
+  report: { asiakasId, roolit:{...}, modules:{...}, hint } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>

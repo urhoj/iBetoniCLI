@@ -5,6 +5,7 @@ import {
   runCustomerGet,
   runCustomerSearch,
   runCustomerModulesReport,
+  runCustomerModulesView,
   runCustomerWorksites,
   projectCustomerRow,
 } from "../../src/commands/customer/index.js";
@@ -323,5 +324,14 @@ describe("ib customer list/get/search", () => {
       "/api/cli/customer/modules/1349"
     );
     expect(result).toEqual(state);
+  });
+
+  test("runCustomerModulesView: keeps the report and says it is a subset (fb#2387)", async () => {
+    const state = { asiakasId: 1349, roolit: {}, modules: { jerry: true } };
+    mockClient.get.mockResolvedValueOnce(state);
+    const result = await runCustomerModulesView(mockClient, 1349);
+    expect(result).toMatchObject(state);
+    expect(result.hint).toContain("SUBSET");
+    expect(result.hint).toContain("ib customer settings 1349");
   });
 });

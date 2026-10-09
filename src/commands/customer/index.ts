@@ -355,6 +355,21 @@ export async function runCustomerModulesReport(
   );
 }
 
+/**
+ * The `ib customer modules` read: the report plus an in-band `hint` that it is
+ * a SUBSET, so a missing key (HAS_AI, HAS_FENNOA, …) is not read as "off"
+ * (fb#2387). Apply/operator keep using the raw report.
+ */
+export async function runCustomerModulesView(
+  client: ApiClient,
+  asiakasId: number
+): Promise<CustomerModulesState & { hint: string }> {
+  return {
+    ...(await runCustomerModulesReport(client, asiakasId)),
+    hint: `modules is a SUBSET (8 flags + pumppu); a missing key is NOT 'off' — full set incl. HAS_AI/HAS_TUOTTEET/HAS_FENNOA: ib customer settings ${asiakasId}`,
+  };
+}
+
 /** asiakasSettings-backed module field keys (excludes the roolit-backed `pumppu`). */
 export const MODULE_FIELD_KEYS = [
   "jerry",
@@ -1252,7 +1267,7 @@ export function registerCustomerCommands(
   };
 
   registerSetUnsetCommand("modules", {
-    report: runCustomerModulesReport,
+    report: runCustomerModulesView,
     parse: parseModuleChanges,
     apply: runCustomerModulesApply,
   });

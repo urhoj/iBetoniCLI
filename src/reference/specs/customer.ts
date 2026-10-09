@@ -274,7 +274,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
+      "report: { asiakasId, roolit:{...}, modules:{...}, hint } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
     errors: [
       ASIAKAS_TARGET_ERR,
       apiErr(400, "Unknown field key, or key in both --set and --unset", "use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders"),
