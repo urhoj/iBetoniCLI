@@ -3541,16 +3541,14 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 
 NOTES
-  - You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors \`ib dev feedback create\`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.
-  - SHELL QUOTING (fb#300): an entry description is prose about code — the text most likely to carry inner double-quotes, which Windows PowerShell splits on. Pass quote-bearing entries via --from-json <file|-> (required --type/--area/--title may come from the JSON); see \`ib help shell-quoting\`.
+  - The description goes positionally or as --description/--summary/--body (several must match). Here --body is FREE TEXT, not raw JSON.
+  - Quote-bearing prose: pass the entry via --from-json <file|-> (--type/--area/--title may come from the JSON) — \`ib help shell-quoting\`.
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after \`--\` is taken as positional text.
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s.
   - Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)
-  - CROSS-LANE ENTRIES (fb#408): --repo is a CSV; a change spanning both lanes names both — --repo "puminet5api,betonicli" — each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.
-  - --feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880) — the response's \`linkKeptBy\` names the keeping resolver (nothing to restore). --take-resolve re-owns it (fb#366): only then the response carries \`relinkedFrom\` (restore: \`ib dev changelog update <thatId> --feedback <id>\`).
-  - DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with \`ib dev feedback get <id>\` after linking; full per-flag matrix: \`ib reference detail get dev changelog add\`.
-  - --type/--area are SERVER-validated (fb#1294): a \`must be one of\` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check \`ib version\`.
-  - Developer-gated.
+  - --repo is a CSV: name every lane a change spans (--repo "puminet5api,betonicli"); each token is bumped/stamped on its own.
+  - --feedback on an ALREADY-resolved row links as a cross-reference (\`linkKeptBy\` names the resolver); --take-resolve re-owns it (\`relinkedFrom\` names the previous entry).
+  - --type/--area are server-validated: a \`must be one of\` listing only OLD values means the API predates this CLI — check \`ib version\`.
 
 SEE ALSO
   ib dev changelog report, ib dev feedback resolve
@@ -3863,15 +3861,13 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --append-description is empty, or combined with --description/--summary/--body → --append-description must be non-empty and is mutually exclusive with a full --description replace — use one or the other
 
 NOTES
-  - SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see \`ib help shell-quoting\`.
-  - --append-description (fb#757) is the non-destructive twin of --description, mirroring \`ib dev feedback update\`: it fetches the current entry, joins the new text onto the end separated by a blank line, and PUTs the merged result — the original entry text is never lost. Exclusive with --description/--summary/--body (exit 4 if combined).
-  - THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.
-  - --bump-level has NO default here (unlike \`add\`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated \`update --status …\` cannot silently downgrade a deliberate minor.
-  - --feedback re-establishes a link lost to delete + re-add — the only way to do it (\`ib dev feedback resolve\` sets status/resolution but not the link). It sets resolvedByChangelogId back to this entry but does NOT mark the row applied: since fb#578 this command writes no status at all, so close the row yourself with \`ib dev feedback resolve <id> --status applied\` once the change is live.
-  - --unlink is the UNDO for --feedback (fb#585). --feedback ADDS a link (the junction allows many), so it cannot correct a mistyped id on its own — \`--unlink 541 --feedback 542\` does, in one call, and the unlink is applied first. It never changes a status: a row closed by the removed link stays closed and is reported on stderr.
-  - A multi-id --feedback/--unlink set is one transaction PER id, not one across the set (fb#586). If one id fails, the others still run and each is reported separately — finish the set with another \`changelog update\`, and do NOT re-run \`add\`, which mints a duplicate entry.
-  - DEPLOY-GATED behaviours (fb#441/517/576/585 + field editability): --unlink, --no-resolve, CSV --feedback, the status-preserve rule, and --bump-level/--feedback/--sentry editability each need a recent puminet5api. The CLI detects and warns where it can (echo-compare on edits; missing \`feedbackUnlinks\`), but --no-resolve against an older backend is dropped SILENTLY and the row force-flips to applied. ALWAYS verify with \`ib dev feedback get <id>\` after linking; full per-flag matrix: \`ib reference detail get dev changelog update\`.
-  - --type/--area are SERVER-validated (fb#1294): a \`must be one of\` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check \`ib version\`.
+  - Quote-bearing prose: pass it via --from-json <file|-> — \`ib help shell-quoting\`.
+  - --append-description fetches the entry and appends after a blank line (the original is kept); exclusive with --description/--summary/--body.
+  - Fix a wrong --bump-level HERE, never by delete + re-add (that orphans the linked feedback row): deploy bumps each repo from the MAX level of its unreleased entries. It has no default here, so other edits never change it.
+  - --feedback re-establishes a link (e.g. one lost to delete + re-add) but writes NO status — close with \`ib dev feedback resolve <id> --status applied\` once live.
+  - --unlink undoes --feedback; \`--unlink 541 --feedback 542\` fixes a mistyped id in one call (unlink first). Neither changes a status.
+  - A multi-id --feedback/--unlink set is one transaction PER id — on a partial failure finish with another \`update\`, never re-run \`add\` (duplicate entry).
+  - --type/--area are server-validated: a \`must be one of\` listing only OLD values means the API predates this CLI — check \`ib version\`.
 
 SEE ALSO
   ib dev changelog pending, ib dev changelog get
@@ -4476,10 +4472,10 @@ FLAGS
   --all    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
-  --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
-  --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; \`--complexity none\` is how you select exactly that set for a backfill pass (fb#535).
-  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use \`--complexity none\` to find those.
-  --severity STRING    Only items with this exact severity, or \`none\` for the rows with NO grade at all — the severity twin of \`--complexity none\` (deploy-gated). Before this existed severity was ORDERABLE but not selectable, so 'which rows still need a grade?' cost a full unresolved page filtered client-side, against a 200-row cap. Unlike --complexity, an unknown value is REJECTED (exit 4), never answered with the whole table.
+  --search STRING    Substring match over description/command/resolution/errorText
+  --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for rows with NO estimate. ⚠ A numeric value EXCLUDES unestimated rows — absent means unestimated, not complex.
+  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls. ⚠ EXCLUDES unestimated rows; \`--complexity none\` finds those.
+  --severity STRING    Only items with this exact severity, or \`none\` for rows with NO grade. An unknown value is REJECTED (exit 4), never answered with the whole table.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets \`truncated: true\` — the 50 default counts, not just an over-ask (fb#605, fb#1439). (default: 50)
   --offset NUMBER    Skip N rows — how you reach anything beyond the 200-row cap. \`--limit 200\`, then \`--limit 200 --offset 200\`, and so on. (default: 0)
@@ -4487,10 +4483,10 @@ FLAGS
   --unclaimed    Only items no agent currently holds — the set you should pick from. Includes rows whose claim EXPIRED (the 24h reclamation), not just never-claimed ones. Mutually exclusive with --mine/--claimed-by/--held.
   --mine    Only items YOU currently hold (shorthand for --claimed-by <your resolved label>)
   --claimed-by STRING    Only items held by this label, and only while the claim is still LIVE
-  --held    Only items ANY agent currently holds (live leases, any holder) — the 'what is being worked on right now' triage view, the complement of --unclaimed without knowing every claimant label. An expired lease counts as free, not held. Mutually exclusive with --unclaimed/--mine/--claimed-by; deploy-gated and CHECKED like --severity (see notes).
-  --gated STRING    Only rows carrying a gate (gateKind IS NOT NULL); pass a value to restrict to one kind (e.g. --gated owner-action), or \`owner-any\` for the whole human-blocked family (owner + owner-decision + owner-action). Use owner-any whenever you mean 'waiting on a person': bare \`owner\` is the LEGACY value only, so naming it answers 0 on a queue whose rows have been reclassified, which reads as 'nothing is blocked'. Filtered SERVER-SIDE since fb#1198 — it previously filtered client-side over one 200-row page, so \`--gated --all\` answered 1 when the table held 18, and because the page is newest-first the rows it dropped were the OLDEST, i.e. the longest-blocked. Deploy-gated but CHECKED like --severity: an older backend ignores the param and answers unfiltered, which under a gate lens reads as 'every row is blocked', so a mismatch raises a loud stderr warning plus an envelope hint.
-  --ungated    Only rows carrying NO gate (gateKind IS NULL) — the complement of bare --gated, and the 'workable right now' half of a fix-session slice (pair it with --unclaimed --max-complexity N). Filtered CLIENT-SIDE — the backend's gated param has no negation value — and therefore routed over the complete per-status walk, so no row is dropped to the 200-row cap: a lone --status walks that status, --all fans out over all four. Mutually exclusive with --gated (exit 4) (fb#1209).
-  --min-age STRING    Exclude rows filed within this duration — <n>m|<n>h|<n>d; a bare number exits 4 rather than being guessed at. Drops rows their filer still owns: a just-filed row carries NO claim yet, so --unclaimed cannot tell it from an abandoned one, and newest-first puts exactly those on top. Client-side over the complete walk like --ungated. A row with no parseable createdAt is KEPT (fb#1421).
+  --held    Only items ANY agent currently holds (live leases) — the 'being worked on now' view. An expired lease counts as free. Mutually exclusive with --unclaimed/--mine/--claimed-by.
+  --gated STRING    Only rows carrying a gate; pass a kind to restrict (e.g. --gated owner-action), or \`owner-any\` for the whole human-blocked family. Use owner-any for 'waiting on a person': bare \`owner\` is the LEGACY value and answers 0 on reclassified rows.
+  --ungated    Only rows with NO gate — the 'workable now' half of a fix slice (pair with --unclaimed --max-complexity N). Client-side over the complete per-status walk, so the 200-row cap drops nothing. Mutually exclusive with --gated.
+  --min-age STRING    Exclude rows filed within <n>m|<n>h|<n>d (a bare number exits 4). A just-filed row has no claim yet, so --unclaimed cannot tell it from an abandoned one. Client-side over the complete walk; a row with no parseable createdAt is kept.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -4513,16 +4509,10 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.
-  - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
-  - --complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). \`--max-complexity 3 --unresolved\` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).
-  - --severity is deploy-gated like the others, but its silent-ignore failure points the WRONG WAY, so this one is CHECKED rather than merely documented: an older backend ignores the param and answers unfiltered, which for \`--severity none\` returns every active row and reads as 'the whole queue is ungraded'. The CLI compares the rows against what was asked and, on a mismatch, emits a loud stderr warning plus an envelope \`hint\` saying the results are unfiltered. An EMPTY result is not flagged — a genuinely empty slice and a filtered-out one look identical, so use \`ib dev feedback count\` (bySeverity/ungraded) to tell them apart.
-  - --oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. \`--kind bug --oldest\`) to keep breakages ahead of age.
-  - Each row carries claimState (free|held|mine). An expired claim reads as \`free\` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically. A row that would read \`mine\` instead reads \`held\` (+ a stderr warning) when the caller's identity is the derived user@host fallback (no $IB_CLAIM_ID/--by/ctx set) — that label is shared by every such session on the host, so \`mine\` cannot be proven (fb#901).
-  - --held (fb#886) is deploy-gated with the same CHECKED contract as --severity, because its silent-ignore also points the wrong way: an older backend ignores the param and answers unfiltered, which reads as 'everything is claimed'. On a mismatch (a returned row with no live lease) the CLI emits a loud stderr warning plus an envelope \`hint\`; filter client-side on claimState there instead.
-  - FRESHNESS NOTE (fb#1421): a stderr note names ACTIVE rows filed in the last 12h; nothing is hidden, and it is suppressed under --min-age. \`--unclaimed --ungated --max-complexity 2 --min-age 12h\` = the fully-workable batch-fix slice.
-  - --ungated (fb#1209) has NO server-side param — the backend's gated filter has no negation value — so it runs CLIENT-SIDE over the complete per-status walk (a lone --status walks that status, --all fans out over all four). That routing is what keeps it exact against the 200-row cap; filtering one capped page is the fb#536/fb#1198 under-report class.
-  - LINKED-BUT-OPEN ROWS: \`changelogLinks\` on an active row means one of two opposite things; a stderr note names each. \`references\` = partly shipped (\`changelog add --feedback <id> --no-resolve\`, fb#647): read the entry (\`ib dev changelog get <id>\`) BEFORE claiming. \`resolves\` on an OPEN row = closed once and REOPENED DELIBERATELY (fb#1553; backend-derived, never auto-advanced): its \`resolution\` says what residue is held open — never close it on the link alone. On a REVIEWED row it is a preserved status (fb#517), not a reopen. Deploy-gated: an older backend sends no links; silence never means 'nothing shipped'.
+  - --severity, --held and --gated are CHECKED: if returned rows do not match the filter, a stderr warning + envelope \`hint\` say the results are unfiltered. An EMPTY result is not flagged — use \`ib dev feedback count\` to tell an empty slice from a filtered one.
+  - Each row carries claimState (free|held|mine); an expired claim reads \`free\`. \`mine\` reads \`held\` (+ stderr warning) when your identity is the shared user@host fallback — set $IB_CLAIM_ID.
+  - A stderr note names ACTIVE rows filed in the last 12h (suppressed by --min-age). \`--unclaimed --ungated --max-complexity 2 --min-age 12h\` = the fully-workable batch-fix slice.
+  - \`changelogLinks\` on an ACTIVE row: \`references\` = partly shipped — read \`ib dev changelog get <id>\` BEFORE claiming; \`resolves\` on an OPEN row = deliberately reopened — its \`resolution\` names the residue, never close it on the link alone.
 
 EXAMPLES
   ib dev feedback list
@@ -4681,10 +4671,10 @@ DESCRIPTION
 
 ARGUMENTS
   <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected (exit 4) with the changelog command to use (feedback #230) (required)
-  <note> STRING    The resolution note, positionally — the same field as --note, so \`resolve 42 --status applied -- "…"\` works exactly like \`--note "…"\`. Mirrors its sibling \`ib dev feedback create <description>\`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once. (optional)
+  <note> STRING    The resolution note, positionally — the same field as --note (\`resolve 42 --status applied -- "…"\`). (optional)
 
 FLAGS
-  --status STRING    open | reviewed | applied | dismissed. STRICT: 'resolved' is the natural guess given this command's own name, but it means fixed/shipped (→ applied), not merely looked at (reviewed) — recognized in the exit-4 did-you-mean, never silently accepted (fb#1364). Reopen a closed row with \`ib dev feedback reopen <id>\` (fb#1363)
+  --status STRING    open | reviewed | applied | dismissed. STRICT: 'resolved' means applied — named in the exit-4 did-you-mean, never accepted. Reopen a closed row with \`ib dev feedback reopen <id>\`
   --note STRING    Resolution note stored on the row (same field as the positional)
   --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
   --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
@@ -4713,12 +4703,10 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - The note can be POSITIONAL or a flag — \`resolve 42 --status applied -- "…"\` and \`resolve 42 --status applied --note "…"\` are the same call (fb#583). The positional matches \`ib dev feedback create <description>\`; the two sibling commands used to disagree about where prose goes, which is the whole reason this was worth changing.
-  - --note/--reason/--resolution and the positional write the SAME stored note. Passing several with different values merges them (joined in positional→note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing, and repeating the same text stores it once.
-  - A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).
-  - The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: \`ib dev changelog add --feedback <id>\` closes it for you (status=applied plus a \`Shipped: changelog #N\` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293). Note the one-call path only advances a row from \`open\` — if you set this row to \`reviewed\` first, a later \`changelog add --feedback\` will preserve that and tell you so, rather than claiming shipped work that is only staged (fb#517). And since fb#880: on an ALREADY-resolved row, \`changelog add --feedback\` links as a cross-reference and keeps the resolver — re-own deliberately with \`--take-resolve\`.
-  - SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see \`ib help shell-quoting\`.
-  - FIXED ONLY PART OF IT? Do not choose between closing the row and recording nothing — there is a third path (fb#647). \`ib dev changelog add --feedback <id> --no-resolve\` links the entry with role \`references\`, recording the shipped half WITHOUT touching the status; then \`ib dev feedback update <id> --append-description "shipped: X; remaining: Y"\` (and \`--scope\` if the residue belongs to another repo) narrows the row to what is left. The link is what makes it legible: \`feedback list\` and \`claim\` both name a linked row, so the next agent reads your entry instead of rediscovering it. Leaving a partial fix unrecorded is the failure this exists to prevent — it costs every later agent the same investigation.
+  - A note WITHOUT --status does NOT close the row (the ack hints so); pass --status applied|dismissed. The positional and --note/--reason/--resolution write ONE stored note — distinct values merge, identical ones store once.
+  - \`ib dev changelog add --feedback <id>\` is the one-call close (status=applied + \`Shipped: changelog #N\`), but only from \`open\`: a \`reviewed\` row is preserved, and an already-resolved row is linked as a cross-reference (re-own with \`--take-resolve\`).
+  - Quote-bearing notes can be split or TRUNCATED by the shell — use --from-json <file|-> (\`ib help shell-quoting\`).
+  - Fixed only PART of it: \`ib dev changelog add --feedback <id> --no-resolve\` records the shipped half without closing, then \`ib dev feedback update <id> --append-description "shipped: X; remaining: Y"\` narrows the row to what is left.
 
 SEE ALSO
   ib dev changelog add, ib dev feedback list, ib dev feedback update, ib dev feedback reopen
@@ -14636,17 +14624,12 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - The list is capped (default 100 / max 500) with NO cursor — \`truncated:true\` flags a result that filled the limit (raise --limit or narrow with --search/--type). Backend signal needs a backend deployed ≥ 2026-06-11; the client-side --search slice sets it on every backend.
-  - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.
-  - jerryActiveUntil (enrolment) + coords + maxDeliveryDistance (km delivery radius) are the set required for a Jerry-enabled varikko to be matchable — a row that is Jerry-active but has null coords or maxDeliveryDistance covers nothing. maxDeliveryDistance is deploy-gated (null on backends older than 2026-07-07). The optional boom range (puomiMin/puomiMax) is NOT in the list — get it via \`ib sijainti get <id>\`.
-  - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all, or --all --asiakas <id> when you know the owner company. An empty result without --all carries a \`hint\` saying exactly this.
-  - --all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).
-  - An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.
-  - --asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).
-  - --jerry (fb#108) is a client-side BetoniJerry audit lens: keeps only Jerry-ENROLLED rows (jerryActiveUntil non-null; expired enrolments INCLUDED so lapsed varikot surface) and stamps each with \`matchable\` = enrolment active (jerryActiveUntil >= now) AND coords present AND maxDeliveryDistance > 0. So \`matchable:false\` spots an enrolled-but-not-matchable varikko (expired, no GPS pin, or 0 km radius) in ONE command. Boom range (puomiMin/puomiMax) is NOT part of matchable — use \`ib sijainti get <id>\`.
-  - isPublic is CROSS-TENANT VISIBILITY, not a display preference: 1 = readable by every authenticated user of every tenant (this is how the keikka flow finds a supplier's concrete plants), 0 = the owning tenant only. It moved from the location TYPE to the ROW on 2026-08-14, so two plants of the same type can now differ.
-  - --public/--private filter client-side on isPublic and are DEPLOY-GATED: a backend older than the per-row change omits the field entirely, so there --public matches NOTHING and --private matches EVERYTHING. Check one row carries isPublic before trusting a sweep.
-  - \`ib sijainti list --type betoniasema --all --private\` is the exposure audit: it names every concrete plant that customers CANNOT see. That is the silent failure mode — a plant created private simply never appears in the tehdas picker, and the keikka editor quietly auto-selects a farther one instead of erroring.
+  - Capped (default 100 / max 500) with NO cursor — \`truncated:true\` means the result filled the limit; raise --limit or narrow with --search/--type.
+  - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company: without --all they are invisible even though \`ib vehicle visits\` and the GPS timeline reference them. Use --search <name> --all, or --all --asiakas <id>; an empty result without --all carries a \`hint\` saying so.
+  - An unknown numeric --type id returns zero rows; an unknown type NAME exits 4.
+  - --jerry keeps Jerry-ENROLLED rows (expired included) and stamps \`matchable\` = enrolment active AND coords AND maxDeliveryDistance (km radius) > 0, so \`matchable:false\` is an enrolled varikko that matches nothing. Boom range (puomiMin/puomiMax) is not in the list — \`ib sijainti get <id>\`.
+  - isPublic is CROSS-TENANT VISIBILITY, per row: 1 = readable by every tenant (how the keikka flow finds a supplier's plants), 0 = the owner only.
+  - \`--type betoniasema --all --private\` is the exposure audit: a private plant never appears in the tehdas picker, and the keikka editor silently picks a farther one instead.
 
 SEE ALSO
   ib sijainti plants, ib sijainti types, ib sijainti set-jerry, ib sijainti set-public, ib search, ib vehicle visits, ib vehicle timeline

@@ -17,7 +17,7 @@ const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
 /** Shared by the `add` and `update` spec notes (fb#1294) — one string, two renders. */
-const SERVER_ENUM_NOTE = "--type/--area are SERVER-validated (fb#1294): a `must be one of` naming only OLD values means the API predates this CLI's enum, not that the value is wrong — check `ib version`.";
+const SERVER_ENUM_NOTE = "--type/--area are server-validated: a `must be one of` listing only OLD values means the API predates this CLI — check `ib version`.";
 // COORDINATED_REPOS / normalizeRepoCsv: see ./repos.ts (mirror of the backend
 // repo model). Step 0 bumps coordinated repos independently from the max
 // --bump-level across the unreleased entries naming them; a --repo whose CSV
@@ -1332,16 +1332,14 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
-            "You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors `ib dev feedback create`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
-            "SHELL QUOTING (fb#300): an entry description is prose about code — the text most likely to carry inner double-quotes, which Windows PowerShell splits on. Pass quote-bearing entries via --from-json <file|-> (required --type/--area/--title may come from the JSON); see `ib help shell-quoting`.",
+            "The description goes positionally or as --description/--summary/--body (several must match). Here --body is FREE TEXT, not raw JSON.",
+            "Quote-bearing prose: pass the entry via --from-json <file|-> (--type/--area/--title may come from the JSON) — `ib help shell-quoting`.",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
             "--dry-run is SERVER-side (X-Dry-Run): the backend validates then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s.",
             "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
-            'CROSS-LANE ENTRIES (fb#408): --repo is a CSV; a change spanning both lanes names both — --repo "puminet5api,betonicli" — each token is bumped/stamped on its own. Demoting one lane to --files loses the attribution.',
-            "--feedback on an ALREADY-resolved row links as a CROSS-REFERENCE by default (fb#880) — the response's `linkKeptBy` names the keeping resolver (nothing to restore). --take-resolve re-owns it (fb#366): only then the response carries `relinkedFrom` (restore: `ib dev changelog update <thatId> --feedback <id>`).",
-            "DEPLOY-GATED link behaviours (fb#366/441/517/548/576): CSV --feedback, --no-resolve, the status-preserve rule, and the relinkedFrom/linkKeptBy/feedbackStatus echoes each need a recent puminet5api — and against an older backend some degrade SILENTLY (--no-resolve is dropped as an unknown body key and the row force-flips to applied). ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog add`.",
+            '--repo is a CSV: name every lane a change spans (--repo "puminet5api,betonicli"); each token is bumped/stamped on its own.',
+            "--feedback on an ALREADY-resolved row links as a cross-reference (`linkKeptBy` names the resolver); --take-resolve re-owns it (`relinkedFrom` names the previous entry).",
             SERVER_ENUM_NOTE,
-            "Developer-gated.",
         ],
         seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
         examples: [
@@ -1648,14 +1646,12 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
-            "SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see `ib help shell-quoting`.",
-            "--append-description (fb#757) is the non-destructive twin of --description, mirroring `ib dev feedback update`: it fetches the current entry, joins the new text onto the end separated by a blank line, and PUTs the merged result — the original entry text is never lost. Exclusive with --description/--summary/--body (exit 4 if combined).",
-            "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
-            "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
-            "--feedback re-establishes a link lost to delete + re-add — the only way to do it (`ib dev feedback resolve` sets status/resolution but not the link). It sets resolvedByChangelogId back to this entry but does NOT mark the row applied: since fb#578 this command writes no status at all, so close the row yourself with `ib dev feedback resolve <id> --status applied` once the change is live.",
-            "--unlink is the UNDO for --feedback (fb#585). --feedback ADDS a link (the junction allows many), so it cannot correct a mistyped id on its own — `--unlink 541 --feedback 542` does, in one call, and the unlink is applied first. It never changes a status: a row closed by the removed link stays closed and is reported on stderr.",
-            "A multi-id --feedback/--unlink set is one transaction PER id, not one across the set (fb#586). If one id fails, the others still run and each is reported separately — finish the set with another `changelog update`, and do NOT re-run `add`, which mints a duplicate entry.",
-            "DEPLOY-GATED behaviours (fb#441/517/576/585 + field editability): --unlink, --no-resolve, CSV --feedback, the status-preserve rule, and --bump-level/--feedback/--sentry editability each need a recent puminet5api. The CLI detects and warns where it can (echo-compare on edits; missing `feedbackUnlinks`), but --no-resolve against an older backend is dropped SILENTLY and the row force-flips to applied. ALWAYS verify with `ib dev feedback get <id>` after linking; full per-flag matrix: `ib reference detail get dev changelog update`.",
+            "Quote-bearing prose: pass it via --from-json <file|-> — `ib help shell-quoting`.",
+            "--append-description fetches the entry and appends after a blank line (the original is kept); exclusive with --description/--summary/--body.",
+            "Fix a wrong --bump-level HERE, never by delete + re-add (that orphans the linked feedback row): deploy bumps each repo from the MAX level of its unreleased entries. It has no default here, so other edits never change it.",
+            "--feedback re-establishes a link (e.g. one lost to delete + re-add) but writes NO status — close with `ib dev feedback resolve <id> --status applied` once live.",
+            "--unlink undoes --feedback; `--unlink 541 --feedback 542` fixes a mistyped id in one call (unlink first). Neither changes a status.",
+            "A multi-id --feedback/--unlink set is one transaction PER id — on a partial failure finish with another `update`, never re-run `add` (duplicate entry).",
             SERVER_ENUM_NOTE,
         ],
         seeAlso: ["ib dev changelog pending", "ib dev changelog get"],
