@@ -94,7 +94,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "keikka", type: "number", description: "Rows synced to this keikkaId" },
       { name: "worksite", type: "number", description: "Rows whose keikka is on this worksite (tyomaaId) — matched through the row's keikka, so a row never synced to a keikka cannot match" },
       { name: "search", type: "string", description: "Case-insensitive substring over the raw sheet cells (rawJson), siteText and customerGuess; min 2 chars" },
-      { name: "limit", type: "number", description: "Max rows (server default 50, capped at 500)" },
+      { name: "limit", type: "number", description: "Max rows (default 50, capped at 500); truncated:true + a hint when more rows match" },
       { name: "no-raw", type: "boolean", description: "Drop rawJson (the raw sheet cells) from every row" },
     ],
     args: [],

@@ -152,8 +152,29 @@ describe("ib dev betomik-orderbook find (fb#2364)", () => {
   test("sends the filters as a query string; --no-raw drops rawJson", async () => {
     mockClient.get.mockResolvedValueOnce({ items: [{ betomikOrderbookImportRowId: 1, tyomaaId: 3604, rawJson: "{}" }] });
     const out = await runBetomikOrderbookFind(mockClient, { worksite: 3604, search: " Kilonkuja ", limit: 5, raw: false });
-    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?worksite=3604&search=Kilonkuja&limit=5");
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?worksite=3604&search=Kilonkuja&limit=6");
     expect(out.items).toEqual([{ betomikOrderbookImportRowId: 1, tyomaaId: 3604 }]);
+    expect(out.truncated).toBe(false);
+  });
+
+  test("asks for one probe row past --limit (default 50); its presence means truncated", async () => {
+    const rows = (n: number) => ({ items: Array.from({ length: n }, (_, i) => ({ betomikOrderbookImportRowId: i })) });
+    mockClient.get.mockResolvedValueOnce(rows(51));
+    const out = await runBetomikOrderbookFind(mockClient, { keikka: 9 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?keikka=9&limit=51");
+    expect(out.items).toHaveLength(50);
+    expect(out.truncated).toBe(true);
+    expect(out.hint).toMatch(/--limit/);
+    mockClient.get.mockResolvedValueOnce(rows(50));
+    expect((await runBetomikOrderbookFind(mockClient, { keikka: 9 })).truncated).toBe(false);
+  });
+
+  test("at the server cap (500) no probe row can return, so a full page is truncated", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: Array.from({ length: 500 }, (_, i) => ({ betomikOrderbookImportRowId: i })) });
+    const out = await runBetomikOrderbookFind(mockClient, { keikka: 9, limit: 900 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?keikka=9&limit=500");
+    expect(out.items).toHaveLength(500);
+    expect(out.truncated).toBe(true);
   });
 
   test.each([

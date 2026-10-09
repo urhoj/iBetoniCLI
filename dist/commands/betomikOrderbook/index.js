@@ -78,14 +78,25 @@ export async function runBetomikOrderbookFind(client, filter) {
         qs.set("worksite", String(filter.worksite));
     if (search)
         qs.set("search", search);
-    if (filter.limit !== undefined)
-        qs.set("limit", String(filter.limit));
+    // The route caps silently, so ask for one row more than wanted: its presence
+    // is the truncation signal. At the server's hard cap the probe row cannot
+    // come back, so a full page there counts as truncated.
+    const want = Math.min(filter.limit ?? FIND_DEFAULT_LIMIT, FIND_MAX_LIMIT);
+    qs.set("limit", String(Math.min(want + 1, FIND_MAX_LIMIT)));
     const raw = await client.get(`/api/betomik-orderbook/rows?${qs}`);
     let items = itemsOf(raw);
+    const truncated = items.length > want || (want === FIND_MAX_LIMIT && items.length === want);
+    items = items.slice(0, want);
     if (filter.raw === false)
         items = items.map(({ rawJson: _raw, ...rest }) => rest);
-    return listEnvelope(items);
+    return listEnvelope(items, {
+        truncated,
+        ...(truncated ? { hint: `more rows match — narrow the filter or raise --limit (max ${FIND_MAX_LIMIT})` } : {}),
+    });
 }
+/** puminet5api's GET /rows default and parseListLimit cap. */
+const FIND_DEFAULT_LIMIT = 50;
+const FIND_MAX_LIMIT = 500;
 /**
  * One ledger row whatever its syncStatus (GET /api/betomik-orderbook/rows/:rowId,
  * fb#1977) — the only way to read a row that reached the terminal 'removed',
