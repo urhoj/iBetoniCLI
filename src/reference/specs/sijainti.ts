@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { ASIAKAS_FLAG_ERR, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, GEOCODE_CLIENT_ERR, GEOCODE_NO_ADDRESS_ERR, LIMIT_500_FLAG, REASON_REQUIRED_FLAG, SIJAINTI_PUBLIC_403_MATCH, apiErr, intParseErr, limitErr, numParseErr, permErrors, puomiErr } from "./shared.js";
+import { ASIAKAS_FLAG_ERR, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, GEOCODE_CLIENT_ERR, GEOCODE_NO_ADDRESS_ERR, LIMIT_500_FLAG, SIJAINTI_PUBLIC_403_MATCH, apiErr, intParseErr, limitErr, numParseErr, permErrors, puomiErr } from "./shared.js";
 
 export const SIJAINTI_SPECS: CommandSpec[] = [
 
@@ -349,15 +349,14 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti delete",
     description:
-      "Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.",
+      "Soft-delete a sijainti (sets deletedTime). Requires --reason unless --dry-run.",
     permissions: ["auth.page.sijainnit.delete"],
     args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to soft-delete" }],
     flags: [
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true }",
     errors: [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
@@ -367,15 +366,14 @@ export const SIJAINTI_SPECS: CommandSpec[] = [
   },
   {
     command: "ib sijainti undelete",
-    description: "Restore a soft-deleted sijainti. Requires --reason.",
+    description: "Restore a soft-deleted sijainti. Requires --reason unless --dry-run.",
     permissions: ["auth.page.sijainnit.edit"],
     args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to restore" }],
     flags: [
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true }",
     errors: [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),

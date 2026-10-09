@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { COMMON_AUTH_ERRORS, FROM_JSON_FLAGS_FLAG, REASON_REQUIRED_FLAG, apiErr, permErrors } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_FLAGS_FLAG, apiErr, permErrors } from "./shared.js";
 
 export const PERSON_EMAIL_SPECS: CommandSpec[] = [
   {
@@ -56,16 +56,16 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
   {
     command: "ib person email add",
     description:
-      "Add an ALTERNATIVE email to a person (the personEmails one-to-many; the primary is managed via `ib person update`). Tenant-scoped: self, a person owned by your active company, or any person for developers/sysadmins; global persons only by self/developer. Emails are globally unique. Requires --reason.",
+      "Add an ALTERNATIVE email to a person (the personEmails one-to-many; the primary is managed via `ib person update`). Tenant-scoped: self, a person owned by your active company, or any person for developers/sysadmins; global persons only by self/developer. Emails are globally unique. Requires --reason unless --dry-run.",
     permissions: ["auth.page.person.edit"],
     args: [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "alternative email to add (<=250 chars)" },
     ],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }",
     errors: [
       apiErr(400, "Equals the primary email, or invalid/too-long email", "manage the primary via `ib person update`; check the address"),
@@ -75,22 +75,22 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib person email add 5351 matti.alt@example.com --reason 'secondary contact'",
-      "ib person email add 5351 matti.alt@example.com --reason preview --dry-run",
+      "ib person email add 5351 matti.alt@example.com --dry-run",
     ],
   },
   {
     command: "ib person email set-main",
     description:
-      "Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like `ib person email add`. Requires --reason.",
+      "Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like `ib person email add`. Requires --reason unless --dry-run.",
     permissions: ["auth.page.person.edit"],
     args: [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "the person's email to promote to primary (primary or alternative)" },
     ],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }",
     errors: [
@@ -103,22 +103,22 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib person email set-main 5351 matti.alt@example.com --reason 'primary contact changed'",
-      "ib person email set-main 5351 matti.alt@example.com --reason preview --dry-run",
+      "ib person email set-main 5351 matti.alt@example.com --dry-run",
     ],
   },
   {
     command: "ib person email remove",
     description:
-      "Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like `ib person email add`. Requires --reason.",
+      "Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like `ib person email add`. Requires --reason unless --dry-run.",
     permissions: ["auth.page.person.edit"],
     args: [
       { name: "person", type: "string", description: "personId or a name resolved within your active company" },
       { name: "email", type: "string", description: "alternative email to remove" },
     ],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }",
     errors: [
       apiErr(404, "Person not found / out of your tenant", "verify the person is in your active company (or switch company)"),
@@ -126,7 +126,7 @@ export const PERSON_EMAIL_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib person email remove 5351 matti.alt@example.com --reason 'no longer valid'",
-      "ib person email remove 5351 matti.alt@example.com --reason preview --dry-run",
+      "ib person email remove 5351 matti.alt@example.com --dry-run",
     ],
   },
 ];

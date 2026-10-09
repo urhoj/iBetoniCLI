@@ -230,7 +230,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
       ROLE_NAME_CLIENT_ERROR,
@@ -244,7 +244,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'",
-      "ib person role grant 5351 --role vehicleHandler --asiakas 26 --reason preview --dry-run",
+      "ib person role grant 5351 --role vehicleHandler --asiakas 26 --dry-run",
     ],
   },
   {
@@ -259,7 +259,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ removed: 1, asiakasPersonSettingId } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId }, validation }",
     errors: [
@@ -472,7 +472,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person day set",
-    description: "Set a person's day availability status (vacation/sick/free/…). Requires --reason.",
+    description: "Set a person's day availability status (vacation/sick/free/…). Requires --reason unless --dry-run.",
     auth: "any",
     flags: [
       { name: "person", type: "number", description: "personId", required: true },
@@ -481,7 +481,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "text", type: "string", description: "Free-text note on the day row" },
     ],
     writeFlags: true,
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
@@ -493,25 +493,25 @@ export const PERSON_SPECS: CommandSpec[] = [
     notes: [
       "Requires Admin or HR Admin (server-enforced) — Keikka Handler is NOT sufficient.",
       "--status accepts an id or a name (resolved via `ib person day statuses`).",
-      "--reason is hard-required (exits 4 without it).",
+      "--reason required unless --dry-run (exit 4).",
       "Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use `ib vehicle driver assign` for that (atomic).",
     ],
     seeAlso: ["ib person day statuses", "ib person day clear", "ib vehicle driver assign"],
     examples: [
       "ib person day set --person 555 --date tomorrow --status loma --reason 'kesäloma'",
-      "ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run --reason preview",
+      "ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run",
     ],
   },
   {
     command: "ib person day clear",
-    description: "Delete a person's day row for a date (remove status entry). Requires --reason.",
+    description: "Delete a person's day row for a date (remove status entry). Requires --reason unless --dry-run.",
     auth: "any",
     flags: [
       { name: "person", type: "number", description: "personId", required: true },
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
     ],
     writeFlags: true,
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [
@@ -522,7 +522,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Requires Admin or HR Admin (server-enforced).",
-      "--reason is hard-required (exits 4 without it).",
+      "--reason required unless --dry-run (exit 4).",
       "Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).",
     ],
     seeAlso: ["ib person day set", "ib person day get"],

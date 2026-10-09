@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, REASON_REQUIRED_FLAG, intParseErr, numParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
+import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, intParseErr, numParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
 
 /** The `--contact-type` parse-guard row every customer/worksite person add/remove leaf shares (its `--person` sibling is PERSON_PARSE_ERR, shared cross-domain via shared.ts). */
 const CONTACT_TYPE_PARSE_ERR = intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)");
@@ -13,7 +13,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   // ─── v1.0.1 additions: customer/worksite/person lifecycle (11) ──────────
   {
     command: "ib customer delete",
-    description: "SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason (not with --dry-run).",
+    description: "SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason unless --dry-run.",
     permissions: ["auth.page.asiakas.edit"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
     flags: [],
@@ -29,17 +29,16 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer person add",
-    description: "Attach a person to a customer (asiakasPerson). Requires --reason.",
+    description: "Attach a person to a customer (asiakasPerson). Requires --reason unless --dry-run.",
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
       intParseErr("--asiakas", "pass a positive asiakasId"),
@@ -52,17 +51,16 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer person remove",
-    description: "Detach a person from a customer (asiakasPerson). Requires --reason.",
+    description: "Detach a person from a customer (asiakasPerson). Requires --reason unless --dry-run.",
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
       intParseErr("--asiakas", "pass a positive asiakasId"),
@@ -98,7 +96,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   // Worksite write gates are single-sourced in shared.ts (WORKSITE_*).
   {
     command: "ib worksite delete",
-    description: "Delete a worksite (tyomaa). Requires --reason (not with --dry-run).",
+    description: "Delete a worksite (tyomaa). Requires --reason unless --dry-run.",
     permissions: [WORKSITE_EDIT_PERMISSION],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
     flags: [],
@@ -228,17 +226,16 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib worksite person add",
-    description: "Attach a person to a worksite (tyomaaPerson). Requires --reason.",
+    description: "Attach a person to a worksite (tyomaaPerson). Requires --reason unless --dry-run.",
     permissions: [WORKSITE_EDIT_PERMISSION],
     flags: [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
     errors: [
       intParseErr("--worksite", "pass a positive tyomaaId"),
@@ -250,17 +247,16 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib worksite person remove",
-    description: "Detach a person from a worksite. Requires --reason.",
+    description: "Detach a person from a worksite. Requires --reason unless --dry-run.",
     permissions: [WORKSITE_EDIT_PERMISSION],
     flags: [
       { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
       { name: "person", type: "number", description: "Target personId (REQUIRED)" },
       { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
       intParseErr("--worksite", "pass a positive tyomaaId"),
@@ -286,7 +282,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   {
     command: "ib person create",
     description:
-      "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.",
+      "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason unless --dry-run. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.",
     permissions: ["auth.page.person.edit"],
     flags: [
       { name: "first", type: "string", description: "personFirstName (REQUIRED)" },
@@ -299,11 +295,10 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
       { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
       ASIAKAS_FLAG_ERR,
@@ -334,7 +329,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   {
     command: "ib person update",
     description:
-      "Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email \"\"). " + clearNote("--email") + " Owner changes are separate — use `ib person owner`. Requires --reason.",
+      "Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email \"\"). " + clearNote("--email") + " Owner changes are separate — use `ib person owner`. Requires --reason unless --dry-run.",
     permissions: ["auth.page.person.edit"],
     args: [{ name: "personId", type: "number", description: "personId to update" }],
     flags: [
@@ -345,11 +340,10 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       { name: "memo", type: "string", description: "personMemo — free-text note/comment" },
       { name: "body", type: "json", description: "Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
       // Same client-side guard as `worksite update` (fb#668) — not shadowing
@@ -373,7 +367,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   {
     command: "ib person owner",
     description:
-      "Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via `ib person role grant`, and from membership via `ib customer person add`. Requires --reason.",
+      "Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via `ib person role grant`, and from membership via `ib customer person add`. Requires --reason unless --dry-run.",
     permissions: [
       "developer/system-admin: any person → any target",
       "self (your own personId): → null always; → a company only if you are a member of it",
@@ -383,11 +377,10 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     flags: [
       { name: "global", type: "boolean", description: "Make the person global (ownerAsiakasId=null)" },
       { name: "asiakas", type: "number", description: "Set owner to this asiakasId" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
       ASIAKAS_FLAG_ERR,
@@ -399,7 +392,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     examples: [
       "ib person owner 5351 --global --reason 'make self-managing'",
       "ib person owner 5351 --asiakas 26 --reason 'assign to company 26'",
-      "ib person owner 5351 --global --reason preview --dry-run",
+      "ib person owner 5351 --global --dry-run",
     ],
   },
   {
@@ -439,7 +432,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person delete",
-    description: "Delete a person. Requires --reason (not with --dry-run).",
+    description: "Delete a person. Requires --reason unless --dry-run.",
     permissions: ["auth.page.person.edit"],
     args: [{ name: "personId", type: "number", description: "personId to delete" }],
     flags: [],

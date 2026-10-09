@@ -417,12 +417,6 @@ export const ASIAKAS_TARGET_ERR: CommandError = {
   meaning: "No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target",
   remedy: "pass <asiakasId> positionally or via --asiakas <id>",
 };
-/** The write-safety `--reason` spelled REQUIRED (the v1.0.1 lifecycle rows). */
-export const REASON_REQUIRED_FLAG: CommandFlag = {
-  name: "reason",
-  type: "string",
-  description: "Audit-log reason (X-Action-Reason); REQUIRED",
-};
 /** The standard list `--limit`: default 100, server cap 500. */
 export const LIMIT_500_FLAG: CommandFlag = {
   name: "limit",

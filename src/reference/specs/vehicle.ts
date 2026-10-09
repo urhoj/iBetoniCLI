@@ -567,7 +567,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle driver assign",
     description:
-      "Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason.",
+      "Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason unless --dry-run.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [
       { name: "vehicleId", type: "number", description: "Target vehicleId" },
@@ -579,16 +579,16 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
     errors: [
       PERSON_PARSE_ERR,
-      apiErr(400, "Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari)", "supply --reason, valid ids, and a driver eligible for this company"),
+      apiErr(400, "Missing/invalid field (bad vehicle/person/date, or person not an eligible pumppari)", "supply valid ids and a driver eligible for this company"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
-      "Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).",
+      "Requires Admin, HR Admin, or Keikka Handler on the active company. --reason required unless --dry-run (exit 4).",
       "Cascade: personPvm.vehicleId set for the driver; keikkaPerson driver (contactPersonTypeId=1) replaced on each affected keikka; palkkiPerson driver replaced on each affected palkki; the prior occupant of this vehicle (oldPersonId) is freed, and the new driver is pulled off any other vehicle (clearedFromVehicleId).",
       "Return reports exactly what changed: keikkaIds + palkkiIds touched, oldPersonId/oldDriverName displaced, newDriverName, clearedFromVehicleId.",
       "keikkaPerson rows are written with keikkaPersonSourceId=30; the grid's per-keikka-bar driver label filters sourceId=50, so the vehicle ROW shows the driver (via personPvm) but a reloaded keikka BAR may not — known display quirk shared with the web grid.",
@@ -598,14 +598,14 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     seeAlso: ["ib vehicle driver gaps", "ib vehicle driver available", "ib vehicle driver clear", "ib vehicle driver default set"],
     examples: [
       "ib vehicle driver assign 53 tomorrow --person 555 --reason 'auto-fill'",
-      "ib vehicle driver assign 53 today --person 555 --dry-run --reason preview",
+      "ib vehicle driver assign 53 today --person 555 --dry-run",
       "ib vehicle driver assign 53 --date tomorrow --person 555 --reason 'auto-fill'",
     ],
   },
   {
     command: "ib vehicle driver clear",
     description:
-      "Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason.",
+      "Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason unless --dry-run.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [
       { name: "vehicleId", type: "number", description: "Target vehicleId" },
@@ -614,15 +614,15 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     flags: [DRIVER_DATE_FLAG],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)",
     errors: [
-      apiErr(400, "Missing/invalid field (no --reason, bad vehicle/date)", "supply --reason and a valid vehicle"),
+      apiErr(400, "Missing/invalid field (bad vehicle/date)", "supply a valid vehicle"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
-      "Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).",
+      "Requires Admin, HR Admin, or Keikka Handler on the active company. --reason required unless --dry-run (exit 4).",
       DRIVER_DATE_NOTE,
       "Use this when a driver breaks down / is pulled off — they become available again for `ib vehicle driver assign` elsewhere. Deploy-gated.",
     ],
@@ -649,7 +649,7 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle driver default set",
     description:
-      "Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason.",
+      "Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason unless --dry-run.",
     permissions: ["auth.page.vehicle.edit"],
     args: [{ name: "vehicleId", type: "number", description: "Target vehicleId" }],
     flags: [
@@ -657,12 +657,12 @@ export const VEHICLE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
       PERSON_PARSE_ERR,
-      apiErr(400, "Missing --reason / bad ids", "supply --reason and a valid vehicleId/personId"),
+      apiErr(400, "Bad ids", "supply a valid vehicleId/personId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     notes: [
@@ -677,17 +677,17 @@ export const VEHICLE_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle driver default clear",
     description:
-      "Clear the vehicle's STANDING default driver (setDefaultPumppari with personId=null): clears the column and removes the default driver from future keikat. Requires --reason.",
+      "Clear the vehicle's STANDING default driver (setDefaultPumppari with personId=null): clears the column and removes the default driver from future keikat. Requires --reason unless --dry-run.",
     permissions: ["auth.page.vehicle.edit"],
     args: [{ name: "vehicleId", type: "number", description: "Target vehicleId" }],
     flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
-      apiErr(400, "Missing --reason / bad id", "supply --reason and a valid vehicleId"),
+      apiErr(400, "Bad id", "supply a valid vehicleId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     notes: [

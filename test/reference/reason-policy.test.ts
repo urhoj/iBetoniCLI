@@ -60,32 +60,40 @@ function reasonError(cmd: Command): CliError {
 describe("enforceSpecReasonPolicy", () => {
   test('an "always" command without --reason exits 4', () => {
     // Real spec path with reasonPolicy: "always".
-    const err = reasonError(fake("ib customer person add", {}));
+    const err = reasonError(fake("ib attachment delete", {}));
     expect(err.exitCode).toBe(4);
     expect(err.statusCode).toBe(0); // client-origin, matches the origin:"client" spec rows
     expect(err.message).toContain("Missing required flag: --reason");
   });
 
   test('an "always" command is NOT exempted by --dry-run', () => {
-    const err = reasonError(fake("ib customer person add", { dryRun: true }));
+    const err = reasonError(fake("ib attachment delete", { dryRun: true }));
     expect(err.exitCode).toBe(4);
   });
 
   test('an "always" command with --reason passes', () => {
     expect(() =>
-      enforceSpecReasonPolicy(fake("ib customer person add", { reason: "cleanup" }))
+      enforceSpecReasonPolicy(fake("ib attachment delete", { reason: "cleanup" }))
     ).not.toThrow();
   });
 
-  // fb#2362: a delete preview writes nothing (each backend handler returns on
+  // fb#2362/fb#2368: a preview writes nothing (each backend handler returns on
   // X-Dry-Run before its write), so it must not demand an audit reason.
-  test.each(["ib worksite delete", "ib customer delete", "ib person delete"])(
-    "%s: --dry-run stands in for --reason; the real delete still requires it",
+  test.each(["ib worksite delete", "ib customer delete", "ib person delete", "ib person role grant", "ib jerry offer send"])(
+    "%s: --dry-run stands in for --reason; the real write still requires it",
     (path) => {
       expect(() => enforceSpecReasonPolicy(fake(path, { dryRun: true }))).not.toThrow();
       expect(reasonError(fake(path, {})).exitCode).toBe(4);
     }
   );
+
+  // fb#2368: "always" is the exception, kept only where the BACKEND itself needs
+  // the reason before its dry-run branch (see the comment on each spec). A new
+  // write landing here must be a deliberate choice, not a copy-paste default.
+  test('only the backend-mandated commands keep reasonPolicy "always"', () => {
+    const always = COMMAND_SPECS.filter((s) => s.reasonPolicy === "always").map((s) => s.command);
+    expect(always.sort()).toEqual(["ib attachment delete", "ib dev migration run"]);
+  });
 
   test('an "unless-dry-run" command with --dry-run passes', () => {
     // Real spec path with reasonPolicy: "unless-dry-run".

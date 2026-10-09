@@ -4,7 +4,7 @@
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
 import { ONBOARDING_STATUS_KEYS, ONBOARDING_STATUSES, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS, PROVIDER_LIST_TABS, ADMIN_REQUEST_STATUSES, SEARCH_DELIVERABLE, COMPANY_TYPES, ONBOARDING_SOURCES, ONBOARDING_EVENT_TYPES, ONBOARDING_EVENT_TYPES_ALL, ONBOARDING_EVENT_BODY_CAP } from "../../commands/jerry/index.js";
-import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, ASIAKAS_TARGET_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, REASON_REQUIRED_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
+import { clearHint, apiErr, limitErr, COMMON_AUTH_ERRORS, SYSADMIN_403, ASIAKAS_FLAG_ERR, ASIAKAS_TARGET_ERR, numParseErr, intParseErr, ASIAKAS_TARGET_FLAG, SEARCH_ALIAS_FLAG } from "./shared.js";
 
 /** The `--tier` parse-guard row every onboarding list/add/set leaf shares. */
 const TIER_PARSE_ERR = intParseErr("--tier", "pass 1 (priority) or 2 (secondary)");
@@ -83,7 +83,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request create",
     description:
-      "Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from `ib jerry offer create`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason.",
+      "Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from `ib jerry offer create`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason unless --dry-run.",
     auth: "any",
     args: [{ name: "address", type: "string", required: false, description: "Worksite address (osoite); pass it here OR as --address (exactly one)" }],
     flags: [
@@ -95,11 +95,10 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "line-length", type: "number", description: "Hose line length m (linjanPituus)" },
       { name: "notes", type: "string", description: "Free-text description shown to providers (kuvaus)" },
       { name: "asiakas", type: "number", description: "Customer asiakasId (omit → your private BetoniJerry account)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
     errors: [
@@ -128,12 +127,12 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request cancel",
     description:
-      "Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason.",
+      "Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason unless --dry-run.",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [
@@ -149,10 +148,10 @@ export const JERRY_SPECS: CommandSpec[] = [
       "Decline a request as a provider WITHOUT making an offer (POST /api/pumppuRequests/:id/decline). Your company bows out; --reason is stored and shown to the customer (who is emailed + pushed that a provider passed). The request leaves your Avoimet tab (moves to Päättyneet). Blocked (409) if you already have an active offer — use `ib jerry offer withdraw` instead. Idempotent. Requires provider role + --reason.",
     permissions: ["provider company (isPumppuToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you were sent" }],
-    flags: [{ name: "reason", type: "string", description: "Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED" }],
+    flags: [{ name: "reason", type: "string", description: "Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED unless --dry-run" }],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, declined: true, hasOtherProviders } (or { …, alreadyDeclined: true }) · { dryRun: true, wouldDecline: { pumppuRequestId, reason } } on --dry-run",
     errors: [
@@ -169,10 +168,10 @@ export const JERRY_SPECS: CommandSpec[] = [
       "Reverse a prior decline as a provider (POST /api/pumppuRequests/:id/undecline). The request returns to your Avoimet tab and is offerable again. Idempotent (no-op success if you had not declined). No customer notification. Requires provider role + --reason.",
     permissions: ["provider company (isPumppuToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you previously declined" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run",
     errors: [
@@ -185,7 +184,7 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry offer create",
     description:
-      "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.",
+      "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason unless --dry-run.",
     permissions: ["provider company (isPumppuToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [
@@ -197,11 +196,10 @@ export const JERRY_SPECS: CommandSpec[] = [
       { name: "extra-notes", type: "string", description: "Free-text notes shown to the customer" },
       { name: "cancellation-terms", type: "string", description: "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)" },
       { name: "maintains-order-info", type: "string", description: "Override provider default (true|false); omit to inherit" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
     errors: [
@@ -222,18 +220,17 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry offer send",
     description:
-      "Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.",
+      "Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason unless --dry-run.",
     permissions: ["provider company (isPumppuToimittaja); owns the offer"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "pumppuOfferId you own" },
     ],
     flags: [
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
     errors: [
@@ -241,23 +238,22 @@ export const JERRY_SPECS: CommandSpec[] = [
       apiErr(409, "Offer not in draft / not owned", "only a draft offer you own can be sent"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry offer send 4012 55 --reason "lahetä tarjous"', "ib jerry offer send 4012 55 --dry-run --reason preview"],
+    examples: ['ib jerry offer send 4012 55 --reason "lahetä tarjous"', "ib jerry offer send 4012 55 --dry-run"],
   },
   {
     command: "ib jerry offer accept",
     description:
-      "Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.",
+      "Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason unless --dry-run.",
     permissions: ["owns the request (customer personId)"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId you own" },
       { name: "offerId", type: "number", description: "pumppuOfferId to accept" },
     ],
     flags: [
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
     errors: [
@@ -279,11 +275,10 @@ export const JERRY_SPECS: CommandSpec[] = [
     flags: [
       { name: "scheduled-at", type: "string", description: "Scheduled keikka start (REQUIRED; future ISO datetime)" },
       { name: "pumppu", type: "number", description: "vehicleId to pin to the keikka (must be yours)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
     errors: [
@@ -303,22 +298,22 @@ export const JERRY_SPECS: CommandSpec[] = [
     seeAlso: ["ib jerry offer accept", "ib jerry request get"],
     examples: [
       "ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu",
-      "ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run --reason preview",
+      "ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run",
     ],
   },
   {
     command: "ib jerry offer withdraw",
     description:
-      "Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason.",
+      "Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason unless --dry-run.",
     permissions: ["isProvider"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "your pumppuOfferId" },
     ],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }",
     errors: [
@@ -332,16 +327,16 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry offer delete",
     description:
-      "Hard-delete YOUR OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only; you must own the offer; DRAFT status ONLY — a sent offer (pending/accepted/…) returns 409, use `ib jerry offer withdraw` for a pending one. The offer's attachments are soft-deleted server-side; the (request, provider) message thread is left in place for reuse. Requires --reason.",
+      "Hard-delete YOUR OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only; you must own the offer; DRAFT status ONLY — a sent offer (pending/accepted/…) returns 409, use `ib jerry offer withdraw` for a pending one. The offer's attachments are soft-deleted server-side; the (request, provider) message thread is left in place for reuse. Requires --reason unless --dry-run.",
     permissions: ["isProvider"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "your DRAFT pumppuOfferId" },
     ],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, pumppuOfferId, deleted: true } or { dryRun: true, wouldDelete: { pumppuOfferId, status } }",
     errors: [
@@ -501,18 +496,17 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry provider-settings set",
     description:
-      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. `publicListingConsent` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.",
+      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason unless --dry-run. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. `publicListingConsent` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
     flags: [
       { name: "body", type: "json", description: "JSON: { jerryPersonId?, offerNotificationEmail?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
       { name: "email", type: "string", description: "Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; " + clearHint("--email") + " and fall back to it." },
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, offerNotificationEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
       ASIAKAS_FLAG_ERR,
@@ -608,17 +602,16 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin enable",
     description:
-      "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness `validation` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
+      "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness `validation` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
       ASIAKAS_TARGET_FLAG,
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape:
       "{ success: true, validation?: { ok, summary: { [severity]: 'passed/total' }, missing: [{ id, severity, titleFi, detail }] } } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
@@ -633,22 +626,21 @@ export const JERRY_SPECS: CommandSpec[] = [
       "It is best-effort and enable-only: the key is ABSENT (not null) when the validation run itself fails, and `disable` never returns it. Re-run the same checks any time with `ib validate --profile jerry --asiakas <id>`.",
     ],
     seeAlso: ["ib validate"],
-    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run --reason preview"],
+    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run"],
   },
   {
     command: "ib jerry admin disable",
     description:
-      "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.",
+      "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
       ASIAKAS_TARGET_FLAG,
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
       ASIAKAS_TARGET_ERR,
@@ -657,7 +649,7 @@ export const JERRY_SPECS: CommandSpec[] = [
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run --reason preview"],
+    examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run"],
   },
   {
     command: "ib jerry admin onboarding list",
@@ -937,14 +929,14 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request expire",
     description:
-      "Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.",
+      "Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request expire 41 --reason "abandoned"'],
@@ -952,14 +944,14 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request cancel",
     description:
-      "Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.",
+      "Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request cancel 41 --reason "customer request"'],
@@ -967,14 +959,14 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request resend",
     description:
-      "Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason.",
+      "Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     notes: [
       "providerCount = companies matching the worksite now; notifiedCount = of those, how many were newly added and emailed.",
@@ -986,18 +978,17 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request extend",
     description:
-      "Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason.",
+      "Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [
       { name: "days", type: "number", description: "Valid for N more days from now; mutually exclusive with --until. Omit BOTH for the backend default of 14 days" },
       { name: "until", type: "string", description: "Absolute new expiry (ISO date/datetime); mutually exclusive with --days" },
-      REASON_REQUIRED_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
     errors: [
       { origin: "client", exit: 4, match: "--days or --until", meaning: "--days and --until passed together", remedy: "pass exactly one, or neither for the default 14 days" },
@@ -1011,14 +1002,14 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request delete",
     description:
-      "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.",
+      "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason unless --dry-run.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-    flags: [REASON_REQUIRED_FLAG],
+    flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
     errors: [
       SYSADMIN_403,

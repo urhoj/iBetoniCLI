@@ -321,7 +321,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     mutates: true,
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     flags: [
       { name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" },
       { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
@@ -359,7 +359,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     mutates: true,
     writeFlags: true,
     dryRunKind: "server",
-    reasonPolicy: "always",
+    reasonPolicy: "unless-dry-run",
     flags: [
       { name: "asiakas", type: "number", required: true, description: "Target tenant ownerAsiakasId" },
       { name: "source", type: "number", required: true, description: "apiKeySourceId (see `ib dev apikey sources`)" },
@@ -388,6 +388,9 @@ export const DEV_META_SPECS: CommandSpec[] = [
     mutates: true,
     writeFlags: true,
     dryRunKind: "server",
+    // "always", not "unless-dry-run" (fb#2368): the backend demands X-Action-Reason
+    // first, and a --dry-run still SPAWNS the runner — its safety is the runner's
+    // own --dry-run handling, so even a preview is an audited action.
     reasonPolicy: "always",
     args: [{ name: "basename", type: "string", description: "Runner name without .js" }],
     flags: [

@@ -1333,7 +1333,7 @@ exports[`Help snapshots — contract stability > help for ib customer delete mat
   ib customer delete <asiakasId> [flags]
 
 DESCRIPTION
-  SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason (not with --dry-run).
+  SOFT-delete a customer (asiakas): sets asiakas.deletedTime. Its worksites and foreign keys stay attached and are listed in the output as leftAttached. Requires --reason unless --dry-run.
   Permissions: requires auth.page.asiakas.edit.
 
 ARGUMENTS
@@ -1970,20 +1970,19 @@ exports[`Help snapshots — contract stability > help for ib customer person add
   ib customer person add [flags]
 
 DESCRIPTION
-  Attach a person to a customer (asiakasPerson). Requires --reason.
+  Attach a person to a customer (asiakasPerson). Requires --reason unless --dry-run.
   Permissions: requires auth.page.asiakas.edit.
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2053,20 +2052,19 @@ exports[`Help snapshots — contract stability > help for ib customer person rem
   ib customer person remove [flags]
 
 DESCRIPTION
-  Detach a person from a customer (asiakasPerson). Requires --reason.
+  Detach a person from a customer (asiakasPerson). Requires --reason unless --dry-run.
   Permissions: requires auth.page.asiakas.edit.
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2443,7 +2441,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -2491,7 +2489,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6071,7 +6069,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin disable
   ib jerry admin disable [<asiakasId>] [flags]
 
 DESCRIPTION
-  Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.
+  Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -6079,13 +6077,12 @@ ARGUMENTS
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6104,7 +6101,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin disable 1402 --reason "offboard provider"
-  ib jerry admin disable --asiakas 1402 --dry-run --reason preview
+  ib jerry admin disable --asiakas 1402 --dry-run
 "
 `;
 
@@ -6113,7 +6110,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin enable 
   ib jerry admin enable [<asiakasId>] [flags]
 
 DESCRIPTION
-  Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness \`validation\` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
+  Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness \`validation\` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -6121,13 +6118,12 @@ ARGUMENTS
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6153,7 +6149,7 @@ SEE ALSO
 
 EXAMPLES
   ib jerry admin enable 1402 --reason "onboard provider"
-  ib jerry admin enable --asiakas 1402 --dry-run --reason preview
+  ib jerry admin enable --asiakas 1402 --dry-run
 "
 `;
 
@@ -6431,20 +6427,20 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request cancel <requestId> [flags]
 
 DESCRIPTION
-  Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.
+  Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6469,20 +6465,20 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request delete <requestId> [flags]
 
 DESCRIPTION
-  Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.
+  Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6507,20 +6503,20 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request expire <requestId> [flags]
 
 DESCRIPTION
-  Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.
+  Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6545,7 +6541,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request extend <requestId> [flags]
 
 DESCRIPTION
-  Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason.
+  Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -6554,13 +6550,12 @@ ARGUMENTS
 FLAGS
   --days NUMBER    Valid for N more days from now; mutually exclusive with --until. Omit BOTH for the backend default of 14 days
   --until STRING    Absolute new expiry (ISO date/datetime); mutually exclusive with --days
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -6693,20 +6688,20 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request resend <requestId> [flags]
 
 DESCRIPTION
-  Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason.
+  Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason unless --dry-run.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7022,7 +7017,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer accept 
   ib jerry offer accept <requestId> <offerId> [flags]
 
 DESCRIPTION
-  Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.
+  Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason unless --dry-run.
   Permissions: requires owns the request (customer personId).
 
 ARGUMENTS
@@ -7030,13 +7025,13 @@ ARGUMENTS
   <offerId> NUMBER    pumppuOfferId to accept (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7071,13 +7066,12 @@ ARGUMENTS
 FLAGS
   --scheduled-at STRING    Scheduled keikka start (REQUIRED; future ISO datetime)
   --pumppu NUMBER    vehicleId to pin to the keikka (must be yours)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7106,7 +7100,7 @@ SEE ALSO
 
 EXAMPLES
   ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu
-  ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run --reason preview
+  ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run
 "
 `;
 
@@ -7115,7 +7109,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer create 
   ib jerry offer create <requestId> [flags]
 
 DESCRIPTION
-  Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with \`ib jerry offer send\`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.
+  Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with \`ib jerry offer send\`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason unless --dry-run.
   Permissions: requires provider company (isPumppuToimittaja).
 
 ARGUMENTS
@@ -7130,13 +7124,12 @@ FLAGS
   --extra-notes STRING    Free-text notes shown to the customer
   --cancellation-terms STRING    Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)
   --maintains-order-info STRING    Override provider default (true|false); omit to inherit
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7167,7 +7160,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer delete 
   ib jerry offer delete <requestId> <offerId> [flags]
 
 DESCRIPTION
-  Hard-delete YOUR OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only; you must own the offer; DRAFT status ONLY — a sent offer (pending/accepted/…) returns 409, use \`ib jerry offer withdraw\` for a pending one. The offer's attachments are soft-deleted server-side; the (request, provider) message thread is left in place for reuse. Requires --reason.
+  Hard-delete YOUR OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only; you must own the offer; DRAFT status ONLY — a sent offer (pending/accepted/…) returns 409, use \`ib jerry offer withdraw\` for a pending one. The offer's attachments are soft-deleted server-side; the (request, provider) message thread is left in place for reuse. Requires --reason unless --dry-run.
   Permissions: requires isProvider.
 
 ARGUMENTS
@@ -7175,13 +7168,13 @@ ARGUMENTS
   <offerId> NUMBER    your DRAFT pumppuOfferId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7207,7 +7200,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer send ma
   ib jerry offer send <requestId> <offerId> [flags]
 
 DESCRIPTION
-  Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.
+  Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason unless --dry-run.
   Permissions: requires provider company (isPumppuToimittaja); owns the offer.
 
 ARGUMENTS
@@ -7215,13 +7208,13 @@ ARGUMENTS
   <offerId> NUMBER    pumppuOfferId you own (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7238,7 +7231,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry offer send 4012 55 --reason "lahetä tarjous"
-  ib jerry offer send 4012 55 --dry-run --reason preview
+  ib jerry offer send 4012 55 --dry-run
 "
 `;
 
@@ -7247,7 +7240,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer withdra
   ib jerry offer withdraw <requestId> <offerId> [flags]
 
 DESCRIPTION
-  Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason.
+  Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason unless --dry-run.
   Permissions: requires isProvider.
 
 ARGUMENTS
@@ -7255,13 +7248,13 @@ ARGUMENTS
   <offerId> NUMBER    your pumppuOfferId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7318,7 +7311,7 @@ exports[`Help snapshots — contract stability > help for ib jerry provider-sett
   ib jerry provider-settings set [flags]
 
 DESCRIPTION
-  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. \`publicListingConsent\` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.
+  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason unless --dry-run. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. \`publicListingConsent\` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS
@@ -7326,13 +7319,12 @@ FLAGS
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --email STRING    Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; pass "" to clear — PowerShell DROPS a bare "", so use \`--email=\` there (same meaning in bash; \`ib help shell-quoting\`) and fall back to it.
   --asiakas NUMBER    Target company asiakasId (default: your own)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7365,19 +7357,19 @@ exports[`Help snapshots — contract stability > help for ib jerry request cance
   ib jerry request cancel <requestId> [flags]
 
 DESCRIPTION
-  Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason.
+  Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason unless --dry-run.
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you own (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7402,7 +7394,7 @@ exports[`Help snapshots — contract stability > help for ib jerry request creat
   ib jerry request create [<address>] [flags]
 
 DESCRIPTION
-  Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from \`ib jerry offer create\`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason.
+  Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from \`ib jerry offer create\`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -7417,13 +7409,12 @@ FLAGS
   --line-length NUMBER    Hose line length m (linjanPituus)
   --notes STRING    Free-text description shown to providers (kuvaus)
   --asiakas NUMBER    Customer asiakasId (omit → your private BetoniJerry account)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7471,13 +7462,13 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you were sent (required)
 
 FLAGS
-  --reason STRING    Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED
+  --reason STRING    Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED unless --dry-run
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -7617,13 +7608,13 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you previously declined (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12276,7 +12267,7 @@ exports[`Help snapshots — contract stability > help for ib person create match
   ib person create [flags]
 
 DESCRIPTION
-  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
+  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason unless --dry-run. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
   Permissions: requires auth.page.person.edit.
 
 FLAGS
@@ -12290,13 +12281,12 @@ FLAGS
   --get-or-create    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
   --body JSON    Raw JSON body, merged under typed flags (optional) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12332,7 +12322,7 @@ exports[`Help snapshots — contract stability > help for ib person day clear ma
   ib person day clear --person <person> --date <date> [flags]
 
 DESCRIPTION
-  Delete a person's day row for a date (remove status entry). Requires --reason.
+  Delete a person's day row for a date (remove status entry). Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -12343,7 +12333,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12361,7 +12351,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Requires Admin or HR Admin (server-enforced).
-  - --reason is hard-required (exits 4 without it).
+  - --reason required unless --dry-run (exit 4).
   - Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).
 
 SEE ALSO
@@ -12417,7 +12407,7 @@ exports[`Help snapshots — contract stability > help for ib person day set matc
   ib person day set --person <person> --date <date> --status <status> [flags]
 
 DESCRIPTION
-  Set a person's day availability status (vacation/sick/free/…). Requires --reason.
+  Set a person's day availability status (vacation/sick/free/…). Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -12430,7 +12420,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12449,7 +12439,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Requires Admin or HR Admin (server-enforced) — Keikka Handler is NOT sufficient.
   - --status accepts an id or a name (resolved via \`ib person day statuses\`).
-  - --reason is hard-required (exits 4 without it).
+  - --reason required unless --dry-run (exit 4).
   - Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use \`ib vehicle driver assign\` for that (atomic).
 
 SEE ALSO
@@ -12457,7 +12447,7 @@ SEE ALSO
 
 EXAMPLES
   ib person day set --person 555 --date tomorrow --status loma --reason 'kesäloma'
-  ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run --reason preview
+  ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run
 "
 `;
 
@@ -12580,7 +12570,7 @@ exports[`Help snapshots — contract stability > help for ib person delete match
   ib person delete <personId> [flags]
 
 DESCRIPTION
-  Delete a person. Requires --reason (not with --dry-run).
+  Delete a person. Requires --reason unless --dry-run.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
@@ -12658,7 +12648,7 @@ exports[`Help snapshots — contract stability > help for ib person email add ma
   ib person email add <person> <email> [flags]
 
 DESCRIPTION
-  Add an ALTERNATIVE email to a person (the personEmails one-to-many; the primary is managed via \`ib person update\`). Tenant-scoped: self, a person owned by your active company, or any person for developers/sysadmins; global persons only by self/developer. Emails are globally unique. Requires --reason.
+  Add an ALTERNATIVE email to a person (the personEmails one-to-many; the primary is managed via \`ib person update\`). Tenant-scoped: self, a person owned by your active company, or any person for developers/sysadmins; global persons only by self/developer. Emails are globally unique. Requires --reason unless --dry-run.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
@@ -12666,13 +12656,13 @@ ARGUMENTS
   <email> STRING    alternative email to add (<=250 chars) (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12691,7 +12681,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person email add 5351 matti.alt@example.com --reason 'secondary contact'
-  ib person email add 5351 matti.alt@example.com --reason preview --dry-run
+  ib person email add 5351 matti.alt@example.com --dry-run
 "
 `;
 
@@ -12733,7 +12723,7 @@ exports[`Help snapshots — contract stability > help for ib person email remove
   ib person email remove <person> <email> [flags]
 
 DESCRIPTION
-  Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like \`ib person email add\`. Requires --reason.
+  Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like \`ib person email add\`. Requires --reason unless --dry-run.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
@@ -12741,13 +12731,13 @@ ARGUMENTS
   <email> STRING    alternative email to remove (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12764,7 +12754,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person email remove 5351 matti.alt@example.com --reason 'no longer valid'
-  ib person email remove 5351 matti.alt@example.com --reason preview --dry-run
+  ib person email remove 5351 matti.alt@example.com --dry-run
 "
 `;
 
@@ -12773,7 +12763,7 @@ exports[`Help snapshots — contract stability > help for ib person email set-ma
   ib person email set-main <person> <email> [flags]
 
 DESCRIPTION
-  Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like \`ib person email add\`. Requires --reason.
+  Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like \`ib person email add\`. Requires --reason unless --dry-run.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
@@ -12781,13 +12771,13 @@ ARGUMENTS
   <email> STRING    the person's email to promote to primary (primary or alternative) (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12808,7 +12798,7 @@ NOTES
 
 EXAMPLES
   ib person email set-main 5351 matti.alt@example.com --reason 'primary contact changed'
-  ib person email set-main 5351 matti.alt@example.com --reason preview --dry-run
+  ib person email set-main 5351 matti.alt@example.com --dry-run
 "
 `;
 
@@ -13386,7 +13376,7 @@ exports[`Help snapshots — contract stability > help for ib person owner matche
   ib person owner <personId> [flags]
 
 DESCRIPTION
-  Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via \`ib person role grant\`, and from membership via \`ib customer person add\`. Requires --reason.
+  Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via \`ib person role grant\`, and from membership via \`ib customer person add\`. Requires --reason unless --dry-run.
   Permissions: requires developer/system-admin: any person → any target, self (your own personId): → null always; → a company only if you are a member of it, company-admin: may release a person CURRENTLY owned by your company → global (cannot pull others in).
 
 ARGUMENTS
@@ -13395,13 +13385,12 @@ ARGUMENTS
 FLAGS
   --global    Make the person global (ownerAsiakasId=null)
   --asiakas NUMBER    Set owner to this asiakasId
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -13420,7 +13409,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib person owner 5351 --global --reason 'make self-managing'
   ib person owner 5351 --asiakas 26 --reason 'assign to company 26'
-  ib person owner 5351 --global --reason preview --dry-run
+  ib person owner 5351 --global --dry-run
 "
 `;
 
@@ -13479,7 +13468,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -13501,7 +13490,7 @@ NOTES
 
 EXAMPLES
   ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'
-  ib person role grant 5351 --role vehicleHandler --asiakas 26 --reason preview --dry-run
+  ib person role grant 5351 --role vehicleHandler --asiakas 26 --dry-run
 "
 `;
 
@@ -13558,7 +13547,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -13631,7 +13620,7 @@ exports[`Help snapshots — contract stability > help for ib person update match
   ib person update <personId> [flags]
 
 DESCRIPTION
-  Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email ""). On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`--email=\` there, which means the same thing in bash (\`ib help shell-quoting\`). Owner changes are separate — use \`ib person owner\`. Requires --reason.
+  Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email ""). On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`--email=\` there, which means the same thing in bash (\`ib help shell-quoting\`). Owner changes are separate — use \`ib person owner\`. Requires --reason unless --dry-run.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
@@ -13645,13 +13634,12 @@ FLAGS
   --memo STRING    personMemo — free-text note/comment
   --body JSON    Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -14430,20 +14418,20 @@ exports[`Help snapshots — contract stability > help for ib sijainti delete mat
   ib sijainti delete <sijaintiId> [flags]
 
 DESCRIPTION
-  Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.
+  Soft-delete a sijainti (sets deletedTime). Requires --reason unless --dry-run.
   Permissions: requires auth.page.sijainnit.delete.
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to soft-delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -14810,20 +14798,20 @@ exports[`Help snapshots — contract stability > help for ib sijainti undelete m
   ib sijainti undelete <sijaintiId> [flags]
 
 DESCRIPTION
-  Restore a soft-deleted sijainti. Requires --reason.
+  Restore a soft-deleted sijainti. Requires --reason unless --dry-run.
   Permissions: requires auth.page.sijainnit.edit.
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to restore (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+  (none)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -15397,7 +15385,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle driver assi
   ib vehicle driver assign <vehicleId> [<date>] --person <person> [flags]
 
 DESCRIPTION
-  Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason.
+  Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason unless --dry-run.
   Permissions: requires auth.page.grid.tilaus.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -15413,7 +15401,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -15424,13 +15412,13 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
-  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari) → supply --reason, valid ids, and a driver eligible for this company
+  exit 4 (HTTP 400)  Missing/invalid field (bad vehicle/person/date, or person not an eligible pumppari) → supply valid ids and a driver eligible for this company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).
+  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason required unless --dry-run (exit 4).
   - Cascade: personPvm.vehicleId set for the driver; keikkaPerson driver (contactPersonTypeId=1) replaced on each affected keikka; palkkiPerson driver replaced on each affected palkki; the prior occupant of this vehicle (oldPersonId) is freed, and the new driver is pulled off any other vehicle (clearedFromVehicleId).
   - Return reports exactly what changed: keikkaIds + palkkiIds touched, oldPersonId/oldDriverName displaced, newDriverName, clearedFromVehicleId.
   - keikkaPerson rows are written with keikkaPersonSourceId=30; the grid's per-keikka-bar driver label filters sourceId=50, so the vehicle ROW shows the driver (via personPvm) but a reloaded keikka BAR may not — known display quirk shared with the web grid.
@@ -15442,7 +15430,7 @@ SEE ALSO
 
 EXAMPLES
   ib vehicle driver assign 53 tomorrow --person 555 --reason 'auto-fill'
-  ib vehicle driver assign 53 today --person 555 --dry-run --reason preview
+  ib vehicle driver assign 53 today --person 555 --dry-run
   ib vehicle driver assign 53 --date tomorrow --person 555 --reason 'auto-fill'
 "
 `;
@@ -15539,7 +15527,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle driver clea
   ib vehicle driver clear <vehicleId> [<date>] [flags]
 
 DESCRIPTION
-  Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason.
+  Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason unless --dry-run.
   Permissions: requires auth.page.grid.tilaus.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -15554,7 +15542,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -15564,13 +15552,13 @@ OUTPUT (JSON, stdout)
   { success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/date) → supply --reason and a valid vehicle
+  exit 4 (HTTP 400)  Missing/invalid field (bad vehicle/date) → supply a valid vehicle
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).
+  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason required unless --dry-run (exit 4).
   - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Use this when a driver breaks down / is pulled off — they become available again for \`ib vehicle driver assign\` elsewhere. Deploy-gated.
 
@@ -15588,7 +15576,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle driver defa
   ib vehicle driver default clear <vehicleId> [flags]
 
 DESCRIPTION
-  Clear the vehicle's STANDING default driver (setDefaultPumppari with personId=null): clears the column and removes the default driver from future keikat. Requires --reason.
+  Clear the vehicle's STANDING default driver (setDefaultPumppari with personId=null): clears the column and removes the default driver from future keikat. Requires --reason unless --dry-run.
   Permissions: requires auth.page.vehicle.edit.
 
 ARGUMENTS
@@ -15601,7 +15589,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -15611,7 +15599,7 @@ OUTPUT (JSON, stdout)
   { success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing --reason / bad id → supply --reason and a valid vehicleId
+  exit 4 (HTTP 400)  Bad id                 → supply a valid vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -15672,7 +15660,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle driver defa
   ib vehicle driver default set <vehicleId> --person <person> [flags]
 
 DESCRIPTION
-  Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason.
+  Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason unless --dry-run.
   Permissions: requires auth.page.vehicle.edit.
 
 ARGUMENTS
@@ -15685,7 +15673,7 @@ WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -15696,7 +15684,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
-  exit 4 (HTTP 400)  Missing --reason / bad ids → supply --reason and a valid vehicleId/personId
+  exit 4 (HTTP 400)  Bad ids                → supply a valid vehicleId/personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -16775,7 +16763,7 @@ exports[`Help snapshots — contract stability > help for ib worksite delete mat
   ib worksite delete <tyomaaId> [flags]
 
 DESCRIPTION
-  Delete a worksite (tyomaa). Requires --reason (not with --dry-run).
+  Delete a worksite (tyomaa). Requires --reason unless --dry-run.
   Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 ARGUMENTS
@@ -17122,20 +17110,19 @@ exports[`Help snapshots — contract stability > help for ib worksite person add
   ib worksite person add [flags]
 
 DESCRIPTION
-  Attach a person to a worksite (tyomaaPerson). Requires --reason.
+  Attach a person to a worksite (tyomaaPerson). Requires --reason unless --dry-run.
   Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -17194,20 +17181,19 @@ exports[`Help snapshots — contract stability > help for ib worksite person rem
   ib worksite person remove [flags]
 
 DESCRIPTION
-  Detach a person from a worksite. Requires --reason.
+  Detach a person from a worksite. Requires --reason unless --dry-run.
   Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
                        If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload

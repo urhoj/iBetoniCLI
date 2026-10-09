@@ -208,6 +208,9 @@ export const ATTACHMENT_SPECS: CommandSpec[] = [
     flags: [],
     writeFlags: true,
     dryRunKind: "server",
+    // "always", not "unless-dry-run" (fb#2368): the backend demands X-Action-Reason
+    // BEFORE its dry-run branch (attachmentCliRoutes.js), so a reason-less preview
+    // would only trade this exit 4 for a server 400.
     reasonPolicy: "always",
     reasonDetail: "(blob deletion is irreversible)",
     outputShape: "{ ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }",
