@@ -179,9 +179,10 @@ export async function runWorksiteUpdate(client, opts, body, flags) {
         failWith(`--owner ${opts.owner} is not the active company (asiakasId ${opts.ownerAsiakasId}); worksite update writes under the active company`, 4, `re-run as the owner: \`--company ${opts.owner}\` (or \`ib auth switch ${opts.owner}\`)`);
     }
     // fb#2160: tyomaa_save binds @asiakasId but never writes it, so the backend
-    // answered success while the worksite stayed on its old customer.
+    // answered success while the worksite stayed on its old customer. The real
+    // write is `worksite set-customer` (fb#2365).
     if ("asiakasId" in body) {
-        failWith("asiakasId is not writable on worksite update: the save proc never writes tyomaa.asiakasId, so the write would report success without moving the worksite", 4, "drop asiakasId from the patch; re-pointing a worksite to another customer needs a migration runner");
+        failWith("asiakasId is not writable on worksite update: the save proc never writes tyomaa.asiakasId, so the write would report success without moving the worksite", 4, "drop asiakasId from the patch; re-point the worksite with `ib worksite set-customer <tyomaaId> --customer <asiakasId>`");
     }
     try {
         await runWorksiteGet(client, opts.tyomaaId);
@@ -261,6 +262,12 @@ export async function runWorksiteGpsCheck(client, range, apply, flags) {
         }
     }
     return res;
+}
+/** POST /api/tyomaa/:tyomaaId/customer — re-point a worksite to another customer of its company (fb#2365). */
+export async function runWorksiteSetCustomer(client, tyomaaId, asiakasId, flags) {
+    return client.post(`/api/tyomaa/${tyomaaId}/customer`, { asiakasId }, {
+        headers: writeFlagsToHeaders(flags),
+    });
 }
 /** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
 export async function runWorksiteHelsinkiFetch(client, tyomaaId, flags) {
@@ -462,6 +469,8 @@ export function registerWorksiteCommands(parent, getClient) {
         .requiredOption("--from <date>")
         .option("--to <date>")
         .option("--apply")).action(jsonAction(getClient, (client, opts) => runWorksiteGpsCheck(client, { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts)));
+    addWriteFlagsToCommand(w.command("set-customer <tyomaaId>")
+        .requiredOption("--customer <asiakasId>", "", intFlag("--customer", 1))).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteSetCustomer(client, parseId(idStr, "tyomaaId"), opts.customer, opts)));
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts)));
     const worksitePerson = w
         .command("person")

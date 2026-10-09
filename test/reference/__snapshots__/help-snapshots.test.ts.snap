@@ -16638,7 +16638,7 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
   ib worksite create [flags]
 
 DESCRIPTION
-  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and \`ib worksite update\` refuses it too (fb#2160) — only a customer merge re-points worksites.
+  Create a new worksite via POST /api/tyomaa/new. REQUIRED in --body: ownerAsiakasId — omitting it 403s at the tenant gate before validation, so a missing field can look like a permission problem. Fields: tyomaaNimi, tyomaaOsoite1, tyomaaContactPersonId (default 0). asiakasId is NOT read on create (tyomaa_create never binds it), and \`ib worksite update\` refuses it too (fb#2160) — re-point a worksite with \`ib worksite set-customer\`.
   Permissions: requires keikkaEdit company-role tier on --body.ownerAsiakasId.
 
 FLAGS
@@ -17301,6 +17301,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite set-customer matches snapshot 1`] = `
+"USAGE
+  ib worksite set-customer <tyomaaId> [flags]
+
+DESCRIPTION
+  Move a worksite to another customer of the same company (change-logged). Existing orders keep their own customer.
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
+
+ARGUMENTS
+  <tyomaaId> NUMBER    tyomaaId (required)
+
+FLAGS
+  --customer NUMBER    Target customer asiakasId (live, same owner company)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { success, tyomaaId, asiakasId, asiakasNimi, previousAsiakasId }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --customer is not an integer >= 1, rejected locally before any request → pass a positive asiakasId
+  exit 4 (HTTP 400)  not a live customer    → pick a non-deleted customer of the worksite's company
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite set-customer 3602 --customer 1451 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite set-geofence matches snapshot 1`] = `
 "USAGE
   ib worksite set-geofence <tyomaaId> [flags]
@@ -17426,7 +17466,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
-  exit 4 (client-side)  The patch sets asiakasId, which the save proc silently ignores (fb#2160) → drop asiakasId from the patch; re-pointing a worksite to another customer needs a migration runner
+  exit 4 (client-side)  The patch sets asiakasId, which the save proc silently ignores (fb#2160) → drop asiakasId from the patch; re-point the worksite with \`ib worksite set-customer <tyomaaId> --customer <asiakasId>\`
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the contact
   exit 4 (client-side)  --owner is not the active company → re-run with --company <ownerAsiakasId>
   exit 5 (client-side)  The worksite is owned by another company; refused BEFORE writing (fb#1860) — under the active company the geofence write no-ops and the owner's cache stays stale → re-run under the owner: --company <ownerAsiakasId> (or ib auth switch)

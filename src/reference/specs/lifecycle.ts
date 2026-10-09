@@ -192,6 +192,23 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib worksite set-customer",
+    description: "Move a worksite to another customer of the same company (change-logged). Existing orders keep their own customer.",
+    permissions: [WORKSITE_EDIT_PERMISSION],
+    args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+    flags: [{ name: "customer", type: "number", description: "Target customer asiakasId (live, same owner company)" }],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ success, tyomaaId, asiakasId, asiakasNimi, previousAsiakasId }",
+    errors: [
+      intParseErr("--customer", "pass a positive asiakasId"),
+      apiErr(400, "not a live customer", "pick a non-deleted customer of the worksite's company"),
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
+      ...permErrors(WORKSITE_EDIT_PERMISSION),
+    ],
+    examples: ["ib worksite set-customer 3602 --customer 1451 --dry-run"],
+  },
+  {
     command: "ib worksite helsinki-fetch",
     description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
     permissions: [WORKSITE_FENCE_PERMISSION],

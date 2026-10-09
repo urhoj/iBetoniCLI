@@ -189,6 +189,30 @@ describe("ib worksite create/update", () => {
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 
+  test("set-customer: POST customer with { asiakasId } + write flags (fb#2365)", async () => {
+    mockClient.post.mockResolvedValueOnce({ success: true });
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["worksite", "set-customer", "3602", "--customer", "1451", "--reason", "customer deleted"],
+      { from: "user" }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/3602/customer",
+      { asiakasId: 1451 },
+      { headers: { "X-Action-Reason": "customer deleted" } }
+    );
+  });
+
+  test.each([["0"], ["abc"]])("set-customer: --customer %s exits 4 before any request", async (value) => {
+    const program = new Command();
+    registerWorksiteCommands(program, async () => mockClient);
+    await expect(
+      program.parseAsync(["worksite", "set-customer", "3602", "--customer", value], { from: "user" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runWorksiteHelsinkiFetch: POST helsinki/fetch", async () => {
     mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteHelsinkiFetch(mockClient, 42, {});
@@ -248,7 +272,11 @@ describe("ib worksite create/update", () => {
     mockClient.get.mockReset();
     await expect(
       runWorksiteUpdate(mockClient, { tyomaaId: 3602, ownerAsiakasId: 27 }, { asiakasId: 1451 }, {})
-    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringMatching(/asiakasId is not writable/) });
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringMatching(/asiakasId is not writable/),
+      hint: expect.stringMatching(/ib worksite set-customer/),
+    });
     expect(mockClient.get).not.toHaveBeenCalled();
     expect(mockClient.post).not.toHaveBeenCalled();
   });
