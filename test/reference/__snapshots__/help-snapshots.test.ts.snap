@@ -17241,15 +17241,20 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { success: true, tyomaa, message } (raw backend response)
+  { success, tyomaa, message }; --dry-run: wouldUpdate { tyomaaId, address, current, proposed: { found, lat, lng, formattedAddress, geocodingAccuracy, ... } }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Worksite not found — or owned by another tenant (the fence answers 404, not 403) → verify tyomaaId and that it belongs to your active company (ib worksite get)
+  exit 4 (HTTP 400)  Address too short for Google Maps lookup → fix the address or use set-location
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check any member of the worksite's owner company (inline tenant fence, not role-gated)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - --dry-run calls Google (billed) but writes nothing; current.geocodingAccuracy MANUAL = a set-location pin the real run overwrites.
+
 EXAMPLES
+  ib worksite refresh-location 99 --dry-run
   ib worksite refresh-location 99 --reason "address corrected"
 "
 `;

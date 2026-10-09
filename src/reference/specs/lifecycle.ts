@@ -118,12 +118,14 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     flags: [],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ success: true, tyomaa, message } (raw backend response)",
+    outputShape: "{ success, tyomaa, message }; --dry-run: wouldUpdate { tyomaaId, address, current, proposed: { found, lat, lng, formattedAddress, geocodingAccuracy, ... } }",
+    notes: ["--dry-run calls Google (billed) but writes nothing; current.geocodingAccuracy MANUAL = a set-location pin the real run overwrites."],
     errors: [
       WORKSITE_FENCE_404,
+      apiErr(400, "Address too short for Google Maps lookup", "fix the address or use set-location"),
       ...permErrors(WORKSITE_FENCE_PERMISSION),
     ],
-    examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
+    examples: ["ib worksite refresh-location 99 --dry-run", 'ib worksite refresh-location 99 --reason "address corrected"'],
   },
   {
     command: "ib worksite set-geofence",
