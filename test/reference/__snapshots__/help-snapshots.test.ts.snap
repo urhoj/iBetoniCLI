@@ -12154,8 +12154,8 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max rows per list (capped at 1000) (default: 100)
-  --from DATE    Window start, Helsinki: YYYY-MM-DD[THH:mm] (default: 90 days before the end)
-  --to DATE    Window end, Helsinki, exclusive; a bare date covers that whole day (default: now)
+  --from DATE    Start, Helsinki: YYYY-MM-DD[THH:mm] (default: end − 90 d)
+  --to DATE    End, Helsinki, exclusive; a bare date = whole day (default: now)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
@@ -12175,15 +12175,13 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Developer-gated server-side and hidden from non-developer discovery.
   - personLog type-1 counts credential logins AND token-refresh/impersonation bootstraps; cross-check securityEvents (credential-only) to tell them apart. Deploy-gated (no-op until the puminet5api backend deploys).
-  - --from/--to bound all four lists; output timestamps and \`window\` are UTC. Deploy-gated: no \`window\` = the backend ignored them.
 
 SEE ALSO
   ib person log, ib person get
 
 EXAMPLES
   ib person activity 63
-  ib person activity 63 --limit 20
-  ib person activity 6286 --from 2026-10-06 --to 2026-10-07
+  ib person activity 63 --from 2026-10-06 --to 2026-10-07
 "
 `;
 
