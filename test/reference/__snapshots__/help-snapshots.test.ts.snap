@@ -16840,6 +16840,50 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite gps-check matches snapshot 1`] = `
+"USAGE
+  ib worksite gps-check [flags]
+
+DESCRIPTION
+  Find worksites placed > 1 km from where the truck actually poured (its long GPS stop around pumppuAika), and optionally pin them there (fb#2361).
+  Permissions: requires edit role in the worksite's owner company (requireCompanyRole tier edit).
+
+FLAGS
+  --from STRING    First Helsinki day, YYYY-MM-DD or today/yesterday
+  --to STRING    Last day (default --from); at most 31 days after --from
+  --apply    Pin every autoApplicable row via set-location (MANUAL, change-logged)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Bad --from/--to        → pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT. Read-only without --apply.
+
+SEE ALSO
+  ib worksite set-location, ib vehicle timeline
+
+EXAMPLES
+  ib worksite gps-check --from 2026-10-01 --to 2026-10-08 --pretty
+  ib worksite gps-check --from yesterday --apply --reason "GPS pin sweep"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite helsinki-fetch matches snapshot 1`] = `
 "USAGE
   ib worksite helsinki-fetch <tyomaaId> [flags]

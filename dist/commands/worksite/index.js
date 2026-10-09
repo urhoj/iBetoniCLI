@@ -4,7 +4,7 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { todayHelsinki } from "../../dates.js";
+import { todayHelsinki, resolveDate } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
@@ -238,6 +238,30 @@ export async function runWorksiteSetLocation(client, tyomaaId, lat, lng, flags) 
         headers: writeFlagsToHeaders(flags),
     });
 }
+/**
+ * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
+ * truck's pour stop. `apply` pins every autoApplicable row through set-location
+ * (MANUAL, change-logged); one failed pin is reported on its row, not thrown.
+ */
+export async function runWorksiteGpsCheck(client, range, apply, flags) {
+    const res = await client.get(`/api/cli/worksite/gps-check${qs({ from: range.from, to: range.to })}`);
+    if (!apply)
+        return res;
+    const writeFlags = { ...flags, reason: flags.reason ?? "GPS stop pin (fb#2361)" };
+    for (const p of res.items) {
+        if (!p.autoApplicable)
+            continue;
+        try {
+            await runWorksiteSetLocation(client, p.tyomaaId, p.proposed.lat, p.proposed.lng, writeFlags);
+            p.applied = true;
+        }
+        catch (e) {
+            p.applied = false;
+            p.error = e instanceof Error ? e.message : String(e);
+        }
+    }
+    return res;
+}
 /** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
 export async function runWorksiteHelsinkiFetch(client, tyomaaId, flags) {
     return client.post(`/api/tyomaa/helsinki/fetch/${tyomaaId}`, {}, {
@@ -434,6 +458,10 @@ export function registerWorksiteCommands(parent, getClient) {
     addWriteFlagsToCommand(w.command("set-location <tyomaaId>")
         .requiredOption("--lat <n>", "", numFlag("--lat", -90, 90))
         .requiredOption("--lng <n>", "", numFlag("--lng", -180, 180))).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteSetLocation(client, parseId(idStr, "tyomaaId"), opts.lat, opts.lng, opts)));
+    addWriteFlagsToCommand(w.command("gps-check")
+        .requiredOption("--from <date>")
+        .option("--to <date>")
+        .option("--apply")).action(jsonAction(getClient, (client, opts) => runWorksiteGpsCheck(client, { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts)));
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts)));
     const worksitePerson = w
         .command("person")

@@ -166,6 +166,32 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     examples: ["ib worksite set-location 3371 --lat 60.1472 --lng 24.554"],
   },
   {
+    command: "ib worksite gps-check",
+    description: "Find worksites placed > 1 km from where the truck actually poured (its long GPS stop around pumppuAika), and optionally pin them there (fb#2361).",
+    permissions: [WORKSITE_EDIT_PERMISSION],
+    args: [],
+    flags: [
+      { name: "from", type: "string", description: "First Helsinki day, YYYY-MM-DD or today/yesterday" },
+      { name: "to", type: "string", description: "Last day (default --from); at most 31 days after --from" },
+      { name: "apply", type: "boolean", description: "Pin every autoApplicable row via set-location (MANUAL, change-logged)" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }>",
+    errors: [
+      apiErr(400, "Bad --from/--to", "pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart"),
+      ...permErrors(WORKSITE_EDIT_PERMISSION),
+    ],
+    notes: [
+      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT. Read-only without --apply.",
+    ],
+    seeAlso: ["ib worksite set-location", "ib vehicle timeline"],
+    examples: [
+      "ib worksite gps-check --from 2026-10-01 --to 2026-10-08 --pretty",
+      'ib worksite gps-check --from yesterday --apply --reason "GPS pin sweep"',
+    ],
+  },
+  {
     command: "ib worksite helsinki-fetch",
     description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
     permissions: [WORKSITE_FENCE_PERMISSION],

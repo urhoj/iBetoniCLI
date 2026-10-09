@@ -10,7 +10,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { todayHelsinki } from "../../dates.js";
+import { todayHelsinki, resolveDate } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
@@ -375,6 +375,52 @@ export async function runWorksiteSetLocation(
   });
 }
 
+/** One GPS pin proposal from GET /api/cli/worksite/gps-check (fb#2361). */
+export interface WorksiteGpsProposal {
+  tyomaaId: number;
+  tyomaaNimi: string | null;
+  accuracy: string | null;
+  current: { lat: number; lng: number };
+  proposed: { lat: number; lng: number };
+  distanceM: number;
+  spreadM: number;
+  keikkaIds: number[];
+  confidence: "high" | "medium" | "low";
+  autoApplicable: boolean;
+  /** Set only under --apply: the set-location result, or the error it raised. */
+  applied?: boolean;
+  error?: string;
+}
+
+/**
+ * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
+ * truck's pour stop. `apply` pins every autoApplicable row through set-location
+ * (MANUAL, change-logged); one failed pin is reported on its row, not thrown.
+ */
+export async function runWorksiteGpsCheck(
+  client: ApiClient,
+  range: { from: string; to?: string },
+  apply: boolean,
+  flags: WriteFlags
+): Promise<ListEnvelope<WorksiteGpsProposal>> {
+  const res = await client.get<ListEnvelope<WorksiteGpsProposal>>(
+    `/api/cli/worksite/gps-check${qs({ from: range.from, to: range.to })}`
+  );
+  if (!apply) return res;
+  const writeFlags = { ...flags, reason: flags.reason ?? "GPS stop pin (fb#2361)" };
+  for (const p of res.items) {
+    if (!p.autoApplicable) continue;
+    try {
+      await runWorksiteSetLocation(client, p.tyomaaId, p.proposed.lat, p.proposed.lng, writeFlags);
+      p.applied = true;
+    } catch (e) {
+      p.applied = false;
+      p.error = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return res;
+}
+
 /** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
 export async function runWorksiteHelsinkiFetch(
   client: ApiClient, tyomaaId: number, flags: WriteFlags
@@ -706,6 +752,17 @@ export function registerWorksiteCommands(
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteFlags & { lat: number; lng: number }) =>
       runWorksiteSetLocation(client, parseId(idStr, "tyomaaId"), opts.lat, opts.lng, opts)
+    )
+  );
+
+  addWriteFlagsToCommand(
+    w.command("gps-check")
+      .requiredOption("--from <date>")
+      .option("--to <date>")
+      .option("--apply")
+  ).action(
+    jsonAction(getClient, (client, opts: WriteFlags & { from: string; to?: string; apply?: boolean }) =>
+      runWorksiteGpsCheck(client, { from: resolveDate(opts.from)!, to: resolveDate(opts.to) }, !!opts.apply, opts)
     )
   );
 
