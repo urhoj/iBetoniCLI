@@ -175,6 +175,8 @@ describe("normalizeType conventional-commit synonyms (fb#188)", () => {
   test("maps fix→bugfix and feat→feature", () => {
     expect(normalizeType("fix")).toBe("bugfix");
     expect(normalizeType("feat")).toBe("feature");
+    expect(normalizeType("documentation")).toBe("docs"); // fb#2379
+    expect(normalizeType("doc")).toBe("docs");
   });
 
   test("trims and lowercases before matching", () => {

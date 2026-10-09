@@ -362,7 +362,7 @@ export function resolveShaAlias(sha, commit) {
  * `fix:` / `feat:`, so agents and devs repeatedly pass those to `changelog add`
  * (feedback #188). Map them to the canonical devChangelog enum before validation.
  */
-const TYPE_SYNONYMS = { fix: "bugfix", feat: "feature" };
+const TYPE_SYNONYMS = { fix: "bugfix", feat: "feature", doc: "docs", documentation: "docs" };
 /**
  * Trim + lowercase --type and resolve a conventional-commit synonym
  * (`fix`→`bugfix`, `feat`→`feature`). Unknown values pass through unchanged for
