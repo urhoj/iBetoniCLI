@@ -746,5 +746,6 @@ export function registerWorksiteCommands(
     base: "tyomaa-combinator",
     idFields: TYOMAA_MERGE_ID_FIELDS,
     idLabel: "tyomaaId",
+    preferMain: true,
   });
 }

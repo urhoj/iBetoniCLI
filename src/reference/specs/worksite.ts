@@ -311,6 +311,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "tyomaaId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "tyomaaId to REMOVE — merged away then deleted (required)" },
+      { name: "prefer-main", type: "boolean", description: "Main wins on conflicting fields instead of blocking; the discarded secondary values are listed (dry-run) and logged" },
       OWNER_ASIAKAS_FLAG,
     ],
     writeFlags: true,
@@ -329,12 +330,13 @@ export const WORKSITE_SPECS: CommandSpec[] = [
       MERGE_DRY_RUN_FIRST_NOTE,
       MERGE_VALIDATE_READONLY_NOTE,
       "Affects keikka / person / grid rows and the change history; caches are invalidated server-side. Every moved order's worksite snapshot (address, coords) is re-copied from the main and its matkat recomputed; the result names snapshotsRefreshed / snapshotRefreshFailed.",
-      "Fields BLANK on the main are filled from the secondary; --dry-run lists them in validation.data.backfillFields. To keep one empty, blank it on the secondary first.",
+      "Main-blank fields are filled from the secondary (validation.data.backfillFields). Fields set on both sides block, unless --prefer-main (discarded values: validation.data.conflictingFields).",
     ],
     seeAlso: ["ib worksite duplicates", "ib worksite delete"],
     examples: [
       "ib worksite merge --main 701 --secondary 702 --dry-run",
       "ib worksite merge --main 701 --secondary 702 --reason 'dedupe: same address'",
+      "ib worksite merge --main 701 --secondary 702 --prefer-main --dry-run",
     ],
   },
 ];

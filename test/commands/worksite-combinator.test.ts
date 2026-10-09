@@ -89,6 +89,18 @@ describe("runWorksiteMerge", () => {
     expect(result).toEqual({ dryRun: true, validation: { success: true, referencesToMove: 5 } });
   });
 
+  test("fb#2357: --prefer-main sends preferMain:true to both /validate and /merge", async () => {
+    asPost().mockResolvedValue({ success: true });
+    const opts = { mainId: 701, secondaryId: 702, ownerAsiakasId: 8, preferMain: true };
+    await runWorksiteMerge(mockClient, opts, { dryRun: true });
+    await runWorksiteMerge(mockClient, opts, { reason: "owner ruling" });
+    const expected = { mainTyomaaId: 701, secondaryTyomaaId: 702, ownerAsiakasId: 8, preferMain: true };
+    expect(asPost().mock.calls[0][0]).toBe("/api/admin/tyomaa-combinator/validate");
+    expect(asPost().mock.calls[0][1]).toEqual(expected);
+    expect(asPost().mock.calls[1][0]).toBe("/api/admin/tyomaa-combinator/merge");
+    expect(asPost().mock.calls[1][1]).toEqual(expected);
+  });
+
   test("fb#1822: a field-conflict 400 on --dry-run surfaces conflictingFields + a worksite-update hint instead of only the generic message", async () => {
     const conflictBody = {
       success: false,
@@ -108,7 +120,7 @@ describe("runWorksiteMerge", () => {
       runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { dryRun: true })
     ).rejects.toMatchObject({
       message: expect.stringContaining("tyomaaOsoite1 ('Pekanraitti 14' vs 'Pekanraitti 14 Hki')"),
-      hint: expect.stringContaining("ib worksite update <secondaryId>"),
+      hint: expect.stringMatching(/--prefer-main[\s\S]*ib worksite update <secondaryId>/),
     });
   });
 

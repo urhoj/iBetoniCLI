@@ -77,6 +77,8 @@ export interface CombinatorMergeOptions {
   ownerAsiakasId: number;
   /** asiakas-combinator only (system-admin): permit a merge above the safety row cap. */
   allowBigMerge?: boolean;
+  /** tyomaa-combinator only (fb#2357): the main wins on conflicting fields. */
+  preferMain?: boolean;
 }
 
 /**
@@ -121,6 +123,7 @@ export async function runCombinatorMerge(
     ownerAsiakasId: opts.ownerAsiakasId,
   };
   if (opts.allowBigMerge) body.allowBigMerge = true;
+  if (opts.preferMain) body.preferMain = true;
   if (flags.dryRun) {
     // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
     // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
@@ -155,7 +158,7 @@ export async function runCombinatorMerge(
             err.body,
             err.exitCode,
             base === "tyomaa-combinator"
-              ? "align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
+              ? "re-run with --prefer-main to keep the main's values (the secondary's are discarded and logged), or align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
               : undefined
           );
         }
@@ -192,6 +195,8 @@ export interface CombinatorCommandsConfig {
    * entities whose validator supports the class, and only from a system admin.
    */
   unownedClass?: boolean;
+  /** worksite combinator only (fb#2357): expose `--prefer-main`. */
+  preferMain?: boolean;
 }
 
 /**
@@ -258,6 +263,9 @@ export function registerCombinatorCommands(
   if (cfg.allowBigMerge) {
     mergeCmd.option("--allow-big-merge");
   }
+  if (cfg.preferMain) {
+    mergeCmd.option("--prefer-main");
+  }
   addWriteFlagsToCommand(mergeCmd).action(
     guarded(async (
       opts: WriteFlags & {
@@ -266,6 +274,7 @@ export function registerCombinatorCommands(
         owner?: number;
         unowned?: boolean;
         allowBigMerge?: boolean;
+        preferMain?: boolean;
       }
     ) => {
       if (
@@ -289,6 +298,7 @@ export function registerCombinatorCommands(
             secondaryId: opts.secondary,
             ownerAsiakasId: owner,
             allowBigMerge: opts.allowBigMerge,
+            preferMain: opts.preferMain,
           },
           opts
         )

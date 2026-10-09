@@ -455,6 +455,7 @@ export function registerWorksiteCommands(parent, getClient) {
         base: "tyomaa-combinator",
         idFields: TYOMAA_MERGE_ID_FIELDS,
         idLabel: "tyomaaId",
+        preferMain: true,
     });
 }
 //# sourceMappingURL=index.js.map

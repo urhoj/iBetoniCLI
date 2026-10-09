@@ -59,6 +59,8 @@ export async function runCombinatorMerge(client, base, idFields, opts, flags) {
     };
     if (opts.allowBigMerge)
         body.allowBigMerge = true;
+    if (opts.preferMain)
+        body.preferMain = true;
     if (flags.dryRun) {
         // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
         // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
@@ -89,7 +91,7 @@ export async function runCombinatorMerge(client, base, idFields, opts, flags) {
                 const conflicts = extractConflictingFields(err.body);
                 if (conflicts) {
                     throw new CliError(`${err.message} — conflicting field(s): ${formatConflictingFields(conflicts)}`, err.statusCode, err.body, err.exitCode, base === "tyomaa-combinator"
-                        ? "align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
+                        ? "re-run with --prefer-main to keep the main's values (the secondary's are discarded and logged), or align the conflicting field(s) onto the secondary, e.g. `ib worksite update <secondaryId> --name/--address/--address2/--postal-code/--city`, then re-run --dry-run"
                         : undefined);
                 }
                 throw new CliError(err.message, err.statusCode, err.body, err.exitCode, "check --main/--secondary");
@@ -149,6 +151,9 @@ export function registerCombinatorCommands(parent, getClient, cfg) {
     if (cfg.allowBigMerge) {
         mergeCmd.option("--allow-big-merge");
     }
+    if (cfg.preferMain) {
+        mergeCmd.option("--prefer-main");
+    }
     addWriteFlagsToCommand(mergeCmd).action(guarded(async (opts) => {
         if (!Number.isInteger(opts.main) || opts.main <= 0 ||
             !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
@@ -164,6 +169,7 @@ export function registerCombinatorCommands(parent, getClient, cfg) {
             secondaryId: opts.secondary,
             ownerAsiakasId: owner,
             allowBigMerge: opts.allowBigMerge,
+            preferMain: opts.preferMain,
         }, opts));
     }));
 }
