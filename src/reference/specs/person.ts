@@ -579,20 +579,23 @@ export const PERSON_SPECS: CommandSpec[] = [
     args: [{ name: "personId", type: "number", description: "person.personId" }],
     flags: [
       { name: "limit", type: "number", default: "100", description: "Max rows per list (capped at 1000)" },
+      { name: "from", type: "date", description: "Window start, Helsinki: YYYY-MM-DD[THH:mm] (default: 90 days before the end)" },
+      { name: "to", type: "date", description: "Window end, Helsinki, exclusive; a bare date covers that whole day (default: now)" },
     ],
     outputShape:
-      "{ personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }",
+      "{ personId, email, lastLoginTime, window:{fromUtc,toUtc}, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }",
     errors: [
       limitErr("pass a positive integer; this command caps at 1000"),
-      apiErr(400, "personId is not a positive integer", "pass a numeric personId"),
+      apiErr(400, "bad personId, or --from/--to malformed / not in order", "numeric personId; dates YYYY-MM-DD[THH:mm], --from before --to"),
       apiErr(404, "no person with that id", "check the id with `ib person get <id>`"),
       ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
     ],
     notes: [
       "Developer-gated server-side and hidden from non-developer discovery.",
       "personLog type-1 counts credential logins AND token-refresh/impersonation bootstraps; cross-check securityEvents (credential-only) to tell them apart. Deploy-gated (no-op until the puminet5api backend deploys).",
+      "--from/--to bound all four lists; output timestamps and `window` are UTC. Deploy-gated: no `window` = the backend ignored them.",
     ],
     seeAlso: ["ib person log", "ib person get"],
-    examples: ["ib person activity 63", "ib person activity 63 --limit 20"],
+    examples: ["ib person activity 63", "ib person activity 63 --limit 20", "ib person activity 6286 --from 2026-10-06 --to 2026-10-07"],
   },
 ];

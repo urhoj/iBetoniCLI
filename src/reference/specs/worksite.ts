@@ -283,13 +283,13 @@ export const WORKSITE_SPECS: CommandSpec[] = [
   {
     command: "ib worksite duplicates",
     description:
-      "List likely-duplicate worksite (tyomaa) pairs for one tenant: strict name+address+number matches, plus the anonymous same-address cluster (nameless rows sharing an address + compatible number/memo/reference/contact). Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib worksite merge`.",
+      "List likely-duplicate worksite (tyomaa) pairs for one tenant: strict name+address+number matches, the anonymous same-address cluster (nameless rows sharing an address + compatible number/memo/reference/contact), and same-Google-place pairs of one customer. Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib worksite merge`.",
     permissions: ["company admin on the tenant (system admin for another owner)"],
     flags: [
       { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
     ],
     outputShape:
-      "{ items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
+      "{ items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous'|'tyomaa_same_place', matchValue (placeId for same_place), confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
     errors: [
       apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
       apiErr(403, "Not permitted on this tenant", OTHER_TENANT_403_REMEDY),
@@ -297,6 +297,7 @@ export const WORKSITE_SPECS: CommandSpec[] = [
     ],
     notes: [
       "tyomaa_anonymous is a medium-confidence heuristic (both rows nameless, same normalized address, matching number/memo/laskuViite/contact, both older than 1 month) — a human confirms before merging.",
+      "tyomaa_same_place (medium): same placeId + same customer, names not conflicting, no age cutoff. Deploy-gated.",
       "Each pair is returned once (id1 < id2), top 100 by confidence.",
     ],
     seeAlso: ["ib worksite merge", "ib worksite get"],

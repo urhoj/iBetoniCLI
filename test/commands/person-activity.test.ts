@@ -15,4 +15,18 @@ describe("runPersonActivity", () => {
     await runPersonActivity(mockApiClient({ get }), 63, {});
     expect(get).toHaveBeenCalledWith("/api/cli/person/63/activity");
   });
+
+  test("passes the --from/--to window, expanding relative dates (fb#2348)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-07T10:00:00Z"));
+    try {
+      const get = vi.fn(async () => ({}));
+      await runPersonActivity(mockApiClient({ get }), 6286, { from: "yesterday", to: "2026-10-07T09:30" });
+      expect(get).toHaveBeenCalledWith(
+        "/api/cli/person/6286/activity?from=2026-10-06&to=2026-10-07T09%3A30"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

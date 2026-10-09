@@ -51,7 +51,7 @@ function formatConflictingFields(fields: ConflictingField[]): string {
  * `matchCode` vocabulary and `confidence` levels differ per entity:
  *   - asiakas: matchCode ytunnus|exact_name|email|name_prefix · confidence high|low
  *   - person:  matchCode phone|email|full_name              · confidence high|medium
- *   - tyomaa:  matchCode tyomaa_strict|tyomaa_anonymous     · confidence high|medium
+ *   - tyomaa:  matchCode tyomaa_strict|tyomaa_anonymous|tyomaa_same_place · confidence high|medium
  * (kept as plain `string` so one type serves all three.)
  */
 export interface DuplicatePair {

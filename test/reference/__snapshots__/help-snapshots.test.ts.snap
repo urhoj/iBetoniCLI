@@ -12147,23 +12147,26 @@ exports[`Help snapshots — contract stability > help for ib person activity mat
 DESCRIPTION
   Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    person.personId (required)
 
 FLAGS
   --limit NUMBER    Max rows per list (capped at 1000) (default: 100)
+  --from DATE    Window start, Helsinki: YYYY-MM-DD[THH:mm] (default: 90 days before the end)
+  --to DATE    Window end, Helsinki, exclusive; a bare date covers that whole day (default: now)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
+  { personId, email, lastLoginTime, window:{fromUtc,toUtc}, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 1000
-  exit 4 (HTTP 400)  personId is not a positive integer → pass a numeric personId
+  exit 4 (HTTP 400)  bad personId, or --from/--to malformed / not in order → numeric personId; dates YYYY-MM-DD[THH:mm], --from before --to
   exit 5 (HTTP 404)  no person with that id → check the id with \`ib person get <id>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
@@ -12172,6 +12175,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Developer-gated server-side and hidden from non-developer discovery.
   - personLog type-1 counts credential logins AND token-refresh/impersonation bootstraps; cross-check securityEvents (credential-only) to tell them apart. Deploy-gated (no-op until the puminet5api backend deploys).
+  - --from/--to bound all four lists; output timestamps and \`window\` are UTC. Deploy-gated: no \`window\` = the backend ignored them.
 
 SEE ALSO
   ib person log, ib person get
@@ -12179,6 +12183,7 @@ SEE ALSO
 EXAMPLES
   ib person activity 63
   ib person activity 63 --limit 20
+  ib person activity 6286 --from 2026-10-06 --to 2026-10-07
 "
 `;
 
@@ -16802,7 +16807,7 @@ exports[`Help snapshots — contract stability > help for ib worksite duplicates
   ib worksite duplicates [flags]
 
 DESCRIPTION
-  List likely-duplicate worksite (tyomaa) pairs for one tenant: strict name+address+number matches, plus the anonymous same-address cluster (nameless rows sharing an address + compatible number/memo/reference/contact). Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds \`ib worksite merge\`.
+  List likely-duplicate worksite (tyomaa) pairs for one tenant: strict name+address+number matches, the anonymous same-address cluster (nameless rows sharing an address + compatible number/memo/reference/contact), and same-Google-place pairs of one customer. Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds \`ib worksite merge\`.
   Permissions: requires company admin on the tenant (system admin for another owner).
 
 FLAGS
@@ -16813,7 +16818,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs
+  { items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous'|'tyomaa_same_place', matchValue (placeId for same_place), confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  ownerAsiakasId missing/invalid → pass --owner <id>, or set an active company
@@ -16823,6 +16828,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - tyomaa_anonymous is a medium-confidence heuristic (both rows nameless, same normalized address, matching number/memo/laskuViite/contact, both older than 1 month) — a human confirms before merging.
+  - tyomaa_same_place (medium): same placeId + same customer, names not conflicting, no age cutoff. Deploy-gated.
   - Each pair is returned once (id1 < id2), top 100 by confidence.
 
 SEE ALSO

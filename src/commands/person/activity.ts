@@ -3,8 +3,11 @@ import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
 import { parseId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
+import { resolveDate } from "../../dates.js";
 export interface PersonActivityOpts {
   limit?: number;
+  from?: string;
+  to?: string;
 }
 
 /**
@@ -16,8 +19,12 @@ export async function runPersonActivity(
   personId: number,
   opts: PersonActivityOpts
 ): Promise<unknown> {
-  const qs = opts.limit !== undefined ? `?limit=${opts.limit}` : "";
-  return client.get(`/api/cli/person/${personId}/activity${qs}`);
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.from) params.set("from", resolveDate(opts.from)!);
+  if (opts.to) params.set("to", resolveDate(opts.to)!);
+  const qs = params.toString();
+  return client.get(`/api/cli/person/${personId}/activity${qs ? `?${qs}` : ""}`);
 }
 
 /** Register `ib person activity`. See `src/reference/specs.ts` for the spec. */
@@ -28,6 +35,8 @@ export function registerPersonActivityCommand(
   parent
     .command("activity <personId>")
     .option("--limit <n>", "", cappedInt(1000))
+    .option("--from <date>")
+    .option("--to <date>")
     .action(
       guarded(async (personIdStr: string, opts: PersonActivityOpts) => {
         const personId = parseId(personIdStr, "personId");
