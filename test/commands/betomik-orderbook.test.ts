@@ -7,6 +7,7 @@ import {
   runBetomikOrderbookRow,
   runBetomikOrderbookFind,
   runBetomikOrderbookReview,
+  buildReviewBody,
   runBetomikOrderbookPropose,
   runBetomikOrderbookAiStats,
   runBetomikOrderbookSyncProgress,
@@ -140,6 +141,14 @@ describe("ib dev betomik-orderbook runs / rows", () => {
       expect(kept.items[0]).toHaveProperty("rawJson");
     });
 
+    test("passes the server's readAt through for `review --read-at` (fb#1824); absent on an older backend", async () => {
+      mockClient.get.mockReset();
+      mockClient.get.mockResolvedValueOnce({ items: ledger, readAt: "2026-10-09T10:00:00.000Z" });
+      expect((await runBetomikOrderbookRows(mockClient, 7, { limit: 1 })).readAt).toBe("2026-10-09T10:00:00.000Z");
+      mockClient.get.mockResolvedValueOnce({ items: ledger });
+      expect(await runBetomikOrderbookRows(mockClient, 7)).not.toHaveProperty("readAt");
+    });
+
     test("--status removed is refused: the route excludes removed rows (fb#1722), so it can never match", async () => {
       await expect(runBetomikOrderbookRows(mockClient, 7, { status: "removed" })).rejects.toMatchObject({ exitCode: 4 });
     });
@@ -197,6 +206,17 @@ describe("ib dev betomik-orderbook row (fb#1977)", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows/1238");
     mockClient.get.mockResolvedValueOnce({ ...row });
     expect(await runBetomikOrderbookRow(mockClient, 1238, { raw: false })).toEqual({ betomikOrderbookImportRowId: 1238, syncStatus: "removed" });
+  });
+});
+
+describe("ib dev betomik-orderbook review --read-at (fb#1824)", () => {
+  test("maps the flags to the body; readAt only when given", () => {
+    expect(buildReviewBody({ status: "approved", rowKind: "palkki", note: "x", readAt: "2026-10-09T10:00:00.000Z" }))
+      .toEqual({ status: "approved", rowKind: "palkki", notes: "x", readAt: "2026-10-09T10:00:00.000Z" });
+    expect(buildReviewBody({ status: "pending" })).toEqual({ status: "pending" });
+  });
+  test("exit 4 on an unparseable --read-at, before any request", () => {
+    expect(() => buildReviewBody({ status: "approved", readAt: "eilen" })).toThrow(expect.objectContaining({ exitCode: 4 }));
   });
 });
 

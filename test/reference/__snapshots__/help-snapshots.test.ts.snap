@@ -2901,6 +2901,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
   exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can trigger a sync
   exit 4 (HTTP 400)  Unknown mode/provider, or the chosen provider has more than 40 un-extracted rows → Use --mode shadow|create|full, --provider bedrock|local, and extract cells in smaller batches first
+  exit 5 (HTTP 404)  No such run            → See \`runs\`
+  exit 4 (HTTP 409)  Another sync holds the run (fb#1824) → \`runs\` shows syncLockedBy; retry later
 
 NOTES
   - --dry-run STILL WRITES LEDGER STATE (syncStatus/plannedAction/blockReason) for every row — only the keikka/palkki writes and the auto-creates are suppressed.
@@ -2927,6 +2929,7 @@ FLAGS
   --row-kind STRING    keikka | palkki — override the parser's classification
   --palkki-type STRING    one of the tenant's active grid_palkkiTypes names (e.g. huolto, pois ajosta, kommentti); ignored/cleared when --row-kind keikka
   --note STRING    reviewNotes (kept when omitted)
+  --read-at STRING    \`rows\`' readAt — refuse (409) if a sync wrote the row since (fb#1824)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -2944,6 +2947,8 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  rowId is not a positive integer → Pass the betomikOrderbookImportRowId from \`ib dev betomik-orderbook rows <runId>\`
   exit 4 (HTTP 400)  Bad status / rowKind / palkkiType → status: pending|approved|rejected; rowKind: keikka|palkki; palkkiType must be one of the names the 400 message lists
+  exit 4 (client-side)  Unparseable --read-at  → Pass \`rows\`' readAt
+  exit 4 (HTTP 409)  Row synced after --read-at; nothing written → Re-read with \`row <rowId>\`, re-check, retry with a fresh --read-at
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
 
 NOTES
@@ -3016,7 +3021,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>
+  ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy, syncStatus, syncedAt, syncedBy }> + readAt (for \`review --read-at\`)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  runId is not a positive integer → Pass the importRunId from \`ib dev betomik-orderbook runs\`
@@ -3056,7 +3061,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>
+  ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount, syncLockedAt, syncLockedBy }> — syncLocked* set = a sync is in flight
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
@@ -3101,6 +3106,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider → Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local
   exit 4 (HTTP 400)  With --provider set on a REAL sync (not --dry-run): provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or >40 rows lack \`extracted\` — neither check runs on --dry-run or without --provider → Configure AI_BEDROCK_MODEL/AI_BEDROCK_ENABLED or AI_LOCAL_BASE_URL/AI_LOCAL_MODEL; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted
   exit 4 (client-side)  No --body or --from-json payload given → Pass --from-json <file|-> or --body '<json>'
+  exit 4 (HTTP 409)  Another sync holds the run (fb#1824) → \`runs\` shows syncLockedBy; retry later
 
 NOTES
   - --dry-run short-circuits BEFORE the upsert, ledger writes, AI extraction, and --digest — it validates and returns only { wouldSync }, never touching the DB. Unlike \`resync\`'s dry run, no ledger state is written and no extraction runs.
@@ -3175,6 +3181,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Only system admin/developer can write rows
   exit 5 (HTTP 404)  A row id does not exist under the Betomik tenant — reported per row as ok:false, the batch continues → Take the ids from \`ib dev betomik-orderbook rows <runId>\`
   exit 4 (HTTP 400)  Unknown --provider, or the provider is not configured on the backend → Use --provider bedrock|local; the backend needs AI_BEDROCK_* / AI_LOCAL_* for it
+  exit 4 (HTTP 409)  Another sync holds the run (fb#1824) → \`runs\` shows syncLockedBy; retry later
 
 NOTES
   - Run --dry-run FIRST: the server still extracts (Bedrock, stored for the real pass) and plans, and each blockReason names what it WOULD create (customer:new "…", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow says customer:missing where the real pass writes on the placeholder customer. Like resync, a dry run still writes LEDGER state: a synced row you dry-run reads pending until the next real pass.

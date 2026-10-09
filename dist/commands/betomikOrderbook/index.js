@@ -57,7 +57,11 @@ export async function runBetomikOrderbookRows(client, runId, filter = {}) {
         items = items.filter((r) => wanted.includes(String(r.syncStatus)));
     if (filter.raw === false)
         items = items.map(({ rawJson: _raw, ...rest }) => rest);
-    return page(items, filter);
+    // The server's read timestamp (DB clock, taken before the read): hand it back as
+    // `review --read-at` to refuse a ruling on a row re-synced since (fb#1824).
+    const readAt = raw?.readAt;
+    const env = page(items, filter);
+    return typeof readAt === "string" ? { ...env, readAt } : env;
 }
 /**
  * Ledger rows ACROSS every run by keikka / worksite / text (GET
@@ -109,6 +113,22 @@ export async function runBetomikOrderbookRow(client, rowId, opts = {}) {
     const rest = { ...row };
     delete rest.rawJson;
     return rest;
+}
+/** `review`'s flags → request body; --read-at is checked here so a typo never reaches the server. */
+export function buildReviewBody(opts) {
+    if (opts.readAt !== undefined && Number.isNaN(Date.parse(opts.readAt))) {
+        failWith(`--read-at: not an ISO timestamp: ${opts.readAt}`, 4, "pass the readAt field from `ib dev betomik-orderbook rows <runId>`");
+    }
+    const body = { status: opts.status };
+    if (opts.rowKind)
+        body.rowKind = opts.rowKind;
+    if (opts.palkkiType)
+        body.palkkiType = opts.palkkiType;
+    if (opts.note)
+        body.notes = opts.note;
+    if (opts.readAt)
+        body.readAt = opts.readAt;
+    return body;
 }
 /** Review one staging row (POST /api/betomik-orderbook/rows/:rowId/review). */
 export async function runBetomikOrderbookReview(client, rowId, body, flags) {
@@ -275,16 +295,11 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
         .requiredOption("--status <status>", "pending | approved | rejected")
         .option("--row-kind <kind>", "keikka | palkki")
         .option("--palkki-type <name>", "one of the tenant's grid_palkkiTypes names")
-        .option("--note <text>", "reviewNotes");
+        .option("--note <text>", "reviewNotes")
+        .option("--read-at <iso>", "Refuse (409) if the row was synced after this time — pass `rows`' readAt");
     addWriteFlagsToCommand(reviewCmd).action(guarded(async (idStr, opts) => {
+        const body = buildReviewBody(opts);
         const client = await getClient();
-        const body = { status: opts.status };
-        if (opts.rowKind)
-            body.rowKind = opts.rowKind;
-        if (opts.palkkiType)
-            body.palkkiType = opts.palkkiType;
-        if (opts.note)
-            body.notes = opts.note;
         writeJson(await runBetomikOrderbookReview(client, parseId(idStr, "rowId"), body, opts));
     }));
     const proposeCmd = group

@@ -49,7 +49,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "offset", type: "number", description: "Runs to skip (default 0)" },
     ],
     args: [],
-    outputShape: "ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount }>",
+    outputShape: "ListEnvelope<{ importRunId, sheetLabel, isoYear, isoWeek, importedAt, importedBy, rowCount, syncLockedAt, syncLockedBy }> — syncLocked* set = a sync is in flight",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
       intParseErr("--limit", "pass a positive integer; it slices the fetched run client-side, so any size works"),
@@ -69,7 +69,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "no-raw", type: "boolean", description: "Drop rawJson (the raw sheet cells) from every row — a 352-row run is ~300 KB with it" },
     ],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
-    outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy }>",
+    outputShape: "ListEnvelope<{ betomikOrderbookImportRowId, importRunId, jobDate, day, tableName, plate, vehicleLabel, vehicleId, vehicleNo, vehiclePuomi, vehicleRegNo, driverRaw, driverName, matchedPersonId, driverMatchStatus, tehdasTilaaja, sourceType, plantOrNote, sourceAsiakasId, betomikBuys, betomikCrew, plantSijaintiId, plantOwnerAsiakasId, plantResolved, customerGuess, siteText, siteClassification, rowKind: 'keikka'|'palkki', palkkiType, maybeNote, m3, aiJson, aiModel, aiProposedAt, reviewStatus, reviewedBy, syncStatus, syncedAt, syncedBy }> + readAt (for `review --read-at`)",
     prettyColumns: ["importRunId", "jobDate", "plate", "vehicleLabel", "driverName", "driverMatchStatus", "sourceType", "m3", "reviewStatus"],
     notes: [
       "rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via `review`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see `propose`/`ai-stats`.",
@@ -140,6 +140,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "row-kind", type: "string", description: "keikka | palkki — override the parser's classification" },
       { name: "palkki-type", type: "string", description: "one of the tenant's active grid_palkkiTypes names (e.g. huolto, pois ajosta, kommentti); ignored/cleared when --row-kind keikka" },
       { name: "note", type: "string", description: "reviewNotes (kept when omitted)" },
+      { name: "read-at", type: "string", description: "`rows`' readAt — refuse (409) if a sync wrote the row since (fb#1824)" },
     ],
     args: [{ name: "rowId", type: "number", description: "betomikOrderbookImportRowId from `rows`" }],
     outputShape: "{ updated: boolean } — updated:false means no row with that id under the Betomik tenant",
@@ -148,8 +149,10 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       "Discover valid --palkki-type names with `ib palkki type list --owner <id>` instead of probing with a bad value.",
     ],
     errors: [
-      { origin: "client", exit: 4, meaning: "rowId is not a positive integer", remedy: "Pass the betomikOrderbookImportRowId from `ib dev betomik-orderbook rows <runId>`" },
+      { origin: "client", exit: 4, match: "invalid rowId", meaning: "rowId is not a positive integer", remedy: "Pass the betomikOrderbookImportRowId from `ib dev betomik-orderbook rows <runId>`" },
       { http: 400, exit: 4, meaning: "Bad status / rowKind / palkkiType", remedy: "status: pending|approved|rejected; rowKind: keikka|palkki; palkkiType must be one of the names the 400 message lists" },
+      { origin: "client", exit: 4, match: "--read-at: not an ISO", meaning: "Unparseable --read-at", remedy: "Pass `rows`' readAt" },
+      { http: 409, exit: 4, match: "synkronoitiin lukemisen", meaning: "Row synced after --read-at; nothing written", remedy: "Re-read with `row <rowId>`, re-check, retry with a fresh --read-at" },
       { http: 403, exit: 3, meaning: "Not a system admin/developer and not an admin of the Betomik company", remedy: "Use a developer token, or an asiakasAdmin of asiakasId 27" },
     ],
     seeAlso: ["ib palkki type list"],
@@ -236,6 +239,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { http: 400, exit: 4, meaning: "Missing sheetLabel/isoYear/isoWeek/rows, or unknown mode/provider", remedy: "Pass the parser's full payload; use --mode shadow|create|full and --provider bedrock|local" },
       { http: 400, exit: 4, match: ["yhtään llm-tarjoajaa", "ilman extracted-kenttää"], meaning: "With --provider set on a REAL sync (not --dry-run): provider not configured (AI_BEDROCK_* / AI_LOCAL_*), or >40 rows lack `extracted` — neither check runs on --dry-run or without --provider", remedy: "Configure AI_BEDROCK_MODEL/AI_BEDROCK_ENABLED or AI_LOCAL_BASE_URL/AI_LOCAL_MODEL; run scripts/sales/betomik-orderbook-extract.py first when rows lack extracted" },
       { origin: "client", exit: 4, meaning: "No --body or --from-json payload given", remedy: "Pass --from-json <file|-> or --body '<json>'" },
+      { http: 409, exit: 4, match: "synkronoidaan jo", meaning: "Another sync holds the run (fb#1824)", remedy: "`runs` shows syncLockedBy; retry later" },
     ],
     examples: [
       'ib dev betomik-orderbook sync --from-json rows.json --mode shadow --reason "cron tick"',
@@ -262,6 +266,8 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
       { http: 400, exit: 4, meaning: "Unknown mode/provider, or the chosen provider has more than 40 un-extracted rows", remedy: "Use --mode shadow|create|full, --provider bedrock|local, and extract cells in smaller batches first" },
+      { http: 404, exit: 5, meaning: "No such run", remedy: "See `runs`" },
+      { http: 409, exit: 4, match: "synkronoidaan jo", meaning: "Another sync holds the run (fb#1824)", remedy: "`runs` shows syncLockedBy; retry later" },
     ],
     examples: ["ib dev betomik-orderbook resync 5 --mode full --dry-run"],
   },
@@ -289,6 +295,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can write rows" },
       { http: 404, exit: 5, meaning: "A row id does not exist under the Betomik tenant — reported per row as ok:false, the batch continues", remedy: "Take the ids from `ib dev betomik-orderbook rows <runId>`" },
       { http: 400, exit: 4, meaning: "Unknown --provider, or the provider is not configured on the backend", remedy: "Use --provider bedrock|local; the backend needs AI_BEDROCK_* / AI_LOCAL_* for it" },
+      { http: 409, exit: 4, match: "synkronoidaan jo", meaning: "Another sync holds the run (fb#1824)", remedy: "`runs` shows syncLockedBy; retry later" },
     ],
     seeAlso: ["ib dev betomik-orderbook resync", "ib dev betomik-orderbook review", "ib dev betomik-orderbook rows"],
     examples: [

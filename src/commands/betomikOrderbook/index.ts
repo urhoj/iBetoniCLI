@@ -80,7 +80,7 @@ export async function runBetomikOrderbookRows(
   client: ApiClient,
   runId: number,
   filter: BetomikRowsFilter = {}
-): Promise<ListEnvelope<Record<string, unknown>>> {
+): Promise<ListEnvelope<Record<string, unknown>> & { readAt?: string }> {
   const wanted = (filter.status ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const bad = wanted.filter((s) => !ROW_SYNC_STATUSES.includes(s));
   if (bad.length) {
@@ -96,7 +96,11 @@ export async function runBetomikOrderbookRows(
   let items = itemsOf<Record<string, unknown>>(raw);
   if (wanted.length) items = items.filter((r) => wanted.includes(String(r.syncStatus)));
   if (filter.raw === false) items = items.map(({ rawJson: _raw, ...rest }) => rest);
-  return page(items, filter);
+  // The server's read timestamp (DB clock, taken before the read): hand it back as
+  // `review --read-at` to refuse a ruling on a row re-synced since (fb#1824).
+  const readAt = (raw as { readAt?: unknown } | null)?.readAt;
+  const env = page(items, filter);
+  return typeof readAt === "string" ? { ...env, readAt } : env;
 }
 
 export interface BetomikFindFilter {
@@ -164,6 +168,21 @@ export interface BetomikReviewBody {
   rowKind?: string;
   palkkiType?: string;
   notes?: string;
+  /** fb#1824: refuse (409) when the row was synced after this time — `rows`' readAt. */
+  readAt?: string;
+}
+
+/** `review`'s flags → request body; --read-at is checked here so a typo never reaches the server. */
+export function buildReviewBody(opts: { status: string; rowKind?: string; palkkiType?: string; note?: string; readAt?: string }): BetomikReviewBody {
+  if (opts.readAt !== undefined && Number.isNaN(Date.parse(opts.readAt))) {
+    failWith(`--read-at: not an ISO timestamp: ${opts.readAt}`, 4, "pass the readAt field from `ib dev betomik-orderbook rows <runId>`");
+  }
+  const body: BetomikReviewBody = { status: opts.status };
+  if (opts.rowKind) body.rowKind = opts.rowKind;
+  if (opts.palkkiType) body.palkkiType = opts.palkkiType;
+  if (opts.note) body.notes = opts.note;
+  if (opts.readAt) body.readAt = opts.readAt;
+  return body;
 }
 
 /** Review one staging row (POST /api/betomik-orderbook/rows/:rowId/review). */
@@ -464,18 +483,16 @@ export function registerBetomikOrderbookCommands(
     .requiredOption("--status <status>", "pending | approved | rejected")
     .option("--row-kind <kind>", "keikka | palkki")
     .option("--palkki-type <name>", "one of the tenant's grid_palkkiTypes names")
-    .option("--note <text>", "reviewNotes");
+    .option("--note <text>", "reviewNotes")
+    .option("--read-at <iso>", "Refuse (409) if the row was synced after this time — pass `rows`' readAt");
   addWriteFlagsToCommand(reviewCmd).action(
     guarded(
       async (
         idStr: string,
-        opts: WriteFlags & { status: string; rowKind?: string; palkkiType?: string; note?: string }
+        opts: WriteFlags & { status: string; rowKind?: string; palkkiType?: string; note?: string; readAt?: string }
       ) => {
+        const body = buildReviewBody(opts);
         const client = await getClient();
-        const body: BetomikReviewBody = { status: opts.status };
-        if (opts.rowKind) body.rowKind = opts.rowKind;
-        if (opts.palkkiType) body.palkkiType = opts.palkkiType;
-        if (opts.note) body.notes = opts.note;
         writeJson(await runBetomikOrderbookReview(client, parseId(idStr, "rowId"), body, opts));
       }
     )
