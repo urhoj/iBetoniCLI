@@ -16892,7 +16892,8 @@ DESCRIPTION
 FLAGS
   --from STRING    First Helsinki day, YYYY-MM-DD or today/yesterday
   --to STRING    Last day (default --from); at most 31 days after --from
-  --apply    Pin every autoApplicable row via set-location (MANUAL, change-logged)
+  --apply    Pin autoApplicable rows via set-location (MANUAL, change-logged)
+  --min-confidence STRING    Lowest confidence --apply pins: high (default) | medium
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -16909,12 +16910,13 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Bad --from/--to        → pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart
+  exit 4 (client-side)  unknown --min-confidence → high or medium
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check edit role in the worksite's owner company (requireCompanyRole tier edit)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT. Read-only without --apply.
+  - Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply.
 
 SEE ALSO
   ib worksite set-location, ib vehicle timeline

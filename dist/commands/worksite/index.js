@@ -8,7 +8,7 @@ import { todayHelsinki, resolveDate } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption, assertEnum } from "../../targets.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { registerPersonLinkCommands } from "../_shared/personLink.js";
@@ -239,18 +239,23 @@ export async function runWorksiteSetLocation(client, tyomaaId, lat, lng, flags) 
         headers: writeFlagsToHeaders(flags),
     });
 }
+export const GPS_MIN_CONFIDENCE = ["high", "medium"];
 /**
  * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
- * truck's pour stop. `apply` pins every autoApplicable row through set-location
- * (MANUAL, change-logged); one failed pin is reported on its row, not thrown.
+ * truck's pour stop. `apply` pins every autoApplicable row at or above
+ * `minConfidence` through set-location (MANUAL, change-logged); one failed pin
+ * is reported on its row, not thrown. The default is "high" (2+ agreeing pours):
+ * a MANUAL pin survives address edits and the order-book sync, so a single-pour
+ * guess at the wrong stop would stick until someone noticed.
  */
-export async function runWorksiteGpsCheck(client, range, apply, flags) {
+export async function runWorksiteGpsCheck(client, range, apply, flags, minConfidence = "high") {
     const res = await client.get(`/api/cli/worksite/gps-check${qs({ from: range.from, to: range.to })}`);
     if (!apply)
         return res;
+    const allowed = minConfidence === "high" ? ["high"] : ["high", "medium"];
     const writeFlags = { ...flags, reason: flags.reason ?? "GPS stop pin (fb#2361)" };
     for (const p of res.items) {
-        if (!p.autoApplicable)
+        if (!p.autoApplicable || !allowed.includes(p.confidence))
             continue;
         try {
             await runWorksiteSetLocation(client, p.tyomaaId, p.proposed.lat, p.proposed.lng, writeFlags);
@@ -468,7 +473,11 @@ export function registerWorksiteCommands(parent, getClient) {
     addWriteFlagsToCommand(w.command("gps-check")
         .requiredOption("--from <date>")
         .option("--to <date>")
-        .option("--apply")).action(jsonAction(getClient, (client, opts) => runWorksiteGpsCheck(client, { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts)));
+        .option("--apply")
+        .option("--min-confidence <level>")).action(jsonAction(getClient, (client, opts) => {
+        assertEnum(opts.minConfidence, GPS_MIN_CONFIDENCE, "--min-confidence");
+        return runWorksiteGpsCheck(client, { from: resolveDate(opts.from), to: resolveDate(opts.to) }, !!opts.apply, opts, opts.minConfidence);
+    }));
     addWriteFlagsToCommand(w.command("set-customer <tyomaaId>")
         .requiredOption("--customer <asiakasId>", "", intFlag("--customer", 1))).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteSetCustomer(client, parseId(idStr, "tyomaaId"), opts.customer, opts)));
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts)));

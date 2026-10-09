@@ -14,7 +14,7 @@ import { todayHelsinki, resolveDate } from "../../dates.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, queryAliasOption, intFlag, numFlag, addOwnerOption, assertEnum } from "../../targets.js";
 import {
   runAddressDashboard,
   registerDashboardCommand,
@@ -393,24 +393,31 @@ export interface WorksiteGpsProposal {
   error?: string;
 }
 
+export const GPS_MIN_CONFIDENCE = ["high", "medium"] as const;
+
 /**
  * GET /api/cli/worksite/gps-check — worksites whose coords sit > 1 km from the
- * truck's pour stop. `apply` pins every autoApplicable row through set-location
- * (MANUAL, change-logged); one failed pin is reported on its row, not thrown.
+ * truck's pour stop. `apply` pins every autoApplicable row at or above
+ * `minConfidence` through set-location (MANUAL, change-logged); one failed pin
+ * is reported on its row, not thrown. The default is "high" (2+ agreeing pours):
+ * a MANUAL pin survives address edits and the order-book sync, so a single-pour
+ * guess at the wrong stop would stick until someone noticed.
  */
 export async function runWorksiteGpsCheck(
   client: ApiClient,
   range: { from: string; to?: string },
   apply: boolean,
-  flags: WriteFlags
+  flags: WriteFlags,
+  minConfidence: (typeof GPS_MIN_CONFIDENCE)[number] = "high"
 ): Promise<ListEnvelope<WorksiteGpsProposal>> {
   const res = await client.get<ListEnvelope<WorksiteGpsProposal>>(
     `/api/cli/worksite/gps-check${qs({ from: range.from, to: range.to })}`
   );
   if (!apply) return res;
+  const allowed: string[] = minConfidence === "high" ? ["high"] : ["high", "medium"];
   const writeFlags = { ...flags, reason: flags.reason ?? "GPS stop pin (fb#2361)" };
   for (const p of res.items) {
-    if (!p.autoApplicable) continue;
+    if (!p.autoApplicable || !allowed.includes(p.confidence)) continue;
     try {
       await runWorksiteSetLocation(client, p.tyomaaId, p.proposed.lat, p.proposed.lng, writeFlags);
       p.applied = true;
@@ -770,10 +777,18 @@ export function registerWorksiteCommands(
       .requiredOption("--from <date>")
       .option("--to <date>")
       .option("--apply")
+      .option("--min-confidence <level>")
   ).action(
-    jsonAction(getClient, (client, opts: WriteFlags & { from: string; to?: string; apply?: boolean }) =>
-      runWorksiteGpsCheck(client, { from: resolveDate(opts.from)!, to: resolveDate(opts.to) }, !!opts.apply, opts)
-    )
+    jsonAction(getClient, (client, opts: WriteFlags & { from: string; to?: string; apply?: boolean; minConfidence?: string }) => {
+      assertEnum(opts.minConfidence, GPS_MIN_CONFIDENCE, "--min-confidence");
+      return runWorksiteGpsCheck(
+        client,
+        { from: resolveDate(opts.from)!, to: resolveDate(opts.to) },
+        !!opts.apply,
+        opts,
+        opts.minConfidence as (typeof GPS_MIN_CONFIDENCE)[number] | undefined
+      );
+    })
   );
 
   addWriteFlagsToCommand(

@@ -173,17 +173,19 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     flags: [
       { name: "from", type: "string", description: "First Helsinki day, YYYY-MM-DD or today/yesterday" },
       { name: "to", type: "string", description: "Last day (default --from); at most 31 days after --from" },
-      { name: "apply", type: "boolean", description: "Pin every autoApplicable row via set-location (MANUAL, change-logged)" },
+      { name: "apply", type: "boolean", description: "Pin autoApplicable rows via set-location (MANUAL, change-logged)" },
+      { name: "min-confidence", type: "string", description: "Lowest confidence --apply pins: high (default) | medium" },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "ListEnvelope<{ tyomaaId, tyomaaNimi, accuracy, current:{lat,lng}, proposed:{lat,lng}, distanceM, spreadM, keikkaIds, confidence:high|medium|low, autoApplicable, applied?, error? }>",
     errors: [
       apiErr(400, "Bad --from/--to", "pass YYYY-MM-DD dates, --to on or after --from, at most 31 days apart"),
+      { origin: "client", exit: 4, match: "--min-confidence must be one of", meaning: "unknown --min-confidence", remedy: "high or medium" },
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     notes: [
-      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT. Read-only without --apply.",
+      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ pours within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply.",
     ],
     seeAlso: ["ib worksite set-location", "ib vehicle timeline"],
     examples: [
