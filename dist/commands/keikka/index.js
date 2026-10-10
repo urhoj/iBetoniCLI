@@ -150,7 +150,9 @@ export async function runKeikkaGet(client, keikkaId) {
  * can be newer than the backend serving it at any time; sending a parameter the
  * new backend ignores costs nothing and removes the ordering hazard entirely.
  *
- * usingFullTextSearch=true mirrors the GPT tool's default path. Rows arrive
+ * usingFullTextSearch is ignored by the backend (the query's shape picks the
+ * proc: a number → phone proc, anything else → full-text); it is sent only
+ * for parity with the GPT tool's request. Rows arrive
  * one-per-keikkaBetoni; dedupe by keikkaId. `limit` is applied client-side
  * (the backend caps at TOP 100, no limit param).
  */

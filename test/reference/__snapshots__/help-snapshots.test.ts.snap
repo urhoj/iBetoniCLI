@@ -8299,7 +8299,7 @@ exports[`Help snapshots — contract stability > help for ib keikka search match
   ib keikka search [<query>] [flags]
 
 DESCRIPTION
-  Search keikkas. A digits-only query matches contact phone, exact keikkaId, worksite name/number, invoice reference and attachment comment (substring); any other query is a full-text word-prefix search over keikka, customer, worksite, contact person and concrete-line text. Returns deduped hits (one per keikka), newest first.
+  Search keikkas. A number (phone, keikkaId, worksite number) matches contact phone, exact keikkaId, worksite name/number, invoice reference and attachment comment (substring); any other query is a full-text word-prefix search over keikka, customer, worksite, contact person and concrete-line text. Returns deduped hits (one per keikka), newest first.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -8325,7 +8325,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Backed by the deployed GET /api/keikka/search (same path the AI order tool uses).
-  - Give a phone number as bare digits (0401234567): \`+358…\` or spaces/dashes route to the text search, which does not search phone. Text matches whole words or word starts only (no infix) and skips drafts, cancelled and deleted orders — the digits path has no status filter.
+  - A phone number may carry +358, spaces, dashes or parentheses (backend fb#2433; an older backend needs bare digits). Text matches whole words or word starts only (no infix). Both paths return only sent/active/delivered orders — never drafts, cancelled, failed or deleted ones.
   - Scope: the active company, from the session token — a hit is returned when that company is the order's owner, source, betoni or pumppu supplier. Use --company <id> to search as another company.
   - --all-companies widens to every order you may read; each hit's ownerName says whose it is. An order owned by another company CANNOT be copied (POST /api/keikka/copy 403s) — a copy always lands in the owner's company.
 
