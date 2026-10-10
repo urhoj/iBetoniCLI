@@ -220,12 +220,12 @@ export const DEV_META_SPECS: CommandSpec[] = [
   {
     command: "ib dev api-usage",
     description:
-      "Live external-API budget counters (fb#1380): per API the current hour/day/month call counts from the Redis counters apiTracking ENFORCES, beside the configured limits, when each window resets, and which windows are exhausted. Check headroom here before adding a poller (Ecofleet, Mapon, FMI, Google Maps, PRH, VIES…). Not the api_usage_log table: that mirror double-counts against the counters and cannot tell whether the next call will be refused.",
+      "Live external-API budget counters: per API the current hour/day/month call counts from the Redis counters apiTracking ENFORCES, beside the configured limits, when each window resets, and which windows are exhausted. Check headroom here before adding a poller (Ecofleet, Mapon, FMI, Google Maps, PRH, VIES…). Not the api_usage_log table: that mirror double-counts against the counters and cannot tell whether the next call will be refused.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [{ name: "service", type: "string", description: "One API by config name (e.g. ecofleet, fmi-weather, google-maps); omit for all" }],
     outputShape:
-      "{ redisAvailable, checkedAt, items:[{ service, name, rateLimitEnabled, hour, day, month, limits:{ perHour, perDay, perMonth }|null, resetAt:{ hour, day, month }, exhausted:{ hour, day, month } }] } — `exhausted` is null per window when that API has no limit. redisAvailable:false means the counters are UNKNOWN, not zero.",
+      "{ redisAvailable, checkedAt, items:[{ service, name, rateLimitEnabled, hour, day, month, limits:{ perHour, perDay, perMonth }|null, resetAt:{ hour, day, month }, exhausted:{ hour, day, month } }] } — `exhausted` is null per window when that API has no limit. redisAvailable:false means the counters are UNKNOWN, not zero; a Redis error mid-read is a 500.",
     errors: [
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
       apiErr(400, "Unknown --service", "the error lists the valid API names"),
@@ -236,7 +236,7 @@ export const DEV_META_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Windows are server-local clock hour/day/month, matching what the limiter enforces.",
-      "The first read of a day can rebuild that day's counters from api_usage_log (the same restore every tracked call triggers), so the numbers are authoritative, not a fresh zero.",
+      "The first read of a day can rebuild the counters from api_usage_log, so they are authoritative, not a fresh zero.",
     ],
     seeAlso: ["ib dev cache keys"],
     examples: ["ib dev api-usage", "ib dev api-usage --service ecofleet"],

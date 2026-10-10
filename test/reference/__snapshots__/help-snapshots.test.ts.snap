@@ -2396,7 +2396,7 @@ exports[`Help snapshots — contract stability > help for ib dev api-usage match
   ib dev api-usage [flags]
 
 DESCRIPTION
-  Live external-API budget counters (fb#1380): per API the current hour/day/month call counts from the Redis counters apiTracking ENFORCES, beside the configured limits, when each window resets, and which windows are exhausted. Check headroom here before adding a poller (Ecofleet, Mapon, FMI, Google Maps, PRH, VIES…). Not the api_usage_log table: that mirror double-counts against the counters and cannot tell whether the next call will be refused.
+  Live external-API budget counters: per API the current hour/day/month call counts from the Redis counters apiTracking ENFORCES, beside the configured limits, when each window resets, and which windows are exhausted. Check headroom here before adding a poller (Ecofleet, Mapon, FMI, Google Maps, PRH, VIES…). Not the api_usage_log table: that mirror double-counts against the counters and cannot tell whether the next call will be refused.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -2407,7 +2407,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { redisAvailable, checkedAt, items:[{ service, name, rateLimitEnabled, hour, day, month, limits:{ perHour, perDay, perMonth }|null, resetAt:{ hour, day, month }, exhausted:{ hour, day, month } }] } — \`exhausted\` is null per window when that API has no limit. redisAvailable:false means the counters are UNKNOWN, not zero.
+  { redisAvailable, checkedAt, items:[{ service, name, rateLimitEnabled, hour, day, month, limits:{ perHour, perDay, perMonth }|null, resetAt:{ hour, day, month }, exhausted:{ hour, day, month } }] } — \`exhausted\` is null per window when that API has no limit. redisAvailable:false means the counters are UNKNOWN, not zero; a Redis error mid-read is a 500.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
@@ -2419,7 +2419,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Windows are server-local clock hour/day/month, matching what the limiter enforces.
-  - The first read of a day can rebuild that day's counters from api_usage_log (the same restore every tracked call triggers), so the numbers are authoritative, not a fresh zero.
+  - The first read of a day can rebuild the counters from api_usage_log, so they are authoritative, not a fresh zero.
 
 SEE ALSO
   ib dev cache keys
@@ -3495,11 +3495,11 @@ exports[`Help snapshots — contract stability > help for ib dev cache raw-delet
   ib dev cache raw-delete <key> [flags]
 
 DESCRIPTION
-  Delete ONE exact raw Redis key — no glob, no \`r:*:\` namespace. The only way to reach operational keys written with a bare redis.set (\`mcp:client:<id>\`, \`mcp:refresh:<token>\`), which \`pattern\`/\`invalidate\` cannot target because they prepend the cache namespace. Previews (exists/type/ttl) unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Delete ONE exact raw Redis key (no glob, no \`r:*:\` namespace) under a server-side allowlist of operational prefixes (e.g. \`mcp:client:<id>\`, \`api:track:global:…\`) that \`pattern\`/\`invalidate\` cannot reach; security state (token blacklist, refresh-token tombstones), login rate limiters and locks are refused; \`api:track:global:\` IS allowed, so this can reset an enforced external-API counter. Previews (exists/type/ttl) unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
-  <key> STRING    The exact raw key, as \`ib dev cache keys\` prints it. Glob characters (* ? [ ] \\) and namespaced \`r:\` keys are refused. (required)
+  <key> STRING    The exact raw key, as \`ib dev cache keys\` prints it (required)
 
 FLAGS
   --confirm    Execute the operation (default is dry-run preview)
@@ -3512,17 +3512,16 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  preview: { dryRun:true, key, exists, type, ttl } | execute: { dryRun:false, key, deleted: 0|1 }
+  preview: { dryRun:true, key, exists, type, ttl } | execute: { dryRun:false, key, deleted: 0|1 }; \`{ dryRun, key, redisSkipped:true }\` = Redis unreachable, nothing checked or deleted
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 4 (HTTP 400)  Missing key, glob characters, or a namespaced r: key → pass one exact raw key; namespaced cache entries go through \`ib dev cache pattern\` / \`invalidate\`
+  exit 4 (HTTP 400)  Missing key, glob characters, or a prefix outside the allowlist → the message lists the allowed prefixes; namespaced cache entries go through \`ib dev cache pattern\` / \`invalidate\`
   exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share one Redis; add --force-prod or use a local endpoint
   exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 4 (client-side)  --dry-run and --confirm passed together → drop --dry-run to execute, or drop --confirm to preview (preview is the default)
-  exit 4 (client-side)  The key contains a glob metacharacter → raw-delete takes one exact key; find it with \`ib dev cache keys --pattern '<glob>'\`
 
 SEE ALSO
   ib dev cache keys, ib dev cache pattern

@@ -308,10 +308,4 @@ describe("runCacheRawDelete (fb#1713)", () => {
       { headers: { "X-Force-Prod": "1", "X-Action-Reason": "test" } }
     );
   });
-
-  test.each(["mcp:client:*", "mcp:client:a?c", "mcp:[ab]", "a\\b"])("refuses glob key %s before any request", async (key) => {
-    const client = mockApiClient({});
-    await expect(runCacheRawDelete(client, key, {})).rejects.toThrow(/glob characters/);
-    expect(client.post).not.toHaveBeenCalled();
-  });
 });

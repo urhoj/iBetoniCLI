@@ -115,21 +115,14 @@ export async function runCachePattern(
 /**
  * Delete ONE exact raw Redis key, bypassing the `r:*:` release namespace that
  * `pattern`/`invalidate` prepend — the only way to reach operational keys written
- * with a bare redis.set (`mcp:client:<id>`, `mcp:refresh:<token>`), fb#1713.
- * Exact-key only, so it can never become a namespace-wide wipe.
+ * with a bare redis.set (`mcp:client:<id>`), fb#1713. Which keys qualify (exact,
+ * allowlisted prefixes) is decided server-side only (fb#2420).
  */
 export async function runCacheRawDelete(
   client: ApiClient,
   key: string,
   opts: CacheWriteOpts
 ): Promise<unknown> {
-  if (/[*?[\]\\]/.test(key)) {
-    failWith(
-      `glob characters not allowed in an exact key: ${key}`,
-      4,
-      "raw-delete takes ONE exact key; find it with `ib dev cache keys --pattern '<glob>'`, or use `ib dev cache pattern` for a namespaced glob"
-    );
-  }
   const { dryRun, fetchOpts } = writeRequestOptions(client, opts);
   return client.post("/api/cli/cache/raw-delete", { key, confirmed: !dryRun }, fetchOpts);
 }
@@ -148,7 +141,7 @@ function addCacheWriteOptions(cmd: Command): Command {
 
 /**
  * Register `ib cache` subcommands. Inspect verbs (stats/keys) are GETs and
- * developer-gated server-side. Destructive verbs (invalidate/clear/pattern)
+ * developer-gated server-side. Destructive verbs (invalidate/clear/pattern/raw-delete)
  * preview by default and require --confirm to execute; --force-prod overrides
  * the shared-cache endpoint guard. `entities` is fully offline.
  */
