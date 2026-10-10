@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { buildReference } from "../../src/reference/dump.js";
+import baseline from "./dump-size-baseline.json" with { type: "json" };
 
 /**
  * Reference-dump size ratchet (fb#779, reshaped by fb#2386). It used to cap the
@@ -8,7 +9,9 @@ import { buildReference } from "../../src/reference/dump.js";
  * checks trip only on VERBOSITY and on what an agent actually loads:
  *  - mean bytes per spec: a concise new command passes, padding raises the mean;
  *  - the largest loadable `ib reference dump <token>`: what one read costs;
- *  - the largest single spec.
+ *  - each single spec: held to PER_SPEC_LIMIT_BYTES unless it has its own
+ *    shrink-only ceiling in dump-size-baseline.json (fb#1423 — a global limit
+ *    set by the largest spec let every other spec grow to that size too).
  * When one trips, TRIM first: move rationale and incident history to
  * `ib reference detail set "<cmd>" --field detail`, delete deploy-gate caveats
  * for backends long since deployed, and keep each note to the operational
@@ -17,7 +20,8 @@ import { buildReference } from "../../src/reference/dump.js";
  */
 const MEAN_SPEC_LIMIT_BYTES = 1_985; // measured 1 962.8 B after the fb#2386 trim
 const DOMAIN_DUMP_LIMIT_BYTES = 120_000; // largest unit: jerry, 102 667 B (fb#2386)
-const PER_SPEC_LIMIT_BYTES = 11_900; // largest: ib dev changelog add, 11 549 B (fb#2386)
+const PER_SPEC_LIMIT_BYTES = 6_000; // default for unlisted specs; largest unlisted: ib reference detail set, 5 804 B (fb#1423)
+const ceilings: Record<string, number> = baseline.ceilings;
 
 const TRIM_HINT =
   "Trim first: move rationale/incident history to `ib reference detail set \"<cmd>\" --field detail`, " +
@@ -61,14 +65,44 @@ describe("reference dump size ratchet (fb#779, fb#2386)", () => {
     ).toEqual([]);
   });
 
-  test(`no single spec exceeds ${PER_SPEC_LIMIT_BYTES} bytes in the dump`, () => {
-    const offenders = Object.entries(fullDump().commands)
-      .map(([name, spec]) => [name, bytes(spec)] as const)
-      .filter(([, size]) => size >= PER_SPEC_LIMIT_BYTES);
-    expect(
-      offenders,
-      offenders.map(([name, size]) => `${name} is ${size} B (limit ${PER_SPEC_LIMIT_BYTES}). ${TRIM_HINT}`).join("\n")
-    ).toEqual([]);
+  test(`no spec exceeds ${PER_SPEC_LIMIT_BYTES} bytes unless baselined (and never above its ceiling)`, () => {
+    const failures: string[] = [];
+    for (const [name, spec] of Object.entries(fullDump().commands)) {
+      const size = bytes(spec);
+      const ceiling = ceilings[name];
+      if (ceiling !== undefined) {
+        if (size > ceiling) {
+          failures.push(
+            `${name} grew to ${size} B (ceiling ${ceiling} B). ${TRIM_HINT} Ceilings are shrink-only: ` +
+              `do NOT raise the entry in test/reference/dump-size-baseline.json casually — a raise is a reviewed decision.`
+          );
+        }
+      } else if (size > PER_SPEC_LIMIT_BYTES) {
+        failures.push(
+          `${name} is ${size} B (limit ${PER_SPEC_LIMIT_BYTES}). ${TRIM_HINT} ` +
+            `If the size is the contract itself, add '"${name}": ${size}' to test/reference/dump-size-baseline.json in the same PR.`
+        );
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  test("liveness: every baselined spec still exists, still exceeds the default, and its ceiling is not above actual", () => {
+    const commands = fullDump().commands as Record<string, unknown>;
+    const stale: string[] = [];
+    for (const [name, ceiling] of Object.entries(ceilings)) {
+      if (!(name in commands)) {
+        stale.push(`${name}: no longer in the dump — delete its baseline entry`);
+        continue;
+      }
+      const size = bytes(commands[name]);
+      if (size <= PER_SPEC_LIMIT_BYTES) {
+        stale.push(`${name}: now ${size} B (<= ${PER_SPEC_LIMIT_BYTES}) — delete its baseline entry`);
+      } else if (ceiling > size) {
+        stale.push(`${name}: ceiling ${ceiling} B is above the actual ${size} B — lower it to ${size}`);
+      }
+    }
+    expect(stale, stale.join("\n")).toEqual([]);
   });
 
   test("loadable units are the non-dev domains plus each dev subgroup, never the whole `dev` tree", () => {

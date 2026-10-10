@@ -1,0 +1,21 @@
+{
+  "_doc": [
+    "Per-spec dump byte ceilings (JSON.stringify(spec).length in the developer dump), enforced by test/reference/dump-size.test.ts (fb#1423).",
+    "Every unlisted spec is held to the default PER_SPEC_LIMIT_BYTES; a listed one only to its own ceiling, so one large spec never raises the bar for the rest.",
+    "Philosophy: SHRINK this file. Ceilings are shrink-only and the liveness test forces an entry to be lowered or deleted as its spec shrinks.",
+    "Never raise a ceiling casually; adding or raising an entry is a reviewed decision made in the same PR as the growth."
+  ],
+  "ceilings": {
+    "ib dev changelog add": 11549,
+    "ib dev feedback create": 11260,
+    "ib dev changelog update": 10977,
+    "ib dev feedback list": 8999,
+    "ib keikka update": 8848,
+    "ib dev feedback update": 8196,
+    "ib dev schema query": 8186,
+    "ib glossary set": 7663,
+    "ib sijainti update": 6988,
+    "ib dev feedback resolve": 6477,
+    "ib legal save": 6357
+  }
+}
