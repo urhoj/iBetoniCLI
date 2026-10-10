@@ -19,6 +19,22 @@ import { resolveDate, todayHelsinki, composeInstant } from "../../dates.js";
 // Palkki TYPES (grid_palkkiTypes — the bar/annotation category catalogue)
 // ---------------------------------------------------------------------------
 
+/**
+ * Copy each typed field that is set onto its backend body key, over a parsed
+ * --body object (typed flags win). Shared by the palkki, type and color builders.
+ */
+function mergeTyped<T extends object>(
+  parsedBody: Record<string, unknown>,
+  typed: T,
+  keys: Partial<Record<keyof T, string>>
+): Record<string, unknown> {
+  const body = { ...parsedBody };
+  for (const k of Object.keys(keys) as Array<keyof T>) {
+    if (typed[k] !== undefined) body[keys[k]!] = typed[k];
+  }
+  return body;
+}
+
 /** Typed convenience fields for `palkki type create|update`, mapped to backend body keys. */
 export interface PalkkiTypeFields {
   name?: string;
@@ -43,19 +59,19 @@ export function buildPalkkiTypeBody(
   parsedBody: Record<string, unknown>,
   typed: PalkkiTypeFields
 ): Record<string, unknown> {
-  const body = { ...parsedBody };
-  if (typed.name !== undefined) body.name = typed.name;
-  if (typed.description !== undefined) body.unit = typed.description;
-  if (typed.owner !== undefined) body.ownerAsiakasId = typed.owner;
-  if (typed.active !== undefined) body.isActive = typed.active;
-  if (typed.vehicleAvailable !== undefined) body.vehicleAvailable = typed.vehicleAvailable;
-  if (typed.sortNo !== undefined) body.sortNo = typed.sortNo;
-  if (typed.showReportKlo !== undefined) body.showReportKlo = typed.showReportKlo;
-  if (typed.reportStyle !== undefined) body.reportStyle = typed.reportStyle;
-  if (typed.showInReport !== undefined) body.showInReport = typed.showInReport;
-  if (typed.isInventoryTransfer !== undefined) body.isInventoryTransfer = typed.isInventoryTransfer;
-  if (typed.isJob !== undefined) body.isJob = typed.isJob;
-  return body;
+  return mergeTyped(parsedBody, typed, {
+    name: "name",
+    description: "unit",
+    owner: "ownerAsiakasId",
+    active: "isActive",
+    vehicleAvailable: "vehicleAvailable",
+    sortNo: "sortNo",
+    showReportKlo: "showReportKlo",
+    reportStyle: "reportStyle",
+    showInReport: "showInReport",
+    isInventoryTransfer: "isInventoryTransfer",
+    isJob: "isJob",
+  });
 }
 
 /**
@@ -154,19 +170,19 @@ export function buildPalkkiColorBody(
   parsedBody: Record<string, unknown>,
   typed: PalkkiColorFields
 ): Record<string, unknown> {
-  const body = { ...parsedBody };
-  if (typed.title !== undefined) body.title = typed.title;
-  if (typed.ehto !== undefined) body.ehto = typed.ehto;
-  if (typed.style !== undefined) body.style = typed.style;
-  if (typed.comment !== undefined) body.comment = typed.comment;
-  if (typed.sortNo !== undefined) body.sortNo = typed.sortNo;
-  if (typed.owner !== undefined) body.ownerAsiakasId = typed.owner;
-  if (typed.active !== undefined) body.isActive = typed.active;
-  if (typed.iconName !== undefined) body.iconName = typed.iconName;
-  if (typed.iconText !== undefined) body.iconText = typed.iconText;
-  if (typed.iconColor !== undefined) body.iconColor = typed.iconColor;
-  if (typed.iconBackgroundColor !== undefined) body.iconBackgroundColor = typed.iconBackgroundColor;
-  return body;
+  return mergeTyped(parsedBody, typed, {
+    title: "title",
+    ehto: "ehto",
+    style: "style",
+    comment: "comment",
+    sortNo: "sortNo",
+    owner: "ownerAsiakasId",
+    active: "isActive",
+    iconName: "iconName",
+    iconText: "iconText",
+    iconColor: "iconColor",
+    iconBackgroundColor: "iconBackgroundColor",
+  });
 }
 
 /**
@@ -353,14 +369,15 @@ export function buildPalkkiBody(
   parsedBody: Record<string, unknown>,
   typed: PalkkiFields
 ): Record<string, unknown> {
-  const body = { ...parsedBody };
-  if (typed.vehicle !== undefined) body.vehicleId = typed.vehicle;
-  if (typed.type !== undefined) body.type = typed.type;
-  if (typed.text !== undefined) body.text = typed.text;
-  if (typed.keikka !== undefined) body.attachedKeikkaId = typed.keikka;
-  if (typed.worksite !== undefined) body.tyomaaId = typed.worksite;
-  if (typed.owner !== undefined) body.ownerAsiakasId = typed.owner;
-  if (typed.style !== undefined) body.style = typed.style;
+  const body = mergeTyped(parsedBody, typed, {
+    vehicle: "vehicleId",
+    type: "type",
+    text: "text",
+    keikka: "attachedKeikkaId",
+    worksite: "tyomaaId",
+    owner: "ownerAsiakasId",
+    style: "style",
+  });
   if (typed.date !== undefined) {
     if (typed.start !== undefined) body.timeStart = composeInstant(typed.date, typed.start, "--start");
     if (typed.end !== undefined) body.timeEnd = composeInstant(typed.date, typed.end, "--end");
@@ -392,16 +409,10 @@ export async function runPalkkiList(client: ApiClient, opts: PalkkiListFilter): 
   );
 }
 
-export interface PalkkiRow {
-  palkkiId: number;
-  date: string;
-  start: string;
-  end: string;
-  [k: string]: unknown;
-}
-
-export async function runPalkkiGet(client: ApiClient, palkkiId: number): Promise<PalkkiRow> {
-  return client.get<PalkkiRow>(`/api/cli/palkki/get/${palkkiId}`);
+export async function runPalkkiGet(client: ApiClient, palkkiId: number) {
+  return client.get<{ palkkiId: number; date: string; start: string; end: string; [k: string]: unknown }>(
+    `/api/cli/palkki/get/${palkkiId}`
+  );
 }
 
 /** POST /api/cli/palkki/create — `vehicleId`, `type` and both times are required (the server 400s otherwise). */
@@ -495,30 +506,31 @@ function addPalkkiTypeFlags(cmd: Command, isUpdate: boolean): Command {
   return c;
 }
 
+/** On/off flag pairs, each one tri-state field: [on opt, off opt, field, label]. */
+const PALKKI_TYPE_TOGGLES = [
+  ["vehicleAvailable", "vehicleUnavailable", "vehicleAvailable", "--vehicle-available / --vehicle-unavailable"],
+  ["showReportTime", "hideReportTime", "showReportKlo", "--show-report-time / --hide-report-time"],
+  ["showInReport", "hideInReport", "showInReport", "--show-in-report / --hide-in-report"],
+  ["active", "inactive", "active", "--active / --inactive"],
+] as const;
+
 function palkkiTypeFieldsFromOpts(opts: PalkkiTypeOpts): PalkkiTypeFields {
-  const pairs: Array<[boolean | undefined, boolean | undefined, string]> = [
-    [opts.vehicleAvailable, opts.vehicleUnavailable, "--vehicle-available / --vehicle-unavailable"],
-    [opts.showReportTime, opts.hideReportTime, "--show-report-time / --hide-report-time"],
-    [opts.showInReport, opts.hideInReport, "--show-in-report / --hide-in-report"],
-    [opts.active, opts.inactive, "--active / --inactive"],
-  ];
-  for (const [a, b, label] of pairs) if (a && b) failWith(`Pass at most one of ${label}`, 4);
-  const tri = (on?: boolean, off?: boolean) => (on ? true : off ? false : undefined);
+  for (const [on, off, , label] of PALKKI_TYPE_TOGGLES) {
+    if (opts[on] && opts[off]) failWith(`Pass at most one of ${label}`, 4);
+  }
   // --job / --inventory-transfer read true|undefined on create; on update the
   // registered --no-X twin makes them true|false|undefined — pass through as-is.
-  return {
+  const fields: PalkkiTypeFields = {
     name: opts.name,
     description: opts.description,
     owner: opts.owner,
-    active: tri(opts.active, opts.inactive),
-    vehicleAvailable: tri(opts.vehicleAvailable, opts.vehicleUnavailable),
     sortNo: opts.sortNo,
-    showReportKlo: tri(opts.showReportTime, opts.hideReportTime),
     reportStyle: opts.reportStyle,
-    showInReport: tri(opts.showInReport, opts.hideInReport),
     isInventoryTransfer: opts.inventoryTransfer,
     isJob: opts.job,
   };
+  for (const [on, off, field] of PALKKI_TYPE_TOGGLES) fields[field] = opts[on] ? true : opts[off] ? false : undefined;
+  return fields;
 }
 
 type PalkkiColorOpts = WriteFlags & {
