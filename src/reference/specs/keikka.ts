@@ -503,9 +503,9 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka search",
     description:
-      "Search keikkas via the backend full-text search: phone number, keikkaId, worksite name/number, invoice reference. Returns deduped hits (one per keikka), newest first.",
+      "Search keikkas. A digits-only query matches contact phone, exact keikkaId, worksite name/number, invoice reference and attachment comment (substring); any other query is a full-text word-prefix search over keikka, customer, worksite, contact person and concrete-line text. Returns deduped hits (one per keikka), newest first.",
     auth: "any",
-    args: [{ name: "query", type: "string", required: false, description: "Full-text search string (phone, keikkaId, worksite name/number, invoice ref) — or pass --search" }],
+    args: [{ name: "query", type: "string", required: false, description: "Digits only (phone, keikkaId, worksite number) or words (names, addresses, comments) — or pass --search" }],
     flags: [
       SEARCH_ALIAS_FLAG,
       { name: "limit", type: "number", description: "Max hits (client-side; backend caps at 100)" },
@@ -520,6 +520,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses).",
+      "Give a phone number as bare digits (0401234567): `+358…` or spaces/dashes route to the text search, which does not search phone. Text matches whole words or word starts only (no infix) and skips drafts, cancelled and deleted orders — the digits path has no status filter.",
       "Scope: the active company, from the session token — a hit is returned when that company is the order's owner, source, betoni or pumppu supplier. Use --company <id> to search as another company.",
       "--all-companies widens to every order you may read; each hit's ownerName says whose it is. An order owned by another company CANNOT be copied (POST /api/keikka/copy 403s) — a copy always lands in the owner's company.",
     ],
