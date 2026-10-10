@@ -704,11 +704,14 @@ export const OPTION_REDIRECTS: Record<string, string> = {
  */
 export const OPTION_DID_YOU_MEAN_OVERRIDES: Record<string, string> = {
   "ib dev feedback list --claimed": "held",
-  // fb#2424: on a create, `--text` is the prose body; FLAG_SYNONYMS' text→search
-  // sent the caller to `feedback list`'s filter instead.
-  "ib dev feedback create --text": "description",
-  "ib dev feedback create --message": "description",
 };
+
+/**
+ * Prose spellings that, on a command owning `--description`, mean that flag
+ * (fb#2424, fb#2432) — before FLAG_SYNONYMS' `text`→`search` sends the caller to
+ * a sibling's read filter. Never `--body`: on ~20 commands it is raw JSON.
+ */
+const PROSE_FLAG_GUESSES = new Set(["text", "message", "note", "content"]);
 
 /** Long flags a command accepts, derived from its curated spec (tier-blind — the
  *  caller already invoked this command; only sibling ENUMERATION is tier-gated).
@@ -1285,14 +1288,16 @@ export function buildUnknownOptionEnvelope(
 
   const bare = unknownOption.replace(/^-+/, "");
   const bareNames = availableOptions.map((o) => o.replace(/^-+/, ""));
+  const bareName = bare.split("=")[0];
   const overrideTarget = OPTION_DID_YOU_MEAN_OVERRIDES[`${canonical} ${unknownOption}`];
   // Spelling-based guess first (prefix/contains/edit distance, or the curated
-  // override), then the FLAG_SYNONYMS table — split so the guess's ORIGIN is
-  // known below without changing `closestName`.
+  // override), then the prose rule, then the FLAG_SYNONYMS table — split so the
+  // guess's ORIGIN is known below without changing `closestName`.
   const fuzzy =
-    overrideTarget && bareNames.includes(overrideTarget)
+    (overrideTarget && bareNames.includes(overrideTarget)
       ? overrideTarget
-      : closestName(bare, bareNames, {});
+      : closestName(bare, bareNames, {})) ??
+    (PROSE_FLAG_GUESSES.has(bareName) && bareNames.includes("description") ? "description" : null);
   const guess = fuzzy ?? closestName(bare, bareNames, FLAG_SYNONYMS);
   const didYouMean = guess ? `--${guess}` : null;
   // A SYNONYM guess is semantic, not a spelling correction, and one domain can
@@ -1367,7 +1372,6 @@ export function buildUnknownOptionEnvelope(
   // every tier, so no gating; a near-spelling on this command still wins.
   // Hedged: only ~40% of commands have a catalog row, and `get` exits 5 on the
   // rest (fb#2115). `bare` keeps any `=value`, so compare the name alone.
-  const bareName = bare.split("=")[0];
   const detailHint =
     redirect ||
     didYouMean ||

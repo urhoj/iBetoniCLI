@@ -250,6 +250,24 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     expect(env.acceptedAs).toBeUndefined();
   });
 
+  // fb#2432: the fb#2424 fix generalised — any command owning --description
+  // answers a prose spelling with it, not a sibling's --search filter.
+  test.each([
+    [["dev", "feedback", "update"], "--text"],
+    [["dev", "changelog", "add"], "--message"],
+    [["dev", "feedback", "create"], "--content"],
+  ])("%j %s → --description (fb#2432)", (path, flag) => {
+    const env = buildUnknownOptionEnvelope(leafByPath(...path), flag);
+    expect(env.didYouMean).toBe("--description");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.acceptedAs).toBeUndefined();
+  });
+
+  test("prose rule needs --description: list keeps --search, JSON --body is never suggested (fb#2432)", () => {
+    expect(buildUnknownOptionEnvelope(leafByPath("dev", "feedback", "list"), "--text").didYouMean).toBe("--search");
+    expect(buildUnknownOptionEnvelope(leafByPath("customer", "update"), "--text").didYouMean).not.toBe("--body");
+  });
+
   test("OPTION_DID_YOU_MEAN_OVERRIDES targets are real flags on the named command", () => {
     for (const [key, target] of Object.entries(OPTION_DID_YOU_MEAN_OVERRIDES)) {
       const command = key.slice(0, key.lastIndexOf(" "));
