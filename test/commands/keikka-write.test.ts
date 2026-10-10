@@ -158,6 +158,29 @@ describe("ib keikka create/update/drivers", () => {
     expect(mockClient.post).not.toHaveBeenCalled();
   });
 
+  test("runKeikkaUpdate pump flags post only the given fields to /api/cli/keikka/pumppu/:id (fb#1432)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12147, changed: ["pumppuPuomi"] });
+    await runKeikkaUpdate(mockClient, 12147, { puomi: 32, linja: 0 }, { reason: "asiakas pyysi" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/pumppu/12147",
+      { pumppuPuomi: 32, pumppuLinja: 0 },
+      { headers: { "X-Action-Reason": "asiakas pyysi" } }
+    );
+    await runKeikkaUpdate(mockClient, 12147, { optimalPuomi: 36 }, { dryRun: true });
+    expect(mockClient.post).toHaveBeenLastCalledWith(
+      "/api/cli/keikka/pumppu/12147",
+      { optimalPumppuPuomi: 36 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("runKeikkaUpdate pump flags: mixing with another group exits 4 before any POST", async () => {
+    await expect(runKeikkaUpdate(mockClient, 12147, { puomi: 32, m3: 5 }, {})).rejects.toThrow(/cannot be combined/);
+    await expect(runKeikkaUpdate(mockClient, 12147, { linja: 40, status: "9" }, {})).rejects.toThrow(/cannot be combined/);
+    await expect(runKeikkaUpdate(mockClient, 12147, {}, {})).rejects.toThrow(/pump flag/);
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {
     mockClient.post.mockResolvedValueOnce({
       assigned: true,

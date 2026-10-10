@@ -865,13 +865,25 @@ ib keikka update --customer <asiakasId>
   ! --customer must be an integer >= 1
   > pass a positive asiakasId
 
+ib keikka update --linja <m>
+  ! --linja must be an integer >= 0
+  > pass whole metres, e.g. 32
+
 ib keikka update --m3 <n>
   ! --m3 must be a number in 0..9999.99
   > pass a number 0..9999.99, e.g. --m3 15
 
+ib keikka update --optimal-puomi <m>
+  ! --optimal-puomi must be an integer >= 0
+  > pass whole metres, e.g. 32
+
 ib keikka update --plant <sijaintiId>
   ! --plant must be an integer >= 1
   > pass a positive sijaintiId (find plants with \`ib sijainti plants --search <name>\`)
+
+ib keikka update --puomi <m>
+  ! --puomi must be an integer >= 0
+  > pass whole metres, e.g. 32
 
 ib keikka update --source <asiakasId>
   ! --source must be an integer >= 1

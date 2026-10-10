@@ -5,7 +5,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody } from "../_shared/jsonBody.js";
 import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween } from "../../dates.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag, numFlag } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag, numFlag, assertEnum } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { ownerAsiakasIdFromToken, personIdFromClaims } from "../../owner.js";
@@ -226,7 +226,7 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
     });
 }
 /**
- * Update a keikka. Five flag groups, five routes, one group per call (no atomicity
+ * Update a keikka. Six flag groups, six routes, one group per call (no atomicity
  * across routes, so mixing is refused):
  *   - `--status` posts the numeric keikkaTilaId to /api/keikka/tila/set;
  *   - the move flags (`--vehicle/--date/--start/--end` — the grid's drag-and-drop) post
@@ -240,7 +240,9 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
  *     keikka_tyomaa_set, so the server writes varmenne + ids back (fb#2045);
  *   - the concrete flags (`--m3/--betoni-comment [--betoni-line]`) post to
  *     /api/cli/keikka/betoni/:id, which picks the keikka's only concrete line or the
- *     named one, and refuses to guess between several (fb#2070).
+ *     named one, and refuses to guess between several (fb#2070);
+ *   - the pump flags (`--puomi/--optimal-puomi/--linja`) post to /api/cli/keikka/pumppu/:id
+ *     (fb#1432).
  */
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
@@ -248,17 +250,28 @@ export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined || fields.source !== undefined;
     const isInfo = fields.drivingInstructions !== undefined || fields.comment !== undefined || fields.title !== undefined;
     const isBetoni = fields.m3 !== undefined || fields.betoniComment !== undefined;
+    const isPump = fields.puomi !== undefined || fields.optimalPuomi !== undefined || fields.linja !== undefined;
     if (fields.supplier !== undefined && fields.plant === undefined) {
         failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
     }
     if (fields.betoniLine !== undefined && !isBetoni) {
         failWith("--betoni-line needs --m3 and/or --betoni-comment — it only picks which concrete line they write", 4);
     }
-    if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni].filter(Boolean).length > 1) {
-        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title) and the concrete flags (--m3/--betoni-comment) cannot be combined — run one command per group", 4);
+    if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni, isPump].filter(Boolean).length > 1) {
+        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title), the concrete flags (--m3/--betoni-comment) and the pump flags (--puomi/--optimal-puomi/--linja) cannot be combined — run one command per group", 4);
     }
-    if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni) {
-        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title) or a concrete flag (--m3/--betoni-comment)", 4);
+    if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni && !isPump) {
+        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title), a concrete flag (--m3/--betoni-comment) or a pump flag (--puomi/--optimal-puomi/--linja)", 4);
+    }
+    if (isPump) {
+        const body = {};
+        if (fields.puomi !== undefined)
+            body.pumppuPuomi = fields.puomi;
+        if (fields.optimalPuomi !== undefined)
+            body.optimalPumppuPuomi = fields.optimalPuomi;
+        if (fields.linja !== undefined)
+            body.pumppuLinja = fields.linja;
+        return client.post(`/api/cli/keikka/pumppu/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
     }
     if (isBetoni) {
         const body = {};
@@ -344,6 +357,30 @@ export async function runKeikkaBetoniMatka(client, keikkaId, flags) {
     return client.post(`/api/keikka/${keikkaId}/betoni-matka`, { mode: flags.refresh ? "refresh" : "preview" }, 
     // the preview is a read (POST only to carry the body), so it passes --read-only (fb#2410)
     { headers: writeFlagsToHeaders(flags), read: !flags.refresh });
+}
+export const RECOMPUTE_MATKA_WHICH = ["betoni", "pumppu", "both"];
+/**
+ * Recompute stored driving distances (betoniMatka plant → site, pumppuMatka pump
+ * home depot → site) server-side, for one keikka (positional) or a date range of
+ * the active company (fb#1981). The bulk route caps and quota-checks server-side.
+ */
+export async function runKeikkaRecomputeMatka(client, target, opts, flags) {
+    const which = opts.which ?? "both";
+    assertEnum(which, RECOMPUTE_MATKA_WHICH, "--which");
+    const hasRange = target.from !== undefined || target.to !== undefined;
+    if (target.keikkaId !== undefined && hasRange) {
+        failWith("pass a keikkaId OR --from/--to, not both", 4);
+    }
+    if (target.keikkaId === undefined && (target.from === undefined || target.to === undefined)) {
+        failWith("pass a keikkaId, or both --from and --to", 4);
+    }
+    const headers = { headers: writeFlagsToHeaders(flags) };
+    if (target.keikkaId !== undefined) {
+        if (opts.onlyMissing)
+            failWith("--only-missing applies only to the --from/--to range form", 4);
+        return client.post(`/api/cli/keikka/recompute-matka/${target.keikkaId}`, { which }, headers);
+    }
+    return client.post("/api/cli/keikka/recompute-matka", { from: target.from, to: target.to, which, onlyMissing: !!opts.onlyMissing }, headers);
 }
 /**
  * POST /api/keikka/copy — duplicates a keikka (customer/worksite/vehicle/concrete
@@ -675,7 +712,11 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears')
         .option("--m3 <n>", "Set the concrete line's volume (m3, 0..9999.99)", numFlag("--m3", 0, 9999.99))
         .option("--betoni-comment <text>", 'Set the concrete line comment; "" clears')
-        .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"));
+        .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"))
+        // 0..999 upper bound is the backend's (400), not restated here
+        .option("--puomi <m>", "Minimum boom length (pumppuPuomi, m); 0 = none", intFlag("--puomi", 0))
+        .option("--optimal-puomi <m>", "Desired boom length (optimalPumppuPuomi, m); 0 = none", intFlag("--optimal-puomi", 0))
+        .option("--linja <m>", "Hose line length (pumppuLinja, m); 0 = none", intFlag("--linja", 0));
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const result = await runKeikkaUpdate(client, parseId(idStr, "keikkaId"), {
@@ -695,6 +736,9 @@ export function registerKeikkaCommands(parent, getClient) {
             m3: opts.m3,
             betoniComment: opts.betoniComment,
             betoniLine: opts.betoniLine,
+            puomi: opts.puomi,
+            optimalPuomi: opts.optimalPuomi,
+            linja: opts.linja,
         }, opts);
         writeJson(result);
     }));
@@ -706,6 +750,17 @@ export function registerKeikkaCommands(parent, getClient) {
         .command("betoni-matka <keikkaId>")
         .option("--refresh", "Re-fetch from Google and store it (default: read-only preview)");
     addWriteFlagsToCommand(betoniMatkaCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaBetoniMatka(client, parseId(idStr, "keikkaId"), opts)));
+    const recomputeMatkaCmd = k
+        .command("recompute-matka [keikkaId]")
+        .option("--from <date>", "Range start (YYYY-MM-DD | today | …), with --to")
+        .option("--to <date>", "Range end, with --from")
+        .option("--which <kind>", "betoni | pumppu | both (default both)")
+        .option("--only-missing", "Range form only: skip keikkas that already have the distance");
+    addWriteFlagsToCommand(recomputeMatkaCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaRecomputeMatka(client, {
+        keikkaId: idStr === undefined ? undefined : parseId(idStr, "keikkaId"),
+        from: resolveDate(opts.from),
+        to: resolveDate(opts.to),
+    }, opts, opts)));
     const copyCmd = k
         .command("copy <keikkaId>")
         .option("--date <date>", "Copy onto this date instead of the source's (keeps the source's time-of-day)");
