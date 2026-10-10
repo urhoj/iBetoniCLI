@@ -853,6 +853,10 @@ ib keikka person list --source <id>
   ! --source must be an integer >= 1
   > pass a valid keikkaPersonSourceId
 
+ib keikka pins --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib keikka search --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer; this command caps at 100

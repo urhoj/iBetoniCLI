@@ -156,6 +156,28 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib keikka pins",
+    description:
+      "Completed orders as map pins (worksite lat/lng, m³, duration, time) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).",
+    permissions: ["company role admin/editor/keikkaHandler (tenant read); self or admin (--person)"],
+    flags: [
+      { name: "start", type: "string", description: "Window start YYYY-MM-DD (default: 365 days before --end)" },
+      { name: "end", type: "string", description: "Window end YYYY-MM-DD, inclusive, Helsinki day (default: today)" },
+      { name: "person", type: "number", description: "personId — only orders this person handled, drove, or was assigned to" },
+    ],
+    outputShape: "{ pins: [...], truncated: boolean, count: number, range: { start, end } }",
+    errors: [
+      intParseErr("--person", "pass a positive personId"),
+      ...permErrors("a company role of admin/editor/keikkaHandler (or --person for yourself)"),
+    ],
+    notes: [
+      "Capped at the newest 20 000 rows; `truncated: true` says the cap was hit — narrow the window.",
+      "Only completed states (9/12/13 Toimitettu, 100 Valmis) and worksites with real coordinates.",
+    ],
+    seeAlso: ["ib keikka list", "ib stats"],
+    examples: ["ib keikka pins --start 2026-01-01 --end 2026-10-10", "ib keikka pins --person 6387 --pretty"],
+  },
+  {
     command: "ib keikka get",
     aliases: ["ib keikka show"],
     description:

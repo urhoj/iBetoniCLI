@@ -8233,6 +8233,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka pins matches snapshot 1`] = `
+"USAGE
+  ib keikka pins [flags]
+
+DESCRIPTION
+  Completed orders as map pins (worksite lat/lng, m³, duration, time) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).
+  Permissions: requires company role admin/editor/keikkaHandler (tenant read); self or admin (--person).
+
+FLAGS
+  --start STRING    Window start YYYY-MM-DD (default: 365 days before --end)
+  --end STRING    Window end YYYY-MM-DD, inclusive, Helsinki day (default: today)
+  --person NUMBER    personId — only orders this person handled, drove, or was assigned to
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { pins: [...], truncated: boolean, count: number, range: { start, end } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check a company role of admin/editor/keikkaHandler (or --person for yourself)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Capped at the newest 20 000 rows; \`truncated: true\` says the cap was hit — narrow the window.
+  - Only completed states (9/12/13 Toimitettu, 100 Valmis) and worksites with real coordinates.
+
+SEE ALSO
+  ib keikka list, ib stats
+
+EXAMPLES
+  ib keikka pins --start 2026-01-01 --end 2026-10-10
+  ib keikka pins --person 6387 --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka recompute-matka matches snapshot 1`] = `
 "USAGE
   ib keikka recompute-matka <keikkaId> [flags]

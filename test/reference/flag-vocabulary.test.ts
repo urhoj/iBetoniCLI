@@ -89,6 +89,11 @@ describe("no new naming outliers", () => {
    * create|update` pushed `--inactive` (isActive=false) past COMMON_THRESHOLD
    * — an accidental stem match (`inactive`.startsWith(`in`)), not a spelling
    * drift of the same parameter.
+   *
+   * `--end-reason` (`ib dev impersonation sessions`'s filter on WHY a session
+   * ended) started colliding once `ib keikka pins` became the fifth command
+   * with `--end` (a window-end date, mirroring the backend's `start`/`end`
+   * query params) — an accidental stem match, not a spelling drift.
    */
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",
@@ -97,6 +102,7 @@ describe("no new naming outliers", () => {
     "from-brand",
     "sijainti-types",
     "in",
+    "end-reason",
   ]);
 
   /**

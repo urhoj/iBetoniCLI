@@ -213,6 +213,27 @@ export async function runKeikkaGet(
   );
 }
 
+export interface KeikkaPinsFlags {
+  start?: string;
+  end?: string;
+  person?: number;
+}
+
+/** Historiakartta data: completed orders as worksite pins for a window (default last 365 days). */
+export async function runKeikkaPins(
+  client: ApiClient,
+  opts: KeikkaPinsFlags
+): Promise<{ pins: unknown[]; truncated: boolean; count: number; range: { start: string; end: string } }> {
+  const end = opts.end ?? todayHelsinki();
+  const start = opts.start ?? addDaysISO(end, -365);
+  const query = qs({ start, end });
+  const path = opts.person
+    ? `/api/user-history/keikka-pins/${opts.person}/${ownerAsiakasIdFromToken(client, "run `ib auth switch`")}${query}`
+    : `/api/stat/keikka-pins${query}`;
+  const r = await client.get<{ pins: unknown[]; truncated: boolean }>(path);
+  return { ...r, count: r.pins.length, range: { start, end } };
+}
+
 /** A projected keikka search hit (deduped; the backend returns one row per betoni pour). */
 export interface KeikkaSearchHit {
   keikkaId: number;
@@ -964,6 +985,12 @@ export function registerKeikkaCommands(
     .action(
       jsonAction(getClient, (client, opts: KeikkaLatestFilter) => runKeikkaLatest(client, opts))
     );
+
+  k.command("pins")
+    .option("--start <date>", "", (v) => v)
+    .option("--end <date>", "", (v) => v)
+    .option("--person <id>", "", intFlag("--person", 1))
+    .action(jsonAction(getClient, (client, opts: KeikkaPinsFlags) => runKeikkaPins(client, opts)));
 
   k.command("get <keikkaId>")
     // `show` — the reflex spelling for read-one-row (fb#836).

@@ -132,6 +132,17 @@ export async function runKeikkaLatest(client, opts) {
 export async function runKeikkaGet(client, keikkaId) {
     return client.get(`/api/cli/keikka/get/${keikkaId}`);
 }
+/** Historiakartta data: completed orders as worksite pins for a window (default last 365 days). */
+export async function runKeikkaPins(client, opts) {
+    const end = opts.end ?? todayHelsinki();
+    const start = opts.start ?? addDaysISO(end, -365);
+    const query = qs({ start, end });
+    const path = opts.person
+        ? `/api/user-history/keikka-pins/${opts.person}/${ownerAsiakasIdFromToken(client, "run `ib auth switch`")}${query}`
+        : `/api/stat/keikka-pins${query}`;
+    const r = await client.get(path);
+    return { ...r, count: r.pins.length, range: { start, end } };
+}
 /**
  * GET /api/keikka/search — existing deployed route (used by the GPT order
  * tool). The route scopes results to the ACTIVE COMPANY, read from the JWT
@@ -645,6 +656,11 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--worksite <id>", "", intFlag("--worksite", 1))
         .option("--lookback <days>", "", intFlag("--lookback", 0))
         .action(jsonAction(getClient, (client, opts) => runKeikkaLatest(client, opts)));
+    k.command("pins")
+        .option("--start <date>", "", (v) => v)
+        .option("--end <date>", "", (v) => v)
+        .option("--person <id>", "", intFlag("--person", 1))
+        .action(jsonAction(getClient, (client, opts) => runKeikkaPins(client, opts)));
     k.command("get <keikkaId>")
         // `show` — the reflex spelling for read-one-row (fb#836).
         .alias("show")
