@@ -77,6 +77,9 @@ describe("levenshtein / closestName (#1)", () => {
     expect(closestName("submit", ["list", "create", "get"])).toBe("create");
     expect(closestName("file", ["list", "create", "get"])).toBe("create");
     expect(closestName("submit", ["list", "get"])).toBeNull();
+    // submit prefers send where the group owns it (fb#2451)
+    expect(closestName("submit", ["create", "send", "list"])).toBe("send");
+    expect(closestName("submit", ["send", "list"])).toBe("send");
   });
   test("retired-name synonym changes→log (#402)", () => {
     expect(closestName("changes", ["log", "keikka"])).toBe("log");

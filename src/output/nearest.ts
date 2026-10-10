@@ -57,14 +57,16 @@ export function levenshtein(a: string, b: string): number {
  * the catalogue and any group added later.
  *
  * `submit`/`file`→`create` is the FILING-VERB case (fb#2450): `ib dev feedback
- * submit` answered `didYouMean: null`. `send` is deliberately absent — it is a
- * real, distinct verb elsewhere (`ib message chat send`, `ib jerry offer send`),
- * so mapping it to `create` would misdirect in groups like `ib keikka`.
+ * submit` answered `didYouMean: null`. `submit` tries `send` FIRST (fb#2451):
+ * where a group owns both, submitting is the send step (`ib jerry offer send`
+ * sends the draft `create` made). `send` itself is deliberately not a key — it
+ * is a real, distinct verb, so mapping it to `create` would misdirect in groups
+ * like `ib keikka`.
  */
 export const VERB_SYNONYMS: Record<string, string[]> = {
   add: ["create"],
   create: ["add"],
-  submit: ["create"],
+  submit: ["send", "create"],
   file: ["create"],
   show: ["get"],
   view: ["get"],
