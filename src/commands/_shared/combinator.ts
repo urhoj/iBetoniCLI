@@ -38,6 +38,19 @@ function extractConflictingFields(body: unknown): ConflictingField[] | null {
   return wellFormed ? (fields as ConflictingField[]) : null;
 }
 
+/**
+ * fb#2367: a worksite merge whose main or secondary is missing or already
+ * soft-deleted — validate throws 50001/50002, /merge answers TYOMAA_NOT_FOUND —
+ * is usually a pair that was ALREADY merged. The merge leaves a COMBINATOR_MERGE
+ * row (oldValue = the secondary's id) on the main's change log.
+ */
+function tyomaaGoneHint(base: string, body: unknown, mainId: number): string | undefined {
+  if (base !== "tyomaa-combinator" || !body || typeof body !== "object") return undefined;
+  const e = (body as Record<string, unknown>).error as Record<string, unknown> | undefined;
+  if (e?.code !== 50001 && e?.code !== 50002 && e?.type !== "TYOMAA_NOT_FOUND") return undefined;
+  return `a worksite is missing or already deleted — already merged? \`ib worksite log ${mainId}\` shows a COMBINATOR_MERGE row with oldValue = the secondary's id`;
+}
+
 function formatConflictingFields(fields: ConflictingField[]): string {
   return fields
     .map((f) => `${f.field} ('${String(f.mainValue)}' vs '${String(f.secondaryValue)}')`)
@@ -162,14 +175,26 @@ export async function runCombinatorMerge(
               : undefined
           );
         }
-        throw new CliError(err.message, err.statusCode, err.body, err.exitCode, "check --main/--secondary");
+        throw new CliError(
+          err.message,
+          err.statusCode,
+          err.body,
+          err.exitCode,
+          tyomaaGoneHint(base, err.body, opts.mainId) ?? "check --main/--secondary"
+        );
       }
       throw err;
     }
   }
-  return client.post<unknown>(`/api/admin/${base}/merge`, body, {
-    headers: writeFlagsToHeaders(flags),
-  });
+  try {
+    return await client.post<unknown>(`/api/admin/${base}/merge`, body, {
+      headers: writeFlagsToHeaders(flags),
+    });
+  } catch (err) {
+    if (!(err instanceof CliError) || err.statusCode !== 400) throw err;
+    const hint = tyomaaGoneHint(base, err.body, opts.mainId);
+    throw hint ? new CliError(err.message, err.statusCode, err.body, err.exitCode, hint) : err;
+  }
 }
 
 /**

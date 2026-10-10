@@ -135,6 +135,30 @@ describe("runWorksiteMerge", () => {
     });
   });
 
+  test("fb#2367: --dry-run on an already-deleted worksite (validate 50002) points at the main's COMBINATOR_MERGE log row", async () => {
+    asPost().mockRejectedValueOnce(
+      new CliError("Sivutyömaa ID:llä 702 on jo poistettu.", 400, { success: false, error: { code: 50002 } }, 4)
+    );
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { dryRun: true })
+    ).rejects.toMatchObject({ hint: expect.stringMatching(/ib worksite log 701`.*COMBINATOR_MERGE/) });
+  });
+
+  test("fb#2367: the real merge's TYOMAA_NOT_FOUND 400 gets the same already-merged hint; other 400s pass through", async () => {
+    asPost().mockRejectedValueOnce(
+      new CliError("not found", 400, { success: false, error: { type: "TYOMAA_NOT_FOUND" } }, 4)
+    );
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { reason: "dedupe" })
+    ).rejects.toMatchObject({ hint: expect.stringMatching(/ib worksite log 701`/) });
+
+    const other = new CliError("Validation failed", 400, { success: false, error: { code: 50203 } }, 4);
+    asPost().mockRejectedValueOnce(other);
+    await expect(
+      runWorksiteMerge(mockClient, { mainId: 701, secondaryId: 702, ownerAsiakasId: 8 }, { reason: "dedupe" })
+    ).rejects.toBe(other);
+  });
+
   // fb#1839: a non-400 CliError (401/403/5xx/network) from the SAME validate
   // POST must propagate completely unchanged — the pre-fix code clobbered its
   // hint to "check --main/--secondary" regardless of status.

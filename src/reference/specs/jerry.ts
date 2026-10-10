@@ -15,8 +15,8 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request list",
     description:
-      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending) while the request is still live (open, not past expiresAt), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, lost to another provider, declined or withdrawn by you, or a pending offer whose request ended — no longer acceptable; kept 30 days). --status (CSV) and --limit apply to --mine only. Whole-market visibility is system-admin only.",
-    permissions: ["--open / --provider: provider company (isPumppuToimittaja)"],
+      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending) while the request is still live (open, not past expiresAt), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, lost to another provider, declined or withdrawn by you, or a pending offer whose request ended — no longer acceptable; kept 30 days). --status (CSV) and --limit apply to --mine only. Whole-market visibility is system-admin only.",
+    permissions: ["--open / --provider: supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     flags: [
       { name: "open", type: "boolean", description: "Provider inbox of open requests in your delivery area (provider role)" },
       { name: "mine", type: "boolean", description: "Your own requests (default)" },
@@ -51,7 +51,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     // corrected two copies and missed domain.ts (fb#551).
     description:
       "Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments. This returns the FULL customer lead (name, address, lat/lng, phone, email) to every matched provider as soon as the request is open — it is NOT masked pre-acceptance. Masking applies to the `--open` inbox list and the fan-out email, not here.",
-    permissions: ["--provider: provider company (isPumppuToimittaja)"],
+    permissions: ["--provider: supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [
       { name: "provider", type: "boolean", description: "Provider-facing detail view (provider role)" },
@@ -146,7 +146,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     command: "ib jerry request decline",
     description:
       "Decline a request as a provider WITHOUT making an offer (POST /api/pumppuRequests/:id/decline). Your company bows out; --reason is stored and shown to the customer (who is emailed + pushed that a provider passed). The request leaves your Avoimet tab (moves to Päättyneet). Blocked (409) if you already have an active offer — use `ib jerry offer withdraw` instead. Idempotent. Requires provider role + --reason.",
-    permissions: ["provider company (isPumppuToimittaja)"],
+    permissions: ["supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you were sent" }],
     flags: [{ name: "reason", type: "string", description: "Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED unless --dry-run" }],
     writeFlags: true,
@@ -166,7 +166,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     command: "ib jerry request undecline",
     description:
       "Reverse a prior decline as a provider (POST /api/pumppuRequests/:id/undecline). The request returns to your Avoimet tab and is offerable again. Idempotent (no-op success if you had not declined). No customer notification. Requires provider role + --reason.",
-    permissions: ["provider company (isPumppuToimittaja)"],
+    permissions: ["supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you previously declined" }],
     flags: [],
     writeFlags: true,
@@ -184,8 +184,8 @@ export const JERRY_SPECS: CommandSpec[] = [
   {
     command: "ib jerry offer create",
     description:
-      "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason unless --dry-run.",
-    permissions: ["provider company (isPumppuToimittaja)"],
+      "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Supplier company only (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason unless --dry-run.",
+    permissions: ["supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [
       { name: "price-cents", type: "number", description: "Offer price in cents (REQUIRED; integer 1..99999900)" },
@@ -221,7 +221,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     command: "ib jerry offer send",
     description:
       "Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason unless --dry-run.",
-    permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+    permissions: ["supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja); owns the offer"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "pumppuOfferId you own" },
@@ -267,7 +267,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     command: "ib jerry offer confirm",
     description:
       "Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm).",
-    permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+    permissions: ["supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja); owns the offer"],
     args: [
       { name: "requestId", type: "number", description: "pumppuRequestId" },
       { name: "offerId", type: "number", description: "pumppuOfferId you own (must be 'accepted')" },
@@ -351,7 +351,7 @@ export const JERRY_SPECS: CommandSpec[] = [
     command: "ib jerry counts",
     description:
       "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) plus this company's Jerry membership state, and requires a provider company.",
-    permissions: ["--provider: provider company (isPumppuToimittaja)"],
+    permissions: ["--provider: supplier company (isPumppuToimittaja, isBetoniToimittaja or isLattiaToimittaja)"],
     flags: [
       { name: "provider", type: "boolean", description: "Provider badge counts (provider role)" },
       { name: "mine", type: "boolean", description: "Customer counts (default)" },
