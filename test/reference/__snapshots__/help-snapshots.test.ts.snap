@@ -4284,13 +4284,13 @@ FLAGS
   --description STRING    Alias for the positional description; if both are passed, they must match
   --body STRING    Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match
   --title STRING    Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description.
-  --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (it used to fall back to improvement, which mis-triaged bug reports silently — feedback #369) (default: improvement)
+  --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (fb#369) (default: improvement)
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
-  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT the issue-tracker vocabulary most tooling uses. Five synonyms are RECOGNISED but never accepted — an unknown value always exits 4 with a \`did you mean\` naming the right one, and is never silently rewritten (fb#369): high→major, medium→minor, low→cosmetic, blocker→critical, trivial→cosmetic. Pass the mapped value, not the synonym
+  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. STRICT: issue-tracker words (high/medium/low/blocker/trivial) exit 4 with a \`did you mean\`, never rewritten (fb#369). See \`ib help severity\`
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
-  --gate-kind STRING    What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses; name a check that can FAIL, e.g. a Sentry/KQL query with a non-zero baseline — no-hits is unfalsifiable, fb#1555) | legal (a document version is superseded) | owner-decision (a call only the owner can make) | owner-action (something only the owner can do) | backlog. Bare \`owner\` is LEGACY and still accepted, but prefer the split — it is what makes the blocked queue filterable, and the distinction used to live in free-text --gate-ref where nothing could read it. Most rows have no gate at all — omit it.
+  --gate-kind STRING    What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses; name a check that can FAIL, e.g. a Sentry/KQL query with a non-zero baseline — no-hits is unfalsifiable, fb#1555) | legal (a document version is superseded) | owner-decision (a call only the owner can make) | owner-action (something only the owner can do) | backlog. Bare \`owner\` is LEGACY (still accepted); prefer the split. Most rows have no gate — omit it.
   --gate-ref STRING    Gate pointer, meaning depends on --gate-kind: deploy → repo@sha being waited on; legal → TYPE@version (the version being superseded); owner-decision/owner-action → free text naming the call or the task; soak → the falsifiable PASS check (query + expected non-zero result). Max 200 chars. Only meaningful together with --gate-kind.
   --gate-until STRING    Wake date (YYYY-MM-DD, an ISO datetime, or today/yesterday/tomorrow) for --gate-kind soak|backlog. Validated CLIENT-SIDE (fb#446) so the error names the flag; the backend also 400s a malformed date.
   --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity, gateKind, gateRef, gateUntil. The READ shape's \`errorText\` is also accepted for \`error\`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped).
@@ -4304,7 +4304,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → description is required; all enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the issue-tracker vocabulary — high≈major, medium≈minor, low≈cosmetic, blocker≈critical, trivial≈cosmetic; all five are hinted, none is accepted), --gate-kind (when given) must be deploy|soak|legal|owner-decision|owner-action|backlog (bare owner is accepted as legacy); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
+  exit 4 (client-side)  Validation             → description is required; every enum is STRICT (allowed values are listed per flag) and never rewritten — the message names the closest valid value (severity: high→major, medium→minor, low→cosmetic, blocker→critical, trivial→cosmetic); --complexity must be an integer 1-5
   exit 4 (client-side)  --gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400 → shorten to 200 chars; long rationale goes in the description
   exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400 → pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow
   exit 4 (client-side)  too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
@@ -4315,26 +4315,19 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.
-  - gh-issue-style invocation works: \`feedback add --title X --description Y\` — \`add\` aliases \`create\`, and --title is prepended to the description as its first line (blank line between). Feedback rows store only a description, so the title is a formatting convenience, not a separate field.
-  - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
-  - SHELL QUOTING (fb#299, fb#702): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — and NEWLINES split the same way, so a multi-line here-string with no quotes at all fails too. The tell differs by where the fragment lands: a bare word reads as \`too many arguments\`, a dash-led one (\`->\` out of "200 -> null") reads as \`unknown option\`, which looks like a flag mistake and is not. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see \`ib help shell-quoting\`.
-  - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib dev ai conversation <id>\`. Manual CLI use does not set it.
-  - No --reason / --idempotency-key (unlike \`ib dev changelog add\`): a META request, not an audited entity mutation.
+  - gh-issue-style \`feedback add --title X --description Y\` works: \`add\` aliases \`create\`, --title is the first line.
+  - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide".
+  - SHELL QUOTING (fb#299, fb#702): Windows PowerShell splits a report on inner double-quotes AND newlines — the fragment surfaces as \`too many arguments\` or a bogus \`unknown option\`. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see \`ib help shell-quoting\`.
+  - Under the /ai assistant, IB_CONVERSATION_ID is auto-attached as context.conversationId (read it with \`ib dev ai conversation <id>\`).
+  - No --reason / --idempotency-key: a META request, not an audited mutation.
 
 EXAMPLES
   ib dev feedback create "schema table output should include row counts"
-  ib dev feedback create --description "schema table output should include row counts"
-  ib dev feedback create --body "gh-style --body works as a --description alias"
   ib dev feedback add --title "Row counts missing" --description "schema table output should include row counts"
   ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
-  ib dev feedback create "ib customer search --email" --kind idea --dry-run
-  ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
   ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea
   ib dev feedback create "keikka editor throws on save" --kind bug --severity major
   ib dev feedback create --from-json ./report.json
-  ib dev feedback create --from-json ./report.json --kind bug
-  ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2
   ib dev feedback create "wait for the fb#941 detail-cap raise to ship" --gate-kind deploy --gate-ref "puminet5api@a930ccaf"
 "
 `;
