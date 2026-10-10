@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import { assertWritableEndpoint } from "../../src/api/endpointGuard.js";
 import { CliError } from "../../src/api/errors.js";
@@ -9,6 +9,7 @@ import {
   runCacheInvalidate,
   runCacheClear,
   runCachePattern,
+  runCacheRawDelete,
   resolveGlob,
 } from "../../src/commands/cache/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -283,5 +284,34 @@ describe("cache pattern exit-4 remedies actually resolve (dead-row guard)", () =
     // row — the case a stale `match` string would silently break.
     const detail = hintDetailForError(thrown!, spec?.errors);
     expect(detail.hint).toBeTruthy();
+  });
+});
+
+// fb#1713 — exact raw key, bypassing the r:*: namespace pattern/invalidate add.
+describe("runCacheRawDelete (fb#1713)", () => {
+  test("previews by default with X-Dry-Run and confirmed:false", async () => {
+    const client = mockApiClient({ post: vi.fn(async () => ({ dryRun: true })) });
+    await runCacheRawDelete(client, "mcp:client:abc", {});
+    expect(client.post).toHaveBeenCalledWith(
+      "/api/cli/cache/raw-delete",
+      { key: "mcp:client:abc", confirmed: false },
+      { headers: { "X-Dry-Run": "1" }, read: true }
+    );
+  });
+
+  test("--confirm --force-prod --reason executes with both headers", async () => {
+    const client = mockApiClient({ post: vi.fn(async () => ({ deleted: 1 })) });
+    await runCacheRawDelete(client, "mcp:client:abc", { confirm: true, forceProd: true, reason: "test" });
+    expect(client.post).toHaveBeenCalledWith(
+      "/api/cli/cache/raw-delete",
+      { key: "mcp:client:abc", confirmed: true },
+      { headers: { "X-Force-Prod": "1", "X-Action-Reason": "test" } }
+    );
+  });
+
+  test.each(["mcp:client:*", "mcp:client:a?c", "mcp:[ab]", "a\\b"])("refuses glob key %s before any request", async (key) => {
+    const client = mockApiClient({});
+    await expect(runCacheRawDelete(client, key, {})).rejects.toThrow(/glob characters/);
+    expect(client.post).not.toHaveBeenCalled();
   });
 });

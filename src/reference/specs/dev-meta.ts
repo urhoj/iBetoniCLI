@@ -216,6 +216,31 @@ export const DEV_META_SPECS: CommandSpec[] = [
     seeAlso: ["ib jerry email-activity", "ib dev email-delivery"],
     examples: ["ib dev email-health", "ib dev email-health --days 30 --pretty"],
   },
+  // ─── api-usage (1) ───────────────────────────────────────────────────────
+  {
+    command: "ib dev api-usage",
+    description:
+      "Live external-API budget counters (fb#1380): per API the current hour/day/month call counts from the Redis counters apiTracking ENFORCES, beside the configured limits, when each window resets, and which windows are exhausted. Check headroom here before adding a poller (Ecofleet, Mapon, FMI, Google Maps, PRH, VIES…). Not the api_usage_log table: that mirror double-counts against the counters and cannot tell whether the next call will be refused.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [{ name: "service", type: "string", description: "One API by config name (e.g. ecofleet, fmi-weather, google-maps); omit for all" }],
+    outputShape:
+      "{ redisAvailable, checkedAt, items:[{ service, name, rateLimitEnabled, hour, day, month, limits:{ perHour, perDay, perMonth }|null, resetAt:{ hour, day, month }, exhausted:{ hour, day, month } }] } — `exhausted` is null per window when that API has no limit. redisAvailable:false means the counters are UNKNOWN, not zero.",
+    errors: [
+      { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+      apiErr(400, "Unknown --service", "the error lists the valid API names"),
+      apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
+      apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+      apiErr(404, "Route not deployed yet", "the backend half is deploy-gated — deploy puminet5api first"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Windows are server-local clock hour/day/month, matching what the limiter enforces.",
+      "The first read of a day can rebuild that day's counters from api_usage_log (the same restore every tracked call triggers), so the numbers are authoritative, not a fresh zero.",
+    ],
+    seeAlso: ["ib dev cache keys"],
+    examples: ["ib dev api-usage", "ib dev api-usage --service ecofleet"],
+  },
   // ─── email-delivery (1) ──────────────────────────────────────────────────
   {
     command: "ib dev email-delivery",

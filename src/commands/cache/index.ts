@@ -112,7 +112,29 @@ export async function runCachePattern(
   return client.post("/api/cli/cache/pattern", { pattern, confirmed: !dryRun }, fetchOpts);
 }
 
-/** Flags shared by the three destructive verbs, in one place so adding a fourth
+/**
+ * Delete ONE exact raw Redis key, bypassing the `r:*:` release namespace that
+ * `pattern`/`invalidate` prepend — the only way to reach operational keys written
+ * with a bare redis.set (`mcp:client:<id>`, `mcp:refresh:<token>`), fb#1713.
+ * Exact-key only, so it can never become a namespace-wide wipe.
+ */
+export async function runCacheRawDelete(
+  client: ApiClient,
+  key: string,
+  opts: CacheWriteOpts
+): Promise<unknown> {
+  if (/[*?[\]\\]/.test(key)) {
+    failWith(
+      `glob characters not allowed in an exact key: ${key}`,
+      4,
+      "raw-delete takes ONE exact key; find it with `ib dev cache keys --pattern '<glob>'`, or use `ib dev cache pattern` for a namespaced glob"
+    );
+  }
+  const { dryRun, fetchOpts } = writeRequestOptions(client, opts);
+  return client.post("/api/cli/cache/raw-delete", { key, confirmed: !dryRun }, fetchOpts);
+}
+
+/** Flags shared by the destructive verbs, in one place so adding a fourth
  *  (as fb#645 did with `--dry-run`) cannot reach two call sites and miss the
  *  third. Same shape as `addWriteFlagsToCommand` / `addAsiakasTargetOption`;
  *  registration ORDER is preserved, so `--help` renders as before. */
@@ -181,6 +203,11 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     jsonAction(getClient, (client, glob: string | undefined, opts: { pattern?: string; confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
       runCachePattern(client, resolveGlob(glob, opts.pattern), opts)
     )
+  );
+
+  // Exact raw key, no glob, no namespace (fb#1713).
+  addCacheWriteOptions(c.command("raw-delete <key>")).action(
+    jsonAction(getClient, (client, key: string, opts: CacheWriteOpts) => runCacheRawDelete(client, key, opts))
   );
 
   c.command("entities")
