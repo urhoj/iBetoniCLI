@@ -22,7 +22,8 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     reasonPolicy: "unless-dry-run",
     outputShape: "{ success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } (ownerAsiakasId = the row's real owner) — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed",
     errors: [
-      apiErr(404, "Customer not found", "verify asiakasId"),
+      apiErr(400, "Cannot delete your own active company (refused even under --dry-run)", "pick another asiakasId"),
+      apiErr(404, "Customer not found or already deleted (a soft-deleted row passes --dry-run, 404s on the real call)", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: ["ib customer delete 9001 --dry-run", 'ib customer delete 9001 --reason "lifecycle cleanup"'],

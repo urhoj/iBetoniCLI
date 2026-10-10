@@ -1356,7 +1356,8 @@ OUTPUT (JSON, stdout)
   { success, rowsAffected, leftAttached } or { dryRun: true, wouldDelete: { asiakasId, ownerAsiakasId }, validation, leftAttached } (ownerAsiakasId = the row's real owner) — leftAttached = { worksites: [{ tyomaaId, name, address, city }], foreignKeys: [{ asiakasForeignKeyId, key, source }] } read before the delete, or null (+ stderr note) when that lookup failed
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 4 (HTTP 400)  Cannot delete your own active company (refused even under --dry-run) → pick another asiakasId
+  exit 5 (HTTP 404)  Customer not found or already deleted (a soft-deleted row passes --dry-run, 404s on the real call) → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
