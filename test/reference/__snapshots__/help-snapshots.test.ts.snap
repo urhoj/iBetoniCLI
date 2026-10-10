@@ -8272,6 +8272,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  keikkaId is not a positive integer → pass a positive keikkaId
   exit 4 (HTTP 400)  The range matched more than 200 keikkas → narrow --from/--to or add --only-missing
   exit 4 (HTTP 400)  Estimated Google lookups exceed the remaining global google-maps allowance (also on --dry-run) → narrow the range or retry later
+  exit 4 (HTTP 400)  More than 100 estimated Google lookups in one run (edge-timeout ceiling, also on --dry-run) → narrow the range or pass --which betoni|pumppu
   exit 4 (HTTP 400)  Invalid range: not real YYYY-MM-DD dates, from after to, or over 366 days → fix --from/--to
   exit 5 (HTTP 404)  Keikka not found, deleted (keikkaTilaId 10) OR outside your visible scope → verify keikkaId — results mirror your permissions
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

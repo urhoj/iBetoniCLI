@@ -435,6 +435,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "invalid keikkaId", meaning: "keikkaId is not a positive integer", remedy: "pass a positive keikkaId" },
       apiErr(400, "The range matched more than 200 keikkas", "narrow --from/--to or add --only-missing", "matched more than 200"),
       apiErr(400, "Estimated Google lookups exceed the remaining global google-maps allowance (also on --dry-run)", "narrow the range or retry later", "remain in the google-maps allowance"),
+      apiErr(400, "More than 100 estimated Google lookups in one run (edge-timeout ceiling, also on --dry-run)", "narrow the range or pass --which betoni|pumppu", "one run allows"),
       apiErr(400, "Invalid range: not real YYYY-MM-DD dates, from after to, or over 366 days", "fix --from/--to"),
       apiErr(404, "Keikka not found, deleted (keikkaTilaId 10) OR outside your visible scope", "verify keikkaId — results mirror your permissions"),
       ...permErrors("auth.page.grid.tilaus.edit"),
