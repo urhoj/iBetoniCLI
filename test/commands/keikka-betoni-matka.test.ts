@@ -9,14 +9,14 @@ describe("ib keikka betoni-matka", () => {
     mockClient.post.mockReset();
   });
 
-  test("previews by default", async () => {
+  test("previews by default — as a READ, so it passes --read-only (fb#2410)", async () => {
     mockClient.post.mockResolvedValueOnce({ betoniMatkaM: 1 });
     const out = await runKeikkaBetoniMatka(mockClient, 5, { refresh: false });
     expect(out).toEqual({ betoniMatkaM: 1 });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/keikka/5/betoni-matka",
       { mode: "preview" },
-      { headers: {} }
+      { headers: {}, read: true }
     );
   });
 
@@ -30,7 +30,7 @@ describe("ib keikka betoni-matka", () => {
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/keikka/5/betoni-matka",
       { mode: "refresh" },
-      { headers: expect.objectContaining({ "X-Dry-Run": "1", "Idempotency-Key": "bm-5" }) }
+      { headers: expect.objectContaining({ "X-Dry-Run": "1", "Idempotency-Key": "bm-5" }), read: false }
     );
   });
 });

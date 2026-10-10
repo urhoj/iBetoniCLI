@@ -341,7 +341,9 @@ export async function runKeikkaDriversAssign(client, keikkaId, flags) {
  * inputs, forced Google, writes; honours X-Dry-Run from the write flags).
  */
 export async function runKeikkaBetoniMatka(client, keikkaId, flags) {
-    return client.post(`/api/keikka/${keikkaId}/betoni-matka`, { mode: flags.refresh ? "refresh" : "preview" }, { headers: writeFlagsToHeaders(flags) });
+    return client.post(`/api/keikka/${keikkaId}/betoni-matka`, { mode: flags.refresh ? "refresh" : "preview" }, 
+    // the preview is a read (POST only to carry the body), so it passes --read-only (fb#2410)
+    { headers: writeFlagsToHeaders(flags), read: !flags.refresh });
 }
 /**
  * POST /api/keikka/copy — duplicates a keikka (customer/worksite/vehicle/concrete

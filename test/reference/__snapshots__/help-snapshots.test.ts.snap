@@ -7714,6 +7714,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Only \`--refresh\` writes: the default preview is a read and runs under \`--read-only\`; the write flags apply to \`--refresh\`.
+
 EXAMPLES
   ib keikka betoni-matka 9001
   ib keikka betoni-matka 9001 --refresh --reason "plant moved"

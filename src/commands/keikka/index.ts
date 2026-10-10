@@ -511,7 +511,8 @@ export async function runKeikkaBetoniMatka(
   return client.post<unknown>(
     `/api/keikka/${keikkaId}/betoni-matka`,
     { mode: flags.refresh ? "refresh" : "preview" },
-    { headers: writeFlagsToHeaders(flags) }
+    // the preview is a read (POST only to carry the body), so it passes --read-only (fb#2410)
+    { headers: writeFlagsToHeaders(flags), read: !flags.refresh }
   );
 }
 

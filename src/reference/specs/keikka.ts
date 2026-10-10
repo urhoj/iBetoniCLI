@@ -404,6 +404,9 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — results mirror your permissions"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
+    notes: [
+      "Only `--refresh` writes: the default preview is a read and runs under `--read-only`; the write flags apply to `--refresh`.",
+    ],
     examples: ["ib keikka betoni-matka 9001", "ib keikka betoni-matka 9001 --refresh --reason \"plant moved\""],
   },
   {
