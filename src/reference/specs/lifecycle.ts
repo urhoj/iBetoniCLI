@@ -3,7 +3,7 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { clearHint, clearNote, apiErr, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, intParseErr, numParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
+import { clearHint, clearNote, apiErr, authErrors, permErrors, ASIAKAS_FLAG_ERR, PERSON_SCOPE_404_REMEDY, intParseErr, numParseErr, PERSON_PARSE_ERR, WORKSITE_EDIT_PERMISSION, WORKSITE_FENCE_PERMISSION, WORKSITE_FENCE_404 } from "./shared.js";
 
 /** The `--contact-type` parse-guard row every customer/worksite person add/remove leaf shares (its `--person` sibling is PERSON_PARSE_ERR, shared cross-domain via shared.ts). */
 const CONTACT_TYPE_PARSE_ERR = intParseErr("--contact-type", "pass a valid contactPersonTypeId (1, 2, 3, or 5)");
@@ -24,7 +24,8 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Cannot delete your own active company (refused even under --dry-run)", "pick another asiakasId"),
       apiErr(404, "Customer not found or already deleted (a soft-deleted row passes --dry-run, 404s on the real call)", "verify asiakasId"),
-      ...permErrors("auth.page.asiakas.edit"),
+      // fb#2435: a nonexistent id 403s for non-developers (the access gate falls back to the id as tenant).
+      ...authErrors(apiErr(403, "Permission denied, or the asiakasId does not exist", "verify asiakasId, then check auth.page.asiakas.edit")),
     ],
     examples: ["ib customer delete 9001 --dry-run", 'ib customer delete 9001 --reason "lifecycle cleanup"'],
   },
