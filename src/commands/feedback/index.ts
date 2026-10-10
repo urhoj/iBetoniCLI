@@ -203,6 +203,13 @@ const KIND_SYNONYMS: Record<string, string> = {
   proposal: "idea",
 };
 
+/** `docs` is 2 edits from `ops`, a confident wrong guess; documentation work is `workspace` (fb#2424). */
+const SCOPE_SYNONYMS: Record<string, string> = {
+  docs: "workspace",
+  doc: "workspace",
+  documentation: "workspace",
+};
+
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
 // (severity = urgency/impact; complexity = effort + how autonomously an agent
 // can act). 1 simple/autonomous · 2 simple/wants-input-proceeds-on-recommendation
@@ -726,7 +733,7 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   // relabelled an improvement and returned a success + feedbackId: the caller
   // moved on and the row was mis-triaged with nothing recording the rewrite.
   assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
-  assertEnum(input.scope, SCOPES, "--scope");
+  assertEnum(input.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
   assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
   const body: FeedbackCreateBody = {
@@ -976,7 +983,7 @@ export async function runFeedbackList(
   opts: FeedbackListOptions
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.kind, KINDS, "--kind");
-  assertEnum(opts.scope, SCOPES, "--scope");
+  assertEnum(opts.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
   // SEVERITY_FILTERS, not SEVERITIES: `none` is a legal filter value, so it has
   // to be IN the allowed list rather than bypassed around the check — bypassing
   // left it out of the rejection message. `high`/`medium`/`low` are the
@@ -1311,7 +1318,7 @@ export async function runFeedbackCount(
 ): Promise<Record<string, unknown>> {
   // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
   assertEnum(opts.kind, KINDS, "--kind");
-  assertEnum(opts.scope, SCOPES, "--scope");
+  assertEnum(opts.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
   // Status scope mirrors `list` (fb#1192): bare count is the ACTIVE bucket, not
   // the whole table — closed rows are where every settled NULL sits, so a
   // whole-table ungraded/unestimated used to read as a backlog that does not
@@ -1848,7 +1855,7 @@ export async function runFeedbackUpdate(
   input: FeedbackUpdateInput,
   current?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  assertEnum(input.scope, SCOPES, "--scope");
+  assertEnum(input.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
   assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
   assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   // Empty string is the documented CLEAR convention (clearHint) — gateFields

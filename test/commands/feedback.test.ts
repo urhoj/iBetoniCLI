@@ -382,6 +382,14 @@ describe("ib feedback create", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  // fb#2424: `docs` is 2 edits from `ops`; documentation work is `workspace`.
+  test("--scope docs exits 4 and points at workspace, not ops", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", scope: "docs" })
+    ).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining("did you mean workspace?") });
+    expect(post).not.toHaveBeenCalled();
+  });
+
   test("--dry-run prints the payload and never POSTs", async () => {
     const out = await runFeedbackCreate(mockClient, {
       description: "preview me",

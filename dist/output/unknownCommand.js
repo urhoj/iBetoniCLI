@@ -587,6 +587,10 @@ export const OPTION_REDIRECTS = {
  */
 export const OPTION_DID_YOU_MEAN_OVERRIDES = {
     "ib dev feedback list --claimed": "held",
+    // fb#2424: on a create, `--text` is the prose body; FLAG_SYNONYMS' text→search
+    // sent the caller to `feedback list`'s filter instead.
+    "ib dev feedback create --text": "description",
+    "ib dev feedback create --message": "description",
 };
 /** Long flags a command accepts, derived from its curated spec (tier-blind — the
  *  caller already invoked this command; only sibling ENUMERATION is tier-gated).

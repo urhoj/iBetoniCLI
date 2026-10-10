@@ -241,6 +241,15 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     expect(env.didYouMean).toBe("--held");
   });
 
+  // fb#2424: FLAG_SYNONYMS text→search named `feedback list`'s filter; on a
+  // create the prose body is --description.
+  test("dev feedback create --text → --description, no sibling search redirect (fb#2424)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "feedback", "create"), "--text");
+    expect(env.didYouMean).toBe("--description");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.acceptedAs).toBeUndefined();
+  });
+
   test("OPTION_DID_YOU_MEAN_OVERRIDES targets are real flags on the named command", () => {
     for (const [key, target] of Object.entries(OPTION_DID_YOU_MEAN_OVERRIDES)) {
       const command = key.slice(0, key.lastIndexOf(" "));
