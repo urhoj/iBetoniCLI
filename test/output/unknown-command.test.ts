@@ -73,6 +73,11 @@ describe("levenshtein / closestName (#1)", () => {
     // Cannot invent a name: silent when neither spelling is a real sibling.
     expect(closestName("stats", ["list", "get"])).toBeNull();
   });
+  test("filing verbs submit/file → create (fb#2450)", () => {
+    expect(closestName("submit", ["list", "create", "get"])).toBe("create");
+    expect(closestName("file", ["list", "create", "get"])).toBe("create");
+    expect(closestName("submit", ["list", "get"])).toBeNull();
+  });
   test("retired-name synonym changes→log (#402)", () => {
     expect(closestName("changes", ["log", "keikka"])).toBe("log");
     // A real edit-distance match still outranks the synonym — and this pair is

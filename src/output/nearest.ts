@@ -55,10 +55,17 @@ export function levenshtein(a: string, b: string): number {
  * feedback stats` ALSO resolves as a real hidden alias on the command itself,
  * so that particular miss now succeeds outright; this entry covers the rest of
  * the catalogue and any group added later.
+ *
+ * `submit`/`file`→`create` is the FILING-VERB case (fb#2450): `ib dev feedback
+ * submit` answered `didYouMean: null`. `send` is deliberately absent — it is a
+ * real, distinct verb elsewhere (`ib message chat send`, `ib jerry offer send`),
+ * so mapping it to `create` would misdirect in groups like `ib keikka`.
  */
 export const VERB_SYNONYMS: Record<string, string[]> = {
   add: ["create"],
   create: ["add"],
+  submit: ["create"],
+  file: ["create"],
   show: ["get"],
   view: ["get"],
   changes: ["log"],
