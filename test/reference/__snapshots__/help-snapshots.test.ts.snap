@@ -8238,7 +8238,7 @@ exports[`Help snapshots — contract stability > help for ib keikka pins matches
   ib keikka pins [flags]
 
 DESCRIPTION
-  Completed orders as map pins (worksite lat/lng, m³, duration, time) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).
+  Completed orders as map pins (worksite lat/lng + name/address, m³, duration, time, otsikko, customer, vehicle and the forecast stored for the pour) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).
   Permissions: requires company role admin/editor/keikkaHandler (tenant read); self or admin (--person).
 
 FLAGS

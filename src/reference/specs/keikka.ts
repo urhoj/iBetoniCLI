@@ -158,7 +158,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka pins",
     description:
-      "Completed orders as map pins (worksite lat/lng, m³, duration, time) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).",
+      "Completed orders as map pins (worksite lat/lng + name/address, m³, duration, time, otsikko, customer, vehicle and the forecast stored for the pour) for the active company in a date window — the data behind the Historiakartta (/map → Historia, /oma → Tilastot → Kartta). --person narrows to one person's own orders (self, or anyone in the company for admins).",
     permissions: ["company role admin/editor/keikkaHandler (tenant read); self or admin (--person)"],
     flags: [
       { name: "start", type: "string", description: "Window start YYYY-MM-DD (default: 365 days before --end)" },
