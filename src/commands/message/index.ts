@@ -4,6 +4,7 @@ import { registerMessageChatCommands } from "./chat/index.js";
 import { registerMessageDailyCommands } from "./daily/index.js";
 import { registerMessageBoardCommands } from "./board/index.js";
 import { registerMessageSupportCommands } from "./support/index.js";
+import { registerMessageSmsCommands } from "./sms/index.js";
 import { registerMessageThreadCommands } from "./thread/index.js";
 
 /**
@@ -15,6 +16,7 @@ import { registerMessageThreadCommands } from "./thread/index.js";
  *   - `board` (alias `ilmoitustaulu`) — the company announcement board
  *   - `support` — Operator → platform support escalations (thread lifecycle)
  *   - `thread`  — thread lifecycle + participants (archive/reopen/rename/add/remove)
+ *   - `sms`     — manual SMS to a driver (HAS_SMS tenants)
  *
  * Each owns its own `message/<system>/` directory, co-located specs, and
  * glossary entry, and plugs in here as one `registerMessage<System>Commands(m,
@@ -27,11 +29,12 @@ export function registerMessageCommands(
   const m = parent
     .command("message")
     .description(
-      "Messaging: conversational chat threads, daily grid notes, the announcement board (ilmoitustaulu), and support escalations"
+      "Messaging: conversational chat threads, daily grid notes, the announcement board (ilmoitustaulu), support escalations, and manual driver SMS"
     );
   registerMessageChatCommands(m, getClient);
   registerMessageDailyCommands(m, getClient);
   registerMessageBoardCommands(m, getClient);
   registerMessageSupportCommands(m, getClient);
   registerMessageThreadCommands(m, getClient);
+  registerMessageSmsCommands(m, getClient);
 }

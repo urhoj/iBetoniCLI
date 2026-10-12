@@ -577,4 +577,42 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       "ib message thread participant remove --tarjous 23 --person 42",
     ],
   },
+  {
+    command: "ib message sms send",
+    description:
+      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin role. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every send (and failure) is logged in smsLog and as an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
+    auth: "any",
+    flags: [
+      { name: "person", type: "number", required: true, description: "Recipient personId (must belong to the active company)" },
+      { name: "message", type: "string", required: true, description: "SMS text (≤ 2 segments, no links)" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ smsLogId, status:'sent', segments }. With --dry-run: { dryRun:true, personId, phone:'***NNNN', segments }.",
+    errors: [
+      PERSON_PARSE_ERR,
+      apiErr(400, "Validation", "empty/too long/link in text, or person has no textable phone"),
+      apiErr(403, "Permission denied", "company lacks the HAS_SMS module or caller is not an admin"),
+      apiErr(404, "Not found", "personId is not in the active company"),
+      apiErr(502, "Gateway rejected", "the SMS gateway refused the message (see the error text); logged as failed in smsLog"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS.",
+      "Deploy-gated: the /api/sms routes must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message sms list", "ib person get"],
+    examples: ['ib message sms send --person 6390 --message "Huomenna lähtö klo 6.30" --dry-run'],
+  },
+  {
+    command: "ib message sms list",
+    description: "SMS sent to one person of the active company, newest first (time, sender, text, status). HAS_SMS module + admin.",
+    auth: "any",
+    flags: [{ name: "person", type: "number", required: true, description: "Recipient personId" }],
+    outputShape: "{ items: [{ smsLogId, createdAt, message, segments, status, errorText, senderPersonId, senderName }] }",
+    errors: [PERSON_PARSE_ERR, apiErr(403, "Permission denied", "HAS_SMS module + admin required"), ...COMMON_AUTH_ERRORS],
+    notes: ["Deploy-gated: the /api/sms routes must be deployed to the target backend."],
+    seeAlso: ["ib message sms send"],
+    examples: ["ib message sms list --person 6390"],
+  },
 ];
