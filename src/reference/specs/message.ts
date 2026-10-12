@@ -580,7 +580,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   {
     command: "ib message sms send",
     description:
-      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin role. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every send (and failure) is logged in smsLog and as an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
+      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin). The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every send (and failure) is logged in smsLog and as an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
     auth: "any",
     flags: [
       { name: "person", type: "number", required: true, description: "Recipient personId (must belong to the active company)" },
@@ -592,9 +592,9 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     errors: [
       PERSON_PARSE_ERR,
       apiErr(400, "Validation", "empty/too long/link in text, or person has no textable phone"),
-      apiErr(403, "Permission denied", "company lacks the HAS_SMS module or caller is not an admin"),
+      apiErr(403, "Permission denied", "company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin"),
       apiErr(404, "Not found", "personId is not in the active company"),
-      apiErr(502, "Gateway rejected", "the SMS gateway refused the message (see the error text); logged as failed in smsLog"),
+      apiErr(422, "Gateway rejected", "the SMS gateway refused or could not take the message (the error text carries the gateway reason when it answered); logged as failed in smsLog — do not blindly retry, each send is billed"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -606,11 +606,11 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib message sms list",
-    description: "SMS sent to one person of the active company, newest first (time, sender, text, status). HAS_SMS module + admin.",
+    description: "SMS sent to one person of the active company, newest first (time, sender, text, status). HAS_SMS module + an admin or dispatcher role.",
     auth: "any",
     flags: [{ name: "person", type: "number", required: true, description: "Recipient personId" }],
     outputShape: "{ items: [{ smsLogId, createdAt, message, segments, status, errorText, senderPersonId, senderName }] }",
-    errors: [PERSON_PARSE_ERR, apiErr(403, "Permission denied", "HAS_SMS module + admin required"), ...COMMON_AUTH_ERRORS],
+    errors: [PERSON_PARSE_ERR, apiErr(403, "Permission denied", "HAS_SMS module + one of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin required"), ...COMMON_AUTH_ERRORS],
     notes: ["Deploy-gated: the /api/sms routes must be deployed to the target backend."],
     seeAlso: ["ib message sms send"],
     examples: ["ib message sms list --person 6390"],
