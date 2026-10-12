@@ -10553,7 +10553,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS.
+  - Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS. The server refuses it over MCP ib_exec, POST /api/cli/exec and the /ai assistant (sms list stays allowed).
   - Deploy-gated: the /api/sms routes must be deployed to the target backend.
 
 SEE ALSO

@@ -598,7 +598,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS.",
+      "Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS. The server refuses it over MCP ib_exec, POST /api/cli/exec and the /ai assistant (sms list stays allowed).",
       "Deploy-gated: the /api/sms routes must be deployed to the target backend.",
     ],
     seeAlso: ["ib message sms list", "ib person get"],
