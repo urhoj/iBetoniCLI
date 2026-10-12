@@ -3,6 +3,7 @@ import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCompanyList,
   runCompanyCurrent,
+  runCompanySetVarikko,
 } from "../../src/commands/company/index.js";
 
 const mockClient = mockApiClient();
@@ -148,5 +149,31 @@ describe("ib company", () => {
     await expect(runCompanyCurrent(mockClient)).rejects.toThrow(
       /No current company/
     );
+  });
+});
+
+// fb#2501: the active company's default depot.
+describe("runCompanySetVarikko", () => {
+  beforeEach(() => {
+    mockClient.post.mockReset();
+    mockClient.getCurrentToken.mockReset();
+    mockClient.getCurrentToken.mockReturnValue(jwt({ ownerAsiakasId: 27, personId: 10 }));
+  });
+
+  test("posts the active company and the depot with the write headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ rowsAffected: [1] });
+    const out = await runCompanySetVarikko(mockClient, 97, { reason: "main depot" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/asiakas/sijainti/varikko/saveDefaultSijainti",
+      { asiakasId: 27, sijaintiId: 97 },
+      { headers: { "X-Action-Reason": "main depot" } }
+    );
+    expect(out).toEqual({ ok: true, asiakasId: 27, varikkoSijaintiId: 97 });
+  });
+
+  test("--dry-run resolves client-side and never POSTs", async () => {
+    const out = await runCompanySetVarikko(mockClient, 97, { dryRun: true });
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(out).toEqual({ dryRun: true, wouldUpdate: { asiakasId: 27, varikkoSijaintiId: 97 } });
   });
 });

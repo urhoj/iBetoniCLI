@@ -264,6 +264,14 @@ const VEHICLE_FIELDS = [
         field: "gridStyle",
         modes: ["update"],
     },
+    {
+        flag: "--varikko <sijaintiId>",
+        description: "The vehicle's own depot sijaintiId — origin of the empty run to the worksite, overrides the company default (varikkoSijaintiId; must be a pumppuvarikko/toimipiste; 0 clears)",
+        optKey: "varikko",
+        field: "varikkoSijaintiId",
+        parse: intFlag("--varikko", 0),
+        modes: ["update"],
+    },
 ];
 /** Attach the field flags this mode exposes, in table order. */
 function addVehicleFieldFlags(cmd, mode) {
@@ -314,6 +322,7 @@ const VEHICLE_DIFF_FIELDS = [
     "vehiclePuomi",
     "gridStyle",
     "hasGpsTracking",
+    "varikkoSijaintiId",
 ];
 /**
  * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
@@ -426,6 +435,8 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
         // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
         gridStyle: changes.gridStyle ?? current.gridStyle,
+        // Absent → omitted from the JSON → the backend keeps the stored depot; 0 clears (fb#2501).
+        varikkoSijaintiId: changes.varikkoSijaintiId ?? current.varikkoSijaintiId,
     };
     // Preview computed entirely client-side — it cannot persist. Report the
     // field-level diff (what would actually change) rather than the whole body.

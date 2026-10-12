@@ -1765,6 +1765,10 @@ ib vehicle update --type <n>
   ! --type must be an integer >= 1
   > pass a vehicleTypeId — \`ib vehicle types\` lists them
 
+ib vehicle update --varikko <sijaintiId>
+  ! --varikko must be an integer >= 0
+  > pass the depot sijaintiId, or 0 to clear
+
 ib vehicle visits --days <n>
   ! --days must be an integer >= 1
   > pass a positive number of days (omit for all-time)

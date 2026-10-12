@@ -7,7 +7,7 @@ import { apiErr, COMMON_AUTH_ERRORS, intParseErr } from "./shared.js";
 
 export const COMPANY_SPECS: CommandSpec[] = [
 
-  // ─── company (6) ─────────────────────────────────────────────────────────
+  // ─── company (7) ─────────────────────────────────────────────────────────
   {
     command: "ib company list",
     description:
@@ -77,6 +77,31 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "For a one-command company context that does NOT persist, use the global `--company <id>` flag instead.",
     ],
     examples: ["ib company switch 1349", "ib company switch --to 1349"],
+  },
+  {
+    command: "ib company set-varikko",
+    description:
+      "Set the active company's default depot (asiakas.varikkoSijaintiId) — the origin of the empty run to the worksite (Tyhjänä työmaalle) for every vehicle without its own depot. POST /api/asiakas/sijainti/varikko/saveDefaultSijainti.",
+    permissions: ["edit role in the active company AND in the sijainti's owner company"],
+    args: [{ name: "sijaintiId", type: "number", description: "Depot sijaintiId (a pumppuvarikko or toimipiste)" }],
+    flags: [],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "{ ok: true, asiakasId, varikkoSijaintiId }; with --dry-run { dryRun: true, wouldUpdate: { asiakasId, varikkoSijaintiId } } (never POSTs)",
+    errors: [
+      { origin: "client", exit: 4, match: "expected a positive integer", meaning: "sijaintiId is not a positive integer", remedy: "pass the depot's sijaintiId (`ib sijainti list`)" },
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "run `ib company switch`" },
+      apiErr(400, "Sijainti … ei ole varikko tai toimipiste / ei löydy", "pick a sijainti of type pumppuvarikko or toimipiste (`ib sijainti get <id>`)"),
+      apiErr(403, "No edit role in the active company or in the sijainti's owner", "verify via `ib company list`; the depot must belong to a company you may edit"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Applies to the ACTIVE company; to set another tenant's default, add the global `--company <asiakasId>`.",
+      "A vehicle's own depot overrides this default: `ib vehicle update <id> --varikko <sijaintiId>`.",
+      "--dry-run is client-side (echoes the request) because backends before fb#2501 persisted on X-Dry-Run.",
+    ],
+    seeAlso: ["ib vehicle update", "ib sijainti list"],
+    examples: ["ib company set-varikko 97 --reason 'main depot'", "ib company set-varikko 97 --dry-run"],
   },
   {
     command: "ib validate",

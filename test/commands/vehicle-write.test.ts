@@ -497,3 +497,31 @@ describe("ib vehicle dates", () => {
     expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/expiring?days=60");
   });
 });
+
+// fb#2501: the vehicle's own depot rides the read-merge-write like every other field.
+describe("runVehicleUpdate --varikko", () => {
+  const c = mockApiClient();
+  beforeEach(() => vi.clearAllMocks());
+  const row = (varikkoSijaintiId: number | null) => [{ vehicleId: 70, asiakasId: 27, vehicleRegNo: "R", varikkoSijaintiId }];
+
+  test("a new depot is posted", async () => {
+    c.get.mockResolvedValueOnce(row(null));
+    c.post.mockResolvedValueOnce({ vehicleId: 70 });
+    await runVehicleUpdate(c, 70, { varikkoSijaintiId: 97 }, {});
+    expect(c.post).toHaveBeenCalledWith("/api/vehicle/save", expect.objectContaining({ varikkoSijaintiId: 97 }), expect.anything());
+  });
+
+  test("absent keeps the stored depot", async () => {
+    c.get.mockResolvedValueOnce(row(55));
+    c.post.mockResolvedValueOnce({ vehicleId: 70 });
+    await runVehicleUpdate(c, 70, { memo: "x" }, {});
+    expect(c.post).toHaveBeenCalledWith("/api/vehicle/save", expect.objectContaining({ varikkoSijaintiId: 55 }), expect.anything());
+  });
+
+  test("--dry-run reports the depot change", async () => {
+    c.get.mockResolvedValueOnce(row(55));
+    const out = await runVehicleUpdate(c, 70, { varikkoSijaintiId: 97 }, { dryRun: true });
+    expect(out).toEqual({ dryRun: true, vehicleId: 70, wouldChange: { varikkoSijaintiId: { from: 55, to: 97 } } });
+    expect(c.post).not.toHaveBeenCalled();
+  });
+});

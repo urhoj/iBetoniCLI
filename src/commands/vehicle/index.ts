@@ -366,6 +366,8 @@ export interface VehicleWriteFields {
   gridStyle?: string;
   /** Whether the vehicle has GPS tracking hardware installed (gates the GPS keikka-tila row). */
   hasGpsTracking?: boolean;
+  /** The vehicle's own depot sijaintiId (overrides the company default); 0 clears (fb#2501). */
+  varikkoSijaintiId?: number;
 }
 
 /**
@@ -449,6 +451,14 @@ const VEHICLE_FIELDS: ReadonlyArray<{
     field: "gridStyle",
     modes: ["update"],
   },
+  {
+    flag: "--varikko <sijaintiId>",
+    description: "The vehicle's own depot sijaintiId — origin of the empty run to the worksite, overrides the company default (varikkoSijaintiId; must be a pumppuvarikko/toimipiste; 0 clears)",
+    optKey: "varikko",
+    field: "varikkoSijaintiId",
+    parse: intFlag("--varikko", 0),
+    modes: ["update"],
+  },
 ];
 
 /** Parsed options of `vehicle create` / `vehicle update` — every field flag, all optional. */
@@ -502,6 +512,7 @@ const VEHICLE_DIFF_FIELDS = [
   "vehiclePuomi",
   "gridStyle",
   "hasGpsTracking",
+  "varikkoSijaintiId",
 ] as const;
 
 /**
@@ -643,6 +654,8 @@ export async function runVehicleUpdate(
     vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
     // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
     gridStyle: changes.gridStyle ?? current.gridStyle,
+    // Absent → omitted from the JSON → the backend keeps the stored depot; 0 clears (fb#2501).
+    varikkoSijaintiId: changes.varikkoSijaintiId ?? current.varikkoSijaintiId,
   };
   // Preview computed entirely client-side — it cannot persist. Report the
   // field-level diff (what would actually change) rather than the whole body.

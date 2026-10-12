@@ -489,7 +489,7 @@ describe("sibling-GROUP subcommand redirect (#343)", () => {
     expect(env.availableElsewhere).toEqual(["ib customer get"]);
     expect(env.hint).toContain("`ib customer get` does");
     // the in-group list is still reported, as context behind the answer
-    expect(env.available).toEqual(["list", "current", "switch"]);
+    expect(env.available).toEqual(["list", "current", "switch", "set-varikko"]);
   });
 
   test("only fires when the sibling command really exists", () => {

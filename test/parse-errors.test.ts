@@ -135,7 +135,7 @@ describe("parser errors → JSON envelope", () => {
     expect(parsed.code).toBe("USAGE");
     expect(parsed.group).toBe("ib company");
     expect(parsed.unknownCommand).toBe("8");
-    expect(parsed.available).toEqual(["list", "current", "switch"]);
+    expect(parsed.available).toEqual(["list", "current", "switch", "set-varikko"]);
     expect(process.exitCode).toBe(4);
   });
 
@@ -149,7 +149,7 @@ describe("parser errors → JSON envelope", () => {
     const out = String(stderrSpy.mock.calls.at(-1)![0]);
     expect(out.startsWith("{")).toBe(false);
     expect(out).toContain('✗ unknown command "8" under `ib company`');
-    expect(out).toContain("list, current, switch");
+    expect(out).toContain("list, current, switch, set-varikko");
     expect(out).toContain("(exit 4)");
     expect(process.exitCode).toBe(4);
   });
@@ -164,7 +164,7 @@ describe("parser errors → JSON envelope", () => {
     // …carrying the caller's own args, so the hint is copy-paste runnable.
     expect(String(parsed.hint)).toContain("`ib customer get 8` does");
     expect(String(parsed.hint)).toContain("same `asiakas` entity");
-    expect(parsed.available).toEqual(["list", "current", "switch"]);
+    expect(parsed.available).toEqual(["list", "current", "switch", "set-varikko"]);
     expect(process.exitCode).toBe(4);
   });
 

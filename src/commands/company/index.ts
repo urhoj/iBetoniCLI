@@ -5,8 +5,10 @@ import { runPersistedSwitch } from "../../auth/switch.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
-import { intFlag, resolveTarget } from "../../targets.js";
+import { intFlag, parseId, resolveTarget } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 
 interface AvailableCompany {
   asiakasId: number;
@@ -109,6 +111,29 @@ export async function runCompanyCurrent(
 }
 
 /**
+ * Set the ACTIVE company's default depot (asiakas.varikkoSijaintiId) — the "Tyhjänä
+ * työmaalle" origin for every vehicle without its own (`ib vehicle update --varikko`),
+ * used by the matka recompute and the /oma map (fb#2501). The backend checks the sijainti
+ * is a pumppuvarikko/toimipiste and that the caller may edit both tenants.
+ *
+ * `--dry-run` resolves client-side (echoes the request, never POSTs): the route only
+ * honours X-Dry-Run from fb#2501's backend on, and an older backend would persist.
+ */
+export async function runCompanySetVarikko(
+  client: ApiClient,
+  sijaintiId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  const asiakasId = ownerAsiakasIdFromToken(client, "run `ib company switch`");
+  const body = { asiakasId, sijaintiId };
+  if (flags.dryRun) return { dryRun: true, wouldUpdate: { asiakasId, varikkoSijaintiId: sijaintiId } };
+  await client.post("/api/asiakas/sijainti/varikko/saveDefaultSijainti", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+  return { ok: true, asiakasId, varikkoSijaintiId: sijaintiId };
+}
+
+/**
  * Register `ib company` subcommands on the parent commander instance:
  *   - list     enumerate available companies with `current` flag
  *   - current  print the active company
@@ -146,6 +171,14 @@ export function registerCompanyCommands(
         );
       })
     );
+
+  addWriteFlagsToCommand(
+    company.command("set-varikko <sijaintiId>")
+  ).action(
+    guarded(async (idStr: string, opts: WriteFlags) => {
+      writeJson(await runCompanySetVarikko(await getClient(), parseId(idStr, "sijaintiId"), opts));
+    })
+  );
 
   // `ib company validate` was renamed to the top-level `ib validate` (clean
   // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.
