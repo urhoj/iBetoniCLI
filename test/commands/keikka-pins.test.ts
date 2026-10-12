@@ -6,7 +6,10 @@ import { todayHelsinki, addDaysISO } from "../../src/dates.js";
 const client = mockApiClient();
 
 describe("ib keikka pins", () => {
-  beforeEach(() => client.get.mockReset().mockResolvedValue({ pins: [{ keikkaId: 1 }, { keikkaId: 2 }], truncated: false }));
+  beforeEach(() => {
+    client.get.mockReset().mockResolvedValue({ pins: [{ keikkaId: 1 }, { keikkaId: 2 }], truncated: false });
+    client.getCurrentToken.mockReset();
+  });
 
   test("tenant read hits /api/stat/keikka-pins with the window and echoes count + range", async () => {
     const r = await runKeikkaPins(client, { start: "2026-01-01", end: "2026-10-10" });
@@ -18,11 +21,16 @@ describe("ib keikka pins", () => {
     const end = todayHelsinki();
     expect(r.range).toEqual({ start: addDaysISO(end, -365), end });
   });
+  test("--end alone derives start as 365 days before it", async () => {
+    const r = await runKeikkaPins(client, { end: "2026-10-10" });
+    expect(r.range).toEqual({ start: "2025-10-10", end: "2026-10-10" });
+    expect(client.get).toHaveBeenCalledWith("/api/stat/keikka-pins?start=2025-10-10&end=2026-10-10");
+  });
   test("--person reads the person route with the token's owner", async () => {
     client.getCurrentToken.mockReturnValue(
       "x." + Buffer.from(JSON.stringify({ sub: 10, ownerAsiakasId: 27 })).toString("base64url") + ".y"
     );
     await runKeikkaPins(client, { start: "2026-01-01", end: "2026-10-10", person: 6387 });
-    expect(String(client.get.mock.calls[0][0])).toMatch(/^\/api\/user-history\/keikka-pins\/6387\/27\?start=/);
+    expect(client.get).toHaveBeenCalledWith("/api/user-history/keikka-pins/6387/27?start=2026-01-01&end=2026-10-10");
   });
 });

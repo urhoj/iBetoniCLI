@@ -168,6 +168,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     outputShape: "{ pins: [...], truncated: boolean, count: number, range: { start, end } }",
     errors: [
       intParseErr("--person", "pass a positive personId"),
+      apiErr(400, "--start/--end not a YYYY-MM-DD date ('Päivämäärät täytyy olla muodossa YYYY-MM-DD')", "pass ISO dates, e.g. --start 2026-01-01 --end 2026-10-10"),
       ...permErrors("a company role of admin/editor/keikkaHandler (or --person for yourself)"),
     ],
     notes: [

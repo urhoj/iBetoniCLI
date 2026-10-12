@@ -8255,6 +8255,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (HTTP 400)  --start/--end not a YYYY-MM-DD date ('Päivämäärät täytyy olla muodossa YYYY-MM-DD') → pass ISO dates, e.g. --start 2026-01-01 --end 2026-10-10
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check a company role of admin/editor/keikkaHandler (or --person for yourself)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -11470,7 +11471,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }
+  { startTime, endTime, pumpingEndTime, duration, totalPrecipitation, maxWindSpeed, maxWindGust, avgTemperature, startTemperature, endTemperature, weatherSymbol, description, hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol, isPumpingPeriod, ... }], coordinates, source, cached? }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --lat/--lng not a number, or --duration/--keikka not a positive integer → pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
@@ -11478,6 +11479,9 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Bad coords/time/duration → use Finland coords, valid ISO time, positive duration
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation covers the pumping window only; the other aggregates also span the hardening hours after it.
 
 EXAMPLES
   ib opendata weather pumping --lat 60.17 --lng 24.94 --start now --duration 120
