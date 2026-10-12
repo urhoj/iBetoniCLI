@@ -189,7 +189,7 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ separate visits within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy a coarse geocode (PARTIAL/CITY/APPROXIMATE/POSTAL/STREET/FAILED; never EXACT/GPS/MANUAL/null); --apply pins only high unless --min-confidence medium. Read-only without --apply. Exits 1 when a pin failed (applied:false) or failedTimelineReads > 0.",
-      "A nightly job (04:40) already re-pins yesterday's delivered sites from a 30-day lookback when > 50 m off (any geocode becomes GPS; a MANUAL pin moves only within its geofence and stays MANUAL), so this command is the manual > 1 km sweep.",
+      "A nightly job (04:40) re-pins yesterday's delivered sites (30-day lookback) when > 50 m off, confidence not low: any geocode becomes GPS, but a > 1 km move needs 2+ agreeing visits unless the old accuracy is PARTIAL/CITY/APPROXIMATE/POSTAL/FAILED/null; a MANUAL pin moves only within its geofence, stays MANUAL. This command is the manual > 1 km sweep.",
     ],
     seeAlso: ["ib worksite set-location", "ib vehicle timeline"],
     examples: [

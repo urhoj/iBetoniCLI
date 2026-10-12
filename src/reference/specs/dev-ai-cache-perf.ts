@@ -171,7 +171,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
           intParseErr("--id", "pass a positive entity id"),
           intParseErr("--asiakas", "pass a positive asiakasId"),
           apiErr(400, "Unknown entityType or cascade unsupported", "run `ib dev cache entities` to list valid types"),
-          apiErr(403, "Not an admin, or cross-tenant entity needs developer", "cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role"),
+          apiErr(403, "Not an admin, or cross-tenant entity needs developer", "cross-tenant entities (keikka, grid, stat, attachment, toimitus) require isSystemAdmin/isDeveloper; others need an admin role"),
           refusedRemote,
           readOnlyErr,
           contradictoryWriteFlags,
