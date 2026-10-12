@@ -186,15 +186,35 @@ const wordSetKey = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()
  * — the batch path tolerates 404s and would pay one list fetch per miss.
  */
 export async function runSchemaProcSuggesting(client, name) {
+    return suggestOn404(runSchemaProc(client, name), async () => {
+        const suggestion = await nearestProcNames(client, name);
+        return suggestion.length
+            ? `did you mean ${orList(suggestion)}? (nearest names in the live proc/function list)`
+            : null;
+    });
+}
+/** `schema table|view` twins of the above (fb#2455), over `schema query`'s table+view list. */
+export async function runSchemaTableSuggesting(client, name) {
+    return suggestOn404(runSchemaTable(client, name), () => nearestObjectNameSuggestion(client, name));
+}
+export async function runSchemaViewSuggesting(client, name) {
+    return suggestOn404(runSchemaView(client, name), () => nearestObjectNameSuggestion(client, name));
+}
+/**
+ * Rethrow a 404 with `suggest()`'s hint. Skipped when the backend's message
+ * already answers — the object's real class, or the `<name>Id` PK-owner table
+ * (schemaIntrospectionSql.js buildMissingObjectMessage); a failed suggestion
+ * lookup keeps the original error.
+ */
+async function suggestOn404(read, suggest) {
     try {
-        return await runSchemaProc(client, name);
+        return await read;
     }
     catch (e) {
-        if (e instanceof CliError && e.statusCode === 404 && !/object exists in dbo/i.test(e.message)) {
-            const suggestion = await nearestProcNames(client, name).catch(() => []);
-            if (suggestion.length) {
-                throw new CliError(e.message, e.statusCode, e.body, e.exitCode, `did you mean ${orList(suggestion)}? (nearest names in the live proc/function list)`);
-            }
+        if (e instanceof CliError && e.statusCode === 404 && !/object exists in dbo|did you mean/i.test(e.message)) {
+            const hint = await suggest().catch(() => null);
+            if (hint)
+                throw new CliError(e.message, e.statusCode, e.body, e.exitCode, hint);
         }
         throw e;
     }
@@ -710,9 +730,9 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
         .description("Sample rows from a reference lookup table (allowlisted, developer-only)")
         .action(jsonAction(getClient, runSchemaRows));
     s.command("table <name>")
-        .action(runOneOrBatch(runSchemaTable));
+        .action(runOneOrBatch(runSchemaTable, runSchemaTableSuggesting));
     s.command("view <name>")
-        .action(runOneOrBatch(runSchemaView));
+        .action(runOneOrBatch(runSchemaView, runSchemaViewSuggesting));
     // function/fn/udf: `proc` already reads scalar + table functions (fb#2310).
     s.command("proc <name>")
         .aliases(["function", "fn", "udf"])

@@ -11,6 +11,8 @@ import {
   runSchemaProcs,
   runSchemaProc,
   runSchemaProcSuggesting,
+  runSchemaTableSuggesting,
+  runSchemaViewSuggesting,
   runSchemaDump,
   runSchemaBatch,
   runSchemaTriggers,
@@ -1079,5 +1081,53 @@ describe("runSchemaProcSuggesting", () => {
     const err = notFound("Proc/function not found: x");
     mockClient.get.mockRejectedValue(err);
     await expect(runSchemaProcSuggesting(mockClient, "x")).rejects.toBe(err);
+  });
+});
+
+// fb#2455: a single-name table/view 404 names the nearest live table/view names.
+describe("runSchemaTableSuggesting / runSchemaViewSuggesting", () => {
+  const notFound = (msg: string) => new CliError(msg, 404, null, 5);
+  const list = (names: string[]) => ({ items: names.map((name) => ({ name })), nextCursor: null, count: names.length });
+  const catalogue = async (path: string, miss: string) => {
+    if (path.startsWith("/api/cli/schema/tables")) return list(["grid_palkit", "grid_palkkiTypes", "keikka"]);
+    if (path.startsWith("/api/cli/schema/views")) return list(["keikkaBetoniView"]);
+    throw notFound(miss);
+  };
+  beforeEach(() => {
+    mockClient.get.mockReset();
+  });
+
+  test("table typo names the real table", async () => {
+    mockClient.get.mockImplementation((p: string) => catalogue(p, "Table not found: grid_palkki"));
+    await expect(runSchemaTableSuggesting(mockClient, "grid_palkki")).rejects.toMatchObject({
+      statusCode: 404,
+      hint: expect.stringContaining("did you mean dbo.grid_palkit"),
+    });
+  });
+
+  test("view typo searches the same table+view list", async () => {
+    mockClient.get.mockImplementation((p: string) => catalogue(p, "View not found: keikkaBetoniViw"));
+    await expect(runSchemaViewSuggesting(mockClient, "keikkaBetoniViw")).rejects.toMatchObject({
+      hint: expect.stringContaining("dbo.keikkaBetoniView"),
+    });
+  });
+
+  test("a backend 404 that already answers (class / PK owner) passes through without a list fetch", async () => {
+    for (const msg of [
+      "Table not found: v — object exists in dbo but is a VIEW; read it with `ib dev schema view v`",
+      "Table not found: tuote — `tuoteId` is the primary key of `tuotteet`; did you mean `ib dev schema table tuotteet`?",
+    ]) {
+      mockClient.get.mockReset();
+      const err = notFound(msg);
+      mockClient.get.mockRejectedValue(err);
+      await expect(runSchemaTableSuggesting(mockClient, "x")).rejects.toBe(err);
+      expect(mockClient.get).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test("a failed list fetch keeps the original 404", async () => {
+    const err = notFound("Table not found: x");
+    mockClient.get.mockRejectedValue(err);
+    await expect(runSchemaTableSuggesting(mockClient, "x")).rejects.toBe(err);
   });
 });
