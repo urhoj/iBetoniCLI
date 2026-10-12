@@ -85,6 +85,22 @@ describe("ib cache run* functions", () => {
     );
   });
 
+  // fb#2469: the default preview came back as dryRun:true with nothing saying it was implicit.
+  test("an implicit preview says so on stderr; explicit --dry-run and --confirm do not", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      mockClient.post.mockResolvedValue({ dryRun: true, wouldDelete: 0 });
+      await runCacheInvalidate(mockClient, { entityType: "keikka" }, { confirm: false });
+      expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toMatch(/preview only .*--confirm/);
+      stderr.mockClear();
+      await runCacheInvalidate(mockClient, { entityType: "keikka" }, { dryRun: true });
+      await runCacheInvalidate(mockClient, { entityType: "keikka" }, { confirm: true });
+      expect(stderr.mock.calls.map((c) => String(c[0])).join("")).not.toMatch(/preview only/);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   test("runCacheInvalidate with --confirm sends a real write (no X-Dry-Run, no read flag)", async () => {
     mockClient.post.mockResolvedValueOnce({ dryRun: false, deleted: 5 });
     await runCacheInvalidate(mockClient, { entityType: "keikka", id: 123 }, { confirm: true, forceProd: false });

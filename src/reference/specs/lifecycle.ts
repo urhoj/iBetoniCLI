@@ -188,7 +188,8 @@ export const LIFECYCLE_SPECS: CommandSpec[] = [
       ...permErrors(WORKSITE_EDIT_PERMISSION),
     ],
     notes: [
-      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ separate visits within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy not EXACT; --apply pins only high unless --min-confidence medium. Read-only without --apply. Exits 1 when a pin failed (applied:false) or failedTimelineReads > 0.",
+      "Checks delivered keikkas of GPS-tracked vehicles at non-MANUAL sites. confidence: high = 2+ separate visits within 300 m, medium = one, low = they disagree. autoApplicable = not low and accuracy a coarse geocode (PARTIAL/CITY/APPROXIMATE/POSTAL/STREET/FAILED; never EXACT/GPS/MANUAL/null); --apply pins only high unless --min-confidence medium. Read-only without --apply. Exits 1 when a pin failed (applied:false) or failedTimelineReads > 0.",
+      "A nightly job (04:40) already re-pins yesterday's delivered sites from a 30-day lookback when > 50 m off (any geocode becomes GPS; a MANUAL pin moves only within its geofence and stays MANUAL), so this command is the manual > 1 km sweep.",
     ],
     seeAlso: ["ib worksite set-location", "ib vehicle timeline"],
     examples: [

@@ -1,7 +1,7 @@
 import { Option } from "commander";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -45,6 +45,10 @@ function writeRequestOptions(client: ApiClient, opts: CacheWriteOpts): {
     );
   }
   const dryRun = !opts.confirm;
+  // An IMPLICIT preview reads like an executed no-op without this (fb#2469).
+  if (dryRun && !opts.dryRun) {
+    warnNote("[ib] preview only (this group previews by default) — add --confirm to apply (plus --force-prod against the deployed API)");
+  }
   if (!dryRun) assertWritableEndpoint(client.endpoint, !!opts.forceProd);
   const headers: Record<string, string> = {};
   if (dryRun) headers["X-Dry-Run"] = "1";
