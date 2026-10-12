@@ -61,7 +61,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
           apiErr(
             404,
             "Table not found",
-            "check the name via `ib dev schema tables`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → `ib dev schema trigger`), and when `<name>Id` is some table's PRIMARY KEY it names that table (`tuote` → `tuotteet`). So a not-found on a name you are sure of means wrong COMMAND or wrong WORD, not a typo."
+            "a single-name 404 names the nearest live table/view names; else `ib dev schema tables`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → `ib dev schema trigger`), and when `<name>Id` is some table's PRIMARY KEY it names that table (`tuote` → `tuotteet`)."
           ),
         ],
         notes: [
@@ -89,7 +89,7 @@ export const DEV_SCHEMA_SPECS: CommandSpec[] = [
         flags: [],
         outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)" + renamedShape,
         notes: [renamedNote],
-        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "a single-name 404 names the nearest live table/view names; else `ib dev schema views` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema view keikkaBetoniView", "ib dev schema view keikkaBetoniView,asiakasView"],
       },
       {

@@ -5496,7 +5496,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  Table not found        → check the name via \`ib dev schema tables\`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → \`ib dev schema trigger\`), and when \`<name>Id\` is some table's PRIMARY KEY it names that table (\`tuote\` → \`tuotteet\`). So a not-found on a name you are sure of means wrong COMMAND or wrong WORD, not a typo.
+  exit 5 (HTTP 404)  Table not found        → a single-name 404 names the nearest live table/view names; else \`ib dev schema tables\`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → \`ib dev schema trigger\`), and when \`<name>Id\` is some table's PRIMARY KEY it names that table (\`tuote\` → \`tuotteet\`).
 
 NOTES
   - ENFORCEMENT, not just existence (fb#425): \`disabled\` on a foreign key or CHECK means it is NOT checked on write — the constraint is inert and violating rows can land. \`notTrusted\` means it was re-enabled without a re-check, so existing rows may already violate it. BOTH KEYS ARE OMITTED WHEN FALSE, so their presence is the signal; a healthy table shows neither. Constraint state differs between environments — a dev-vs-prod FK failure is usually this.
@@ -5640,7 +5640,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  View not found         → check the name via \`ib dev schema views\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+  exit 5 (HTTP 404)  View not found         → a single-name 404 names the nearest live table/view names; else \`ib dev schema views\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
 
 NOTES
   - OBJECT_DEFINITION keeps the ORIGINAL CREATE text after an sp_rename, so the body can declare a DIFFERENT name than the one you asked for (\`keikka_saveContactPerson\` returns \`CREATE PROCEDURE [dbo].[updateKeikkaPerson]\`). When it does, the payload carries \`renamedFrom\` and a \`renameNote\`: the body IS the object you asked for, not a wrong fetch — and the old name is what a codebase grep for callers will match (fb#1140).
