@@ -33,4 +33,13 @@ describe("ib keikka pins", () => {
     await runKeikkaPins(client, { start: "2026-01-01", end: "2026-10-10", person: 6387 });
     expect(client.get).toHaveBeenCalledWith("/api/user-history/keikka-pins/6387/27?start=2026-01-01&end=2026-10-10");
   });
+  test.each([
+    [{ end: "10.10.2026" }, "--end"],
+    [{ start: "2026-1-1", end: "2026-10-10" }, "--start"],
+    [{ end: "2026-13-45" }, "--end"],
+    [{ start: "2026-02-30" }, "--start"],
+  ])("bad date %o exits 4 naming %s, before any request (fb#2518)", async (opts, flag) => {
+    await expect(runKeikkaPins(client, opts)).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining(flag) });
+    expect(client.get).not.toHaveBeenCalled();
+  });
 });

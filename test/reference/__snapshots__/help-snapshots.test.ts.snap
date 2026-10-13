@@ -8303,6 +8303,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --start/--end is not a real YYYY-MM-DD date (checked before any request) → pass ISO dates, e.g. --start 2026-01-01 --end 2026-10-10
   exit 4 (HTTP 400)  --start/--end not a YYYY-MM-DD date ('Päivämäärät täytyy olla muodossa YYYY-MM-DD') → pass ISO dates, e.g. --start 2026-01-01 --end 2026-10-10
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check a company role of admin/editor/keikkaHandler (or --person for yourself)
