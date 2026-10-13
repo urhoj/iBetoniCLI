@@ -655,7 +655,8 @@ export async function runVehicleUpdate(
     // "" is a deliberate clear (the route NULLs it); only undefined keeps the current value.
     gridStyle: changes.gridStyle ?? current.gridStyle,
     // Absent → omitted from the JSON → the backend keeps the stored depot; 0 clears (fb#2501).
-    varikkoSijaintiId: changes.varikkoSijaintiId ?? current.varikkoSijaintiId,
+    // Never re-send the stored depot: the backend re-gates any sent depot on its owner tenant (fb#2538).
+    varikkoSijaintiId: changes.varikkoSijaintiId,
   };
   // Preview computed entirely client-side — it cannot persist. Report the
   // field-level diff (what would actually change) rather than the whole body.
@@ -663,7 +664,7 @@ export async function runVehicleUpdate(
     return {
       dryRun: true,
       vehicleId,
-      wouldChange: diffFields(current, body, VEHICLE_DIFF_FIELDS),
+      wouldChange: diffFields(current, { ...body, varikkoSijaintiId: body.varikkoSijaintiId ?? current.varikkoSijaintiId }, VEHICLE_DIFF_FIELDS),
     };
   }
   return client.post("/api/vehicle/save", body, {

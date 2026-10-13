@@ -511,11 +511,17 @@ describe("runVehicleUpdate --varikko", () => {
     expect(c.post).toHaveBeenCalledWith("/api/vehicle/save", expect.objectContaining({ varikkoSijaintiId: 97 }), expect.anything());
   });
 
-  test("absent keeps the stored depot", async () => {
+  test("dry-run without --varikko reports no depot change", async () => {
+    c.get.mockResolvedValueOnce(row(55));
+    const out = await runVehicleUpdate(c, 70, { memo: "x" }, { dryRun: true });
+    expect(JSON.stringify(out)).not.toContain("varikkoSijaintiId");
+  });
+
+  test("absent omits the depot (backend keeps it, fb#2538)", async () => {
     c.get.mockResolvedValueOnce(row(55));
     c.post.mockResolvedValueOnce({ vehicleId: 70 });
     await runVehicleUpdate(c, 70, { memo: "x" }, {});
-    expect(c.post).toHaveBeenCalledWith("/api/vehicle/save", expect.objectContaining({ varikkoSijaintiId: 55 }), expect.anything());
+    expect(c.post.mock.calls[0][1].varikkoSijaintiId).toBeUndefined();
   });
 
   test("--dry-run reports the depot change", async () => {
