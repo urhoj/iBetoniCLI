@@ -135,7 +135,7 @@ export async function runVehicleStatus(
  * GET /api/cli/vehicle/locations — fleet-wide live position snapshot.
  *
  * Rows are self-describing about how far they can be trusted (feedback #324):
- * `matched` is false when the Ecofleet object's plate resolves to no
+ * `matched` is false when the GPS provider unit's plate resolves to no
  * dbo.vehicle row (vehicleId:null — expected, not an error), and
  * `ageMinutes`/`stale` report tracker freshness against the envelope's
  * `staleAfterMinutes`. Pass-through: the backend derives both.
