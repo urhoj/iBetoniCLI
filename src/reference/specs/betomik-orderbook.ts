@@ -258,10 +258,10 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     ],
     args: [{ name: "runId", type: "number", description: "importRunId from `runs`" }],
     notes: [
-      "--dry-run STILL WRITES LEDGER STATE (syncStatus/plannedAction/blockReason) for every row — only the keikka/palkki writes and the auto-creates are suppressed.",
-      "A dry run WITH --provider still performs (and pays for) the AI cell extractions and stores extractedJson.",
+      "--dry-run writes NOTHING (fb#2566): no ledger state, no audit rows, no keikka/palkki; each row's would-be mark (syncStatus/plannedAction/blockReason) comes back in summary.marks.",
+      "A dry run WITH --provider still performs (and pays for) the AI cell extractions but does not store them — the real pass extracts again.",
     ],
-    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, moved, unmatched: [{ plate, cell, days }], errors } } } — --dry-run returns { dryRun: true, summary }",
+    outputShape: "{ summary: { importRunId, mode, dryRun, rows, planned, written, blocked, extracted, errors, dayDrivers: { blocks, planned, assigned, cleared, unchanged, frozen, skipped, moved, unmatched: [{ plate, cell, days }], errors } } } — --dry-run returns { dryRun: true, summary } with summary.marks: [{ rowId, syncStatus, plannedAction, blockReason, … }]",
     errors: [
       { origin: "client", exit: 4, meaning: "runId is not a positive integer", remedy: "Pass the importRunId from `ib dev betomik-orderbook runs`" },
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Only system admin/developer can trigger a sync" },
@@ -285,7 +285,7 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
       { name: "provider", type: "string", description: "bedrock (default) | local — used only for a row with no stored extraction" },
     ],
     notes: [
-      "Run --dry-run FIRST: the server still extracts (Bedrock, stored for the real pass) and plans, and each blockReason names what it WOULD create (customer:new \"…\", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow says customer:missing where the real pass writes on the placeholder customer. Like resync, a dry run still writes LEDGER state: a synced row you dry-run reads pending until the next real pass.",
+      "Run --dry-run FIRST: the server still extracts (Bedrock, not stored — the real pass extracts again) and plans, and each blockReason names what it WOULD create (customer:new \"…\", worksite:new, contact:new) — a garbage customer is caught before it exists. Shadow says customer:missing where the real pass writes on the placeholder customer. A dry run writes nothing (fb#2566): each item shows the planned mark, the stored row is unchanged.",
       "One request per row: a week never hits the edge timeout a run-level sync can, and a failing row is reported (ok:false) without aborting the rest. Day drivers are untouched — resync <runId> --mode full afterwards.",
       "--idempotency-key is suffixed per row (<key>:<rowId>), so a batch never replays one row's answer for another.",
     ],

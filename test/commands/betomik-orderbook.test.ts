@@ -416,6 +416,17 @@ describe("ib dev betomik-orderbook sync-row (the validator's Vie betoni.onlineen
     expect(result.items[0].blockReason).toBe('customer:new "Peab Oy"');
   });
 
+  test("--dry-run: the would-be mark in summary.marks wins over the untouched stored row (fb#2566)", async () => {
+    mockClient.post.mockResolvedValue({
+      dryRun: true,
+      summary: { written: { create: 0, update: 0, delete: 0 }, errors: [], marks: [{ rowId: 7, syncStatus: "blocked", plannedAction: "create", blockReason: 'customer:new "Peab Oy"' }] },
+      row: { betomikOrderbookImportRowId: 7, syncStatus: "pending", plannedAction: "none", blockReason: null, keikkaId: 55, rowKind: "keikka" },
+    });
+    const result = await runBetomikOrderbookSyncRows(mockClient, [7], {}, { dryRun: true });
+    expect(result.items[0]).toMatchObject({ syncStatus: "blocked", plannedAction: "create", blockReason: 'customer:new "Peab Oy"', keikkaId: 55, rowKind: "keikka" });
+    expect(result.summary.blocked).toBe(1);
+  });
+
   test("a row that fails does not abort the batch: it is reported with ok:false and counted as failed", async () => {
     mockClient.post
       .mockRejectedValueOnce(new CliError("row 9 not found", 404, null, 5))

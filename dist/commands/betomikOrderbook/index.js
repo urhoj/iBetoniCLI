@@ -189,7 +189,10 @@ export async function runBetomikOrderbookSyncRows(client, rowIds, body, flags) {
             const res = (await client.post(`/api/betomik-orderbook/rows/${rowId}/sync`, body, {
                 headers: writeFlagsToHeaders(perRow),
             }));
-            const row = res.row || {};
+            // A dry run leaves the stored row untouched (fb#2566) and returns the mark it
+            // WOULD write in summary.marks — that plan is the preview, not the stale row.
+            const mark = res.summary?.marks?.filter((m) => m.rowId === rowId).at(-1);
+            const row = { ...res.row, ...mark };
             const status = String(row.syncStatus ?? "");
             items.push({
                 rowId,
