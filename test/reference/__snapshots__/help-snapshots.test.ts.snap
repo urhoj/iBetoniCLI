@@ -10557,7 +10557,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ smsLogId, createdAt, message, segments, status, errorText, senderPersonId, senderName }] }
+  { items: [{ smsLogId, createdAt, message, segments, status:'sent'|'failed'|'unknown', errorText, senderPersonId, senderName }] } — 'unknown' = the gateway never answered, the SMS may have been delivered.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
@@ -10599,14 +10599,14 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { smsLogId, status:'sent', segments }. With --dry-run: { dryRun:true, personId, phone:'***NNNN', segments }.
+  { smsLogId, status:'sent', segments, phone:'***NNNN' }. With --dry-run: { dryRun:true, personId, phone:'***NNNN', segments }. On 422: { error, smsLogId, status:'failed'|'unknown' }.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Validation             → empty/too long/link in text, or person has no textable phone
   exit 3 (HTTP 403)  Permission denied      → company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin
   exit 5 (HTTP 404)  Not found              → personId is not in the active company
-  exit 4 (HTTP 422)  Gateway rejected       → the SMS gateway refused or could not take the message (the error text carries the gateway reason when it answered); logged as failed in smsLog — do not blindly retry, each send is billed
+  exit 4 (HTTP 422)  Gateway rejected or no answer → body.status 'failed': the gateway refused (error text carries its reason) — fix the cause before retrying, each send is billed. body.status 'unknown': no gateway answer within 15 s, the SMS MAY have been delivered — do NOT re-send until the recipient confirms. Both are logged in smsLog with that status
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
