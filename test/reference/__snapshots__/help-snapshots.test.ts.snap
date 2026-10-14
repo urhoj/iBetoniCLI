@@ -652,7 +652,7 @@ exports[`Help snapshots — contract stability > help for ib auth login matches 
   ib auth login [flags]
 
 DESCRIPTION
-  Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so).
+  Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session (a stderr note names the switch, fb#2557) and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so).
   Auth: none (public).
 
 FLAGS
@@ -686,7 +686,7 @@ exports[`Help snapshots — contract stability > help for ib auth logout matches
   ib auth logout [flags]
 
 DESCRIPTION
-  Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); the credentials file is removed with the last session.
+  Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); logging out the ACTIVE one promotes a parked session, api.ibetoni.fi first, and says so on stderr (fb#2557); the credentials file is removed with the last session.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -2805,11 +2805,12 @@ exports[`Help snapshots — contract stability > help for ib dev betomik-orderbo
   ib dev betomik-orderbook find [flags]
 
 DESCRIPTION
-  Ledger rows across ALL import runs by keikka, worksite or text (GET /api/betomik-orderbook/rows, fb#2364) — answers "what did the sheet say for this order" without walking \`runs\` + \`rows\`. Filters are ANDed and applied server-side; \`removed\` rows are INCLUDED (the history is the point — read syncStatus). Newest run first.
+  Ledger rows across ALL import runs by keikka, palkki, worksite or text (GET /api/betomik-orderbook/rows, fb#2364) — answers "what did the sheet say for this order" without walking \`runs\` + \`rows\`. Filters are ANDed and applied server-side; \`removed\` rows are INCLUDED (the history is the point — read syncStatus). Newest run first.
   Permissions: requires isSystemAdminOrDeveloper, or an admin of the Betomik company (asiakasId 27) — server-enforced.
 
 FLAGS
   --keikka NUMBER    Rows synced to this keikkaId
+  --palkki NUMBER    Rows synced to this palkkiId — the entry point for a fallback bar (blockReason fallback:palkki)
   --worksite NUMBER    Rows whose keikka is on this worksite (tyomaaId) — matched through the row's keikka, so a row never synced to a keikka cannot match
   --search STRING    Case-insensitive substring over the raw sheet cells (rawJson), siteText and customerGuess; min 2 chars
   --limit NUMBER    Max rows (default 50, capped at 500); truncated:true + a hint when more rows match
@@ -2823,9 +2824,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ betomikOrderbookImportRowId, importRunId, sheetLabel, isoYear, isoWeek, jobDate, plate, driverName, customerGuess, siteText, rowKind, rowKey, syncStatus, keikkaId, palkkiId, tyomaaId, m3, rawJson, ...every \`rows\` column }>
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  None of --keikka/--worksite/--search given → Pass at least one filter; to list a whole run use \`ib dev betomik-orderbook rows <runId>\`
+  exit 4 (client-side)  None of --keikka/--palkki/--worksite/--search given → Pass at least one filter; to list a whole run use \`ib dev betomik-orderbook rows <runId>\`
   exit 4 (client-side)  --search shorter than 2 characters → Pass a longer substring
   exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 4 (client-side)  --palkki is not an integer >= 1, rejected locally before any request → pass a positive palkkiId
   exit 4 (client-side)  --worksite is not an integer >= 1, rejected locally before any request → pass a positive tyomaaId
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer (server caps at 500)
   exit 4 (HTTP 400)  Backend rejected a filter (non-numeric id, short search, or none given) → Check the flag values
@@ -2838,6 +2840,7 @@ EXAMPLES
   ib dev betomik-orderbook find --worksite 3604 --no-raw
   ib dev betomik-orderbook find --search Kilonkuja
   ib dev betomik-orderbook find --keikka 123456
+  ib dev betomik-orderbook find --palkki 7621 --no-raw
 "
 `;
 

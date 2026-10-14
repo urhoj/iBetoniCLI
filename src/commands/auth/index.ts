@@ -115,12 +115,13 @@ export function registerAuthCommands(
             });
             return;
           }
-          await performLogout({
+          const promoted = await performLogout({
             endpoint: creds.endpoint,
             refreshToken: creds.refreshToken,
             jwt: creds.jwt,
             credentialsPath: defaultCredentialsPath(),
           });
+          if (promoted) warnNote(`[ib] note: ${endpointKey(promoted)} is now the active session`);
         } catch (e) {
           // Generic exit 1 — a best-effort revoke that fails is not an auth
           // problem. Raised as a CliError so `guarded` records it (see login).

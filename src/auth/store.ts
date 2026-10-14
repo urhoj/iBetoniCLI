@@ -92,8 +92,13 @@ export interface CredentialsStore {
   sessions(): Promise<StoredSession[]>;
   clear(): Promise<void>;
   remove(profile: string): Promise<void>;
-  /** Forget one endpoint's session, active or parked; the file goes with the last one. */
-  removeEndpoint(endpoint: string): Promise<void>;
+  /**
+   * Forget one endpoint's session, active or parked; the file goes with the
+   * last one. Removing the ACTIVE session promotes a parked one (the `prefer`
+   * endpoint's, else the first) so a bare `ib` still has a session (fb#2557).
+   * Resolves to the promoted session's endpoint, else null.
+   */
+  removeEndpoint(endpoint: string, opts?: { prefer?: string }): Promise<string | null>;
   /**
    * Serialize a critical section against OTHER PROCESSES sharing this
    * credentials file (fb#884: the rotating-refresh-token race). Best-effort —
@@ -222,20 +227,36 @@ export function createStore(path: string): CredentialsStore {
       delete file.profiles[profile];
       await writeCredentialsFile(path, file);
     },
-    async removeEndpoint(endpoint: string): Promise<void> {
+    async removeEndpoint(endpoint: string, opts?: { prefer?: string }): Promise<string | null> {
       let file: CredentialsFile | null;
       try {
         file = await readCredentialsFile(path);
       } catch {
-        return; // corrupt — nothing to remove
+        return null; // corrupt — nothing to remove
       }
-      if (!file) return;
+      if (!file) return null;
       const key = endpointKey(endpoint);
+      const wasActive = activeIsFor(file, key);
       file.profiles = { ...file.profiles };
-      if (activeIsFor(file, key)) delete file.profiles[ACTIVE_PROFILE];
+      if (wasActive) delete file.profiles[ACTIVE_PROFILE];
       delete file.profiles[key];
-      if (Object.keys(file.profiles).length === 0) return clear();
+      let promoted: string | null = null;
+      if (wasActive) {
+        const parked = Object.keys(file.profiles).filter((k) => k !== ACTIVE_PROFILE && !k.startsWith("_"));
+        const preferKey = opts?.prefer ? endpointKey(opts.prefer) : undefined;
+        const next = preferKey && parked.includes(preferKey) ? preferKey : parked[0];
+        if (next) {
+          file.profiles[ACTIVE_PROFILE] = file.profiles[next];
+          delete file.profiles[next];
+          promoted = file.profiles[ACTIVE_PROFILE].endpoint;
+        }
+      }
+      if (Object.keys(file.profiles).length === 0) {
+        await clear();
+        return null;
+      }
       await writeCredentialsFile(path, file);
+      return promoted;
     },
   };
 }

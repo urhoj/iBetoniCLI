@@ -1,4 +1,5 @@
 import { createStore, endpointKey } from "./store.js";
+import { DEFAULT_ENDPOINT } from "../globals.js";
 /**
  * fb#1624: under `--endpoint <slot sibling>` the store hands back the OTHER
  * slot's session (fb#1609), so a logout named for api-staging.ibetoni.fi would
@@ -19,6 +20,8 @@ export function borrowedSessionNote(creds, endpoint) {
  * session (other endpoints' sessions stay — fb#855; the file goes with the
  * last one). Network failures are swallowed — the local session is always
  * removed so the user is logged out from this machine even when offline.
+ * Logging out the ACTIVE session promotes a parked one, the default
+ * endpoint's first (fb#2557); resolves to its endpoint, else null.
  */
 export async function performLogout(opts) {
     // Best-effort revoke; never throws.
@@ -38,6 +41,6 @@ export async function performLogout(opts) {
     catch {
         // fail-open — still delete the local file
     }
-    await createStore(opts.credentialsPath).removeEndpoint(opts.endpoint);
+    return createStore(opts.credentialsPath).removeEndpoint(opts.endpoint, { prefer: DEFAULT_ENDPOINT });
 }
 //# sourceMappingURL=logout.js.map

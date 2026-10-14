@@ -218,13 +218,30 @@ describe("credentials store — per-endpoint sessions (fb#855)", () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  test("removeEndpoint of the ACTIVE session leaves a parked one in place (no active until the next login)", async () => {
+  // fb#2557: this used to leave NO active session, so a bare `ib` read
+  // "Not logged in" while a valid parked login sat in the file.
+  test("removeEndpoint of the ACTIVE session promotes the parked one", async () => {
     const s = createStore(path);
     await s.save(prod, undefined, { activate: true });
     await s.save(local);
-    await s.removeEndpoint("https://api.ibetoni.fi");
+    expect(await s.removeEndpoint("https://api.ibetoni.fi")).toBe("http://127.0.0.1:8080");
+    expect((await s.load())?.jwt).toBe("eyJlocal");
+    expect(await s.sessions()).toHaveLength(1);
+  });
+
+  test("promotion prefers the given endpoint, never a stash, and a parked removal promotes nothing", async () => {
+    const s = createStore(path);
+    const staging = { ...prod, jwt: "eyJstaging", endpoint: "https://puminet7api-staging.azurewebsites.net" };
+    await s.save(prod, undefined, { activate: true });
+    await s.save(prod, "_impersonator");
+    await s.save(local, undefined, { activate: true });
+    await s.save(staging, undefined, { activate: true });
+    expect(await s.removeEndpoint(staging.endpoint, { prefer: "https://api.ibetoni.fi" })).toBe("https://api.ibetoni.fi");
+    expect((await s.load())?.jwt).toBe("eyJprod");
+    expect(await s.removeEndpoint("http://127.0.0.1:8080")).toBeNull();
+    expect((await s.load())?.jwt).toBe("eyJprod");
+    expect(await s.removeEndpoint("https://api.ibetoni.fi")).toBeNull(); // only the stash is left
     expect(await s.load()).toBeNull();
-    expect((await s.loadFor("http://127.0.0.1:8080"))?.jwt).toBe("eyJlocal");
   });
 
   test("sessions() excludes internal stashes (underscore-prefixed profiles)", async () => {

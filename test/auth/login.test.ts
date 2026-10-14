@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Buffer } from "node:buffer";
-import { performLogin } from "../../src/auth/login.js";
+import { performLogin, activeSwitchNote } from "../../src/auth/login.js";
 
 // vi.mock is hoisted to the top, so the factory cannot close over file-scope
 // variables. Use vi.hoisted to lift our fn alongside it.
@@ -224,5 +224,19 @@ describe("performLogin", () => {
       timeoutMs: 5000,
     });
     expect(mockOpen).toHaveBeenCalledTimes(1);
+  });
+});
+
+// fb#2557: a login that takes over the active slot from another endpoint says so.
+describe("activeSwitchNote", () => {
+  test("names the new active endpoint and the parked one", () => {
+    const note = activeSwitchNote("https://api.ibetoni.fi", "https://puminet7api-staging.azurewebsites.net");
+    expect(note).toMatch(/puminet7api-staging\.azurewebsites\.net is now the ACTIVE endpoint/);
+    expect(note).toMatch(/api\.ibetoni\.fi session is parked/);
+  });
+
+  test("silent on a first login or a re-login to the same endpoint", () => {
+    expect(activeSwitchNote(null, "https://api.ibetoni.fi")).toBeNull();
+    expect(activeSwitchNote("https://api.ibetoni.fi/", "https://API.ibetoni.fi")).toBeNull();
   });
 });

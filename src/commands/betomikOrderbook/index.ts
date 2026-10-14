@@ -105,6 +105,7 @@ export async function runBetomikOrderbookRows(
 
 export interface BetomikFindFilter {
   keikka?: number;
+  palkki?: number;
   worksite?: number;
   search?: string;
   limit?: number;
@@ -113,21 +114,22 @@ export interface BetomikFindFilter {
 }
 
 /**
- * Ledger rows ACROSS every run by keikka / worksite / text (GET
- * /api/betomik-orderbook/rows, fb#2364) — "what did the sheet say for this
- * order" in one call. Filtered and capped server-side, removed rows included.
+ * Ledger rows ACROSS every run by keikka / palkki / worksite / text (GET
+ * /api/betomik-orderbook/rows, fb#2364, fb#2546) — "what did the sheet say for
+ * this order" in one call. Filtered and capped server-side, removed rows included.
  */
 export async function runBetomikOrderbookFind(
   client: ApiClient,
   filter: BetomikFindFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   const search = filter.search?.trim();
-  if (filter.keikka === undefined && filter.worksite === undefined && !search) {
-    failWith("find: pass at least one of --keikka, --worksite, --search", 4);
+  if (filter.keikka === undefined && filter.palkki === undefined && filter.worksite === undefined && !search) {
+    failWith("find: pass at least one of --keikka, --palkki, --worksite, --search", 4);
   }
   if (search !== undefined && search.length < 2) failWith("--search: at least 2 characters", 4);
   const qs = new URLSearchParams();
   if (filter.keikka !== undefined) qs.set("keikka", String(filter.keikka));
+  if (filter.palkki !== undefined) qs.set("palkki", String(filter.palkki));
   if (filter.worksite !== undefined) qs.set("worksite", String(filter.worksite));
   if (search) qs.set("search", search);
   // The route caps silently, so ask for one row more than wanted: its presence
@@ -462,8 +464,9 @@ export function registerBetomikOrderbookCommands(
 
   group
     .command("find")
-    .description("Ledger rows across ALL runs by keikka / worksite / text — what the sheet said for an order")
+    .description("Ledger rows across ALL runs by keikka / palkki / worksite / text — what the sheet said for an order")
     .option("--keikka <id>", "Rows synced to this keikkaId", intFlag("--keikka"))
+    .option("--palkki <id>", "Rows synced to this palkkiId", intFlag("--palkki"))
     .option("--worksite <id>", "Rows whose keikka is on this worksite (tyomaaId)", intFlag("--worksite"))
     .option("--search <text>", "Substring over the raw sheet cells, siteText and customerGuess (min 2 chars)")
     .option("--limit <n>", "Max rows (server default 50, max 500)", intFlag("--limit"))

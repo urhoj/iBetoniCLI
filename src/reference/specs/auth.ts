@@ -10,7 +10,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth login",
     description:
-      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so).",
+      "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600). Sessions are kept PER ENDPOINT (fb#855): a login with --endpoint <other> becomes the active session (a stderr note names the switch, fb#2557) and PARKS the previous endpoint's session instead of replacing it, and every later call under --endpoint <url> uses the session minted for that url — so a prod login and a local-dev login coexist with no re-login when switching. Exception (fb#1609): api.ibetoni.fi and api-staging.ibetoni.fi are slots of ONE backend, so --endpoint for either falls back to the other's session (stderr note says so).",
     auth: "none",
     flags: [
       {
@@ -57,7 +57,7 @@ export const AUTH_SPECS: CommandSpec[] = [
   {
     command: "ib auth logout",
     description:
-      "Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); the credentials file is removed with the last session.",
+      "Revoke the refresh token server-side (best-effort) and forget the local session of the ACTIVE endpoint — or of --endpoint <url> — leaving other endpoints' sessions in place (fb#855); logging out the ACTIVE one promotes a parked session, api.ibetoni.fi first, and says so on stderr (fb#2557); the credentials file is removed with the last session.",
     auth: "any",
     dryRunKind: "client",
     flags: [

@@ -497,6 +497,10 @@ ib dev betomik-orderbook find --limit <n>
   ! --limit must be an integer >= 1
   > pass a positive integer (server caps at 500)
 
+ib dev betomik-orderbook find --palkki <id>
+  ! --palkki must be an integer >= 1
+  > pass a positive palkkiId
+
 ib dev betomik-orderbook find --worksite <id>
   ! --worksite must be an integer >= 1
   > pass a positive tyomaaId

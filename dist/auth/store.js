@@ -149,24 +149,39 @@ export function createStore(path) {
             delete file.profiles[profile];
             await writeCredentialsFile(path, file);
         },
-        async removeEndpoint(endpoint) {
+        async removeEndpoint(endpoint, opts) {
             let file;
             try {
                 file = await readCredentialsFile(path);
             }
             catch {
-                return; // corrupt — nothing to remove
+                return null; // corrupt — nothing to remove
             }
             if (!file)
-                return;
+                return null;
             const key = endpointKey(endpoint);
+            const wasActive = activeIsFor(file, key);
             file.profiles = { ...file.profiles };
-            if (activeIsFor(file, key))
+            if (wasActive)
                 delete file.profiles[ACTIVE_PROFILE];
             delete file.profiles[key];
-            if (Object.keys(file.profiles).length === 0)
-                return clear();
+            let promoted = null;
+            if (wasActive) {
+                const parked = Object.keys(file.profiles).filter((k) => k !== ACTIVE_PROFILE && !k.startsWith("_"));
+                const preferKey = opts?.prefer ? endpointKey(opts.prefer) : undefined;
+                const next = preferKey && parked.includes(preferKey) ? preferKey : parked[0];
+                if (next) {
+                    file.profiles[ACTIVE_PROFILE] = file.profiles[next];
+                    delete file.profiles[next];
+                    promoted = file.profiles[ACTIVE_PROFILE].endpoint;
+                }
+            }
+            if (Object.keys(file.profiles).length === 0) {
+                await clear();
+                return null;
+            }
             await writeCredentialsFile(path, file);
+            return promoted;
         },
     };
 }

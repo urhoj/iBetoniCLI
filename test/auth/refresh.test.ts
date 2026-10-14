@@ -51,6 +51,7 @@ function memoryStore(initial: CredentialsProfile | null) {
     },
     async removeEndpoint() {
       current = null;
+      return null;
     },
     withLock<T>(fn: () => Promise<T>): Promise<T> {
       const run = chain.then(fn);

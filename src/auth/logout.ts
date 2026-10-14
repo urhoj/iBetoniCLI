@@ -1,4 +1,5 @@
 import { createStore, endpointKey, type CredentialsProfile } from "./store.js";
+import { DEFAULT_ENDPOINT } from "../globals.js";
 
 /**
  * fb#1624: under `--endpoint <slot sibling>` the store hands back the OTHER
@@ -28,8 +29,10 @@ export interface LogoutOptions {
  * session (other endpoints' sessions stay — fb#855; the file goes with the
  * last one). Network failures are swallowed — the local session is always
  * removed so the user is logged out from this machine even when offline.
+ * Logging out the ACTIVE session promotes a parked one, the default
+ * endpoint's first (fb#2557); resolves to its endpoint, else null.
  */
-export async function performLogout(opts: LogoutOptions): Promise<void> {
+export async function performLogout(opts: LogoutOptions): Promise<string | null> {
   // Best-effort revoke; never throws.
   try {
     await fetch(`${opts.endpoint}/oauth/revoke`, {
@@ -46,5 +49,5 @@ export async function performLogout(opts: LogoutOptions): Promise<void> {
   } catch {
     // fail-open — still delete the local file
   }
-  await createStore(opts.credentialsPath).removeEndpoint(opts.endpoint);
+  return createStore(opts.credentialsPath).removeEndpoint(opts.endpoint, { prefer: DEFAULT_ENDPOINT });
 }

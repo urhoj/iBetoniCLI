@@ -166,6 +166,12 @@ describe("ib dev betomik-orderbook find (fb#2364)", () => {
     expect(out.truncated).toBe(false);
   });
 
+  test("--palkki alone is a valid filter and is sent as palkki= (fb#2546)", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [] });
+    await runBetomikOrderbookFind(mockClient, { palkki: 7621 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/betomik-orderbook/rows?palkki=7621&limit=51");
+  });
+
   test("asks for one probe row past --limit (default 50); its presence means truncated", async () => {
     const rows = (n: number) => ({ items: Array.from({ length: n }, (_, i) => ({ betomikOrderbookImportRowId: i })) });
     mockClient.get.mockResolvedValueOnce(rows(51));

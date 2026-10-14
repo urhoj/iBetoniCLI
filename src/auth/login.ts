@@ -1,8 +1,22 @@
 import { errorMessage } from "../api/errors.js";
 import { generatePkcePair, generateState } from "./pkce.js";
 import { startCallbackServer } from "./callbackServer.js";
-import { createStore } from "./store.js";
+import { createStore, endpointKey } from "./store.js";
 import { decodeJwtPayload } from "./jwt.js";
+
+/**
+ * fb#2557: a login always becomes the ACTIVE session, so `auth login
+ * --endpoint <staging>` silently moved every later bare `ib` to staging.
+ * Returns the stderr note naming the switch, or null when nothing switched.
+ */
+export function activeSwitchNote(previousEndpoint: string | null, endpoint: string): string | null {
+  if (!previousEndpoint) return null;
+  const was = endpointKey(previousEndpoint);
+  const now = endpointKey(endpoint);
+  return was === now
+    ? null
+    : `[ib] note: ${now} is now the ACTIVE endpoint for bare ib commands; the ${was} session is parked (reach it with --endpoint ${previousEndpoint}, or log ${now} out to fall back to it)`;
+}
 
 export interface LoginOptions {
   endpoint: string;
@@ -151,6 +165,12 @@ export async function performLogin(opts: LoginOptions): Promise<{ token: string 
   // 7. Persist credentials — as the ACTIVE session; a session for another
   //    endpoint is parked, not replaced (fb#855).
   const store = createStore(opts.credentialsPath);
+  let previous: string | null = null;
+  try {
+    previous = (await store.load())?.endpoint ?? null;
+  } catch {
+    // corrupt file — save() overwrites it; there is no previous session to name
+  }
   const now = new Date();
   await store.save(
     {
@@ -171,6 +191,8 @@ export async function performLogin(opts: LoginOptions): Promise<{ token: string 
   const who = payload.email ?? "user";
   const where = payload.ownerAsiakasName ?? `tenant ${payload.ownerAsiakasId}`;
   process.stderr.write(`Logged in as ${who} at ${where}.\n`);
+  const note = activeSwitchNote(previous, opts.endpoint);
+  if (note) process.stderr.write(`${note}\n`);
 
   return { token: tokenBody.access_token };
 }
