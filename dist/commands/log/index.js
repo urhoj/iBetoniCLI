@@ -128,9 +128,12 @@ export async function runLogUser(client, personId, limit, opts = {}) {
         : `/api/changes/user/${personId}/${owner}?limit=${limit}`, opts.owner);
     return envelope(rows.map(projectChangeRow), isCapped(rows, limit));
 }
-/** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */
+/**
+ * Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity.
+ * Returns the command so a caller can chain `.aliases()` (paired with its spec's `aliases`).
+ */
 export function registerLogAlias(group, getClient, entityType, idArgName, fieldExample = "Filter by changeTracker fieldName") {
-    addOwnerOption(group.command(`log <${idArgName}>`))
+    return addOwnerOption(group.command(`log <${idArgName}>`))
         .option("--limit <n>", "", cappedInt(500), 100)
         .option("--field <name>", fieldExample)
         .action(jsonAction(getClient, (client, idStr, opts) => runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {

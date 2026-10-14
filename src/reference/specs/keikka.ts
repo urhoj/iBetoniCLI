@@ -320,7 +320,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka update",
     description:
-      "Update a keikka, one flag group per call (six routes, no atomicity across them): `--status` (numeric keikkaTilaId → POST /api/keikka/tila/set); MOVE like the grid's drag-and-drop (`--vehicle`/`--date`/`--start`/`--end`); RE-POINT (`--customer`/`--worksite`/`--plant`/`--source`); TEXT (`--driving-instructions`/`--comment`/`--title`); a CONCRETE line (`--m3`/`--betoni-comment` [`--betoni-line`]); PUMP needs (`--puomi`/`--optimal-puomi`/`--linja`). The five groups post to /api/cli/keikka/{move|refs|info|betoni|pumppu}/:id.",
+      "Update a keikka, one flag group per call (six routes, no atomicity across them): `--status` (numeric keikkaTilaId → POST /api/keikka/tila/set); MOVE like the grid's drag-and-drop (`--vehicle`/`--date`/`--start`/`--end`); RE-POINT (`--customer`/`--worksite`/`--plant`/`--source`); TEXT (`--driving-instructions`/`--comment`/`--title`); a CONCRETE line (`--m3`/`--betoni-comment`/spec flags [`--betoni-line`]); PUMP needs (`--puomi`/`--optimal-puomi`/`--linja`). The five groups post to /api/cli/keikka/{move|refs|info|betoni|pumppu}/:id.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to update" }],
     flags: [
@@ -334,7 +334,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "start", type: "string", description: "New pump start, HH:MM Helsinki" },
       { name: "end", type: "string", description: "New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)" },
       { name: "customer", type: "number", description: "Re-point to this customer (asiakasId) — the tenant's own, or a self-owned company row" },
-      { name: "worksite", type: "number", description: "Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning. The CURRENT worksite re-snapshots it into the keikka and recomputes distances (resnapshot) — use after a worksite edit" },
+      { name: "worksite", type: "number", description: "Re-point to this worksite (tyomaaId); another customer's is allowed with a warning. The CURRENT one re-snapshots it and recomputes distances (use after a worksite edit)" },
       { name: "plant", type: "number", description: "Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner" },
       { name: "supplier", type: "number", description: "Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant" },
       { name: "source", type: "number", description: "Set the source company (lähdeasiakas, sourceAsiakasId) — the tenant itself, its own customer, or a self-owned company row" },
@@ -343,7 +343,12 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "title", type: "string", description: 'Title (keikkaOtsikko, max 100); "" clears' },
       { name: "m3", type: "number", description: "Volume of one concrete line (keikkaBetoni.m3, 0..9999.99, 2 decimals); the keikka's m3 is the sum of its lines" },
       { name: "betoni-comment", type: "string", description: 'Comment on one concrete line (betoniComment); "" clears' },
-      { name: "betoni-line", type: "number", description: "keikkaBetoniId of the line --m3/--betoni-comment write — optional on a single-line keikka; a multi-line keikka is refused with its lines listed" },
+      { name: "laatu", type: "string", description: "Grade (betoniLaatu): id or name" },
+      { name: "lujuus", type: "string", description: "Strength: id or name, C30/37 or one half (C37; ambiguous refused)" },
+      { name: "raekoko", type: "string", description: "Aggregate: id or name (16mm)" },
+      { name: "notkeus", type: "string", description: "Consistency: id or name (S3)" },
+      { name: "kayttoika", type: "string", description: "Service life: id or name (50v)" },
+      { name: "betoni-line", type: "number", description: "keikkaBetoniId the concrete flags write; needed only when the keikka has several lines (they are listed)" },
       { name: "puomi", type: "number", description: "Minimum boom length, m (pumppuPuomi, 0..999); 0 = none" },
       { name: "optimal-puomi", type: "number", description: "Desired boom length, m (optimalPumppuPuomi); 0 = none" },
       { name: "linja", type: "number", description: "Hose line length, m (pumppuLinja); 0 = none" },
@@ -351,7 +356,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     outputShape:
-      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId,sourceAsiakasId}, to:{…}, siteChanged, resnapshot, plantChanged, sourceChanged, warnings:[string] }. Text/pump: { keikkaId, from, to, changed:[field] }. Concrete: { keikkaId, keikkaBetoniId, from, to, changed:[m3|betoniComment] }. Text/concrete/pump skip unchanged fields (--dry-run: { dryRun:true, wouldUpdate, validation })",
+      "--status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId,sourceAsiakasId}, to:{…}, siteChanged, resnapshot, plantChanged, sourceChanged, warnings:[string] }. Text/pump: { keikkaId, from, to, changed:[field] }. Concrete: { keikkaId, keikkaBetoniId, from, to, changed:[m3|betoniComment|<spec>Id] }. Text/concrete/pump skip unchanged fields (--dry-run: { dryRun:true, wouldUpdate, validation })",
     errors: [
       // The THIRD twin of the fb#668 class, and the client-side shape of it:
       // this command has several exit-4 client guards; a sole matchless client
@@ -359,7 +364,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       // each guard reaches its own remedy.
       { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status, or a move flag, a reference flag, a text flag, a concrete flag or a pump flag (see FLAGS)" },
       { origin: "client", exit: 4, match: "cannot be combined", meaning: "Flags from two groups (status / move / reference / text / concrete / pump) — separate routes, no atomicity", remedy: "run one command per group" },
-      { origin: "client", exit: 4, match: "--betoni-line needs", meaning: "--betoni-line alone — it only picks the line --m3/--betoni-comment write", remedy: "add --m3 <n> and/or --betoni-comment <text>" },
+      { origin: "client", exit: 4, match: "--betoni-line needs", meaning: "--betoni-line alone — it only picks the line the concrete flags write", remedy: "add a concrete flag" },
       numParseErr("--m3", "pass a number 0..9999.99, e.g. --m3 15"),
       intParseErr("--betoni-line", "pass a positive keikkaBetoniId (a refused multi-line call lists them)"),
       { origin: "client", exit: 4, match: "must be an integer >= 0", meaning: "--puomi/--optimal-puomi/--linja not a whole number >= 0", remedy: "pass whole metres, e.g. 32" },
@@ -374,13 +379,13 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "must be after the start", meaning: "--end is not after the (new or current) start; same-day only", remedy: "pass an --end later than the start, or move --start first" },
       { origin: "client", exit: 4, match: "no pumppuAika to move from", meaning: "The row has no pumppuAika, so a partial time flag has nothing to fill from", remedy: "pass both --date and --start" },
       { origin: "client", exit: 4, match: "--vehicle must be an integer", meaning: "--vehicle is not an integer >= 1, rejected locally before any request", remedy: "pass a positive vehicleId" },
-      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line; pump: a value outside 0..999)", "check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)"),
+      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, or an unknown/ambiguous spec value; pump: a value outside 0..999)", "check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)"),
       apiErr(404, "Keikka, or a --customer/--worksite/--plant/--source/--betoni-line target, not found, soft-deleted, OR outside your visible scope", "the message names which id; another tenant's rows (or another keikka's --betoni-line) 404 identically to missing ones"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
       "--status takes the numeric keikkaTilaId, NOT a name — e.g. 9 Toimitettu, 8 Peruttu, 2 Lähetetty; legend: `ib keikka tilat`.",
-      "A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.",
+      "A move = the grid drop's two writes (time, then vehicle with driver re-derivation), change-tracked; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.",
       "Time flags read the row first (pvm/time) to fill what you omit: `--date` alone keeps the clock time, `--end` alone recomputes pumppuKesto from the current start.",
       "A re-point uses the grid's procs; betoniMatka is recomputed. Unlike a merge, the old customer/worksite is kept.",
     ],
@@ -391,8 +396,8 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       "ib keikka update 12118 --customer 1482 --worksite 3438 --dry-run",
       "ib keikka update 12147 --plant 45 --reason 'Swerock Lohja ok'",
       "ib keikka update 12276 --driving-instructions 'Portti 2, soita 15 min ennen' --dry-run",
-      "ib keikka update 12278 --m3 15 --dry-run",
       "ib keikka update 12278 --m3 12 --betoni-line 23456 --reason 'arvio korjattu'",
+      "ib keikka update 12278 --lujuus C30/37 --betoni-line 23456 --dry-run",
       "ib keikka update 12147 --puomi 32 --linja 40 --reason 'asiakas pyysi'",
     ],
   },
@@ -556,6 +561,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
   {
     command: "ib keikka log",
+    aliases: ["ib keikka history", "ib keikka changes"],
     description:
       "Change-tracker audit trail for one keikka — who changed which field, when, old→new, with --reason. Folds in the keikka's keikkaBetoni (concrete-line) rows. Alias of `ib log entity keikka`. GET /api/changes/keikka/:keikkaId/:ownerAsiakasId.",
     auth: "any",

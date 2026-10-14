@@ -8198,6 +8198,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib keikka log matches snapshot 1`] = `
 "USAGE
   ib keikka log <keikkaId> [flags]
+  (also: ib keikka history · ib keikka changes)
 
 DESCRIPTION
   Change-tracker audit trail for one keikka — who changed which field, when, old→new, with --reason. Folds in the keikka's keikkaBetoni (concrete-line) rows. Alias of \`ib log entity keikka\`. GET /api/changes/keikka/:keikkaId/:ownerAsiakasId.
@@ -8472,7 +8473,7 @@ exports[`Help snapshots — contract stability > help for ib keikka update match
   ib keikka update <keikkaId> [flags]
 
 DESCRIPTION
-  Update a keikka, one flag group per call (six routes, no atomicity across them): \`--status\` (numeric keikkaTilaId → POST /api/keikka/tila/set); MOVE like the grid's drag-and-drop (\`--vehicle\`/\`--date\`/\`--start\`/\`--end\`); RE-POINT (\`--customer\`/\`--worksite\`/\`--plant\`/\`--source\`); TEXT (\`--driving-instructions\`/\`--comment\`/\`--title\`); a CONCRETE line (\`--m3\`/\`--betoni-comment\` [\`--betoni-line\`]); PUMP needs (\`--puomi\`/\`--optimal-puomi\`/\`--linja\`). The five groups post to /api/cli/keikka/{move|refs|info|betoni|pumppu}/:id.
+  Update a keikka, one flag group per call (six routes, no atomicity across them): \`--status\` (numeric keikkaTilaId → POST /api/keikka/tila/set); MOVE like the grid's drag-and-drop (\`--vehicle\`/\`--date\`/\`--start\`/\`--end\`); RE-POINT (\`--customer\`/\`--worksite\`/\`--plant\`/\`--source\`); TEXT (\`--driving-instructions\`/\`--comment\`/\`--title\`); a CONCRETE line (\`--m3\`/\`--betoni-comment\`/spec flags [\`--betoni-line\`]); PUMP needs (\`--puomi\`/\`--optimal-puomi\`/\`--linja\`). The five groups post to /api/cli/keikka/{move|refs|info|betoni|pumppu}/:id.
   Permissions: requires auth.page.grid.tilaus.edit.
 
 ARGUMENTS
@@ -8485,7 +8486,7 @@ FLAGS
   --start STRING    New pump start, HH:MM Helsinki
   --end STRING    New pump end, HH:MM Helsinki — becomes pumppuKesto (minutes from start)
   --customer NUMBER    Re-point to this customer (asiakasId) — the tenant's own, or a self-owned company row
-  --worksite NUMBER    Re-point to this worksite (tyomaaId) of the tenant; a worksite of another customer is allowed with a warning. The CURRENT worksite re-snapshots it into the keikka and recomputes distances (resnapshot) — use after a worksite edit
+  --worksite NUMBER    Re-point to this worksite (tyomaaId); another customer's is allowed with a warning. The CURRENT one re-snapshots it and recomputes distances (use after a worksite edit)
   --plant NUMBER    Set the concrete plant (betoniSijaintiId); the supplier (betoniAsiakasId) becomes the plant's owner
   --supplier NUMBER    Optional check with --plant: the expected betoniAsiakasId — refused if it does not own the plant
   --source NUMBER    Set the source company (lähdeasiakas, sourceAsiakasId) — the tenant itself, its own customer, or a self-owned company row
@@ -8494,7 +8495,12 @@ FLAGS
   --title STRING    Title (keikkaOtsikko, max 100); "" clears
   --m3 NUMBER    Volume of one concrete line (keikkaBetoni.m3, 0..9999.99, 2 decimals); the keikka's m3 is the sum of its lines
   --betoni-comment STRING    Comment on one concrete line (betoniComment); "" clears
-  --betoni-line NUMBER    keikkaBetoniId of the line --m3/--betoni-comment write — optional on a single-line keikka; a multi-line keikka is refused with its lines listed
+  --laatu STRING    Grade (betoniLaatu): id or name
+  --lujuus STRING    Strength: id or name, C30/37 or one half (C37; ambiguous refused)
+  --raekoko STRING    Aggregate: id or name (16mm)
+  --notkeus STRING    Consistency: id or name (S3)
+  --kayttoika STRING    Service life: id or name (50v)
+  --betoni-line NUMBER    keikkaBetoniId the concrete flags write; needed only when the keikka has several lines (they are listed)
   --puomi NUMBER    Minimum boom length, m (pumppuPuomi, 0..999); 0 = none
   --optimal-puomi NUMBER    Desired boom length, m (optimalPumppuPuomi); 0 = none
   --linja NUMBER    Hose line length, m (pumppuLinja); 0 = none
@@ -8510,12 +8516,12 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId,sourceAsiakasId}, to:{…}, siteChanged, resnapshot, plantChanged, sourceChanged, warnings:[string] }. Text/pump: { keikkaId, from, to, changed:[field] }. Concrete: { keikkaId, keikkaBetoniId, from, to, changed:[m3|betoniComment] }. Text/concrete/pump skip unchanged fields (--dry-run: { dryRun:true, wouldUpdate, validation })
+  --status: backend response. Move: { keikkaId, from:{vehicleId,pumppuAika,pumppuKesto}, to:{…}, vehicleChanged, timeChanged, drivers:{removed:[personId],added:[personId]}|null }. Re-point: { keikkaId, from:{asiakasId,tyomaaId,betoniAsiakasId,betoniSijaintiId,sourceAsiakasId}, to:{…}, siteChanged, resnapshot, plantChanged, sourceChanged, warnings:[string] }. Text/pump: { keikkaId, from, to, changed:[field] }. Concrete: { keikkaId, keikkaBetoniId, from, to, changed:[m3|betoniComment|<spec>Id] }. Text/concrete/pump skip unchanged fields (--dry-run: { dryRun:true, wouldUpdate, validation })
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No field flags given at all → pass --status, or a move flag, a reference flag, a text flag, a concrete flag or a pump flag (see FLAGS)
   exit 4 (client-side)  Flags from two groups (status / move / reference / text / concrete / pump) — separate routes, no atomicity → run one command per group
-  exit 4 (client-side)  --betoni-line alone — it only picks the line --m3/--betoni-comment write → add --m3 <n> and/or --betoni-comment <text>
+  exit 4 (client-side)  --betoni-line alone — it only picks the line the concrete flags write → add a concrete flag
   exit 4 (client-side)  --m3 is not a number, rejected locally before any request → pass a number 0..9999.99, e.g. --m3 15
   exit 4 (client-side)  --betoni-line is not an integer >= 1, rejected locally before any request → pass a positive keikkaBetoniId (a refused multi-line call lists them)
   exit 4 (client-side)  --puomi/--optimal-puomi/--linja not a whole number >= 0 → pass whole metres, e.g. 32
@@ -8530,7 +8536,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --end is not after the (new or current) start; same-day only → pass an --end later than the start, or move --start first
   exit 4 (client-side)  The row has no pumppuAika, so a partial time flag has nothing to fill from → pass both --date and --start
   exit 4 (client-side)  --vehicle is not an integer >= 1, rejected locally before any request → pass a positive vehicleId
-  exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line; pump: a value outside 0..999) → check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)
+  exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, or an unknown/ambiguous spec value; pump: a value outside 0..999) → check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)
   exit 5 (HTTP 404)  Keikka, or a --customer/--worksite/--plant/--source/--betoni-line target, not found, soft-deleted, OR outside your visible scope → the message names which id; another tenant's rows (or another keikka's --betoni-line) 404 identically to missing ones
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
@@ -8538,7 +8544,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - --status takes the numeric keikkaTilaId, NOT a name — e.g. 9 Toimitettu, 8 Peruttu, 2 Lähetetty; legend: \`ib keikka tilat\`.
-  - A move = the grid drop's two writes (keikka_saveAika, then keikka_saveVehicle with reassignPumpparit), change-tracked and broadcast identically; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.
+  - A move = the grid drop's two writes (time, then vehicle with driver re-derivation), change-tracked; time first, so a day+vehicle move gets the NEW day's driver. Not one transaction — preview with --dry-run.
   - Time flags read the row first (pvm/time) to fill what you omit: \`--date\` alone keeps the clock time, \`--end\` alone recomputes pumppuKesto from the current start.
   - A re-point uses the grid's procs; betoniMatka is recomputed. Unlike a merge, the old customer/worksite is kept.
 
@@ -8549,8 +8555,8 @@ EXAMPLES
   ib keikka update 12118 --customer 1482 --worksite 3438 --dry-run
   ib keikka update 12147 --plant 45 --reason 'Swerock Lohja ok'
   ib keikka update 12276 --driving-instructions 'Portti 2, soita 15 min ennen' --dry-run
-  ib keikka update 12278 --m3 15 --dry-run
   ib keikka update 12278 --m3 12 --betoni-line 23456 --reason 'arvio korjattu'
+  ib keikka update 12278 --lujuus C30/37 --betoni-line 23456 --dry-run
   ib keikka update 12147 --puomi 32 --linja 40 --reason 'asiakas pyysi'
 "
 `;

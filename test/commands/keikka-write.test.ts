@@ -152,6 +152,17 @@ describe("ib keikka create/update/drivers", () => {
     );
   });
 
+  test("runKeikkaUpdate concrete spec flags send the raw value under the backend key (fb#2567)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12741, changed: ["lujuusId"] });
+    await runKeikkaUpdate(mockClient, 12741, { lujuus: "C37", kayttoika: "1", betoniLine: 43442 }, { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/betoni/12741",
+      { lujuusId: "C37", kayttoIkaId: "1", keikkaBetoniId: 43442 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+    await expect(runKeikkaUpdate(mockClient, 12741, { laatu: "RAK", puomi: 32 }, {})).rejects.toThrow(/cannot be combined/);
+  });
+
   test("runKeikkaUpdate concrete flags: --betoni-line alone and mixing with a text flag exit 4 before any POST", async () => {
     await expect(runKeikkaUpdate(mockClient, 12278, { betoniLine: 900 }, {})).rejects.toThrow(/--betoni-line needs/);
     await expect(runKeikkaUpdate(mockClient, 12278, { m3: 15, comment: "x" }, {})).rejects.toThrow(/cannot be combined/);

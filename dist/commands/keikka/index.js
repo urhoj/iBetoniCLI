@@ -244,6 +244,14 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+/** Concrete spec flag -> backend body key (fb#2567). */
+const BETONI_SPEC_FLAGS = [
+    ["laatu", "laatuId"],
+    ["lujuus", "lujuusId"],
+    ["raekoko", "raeKokoId"],
+    ["notkeus", "notkeusId"],
+    ["kayttoika", "kayttoIkaId"],
+];
 /**
  * Update a keikka. Six flag groups, six routes, one group per call (no atomicity
  * across routes, so mixing is refused):
@@ -262,25 +270,29 @@ export async function runKeikkaIntakeCommit(client, body, flags) {
  *     named one, and refuses to guess between several (fb#2070);
  *   - the pump flags (`--puomi/--optimal-puomi/--linja`) post to /api/cli/keikka/pumppu/:id
  *     (fb#1432).
+ * The concrete spec flags (`--laatu/--lujuus/--raekoko/--notkeus/--kayttoika`, fb#2567) join
+ * the concrete group and are sent raw: the backend resolves an id or a name ("C37") against
+ * the keikka owner's reference, so MCP callers get the same resolution.
  */
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
     const isMove = needsRow || fields.vehicle !== undefined;
     const isRefs = fields.customer !== undefined || fields.worksite !== undefined || fields.plant !== undefined || fields.source !== undefined;
     const isInfo = fields.drivingInstructions !== undefined || fields.comment !== undefined || fields.title !== undefined;
-    const isBetoni = fields.m3 !== undefined || fields.betoniComment !== undefined;
+    const specEntries = BETONI_SPEC_FLAGS.filter(([flag]) => fields[flag] !== undefined);
+    const isBetoni = fields.m3 !== undefined || fields.betoniComment !== undefined || specEntries.length > 0;
     const isPump = fields.puomi !== undefined || fields.optimalPuomi !== undefined || fields.linja !== undefined;
     if (fields.supplier !== undefined && fields.plant === undefined) {
         failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
     }
     if (fields.betoniLine !== undefined && !isBetoni) {
-        failWith("--betoni-line needs --m3 and/or --betoni-comment — it only picks which concrete line they write", 4);
+        failWith("--betoni-line needs a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) — it only picks which concrete line they write", 4);
     }
     if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni, isPump].filter(Boolean).length > 1) {
-        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title), the concrete flags (--m3/--betoni-comment) and the pump flags (--puomi/--optimal-puomi/--linja) cannot be combined — run one command per group", 4);
+        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title), the concrete flags (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) and the pump flags (--puomi/--optimal-puomi/--linja) cannot be combined — run one command per group", 4);
     }
     if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni && !isPump) {
-        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title), a concrete flag (--m3/--betoni-comment) or a pump flag (--puomi/--optimal-puomi/--linja)", 4);
+        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title), a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) or a pump flag (--puomi/--optimal-puomi/--linja)", 4);
     }
     if (isPump) {
         const body = {};
@@ -298,6 +310,8 @@ export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
             body.m3 = fields.m3;
         if (fields.betoniComment !== undefined)
             body.betoniComment = fields.betoniComment;
+        for (const [flag, key] of specEntries)
+            body[key] = fields[flag];
         if (fields.betoniLine !== undefined)
             body.keikkaBetoniId = fields.betoniLine;
         return client.post(`/api/cli/keikka/betoni/${keikkaId}`, body, { headers: writeFlagsToHeaders(flags) });
@@ -736,6 +750,11 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--title <text>", 'Set the order title (otsikko, max 100); "" clears')
         .option("--m3 <n>", "Set the concrete line's volume (m3, 0..9999.99)", numFlag("--m3", 0, 9999.99))
         .option("--betoni-comment <text>", 'Set the concrete line comment; "" clears')
+        .option("--laatu <idOrName>", "Set the concrete line's grade (betoniLaatu id or name)")
+        .option("--lujuus <idOrName>", "Set the strength class (betoniLujuus id or name, e.g. C30/37 or C37)")
+        .option("--raekoko <idOrName>", "Set the aggregate size (betoniRaeKoko id or name, e.g. 16mm)")
+        .option("--notkeus <idOrName>", "Set the consistency class (betoniNotkeus id or name, e.g. S3)")
+        .option("--kayttoika <idOrName>", "Set the design service life (betoniKayttoIka id or name, e.g. 50v)")
         .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"))
         // 0..999 upper bound is the backend's (400), not restated here
         .option("--puomi <m>", "Minimum boom length (pumppuPuomi, m); 0 = none", intFlag("--puomi", 0))
@@ -760,6 +779,11 @@ export function registerKeikkaCommands(parent, getClient) {
             m3: opts.m3,
             betoniComment: opts.betoniComment,
             betoniLine: opts.betoniLine,
+            laatu: opts.laatu,
+            lujuus: opts.lujuus,
+            raekoko: opts.raekoko,
+            notkeus: opts.notkeus,
+            kayttoika: opts.kayttoika,
             puomi: opts.puomi,
             optimalPuomi: opts.optimalPuomi,
             linja: opts.linja,
@@ -803,6 +827,6 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--by-person")
         .option("--count")
         .action(jsonAction(getClient, (client, keikkaIdStr, opts) => runKeikkaPersonList(client, resolveTarget(keikkaIdStr, opts.keikka, "keikkaId", "keikka"), { source: opts.source, byPerson: opts.byPerson, count: opts.count })));
-    registerLogAlias(k, getClient, "keikka", "keikkaId", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)");
+    registerLogAlias(k, getClient, "keikka", "keikkaId", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)").aliases(["history", "changes"]); // fb#2558: the words agents reach for first
 }
 //# sourceMappingURL=index.js.map
