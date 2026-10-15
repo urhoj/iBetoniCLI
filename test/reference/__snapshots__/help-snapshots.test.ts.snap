@@ -13472,21 +13472,21 @@ exports[`Help snapshots — contract stability > help for ib person get matches 
   (also: ib person show)
 
 DESCRIPTION
-  Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.
+  Get a single person by personId. In scope: a person the company OWNS or a live MEMBER of it (asiakasPerson, even when another company owns them — fb#2600); global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas scopes the read to ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and an out-of-scope personId returns 404.
   Permissions: requires auth.page.person.read.
 
 ARGUMENTS
   <personId> NUMBER    personId to fetch (required)
 
 FLAGS
-  --asiakas NUMBER    Read a person owned by this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.
+  --asiakas NUMBER    Read a person owned by, or a member of, this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { personId, name, email, phone, asiakasId:number|null (owner tenant, same key as \`person search\`; null/0 = global person — fb#1393), roles:number[] }
+  { personId, name, email, phone, asiakasId:number|null (owner tenant, same key as \`person search\`; null/0 = global person — fb#1393; may differ from the scope company for a member), roles:number[] (distinct roles held in the scope company) }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach

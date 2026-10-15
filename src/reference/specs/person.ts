@@ -55,7 +55,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     command: "ib person get",
     aliases: ["ib person show"],
     description:
-      "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.",
+      "Get a single person by personId. In scope: a person the company OWNS or a live MEMBER of it (asiakasPerson, even when another company owns them — fb#2600); global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas scopes the read to ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and an out-of-scope personId returns 404.",
     permissions: ["auth.page.person.read"],
     args: [{ name: "personId", type: "number", description: "personId to fetch" }],
     flags: [
@@ -63,11 +63,11 @@ export const PERSON_SPECS: CommandSpec[] = [
         name: "asiakas",
         type: "number",
         description:
-          "Read a person owned by this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.",
+          "Read a person owned by, or a member of, this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.",
       },
     ],
     outputShape:
-      "{ personId, name, email, phone, asiakasId:number|null (owner tenant, same key as `person search`; null/0 = global person — fb#1393), roles:number[] }",
+      "{ personId, name, email, phone, asiakasId:number|null (owner tenant, same key as `person search`; null/0 = global person — fb#1393; may differ from the scope company for a member), roles:number[] (distinct roles held in the scope company) }",
     errors: [
       ASIAKAS_FLAG_ERR,
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
