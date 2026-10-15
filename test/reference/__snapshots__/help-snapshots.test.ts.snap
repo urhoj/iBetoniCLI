@@ -11610,7 +11610,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { startTime, endTime, pumpingEndTime, duration, totalPrecipitation, maxWindSpeed, maxWindGust, avgTemperature, startTemperature, endTemperature, weatherSymbol, description, hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol, isPumpingPeriod, ... }], coordinates, source, cached? }
+  { startTime, endTime, pumpingEndTime?, duration, totalPrecipitation, maxWindSpeed, maxWindGust, avgTemperature, startTemperature?, endTemperature?, weatherSymbol, description, hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol, isPumpingPeriod?, ... }], coordinates, source, fetchTime, cached?, ... }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --lat/--lng not a number, or --duration/--keikka not a positive integer → pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
@@ -11620,7 +11620,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation covers the pumping window only; the other aggregates also span the hardening hours after it.
+  - totalPrecipitation / avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation covers the pumping window only; the other aggregates also span the hardening hours after it. The \`?\` fields are absent when FMI answers with a single time point (hourly then has one entry). \`...\` = avgHumidity, avgDewPoint, avgPressure, start/end/avgFeelsLike.
 
 EXAMPLES
   ib opendata weather pumping --lat 60.17 --lng 24.94 --start now --duration 120

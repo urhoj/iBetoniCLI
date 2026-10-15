@@ -155,9 +155,9 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       { name: "keikka", type: "number", description: "Keikka id (optional, for backend error correlation only)" },
     ],
     outputShape:
-      "{ startTime, endTime, pumpingEndTime, duration, totalPrecipitation, maxWindSpeed, maxWindGust, avgTemperature, startTemperature, endTemperature, weatherSymbol, description, hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol, isPumpingPeriod, ... }], coordinates, source, cached? }",
+      "{ startTime, endTime, pumpingEndTime?, duration, totalPrecipitation, maxWindSpeed, maxWindGust, avgTemperature, startTemperature?, endTemperature?, weatherSymbol, description, hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol, isPumpingPeriod?, ... }], coordinates, source, fetchTime, cached?, ... }",
     notes: [
-      "avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation covers the pumping window only; the other aggregates also span the hardening hours after it.",
+      "totalPrecipitation / avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation covers the pumping window only; the other aggregates also span the hardening hours after it. The `?` fields are absent when FMI answers with a single time point (hourly then has one entry). `...` = avgHumidity, avgDewPoint, avgPressure, start/end/avgFeelsLike.",
     ],
     errors: [
       { origin: "client", exit: 4, meaning: "--lat/--lng not a number, or --duration/--keikka not a positive integer", remedy: "pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120" },
