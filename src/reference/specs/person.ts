@@ -32,16 +32,32 @@ export const PERSON_SPECS: CommandSpec[] = [
           "List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).",
       },
       LIMIT_500_FLAG,
+      {
+        name: "logged-in-since",
+        type: "string",
+        description: "Only people whose lastLogin is at or after this ISO date/time. Requires company admin/owner in the selected company, or sysadmin/developer. Mutually exclusive with --not-logged-in-since.",
+      },
+      {
+        name: "not-logged-in-since",
+        type: "string",
+        description: "Only people whose lastLogin is before this ISO date/time, including never-active people (null). Same admin access as --logged-in-since; mutually exclusive with it.",
+      },
     ],
     outputShape:
-      "ListEnvelope<{ personId, name, email, phone, phoneLoginEnabled:boolean (SMS login on; the login number itself is not listed), roles:number[] (distinct roles held in the scope company; [] for an --owned non-member) }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ personId, name, email, phone, phoneLoginEnabled:boolean (SMS login on; the login number itself is not listed), roles:number[] (distinct roles held in the scope company; [] for an --owned non-member), lastLogin?:ISO-UTC|null (company admin/owner in the selected company or sysadmin/developer only; omitted for ordinary members) }>" + TRUNCATED_NOTE,
     errors: [
       ASIAKAS_FLAG_ERR,
       limitErr("pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap"),
       apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
+      { origin: "client", exit: 4, meaning: "Invalid ISO cutoff or both login filters supplied", remedy: "pass one of --logged-in-since or --not-logged-in-since with a real ISO date/time", match: ["--logged-in-since", "--not-logged-in-since"] },
+      apiErr(400, "Invalid login cutoff", "use a real ISO date/time; the CLI converts it to UTC before sending", ["login cutoff", "mutually exclusive"]),
+      apiErr(403, "Login activity requires company admin", "use a company where you are admin/owner, or a sysadmin/developer token; ordinary list access is unchanged", ["login activity requires"]),
+      { origin: "client", exit: 6, meaning: "Backend response lacks login activity support", remedy: "deploy the updated backend before using the login filters" },
       ...permErrors("auth.page.person.read"),
     ],
     notes: [
+      "lastLogin is the latest of person.lastLoginTime (person-wide login) and driver-app visits in the SELECTED company. Null means neither exists; driver-app visits count even without a fresh login. This is activity, not a company-specific authentication history.",
+      "Cutoffs without an offset use Europe/Helsinki (date-only = local midnight); Z or explicit offsets identify an instant. Filters run before --limit. Live uncached read. Filtered results lacking lastLogin are rejected: deploy the updated backend first.",
       "This command does NOT search by name — it enumerates and filters by role/company. To find a person by name or email use `ib person search <query>` (which also accepts `--search`).",
     ],
     seeAlso: ["ib person search"],
@@ -49,6 +65,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       "ib person list",
       "ib person list --owned",
       "ib person list --asiakas 1349 --limit 50",
+      "ib person list --asiakas 27 --role pumppari --not-logged-in-since 2026-10-15T18:30",
     ],
   },
   {

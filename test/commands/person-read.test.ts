@@ -1,9 +1,12 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
+import { Command } from "commander";
+import { captureActionError } from "../helpers/stderr.js";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPersonList,
   runPersonGet,
   runPersonSearch,
+  registerPersonCommands,
 } from "../../src/commands/person/index.js";
 
 const mockClient = mockApiClient();
@@ -49,6 +52,64 @@ describe("ib person list/get/search", () => {
     });
     await runPersonList(mockClient, { owned: true });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/list?owned=1");
+  });
+
+  test.each([
+    ["loggedInSince", "loggedInSince"],
+    ["notLoggedInSince", "notLoggedInSince"],
+  ])("runPersonList: %s converts Helsinki wall-clock to UTC", async (option, query) => {
+    mockClient.get.mockResolvedValueOnce({ items: [{ personId: 1, lastLogin: null }], count: 1, nextCursor: null });
+    const result = await runPersonList(mockClient, { [option]: "2026-10-15T18:30" });
+    expect(mockClient.get).toHaveBeenCalledWith(`/api/cli/person/list?${query}=2026-10-15T15%3A30%3A00.000Z`);
+    expect(result.items[0]).toHaveProperty("lastLogin", null);
+  });
+
+  test("runPersonList: explicit offset refers to the same instant", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [], count: 0, nextCursor: null });
+    await runPersonList(mockClient, { loggedInSince: "2026-10-15T18:30:00+03:00" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/list?loggedInSince=2026-10-15T15%3A30%3A00.000Z");
+  });
+
+  test.each(["loggedInSince", "notLoggedInSince"])("%s preserves fractional cutoff precision", async (option) => {
+    mockClient.get.mockResolvedValueOnce({ items: [], count: 0, nextCursor: null });
+    await runPersonList(mockClient, { [option]: "2026-10-15T18:30:00.999" });
+    expect(mockClient.get).toHaveBeenCalledWith(`/api/cli/person/list?${option}=2026-10-15T15%3A30%3A00.999Z`);
+  });
+
+  test.each([
+    { loggedInSince: "invalid" },
+    { loggedInSince: "2026-02-30T12:00Z" },
+    { loggedInSince: "2026-10-15T18:30", notLoggedInSince: "2026-10-15T18:30" },
+  ])("runPersonList: rejects invalid/conflicting filters before the request (%j)", async (opts) => {
+    await expect(runPersonList(mockClient, opts)).rejects.toMatchObject({ exitCode: 4 });
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+
+  test("filtered reads reject a backend that ignored the filter", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [{ personId: 1 }], count: 1, nextCursor: null });
+    await expect(runPersonList(mockClient, { loggedInSince: "2026-10-15T18:30" })).rejects.toThrow(/backend.*login activity/i);
+  });
+
+  test.each(["--logged-in-since", "--not-logged-in-since"])("registered %s flag reaches the API", async (flag) => {
+    mockClient.get.mockResolvedValueOnce({ items: [], count: 0, nextCursor: null });
+    const program = new Command("ib").exitOverride();
+    registerPersonCommands(program, async () => mockClient, async () => mockClient);
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+      await program.parseAsync(["node", "ib", "person", "list", flag, "2026-10-15T18:30"]);
+      expect(mockClient.get).toHaveBeenCalledWith(expect.stringContaining("2026-10-15T15%3A30%3A00.000Z"));
+    } finally {
+      out.mockRestore();
+    }
+  });
+
+  test("registered conflicting flags emit exit 4 without a request", async () => {
+    const program = new Command("ib").exitOverride();
+    registerPersonCommands(program, async () => mockClient, async () => mockClient);
+    const { exitCode, envelope } = await captureActionError(() => program.parseAsync(["node", "ib", "person", "list", "--logged-in-since", "2026-10-15", "--not-logged-in-since", "2026-10-16"]));
+    expect(exitCode).toBe(4);
+    expect(envelope.error).toMatch(/mutually exclusive/);
+    expect(mockClient.get).not.toHaveBeenCalled();
   });
 
   test("runPersonGet: GET /api/cli/person/get/6233", async () => {
