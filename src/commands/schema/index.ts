@@ -663,14 +663,16 @@ const CLI_FIELD_ALIASES: Record<string, Record<string, string>> = {
 async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: string): Promise<string | null> {
   let tables = queryTables(sql);
   if (tables.length === 0) return null;
-  // `v.plate` / `vehicle.plate` — the qualifier narrows the search to one table.
-  // Scoped BEFORE the cap below, so an alias of the 7th join is still found (fb#1812).
+  // `v.plate` / `vehicle.plate` — the qualifiers narrow the search. EVERY one
+  // counts: the error does not say which `<q>.col` failed, and the first may be a
+  // valid `p.personId` beside the failing `aps.personId` (fb#2613). Scoped BEFORE
+  // the cap below, so an alias of the 7th join is still found (fb#1812).
   const escaped = badColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const qualified = new RegExp(`\\b([A-Za-z_]\\w*)\\.\\[?${escaped}\\]?\\b`, "i").exec(sql);
-  if (qualified) {
-    const scoped = tables.filter((t) => [t.alias, t.table].some((n) => n?.toLowerCase() === qualified[1].toLowerCase()));
-    if (scoped.length) tables = scoped;
-  }
+  const qualifiers = new Set(
+    [...sql.matchAll(new RegExp(`\\b([A-Za-z_]\\w*)\\.\\[?${escaped}\\]?\\b`, "gi"))].map((m) => m[1].toLowerCase())
+  );
+  const scoped = tables.filter((t) => [t.alias, t.table].some((n) => n && qualifiers.has(n.toLowerCase())));
+  if (scoped.length) tables = scoped;
   const columnsByTable = await Promise.all(
     // Each table is a round-trip; an ad-hoc query rarely joins more than six.
     tables.slice(0, 6).map(async ({ table }) => {
@@ -679,7 +681,10 @@ async function columnNameSuggestion(client: ApiClient, sql: string, badColumn: s
       return { table, columns: cols.map((c) => c.name).filter((n): n is string => typeof n === "string") };
     })
   );
-  const known = columnsByTable.filter((t) => t.columns.length);
+  // A table that HAS the column cannot be the one the error is about (fb#2613).
+  const known = columnsByTable.filter(
+    (t) => t.columns.length && !t.columns.some((c) => c.toLowerCase() === badColumn.toLowerCase())
+  );
   if (!known.length) return null;
   for (const { table, columns } of known) {
     // A guessed `id` means the key, which is spelled `<table>Id` here; edit

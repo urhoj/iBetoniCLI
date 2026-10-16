@@ -553,6 +553,22 @@ describe("ib schema", () => {
         await expect(runSchemaQuery(mockClient, "SELECT foo FROM nope")).rejects.toBe(original);
       });
 
+      // fb#2613: the first `<q>.personId` was a VALID p.personId, so the hint
+      // searched person and suggested the column the query already used.
+      test("every qualifier counts, and a table that HAS the column is never the answer", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Invalid column name 'personId'.", 400, null, 4));
+        get()
+          .mockResolvedValueOnce(cols("personId", "personFirstName"))
+          .mockResolvedValueOnce(cols("asiakasPersonSettingsId", "asiakasId", "person_Id"));
+
+        const err = await runSchemaQuery(
+          mockClient,
+          "SELECT p.personId FROM person p JOIN asiakasPersonSettings aps ON aps.personId = p.personId"
+        ).catch((e) => e);
+        expect(err.hint).toMatch(/^did you mean asiakasPersonSettings\.person_Id\b.*\(nearest columns in asiakasPersonSettings\)$/);
+        expect(err.hint).not.toContain("person.personId");
+      });
+
       // fb#1812: the table cap used to run BEFORE alias scoping, so a qualifier
       // naming the 7th join fell through to the first six tables' columns.
       test("an alias beyond the 6-table fetch cap is still scoped to, not silently replaced by the first six", async () => {
