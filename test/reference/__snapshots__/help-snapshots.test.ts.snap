@@ -10541,12 +10541,99 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message driver channels matches snapshot 1`] = `
+"USAGE
+  ib message driver channels --person <person> [flags]
+
+DESCRIPTION
+  Available manual-message channels for one person in the active company: push device count and masked email. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --person NUMBER    Recipient personId in the active company (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { pushDevices:number, email:string|null } — email is masked; zero devices means push is unavailable.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer
+  exit 5 (HTTP 404)  Not found              → personId is not reachable in the active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message driver send, ib message sms list
+
+EXAMPLES
+  ib message driver channels --person 6390
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message driver send matches snapshot 1`] = `
+"USAGE
+  ib message driver send --person <person> --channel <channel> --message <message> [flags]
+
+DESCRIPTION
+  Send ONE manual push notification or email to a person in the active company, using the same service as the UI. Requires a sender role or system admin/developer; no HAS_SMS module needed. The server resolves the recipient address/devices and logs the result. This sends immediately, bypassing automated notification preferences and time filters.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --person NUMBER    Recipient personId in the active company (required)
+  --channel STRING    push | email (SMS uses message sms send) (required)
+  --message STRING    Plain text, 1-1000 characters after trimming (required)
+  --subject STRING    Push title or email subject; default Viesti, trimmed to 200 characters
+  --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { smsLogId:number|null, status:'sent', channel:'push'|'email', target:'push'|maskedEmail }. With --dry-run: { dryRun:true, personId, channel, target }. On 422: { error, smsLogId, status:'failed' }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  Validation             → pass --channel push or --channel email
+  exit 4 (HTTP 400)  Validation             → message must be non-empty and at most 1000 characters; email requires a recipient email address
+  exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer
+  exit 5 (HTTP 404)  Not found              → personId is not reachable in the active company
+  exit 4 (HTTP 422)  Send failed            → inspect the error and message history before retrying; delivery may be partial or uncertain
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS remains blocked on all AI bridges.
+  - --dry-run validates text and recipient but sends/logs nothing; it does not test delivery or guarantee a push device is reachable.
+  - Use --idempotency-key for retries. After a timeout, check message sms list before resending.
+  - --from-json accepts person, channel, message and subject; explicit flags win. Write-safety flags stay on argv.
+
+SEE ALSO
+  ib message driver channels, ib message sms list, ib message sms send
+
+EXAMPLES
+  ib message driver send --person 6390 --channel push --message "Huomenna lahto klo 6.30" --dry-run
+  ib message driver send --person 6390 --channel email --subject "Aikataulu" --message "Lahto klo 6.30" --idempotency-key driver-6390-schedule --reason "User requested schedule message"
+  ib message driver send --from-json driver-message.json --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message sms list matches snapshot 1`] = `
 "USAGE
   ib message sms list --person <person> [flags]
 
 DESCRIPTION
-  SMS sent to one person of the active company, newest first (time, sender, text, status). HAS_SMS module + an admin or dispatcher role.
+  Messages sent to one person of the active company across SMS, push and email, newest first. Requires an admin or dispatcher role.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -10557,11 +10644,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ smsLogId, createdAt, message, segments, status:'sent'|'failed'|'unknown', errorText, senderPersonId, senderName }] } — 'unknown' = the gateway never answered, the SMS may have been delivered.
+  { items: [{ smsLogId, createdAt, channel:'sms'|'push'|'email', subject:null|string, message, segments:null|number, status:'sent'|'failed'|'unknown', errorText, senderPersonId, senderName }] } — segments is null for non-SMS messages; 'unknown' = the gateway never answered, the SMS may have been delivered.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
-  exit 3 (HTTP 403)  Permission denied      → HAS_SMS module + one of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin required
+  exit 3 (HTTP 403)  Permission denied      → caller lacks one of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin and is not a system admin/developer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10569,7 +10656,7 @@ NOTES
   - Deploy-gated: the /api/sms routes must be deployed to the target backend.
 
 SEE ALSO
-  ib message sms send
+  ib message sms send, ib message driver channels, ib message driver send
 
 EXAMPLES
   ib message sms list --person 6390

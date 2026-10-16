@@ -1069,6 +1069,14 @@ ib message daily share --to <asiakasId>
   ! --to must be an integer >= 1
   > pass the tenant's asiakasId to share with
 
+ib message driver channels --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib message driver send --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib message sms list --person <id>
   ! --person must be an integer >= 1
   > pass a positive personId

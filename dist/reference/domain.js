@@ -42,7 +42,7 @@ export const DOMAIN_BLURBS = {
     stats: "Aggregated delivery statistics — `stats --all` is the only CROSS-TENANT (developer) rollup; use it instead of looping `keikka list --company` over companies.",
     opendata: "Free/open external-data APIs — building registries, FMI weather, PRH business registry.",
     jerry: "BetoniJerry RFQ marketplace: requests, offers, confirmation.",
-    message: "Chat threads, the announcement board, and daily grid notes.",
+    message: "Chat threads, announcements, daily notes, support, and manual driver SMS/push/email.",
     attachment: "Files (photos/PDFs) linked to entities via Azure Blob.",
     legal: "Versioned legal documents and per-person acceptances.",
     validate: "Company and person readiness validation profiles.",
