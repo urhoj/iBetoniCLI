@@ -22,7 +22,8 @@ describe("ib perf run* functions", () => {
           { procedure: "keikka_get", duration: 1500, entity: "keikka", params: ["keikkaId"], timestamp: "2026-06-18T00:00:00Z" },
         ],
         count: 1,
-        totalCount: 42,
+        bufferedCount: 42,
+        since: "2026-06-01T00:00:00Z",
         environment: "production",
       },
     });
@@ -35,14 +36,15 @@ describe("ib perf run* functions", () => {
       nextCursor: null,
       count: 1,
       truncated: false,
-      totalCount: 42,
+      bufferedCount: 42,
+      since: "2026-06-01T00:00:00Z",
       environment: "production",
     });
   });
 
   test("runPerfSlow flags truncated when the page fills the limit", async () => {
     mockClient.get.mockResolvedValueOnce({
-      data: { queries: [{ procedure: "p", duration: 1, entity: "e", params: [], timestamp: "t" }, { procedure: "p2", duration: 2, entity: "e", params: [], timestamp: "t" }], count: 2, totalCount: 99, environment: "production" },
+      data: { queries: [{ procedure: "p", duration: 1, entity: "e", params: [], timestamp: "t" }, { procedure: "p2", duration: 2, entity: "e", params: [], timestamp: "t" }], count: 2, bufferedCount: 99, environment: "production" },
     });
     const out = await runPerfSlow(mockClient, { limit: 2 });
     expect(mockClient.get).toHaveBeenCalledWith("/api/admin/slow-queries?limit=2");
@@ -50,10 +52,10 @@ describe("ib perf run* functions", () => {
   });
 
   test("runPerfStats unwraps .data", async () => {
-    mockClient.get.mockResolvedValueOnce({ data: { totalSlowQueries: 7, avgDuration: 1200 } });
+    mockClient.get.mockResolvedValueOnce({ data: { bufferedCount: 7, avgDuration: 1200 } });
     const out = await runPerfStats(mockClient, { env: "staging" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/admin/slow-queries/stats?env=staging");
-    expect(out).toEqual({ totalSlowQueries: 7, avgDuration: 1200 });
+    expect(out).toEqual({ bufferedCount: 7, avgDuration: 1200 });
   });
 
   test("runPerfConfig folds in availableEnvironments", async () => {

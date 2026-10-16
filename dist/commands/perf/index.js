@@ -18,7 +18,8 @@ export async function runPerfSlow(client, opts) {
     const limit = opts.limit ?? 50;
     return {
         ...listEnvelope(items, { truncated: items.length >= limit }),
-        totalCount: d.totalCount,
+        bufferedCount: d.bufferedCount,
+        since: d.since,
         environment: d.environment,
     };
 }

@@ -38,9 +38,9 @@ interface SlowQueryRow {
 export async function runPerfSlow(
   client: ApiClient,
   opts: { limit?: number; env?: string }
-): Promise<ListEnvelope<SlowQueryRow> & { totalCount?: number; environment?: string }> {
+): Promise<ListEnvelope<SlowQueryRow> & { bufferedCount?: number; since?: string | null; environment?: string }> {
   const res = await client.get<{
-    data: { queries?: RawSlow[]; totalCount?: number; environment?: string };
+    data: { queries?: RawSlow[]; bufferedCount?: number; since?: string | null; environment?: string };
   }>(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
   const d = res.data ?? {};
   const items: SlowQueryRow[] = (d.queries ?? []).map((r) => ({
@@ -53,7 +53,8 @@ export async function runPerfSlow(
   const limit = opts.limit ?? 50;
   return {
     ...listEnvelope(items, { truncated: items.length >= limit }),
-    totalCount: d.totalCount,
+    bufferedCount: d.bufferedCount,
+    since: d.since,
     environment: d.environment,
   };
 }

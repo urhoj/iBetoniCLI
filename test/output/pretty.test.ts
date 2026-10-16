@@ -33,7 +33,7 @@ describe("pretty output", () => {
   });
 
   test("renderList surfaces extra scalar envelope keys as a context line", () => {
-    // `schema indexes` carries statsSince, `perf slow` totalCount/environment —
+    // `schema indexes` carries statsSince, `perf slow` bufferedCount/since/environment —
     // context that changes how the table is read must not be JSON-only.
     const env = {
       statsSince: "2026-08-09T04:39:19.553Z",
