@@ -3,8 +3,9 @@
  * over the existing /api/admin/slow-queries* routes. Read commands work under
  * --read-only; `clear` is a developer write. All four are tier:"developer".
  *
- * SQL coverage is executeQuery-path-only (raw getConnection() queries are not
- * timed) — the same caveat the global --stats flag carries.
+ * SQL coverage: every SQL request since puminet5api cl#3378 (fb#2617); older
+ * backends time only the executeQuery (cache-runner) path. Unlike --stats, which
+ * reads the backend's Server-Timing shape, these routes cannot say which applies.
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";

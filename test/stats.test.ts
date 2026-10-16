@@ -18,10 +18,29 @@ describe("stats accumulator", () => {
   });
 
   test("parseServerTiming extracts sql dur + proc count", () => {
-    expect(parseServerTiming('sql;dur=45;desc="3 procs"')).toEqual({ sqlMs: 45, sqlProcCount: 3 });
+    expect(parseServerTiming('sql;dur=45;desc="3 procs"')).toEqual({ sqlMs: 45, sqlProcCount: 3, sqlAllQueries: false });
     expect(parseServerTiming("sql;dur=12")).toEqual({ sqlMs: 12 });
     expect(parseServerTiming(null)).toEqual({});
     expect(parseServerTiming("app;dur=9")).toEqual({});
+  });
+
+  test("parseServerTiming reads the all-queries shape (fb#2619)", () => {
+    expect(parseServerTiming('sql;dur=45;desc="3 queries"')).toEqual({ sqlMs: 45, sqlProcCount: 3, sqlAllQueries: true });
+    expect(parseServerTiming('sql;dur=45;desc="3 procs"')).toEqual({ sqlMs: 45, sqlProcCount: 3, sqlAllQueries: false });
+  });
+
+  test("an all-queries backend is labelled coverage all, in JSON and pretty (fb#2619)", () => {
+    enableStats();
+    recordRequest({ apiMs: 120, serverTiming: 'sql;dur=45;desc="3 queries", cacheHit;dur=1, cacheMiss;dur=0' });
+    expect(JSON.parse(buildStatsLine(false)!).stats).toMatchObject({ sqlMs: 45, sqlProcCount: 3, sqlCoverage: "all" });
+    expect(buildStatsLine(true)).toBe("[ib] stats: api=120ms sql=45ms (3 queries) cache=1 hit / 0 miss");
+  });
+
+  test("one older-backend response keeps the whole invocation labelled partial (fb#2619)", () => {
+    enableStats();
+    recordRequest({ apiMs: 10, serverTiming: 'sql;dur=4;desc="2 queries"' });
+    recordRequest({ apiMs: 10, serverTiming: 'sql;dur=6;desc="1 procs"' });
+    expect(JSON.parse(buildStatsLine(false)!).stats.sqlCoverage).toBe("executeQuery-path-only");
   });
 
   test("API-only invocation (no Server-Timing) emits api but omits sql fields", () => {
@@ -49,6 +68,7 @@ describe("stats accumulator", () => {
     expect(parseServerTiming('sql;dur=1152;desc="1 procs", cacheHit;dur=0, cacheMiss;dur=1')).toEqual({
       sqlMs: 1152,
       sqlProcCount: 1,
+      sqlAllQueries: false,
       cacheHits: 0,
       cacheMisses: 1,
     });

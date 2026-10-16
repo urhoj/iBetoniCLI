@@ -5202,7 +5202,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+  - SQL durations cover every SQL request (raw getConnection() queries included) since puminet5api cl#3378 / fb#2617; older backends time only the executeQuery (cache-runner) path.
   - Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see \`ib dev perf config\`.
 
 SEE ALSO
@@ -5238,7 +5238,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+  - SQL durations cover every SQL request (raw getConnection() queries included) since puminet5api cl#3378 / fb#2617; older backends time only the executeQuery (cache-runner) path.
 
 SEE ALSO
   ib dev perf slow, ib dev perf config

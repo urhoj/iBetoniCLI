@@ -5,8 +5,10 @@
  * stats line). The API client feeds `recordRequest` per request; `bin/ib.ts`
  * (and runArgv, if wired) calls `flushStats` once after the command resolves.
  * Output is one stderr line — never stdout (preserves the JSON data contract).
- * SQL time and cache hit/miss counts cover the executeQuery (cache-runner) path
- * only and are always labelled as such.
+ * SQL coverage is labelled from the backend's own header: `desc="<n> queries"`
+ * (puminet5api cl#3378 / fb#2617 onward) times EVERY SQL request, the older
+ * `desc="<n> procs"` only the executeQuery (cache-runner) path. Cache hit/miss
+ * counts always cover only the cache runner's Redis lookups.
  */
 import { warnNote } from "./output/json.js";
 function empty() {
@@ -17,6 +19,7 @@ function empty() {
         sqlMs: 0,
         sqlProcCount: 0,
         sqlSeen: false,
+        sqlPartial: false,
         cacheHits: 0,
         cacheMisses: 0,
         cacheSeen: false,
@@ -35,8 +38,9 @@ export function resetStats() {
 /**
  * Parse a `Server-Timing` header for the backend's `sql` / `cacheHit` /
  * `cacheMiss` metrics. Best-effort, never throws. Encoding (set by puminet5api
- * `app.js`): `sql;dur=<ms>;desc="<n> procs", cacheHit;dur=<n>, cacheMiss;dur=<n>`
- * — counts ride in `dur` for trivial numeric parsing.
+ * `app.js`): `sql;dur=<ms>;desc="<n> queries", cacheHit;dur=<n>, cacheMiss;dur=<n>`
+ * — counts ride in `dur` for trivial numeric parsing. Older backends send
+ * `desc="<n> procs"` (executeQuery path only); both are accepted.
  */
 export function parseServerTiming(header) {
     if (!header)
@@ -49,19 +53,24 @@ export function parseServerTiming(header) {
             continue;
         let dur;
         let procCount;
+        let allQueries;
         for (const seg of segs.slice(1)) {
             const durMatch = /^dur=([0-9.]+)$/.exec(seg);
             if (durMatch)
                 dur = Number(durMatch[1]);
-            const descMatch = /^desc="?(\d+) procs"?$/.exec(seg);
-            if (descMatch)
+            const descMatch = /^desc="?(\d+) (procs|queries)"?$/.exec(seg);
+            if (descMatch) {
                 procCount = Number(descMatch[1]);
+                allQueries = descMatch[2] === "queries";
+            }
         }
         if (name === "sql") {
             if (dur !== undefined)
                 out.sqlMs = dur;
             if (procCount !== undefined)
                 out.sqlProcCount = procCount;
+            if (allQueries !== undefined)
+                out.sqlAllQueries = allQueries;
         }
         else if (name === "cacheHit") {
             if (dur !== undefined)
@@ -83,6 +92,8 @@ export function recordRequest(info) {
     if (t.sqlMs !== undefined) {
         acc.sqlMs += t.sqlMs;
         acc.sqlSeen = true;
+        if (!t.sqlAllQueries)
+            acc.sqlPartial = true;
     }
     if (t.sqlProcCount !== undefined)
         acc.sqlProcCount += t.sqlProcCount;
@@ -98,9 +109,11 @@ export function buildStatsLine(pretty) {
         return null;
     if (pretty) {
         const reqPart = acc.apiReqCount > 1 ? ` over ${acc.apiReqCount} requests` : "";
-        const sqlPart = acc.sqlSeen
-            ? ` sql=${acc.sqlMs}ms (${acc.sqlProcCount} procs, executeQuery-path-only)`
-            : "";
+        const sqlPart = !acc.sqlSeen
+            ? ""
+            : acc.sqlPartial
+                ? ` sql=${acc.sqlMs}ms (${acc.sqlProcCount} procs, executeQuery-path-only)`
+                : ` sql=${acc.sqlMs}ms (${acc.sqlProcCount} queries)`;
         const cachePart = acc.cacheSeen ? ` cache=${acc.cacheHits} hit / ${acc.cacheMisses} miss` : "";
         return `[ib] stats: api=${acc.apiMs}ms${reqPart}${sqlPart}${cachePart}`;
     }
@@ -110,7 +123,7 @@ export function buildStatsLine(pretty) {
     if (acc.sqlSeen) {
         stats.sqlMs = acc.sqlMs;
         stats.sqlProcCount = acc.sqlProcCount;
-        stats.sqlCoverage = "executeQuery-path-only";
+        stats.sqlCoverage = acc.sqlPartial ? "executeQuery-path-only" : "all";
     }
     if (acc.cacheSeen) {
         stats.cacheHits = acc.cacheHits;

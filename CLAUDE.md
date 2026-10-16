@@ -202,17 +202,17 @@ The DB-backed domain vocabulary (`src/commands/glossary/index.ts`, backend `/api
 
 ### `ib perf` — SQL slow-query monitoring
 
-`src/commands/perf/index.ts` — four `tier:"developer"` leaves over the EXISTING `/api/admin/slow-queries*` routes (no backend deploy needed; the routes predate the group): `ib dev perf --help`. Coverage caveat (shared with `--stats`): only `executeQuery`-path stored procs are timed — raw `getConnection()` queries are not.
+`src/commands/perf/index.ts` — four `tier:"developer"` leaves over the EXISTING `/api/admin/slow-queries*` routes (no backend deploy needed; the routes predate the group): `ib dev perf --help`. Coverage: every SQL request since puminet5api cl#3378 (fb#2617); older backends time only `executeQuery`-path procs. The perf routes cannot say which applies (`--stats` can — see below).
 
 ### Global `--stats` flag
 
 `src/stats.ts` — a process-singleton accumulator. `--stats` (resolved in `globals.ts` → `GlobalOptions.stats`, enabled in `bin/ib.ts`'s preAction) makes `src/api/client.ts` time each request and `recordRequest` it; `bin/ib.ts` calls `flushStats` once after `parseAsync`, emitting ONE line to **stderr** — never stdout (the JSON data contract is preserved; same channel as the acting-as write diagnostic). Three dimensions, summed across all requests in the invocation:
 
 - `apiMs` — wall-clock round-trip (incl. any 401-refresh retry); always present. `apiReqCount` added (JSON) when >1.
-- `sqlMs` / `sqlProcCount` / `sqlCoverage:"executeQuery-path-only"` — only when the backend emits a `Server-Timing: sql;dur=…;desc="N procs"` header (deploy-gated; absent on routes that don't hit the cache runner).
+- `sqlMs` / `sqlProcCount` / `sqlCoverage` — only when the backend emits a `Server-Timing: sql;dur=…` header. Coverage is read from its `desc`: `"N queries"` (puminet5api cl#3378 / fb#2617 on) → `sqlCoverage:"all"`, every SQL request; the older `"N procs"` → `"executeQuery-path-only"`. Any request in the invocation answering the old shape makes the whole line `executeQuery-path-only`. `sqlProcCount` keeps its name for the JSON contract; on new backends it counts SQL requests.
 - `cacheHits` / `cacheMisses` — only when the backend emits `cacheHit`/`cacheMiss` Server-Timing metrics. Deliberately **absent** (not `0/0`) on routes that did no cached read, so raw-query routes don't read as "all misses". A cache hit shows `sqlMs:0` (no proc ran) with `cacheHits:1` — the pair disambiguates "served from cache" from "no SQL".
 
-`--pretty` renders a human line: `[ib] stats: api=120ms sql=45ms (3 procs, executeQuery-path-only) cache=2 hit / 1 miss`. JSON mode emits `{"stats":{…}}`. The backend half lives in `puminet5api` (`modules/monitoring/requestSqlTiming.js` AsyncLocalStorage scope + `app.js` `Server-Timing` response wrapper).
+`--pretty` renders a human line: `[ib] stats: api=120ms sql=45ms (3 queries) cache=2 hit / 1 miss` (older backends: `(3 procs, executeQuery-path-only)`). JSON mode emits `{"stats":{…}}`. The backend half lives in `puminet5api` (`modules/monitoring/requestSqlTiming.js` AsyncLocalStorage scope + `app.js` `Server-Timing` response wrapper).
 
 ### Global `--print-payload` flag
 

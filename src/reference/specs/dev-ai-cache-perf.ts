@@ -288,7 +288,7 @@ export const DEV_AI_CACHE_PERF_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ];
     const COVERAGE_NOTE =
-      "SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.";
+      "SQL durations cover every SQL request (raw getConnection() queries included) since puminet5api cl#3378 / fb#2617; older backends time only the executeQuery (cache-runner) path.";
     return [
       {
         command: "ib dev perf slow",
