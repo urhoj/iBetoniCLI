@@ -57,6 +57,7 @@ import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 import { diffFields } from "../../diff.js";
+import { isIsoDateOrDateTime, resolveDateTime } from "../../dates.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -64,6 +65,8 @@ export interface PersonListFilter {
   /** List persons the company OWNS instead of its members (the default). */
   owned?: boolean;
   limit?: number;
+  loggedInSince?: string;
+  notLoggedInSince?: string;
 }
 
 /** Typed convenience fields for `person create`, mapped to backend column names. */
@@ -154,14 +157,29 @@ export async function runPersonList(
   client: ApiClient,
   opts: PersonListFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  return client.get<ListEnvelope<Record<string, unknown>>>(
+  if (opts.loggedInSince !== undefined && opts.notLoggedInSince !== undefined) {
+    failUsage("--logged-in-since and --not-logged-in-since are mutually exclusive");
+  }
+  const cutoff = (value: string | undefined, flag: string) => {
+    if (value === undefined) return undefined;
+    if (!isIsoDateOrDateTime(value)) failUsage(`${flag} must be a valid ISO date or timestamp`);
+    return resolveDateTime(value, flag);
+  };
+  const result = await client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/person/list${qs({
       role: opts.role || undefined,
       asiakas: opts.asiakas,
       limit: opts.limit,
       owned: opts.owned ? "1" : undefined,
+      loggedInSince: cutoff(opts.loggedInSince, "--logged-in-since"),
+      notLoggedInSince: cutoff(opts.notLoggedInSince, "--not-logged-in-since"),
     })}`
   );
+  if ((opts.loggedInSince !== undefined || opts.notLoggedInSince !== undefined) &&
+      result.items.some((row) => !Object.hasOwn(row, "lastLogin"))) {
+    failWith("The backend does not support person login activity filters yet; deploy the updated backend before using them", 6);
+  }
+  return result;
 }
 
 /**
@@ -703,6 +721,8 @@ export function registerPersonCommands(
   registerPersonDayMessageChannelCommands(p, getClient);
 
   p.command("list")
+    .option("--logged-in-since <iso>")
+    .option("--not-logged-in-since <iso>")
     .option("--role <role>")
     .option("--asiakas <id>", "", intFlag("--asiakas"))
     .option(

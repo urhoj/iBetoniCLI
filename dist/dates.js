@@ -116,7 +116,10 @@ function helsinkiOffsetMs(utcMs) {
         if (type !== "literal")
             p[type] = Number(value);
     }
-    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - utcMs;
+    // The formatter emits whole seconds. Compare at the same precision so the
+    // input's milliseconds cannot become part of the timezone offset (fb#2615).
+    const wholeSecondMs = Math.floor(utcMs / 1000) * 1000;
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - wholeSecondMs;
 }
 /**
  * Normalize a TIMESTAMP flag to a UTC ISO instant (`…Z`) — the shape the

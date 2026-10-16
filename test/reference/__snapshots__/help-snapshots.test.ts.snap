@@ -13927,23 +13927,31 @@ FLAGS
   --asiakas NUMBER    Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it, or be a sysadmin/developer). Combine with --owned for the persons it owns.
   --owned    List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).
   --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --logged-in-since STRING    Only people whose lastLogin is at or after this ISO date/time. Requires company admin/owner in the selected company, or sysadmin/developer. Mutually exclusive with --not-logged-in-since.
+  --not-logged-in-since STRING    Only people whose lastLogin is before this ISO date/time, including never-active people (null). Same admin access as --logged-in-since; mutually exclusive with it.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, name, email, phone, phoneLoginEnabled:boolean (SMS login on; the login number itself is not listed), roles:number[] (distinct roles held in the scope company; [] for an --owned non-member) }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+  ListEnvelope<{ personId, name, email, phone, phoneLoginEnabled:boolean (SMS login on; the login number itself is not listed), roles:number[] (distinct roles held in the scope company; [] for an --owned non-member), lastLogin?:ISO-UTC|null (company admin/owner in the selected company or sysadmin/developer only; omitted for ordinary members) }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 500, so narrow with the company/role filters rather than raising the cap
   exit 4 (HTTP 400)  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
+  exit 4 (client-side)  Invalid ISO cutoff or both login filters supplied → pass one of --logged-in-since or --not-logged-in-since with a real ISO date/time
+  exit 4 (HTTP 400)  Invalid login cutoff   → use a real ISO date/time; the CLI converts it to UTC before sending
+  exit 3 (HTTP 403)  Login activity requires company admin → use a company where you are admin/owner, or a sysadmin/developer token; ordinary list access is unchanged
+  exit 6 (client-side)  Backend response lacks login activity support → deploy the updated backend before using the login filters
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
+  - lastLogin is the latest of person.lastLoginTime (person-wide login) and driver-app visits in the SELECTED company. Null means neither exists; driver-app visits count even without a fresh login. This is activity, not a company-specific authentication history.
+  - Cutoffs without an offset use Europe/Helsinki (date-only = local midnight); Z or explicit offsets identify an instant. Filters run before --limit. Live uncached read. Filtered results lacking lastLogin are rejected: deploy the updated backend first.
   - This command does NOT search by name — it enumerates and filters by role/company. To find a person by name or email use \`ib person search <query>\` (which also accepts \`--search\`).
 
 SEE ALSO
@@ -13953,6 +13961,7 @@ EXAMPLES
   ib person list
   ib person list --owned
   ib person list --asiakas 1349 --limit 50
+  ib person list --asiakas 27 --role pumppari --not-logged-in-since 2026-10-15T18:30
 "
 `;
 
