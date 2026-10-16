@@ -102,6 +102,13 @@ describe("resolveDate accepts a read-shape date column (fb#357)", () => {
 });
 
 describe("resolveDateTime — timestamp flags normalize to a UTC instant", () => {
+  test.each([
+    ["2026-10-15T18:30:00.123", "2026-10-15T15:30:00.123Z"],
+    ["2026-10-15T18:30:00.999", "2026-10-15T15:30:00.999Z"],
+    ["2026-01-15T18:30:00.999", "2026-01-15T16:30:00.999Z"],
+  ])("preserves fractional seconds when converting %s", (input, expected) => {
+    expect(resolveDateTime(input)).toBe(expected);
+  });
   test("fb#412 repro: an offset is APPLIED, not dropped", () => {
     // Posting the raw string stored 12:00Z — a 3 h skew on every backdated
     // onboarding event, silently, behind an HTTP 200.
