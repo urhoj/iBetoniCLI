@@ -355,11 +355,19 @@ describe("--area repo-name remedy (fb#212)", () => {
     expect(err.body?.problems?.[0]?.remedy).toContain("--repo puminet5api");
   });
 
-  test("a non-repo-shaped invalid --area gets no remedy, just the allowed list", () => {
+  test("a feature-shaped invalid --area says it is the code layer (fb#2626)", () => {
     const err = captureThrow(() => validateEnums(undefined, "bogus"));
     const p = err.body?.problems?.[0];
     expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd", "workspace", "site"]);
-    expect(p?.remedy).toBeUndefined();
+    expect(p?.remedy).toContain("code LAYER");
+    expect(p?.remedy).not.toContain("usually");
+  });
+
+  test("a feature-shaped --area names the layer --repo implies (fb#2626)", () => {
+    const err = captureThrow(() =>
+      validateEnums(undefined, "notifications", undefined, undefined, undefined, "ib dev changelog add", "puminet5api,betonicli")
+    );
+    expect(err.body?.problems?.[0]?.remedy).toContain("for --repo puminet5api that is usually `--area backend`");
   });
 });
 

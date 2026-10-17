@@ -97,7 +97,7 @@ const SERVER_ENUM_NOTE =
 const REPO_FLAG_DESC =
   "Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. `--repo \"puminet5api,betonicli\"`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via `npm run final`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none.";
 const AREA_FLAG_DESC =
-  "Technical layer: frontend|backend|cli|database|cicd|workspace|site (repo granularity goes in --repo, not here). This is different from `ib dev feedback --scope`, which names the product surface; ops/jerry/security are scopes, not areas.";
+  "Code LAYER, not the feature: frontend|backend|cli|database|cicd|workspace|site (the repo goes in --repo). Not `ib dev feedback --scope` (the product surface): sms/ops/jerry/security are not areas.";
 // Scope-shaped values agents predictably pass to --area (`ib dev feedback
 // --scope` accepts these). The remedy string is built from the key at the call
 // site. No `jerry` entry: AREA_REPO_REMEDIES below also carries `jerry` and
@@ -144,6 +144,19 @@ const AREA_REPO_REMEDIES: Record<string, string> = {
   puminet5api: "puminet5api",
   "puminet7-functions-app": "puminet7-functions-app",
   betonicli: "betonicli",
+};
+// The layer a repo usually means, for the remedy on a FEATURE-shaped --area
+// (`--area notifications --repo puminet5api` → backend, fb#2626).
+const REPO_DEFAULT_AREA: Record<string, string> = {
+  puminet4: "frontend",
+  betonijerry: "frontend",
+  puminet5api: "backend",
+  "puminet7-functions-app": "backend",
+  betonicli: "cli",
+  workspace: "workspace",
+  "ibetoni-site": "site",
+  bsg2: "site",
+  betonipumppu: "site",
 };
 
 /**
@@ -351,7 +364,8 @@ export function validateEnums(
   bumpLevel?: string,
   source?: string,
   severity?: string,
-  commandPath = "ib dev changelog add"
+  commandPath = "ib dev changelog add",
+  repo?: string
 ): void {
   const problems: FlagProblem[] = [];
   if (severity !== undefined && !SEVERITIES.includes(severity))
@@ -368,19 +382,20 @@ export function validateEnums(
     problems.push({ flag: "--type", issue: "invalid", got: type, allowed: TYPES, synonyms: TYPE_SYNONYMS });
   if (area !== undefined && !AREAS.includes(area)) {
     const lower = area.toLowerCase();
-    const repo = AREA_REPO_REMEDIES[lower];
+    const repoRemedy = AREA_REPO_REMEDIES[lower];
+    const firstRepo = (repo ?? "").split(",")[0].trim().toLowerCase();
+    const layer = REPO_DEFAULT_AREA[firstRepo];
     problems.push({
       flag: "--area",
       issue: "invalid",
       got: area,
       allowed: AREAS,
-      ...(repo
-        ? {
-            remedy: `--area is the technical layer, not the repo — pass --repo ${repo} and pick the layer from the allowed values`,
-          }
+      remedy: repoRemedy
+        ? `--area is the technical layer, not the repo — pass --repo ${repoRemedy} and pick the layer from the allowed values`
         : AREA_SCOPE_VALUES.has(lower)
-          ? { remedy: `use --scope ${lower} when filing feedback; --area accepts technical layers only` }
-        : {}),
+          ? `use --scope ${lower} when filing feedback; --area accepts technical layers only`
+          : `--area is the code LAYER the change touches, not the feature` +
+            (layer ? ` — for --repo ${firstRepo} that is usually \`--area ${layer}\`` : ""),
     });
   }
   if (bumpLevel !== undefined && !BUMP_LEVELS.includes(bumpLevel))
@@ -1083,7 +1098,7 @@ export function registerChangelogCommands(
       warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
       normalizeChangelogEnums(o);
       requireAddFields(description, o as Record<string, unknown>);
-      validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity);
+      validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog add", o.repo);
       o.sha = resolveShaAlias(o.sha, o.commit)!;
       validateFieldLengths(o);
       const entryDate = resolveDate(o.date || "today")!;
@@ -1275,7 +1290,7 @@ export function registerChangelogCommands(
     }
     applyFromJson(cmd, o as Record<string, unknown>, current);
     normalizeChangelogEnums(o);
-    validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
+    validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update", o.repo);
     // --summary/--body are aliases for --description (feedback #205/#278); fold
     // them in before the patch build so the loop below picks them up. Several may
     // be given only when they agree.
