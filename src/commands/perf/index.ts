@@ -35,13 +35,21 @@ interface SlowQueryRow {
   timestamp: string;
 }
 
+interface SlowMeta {
+  bufferedCount?: number;
+  since?: string | null;
+  environment?: string;
+  /** true when the backend could not read the Redis buffer: an empty list then means "unknown", not "none" (fb#2625). */
+  unavailable?: boolean;
+}
+
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(
   client: ApiClient,
   opts: { limit?: number; env?: string }
-): Promise<ListEnvelope<SlowQueryRow> & { bufferedCount?: number; since?: string | null; environment?: string }> {
+): Promise<ListEnvelope<SlowQueryRow> & SlowMeta> {
   const res = await client.get<{
-    data: { queries?: RawSlow[]; bufferedCount?: number; since?: string | null; environment?: string };
+    data: { queries?: RawSlow[] } & SlowMeta;
   }>(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
   const d = res.data ?? {};
   const items: SlowQueryRow[] = (d.queries ?? []).map((r) => ({
@@ -57,6 +65,7 @@ export async function runPerfSlow(
     bufferedCount: d.bufferedCount,
     since: d.since,
     environment: d.environment,
+    ...(d.unavailable ? { unavailable: true } : {}),
   };
 }
 

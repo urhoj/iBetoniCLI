@@ -51,6 +51,14 @@ describe("ib perf run* functions", () => {
     expect(out.truncated).toBe(true);
   });
 
+  test("runPerfSlow surfaces an unreadable buffer as unavailable, not an empty list (fb#2625)", async () => {
+    mockClient.get.mockResolvedValueOnce({ data: { queries: [], count: 0, bufferedCount: 0, since: null, environment: "production", unavailable: true } });
+    expect((await runPerfSlow(mockClient, {})).unavailable).toBe(true);
+
+    mockClient.get.mockResolvedValueOnce({ data: { queries: [], count: 0, bufferedCount: 0, since: null, environment: "production" } });
+    expect(await runPerfSlow(mockClient, {})).not.toHaveProperty("unavailable");
+  });
+
   test("runPerfStats unwraps .data", async () => {
     mockClient.get.mockResolvedValueOnce({ data: { bufferedCount: 7, avgDuration: 1200 } });
     const out = await runPerfStats(mockClient, { env: "staging" });

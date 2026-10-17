@@ -21,6 +21,7 @@ export async function runPerfSlow(client, opts) {
         bufferedCount: d.bufferedCount,
         since: d.since,
         environment: d.environment,
+        ...(d.unavailable ? { unavailable: true } : {}),
     };
 }
 /** GET aggregate slow-query stats (top procedures, avg/max, by-entity). */
