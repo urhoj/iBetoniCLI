@@ -56,7 +56,7 @@ describe("ib perf run* functions", () => {
     expect((await runPerfSlow(mockClient, {})).unavailable).toBe(true);
 
     mockClient.get.mockResolvedValueOnce({ data: { queries: [], count: 0, bufferedCount: 0, since: null, environment: "production" } });
-    expect(await runPerfSlow(mockClient, {})).not.toHaveProperty("unavailable");
+    expect((await runPerfSlow(mockClient, {})).unavailable).toBeUndefined();
   });
 
   test("runPerfStats unwraps .data", async () => {

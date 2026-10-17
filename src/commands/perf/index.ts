@@ -65,7 +65,7 @@ export async function runPerfSlow(
     bufferedCount: d.bufferedCount,
     since: d.since,
     environment: d.environment,
-    ...(d.unavailable ? { unavailable: true } : {}),
+    unavailable: d.unavailable,
   };
 }
 

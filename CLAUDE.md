@@ -202,7 +202,7 @@ The DB-backed domain vocabulary (`src/commands/glossary/index.ts`, backend `/api
 
 ### `ib perf` — SQL slow-query monitoring
 
-`src/commands/perf/index.ts` — four `tier:"developer"` leaves over the EXISTING `/api/admin/slow-queries*` routes (the routes predate the group, but `bufferedCount` and a buffer-derived, nullable `since` need puminet5api with fb#2618 (cl#3377), and `stats.last24h` needs cl#3376; older backends return `totalCount` / `totalSlowQueries` instead and a `since` that was a start-time key or "now", never null): `ib dev perf --help`. Coverage: every SQL request since puminet5api cl#3378 (fb#2617); older backends time only `executeQuery`-path procs. The perf routes cannot say which applies (`--stats` can — see below).
+`src/commands/perf/index.ts` — four `tier:"developer"` leaves over the EXISTING `/api/admin/slow-queries*` routes (the routes predate the group, but `bufferedCount` and a buffer-derived, nullable `since` need puminet5api with fb#2618 (cl#3377), and `stats.last24h` needs cl#3376; older backends return `totalCount` / `totalSlowQueries` instead and a `since` that was a start-time key or "now", never null): `ib dev perf --help`. Coverage: every SQL request since puminet5api cl#3378 (fb#2617); older backends time only `executeQuery`-path procs. `slow` and `stats` carry `unavailable: true` when the backend could not read the Redis buffer (puminet5api fb#2621, passed through by fb#2625): an empty result then means unknown, not none. The perf routes cannot say which applies (`--stats` can — see below).
 
 ### Global `--stats` flag
 

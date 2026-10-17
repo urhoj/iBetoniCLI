@@ -239,7 +239,7 @@ function readableColumnCount(n: number): number {
 /**
  * ListEnvelope's own keys. Anything ELSE on a list envelope is command-specific
  * context a run* function chose to surface — `statsSince` on `schema indexes`,
- * `bufferedCount`/`since`/`environment` on `perf slow`. Scalars among them render as one
+ * `bufferedCount`/`since`/`environment`/`unavailable` on `perf slow`. Scalars among them render as one
  * dim line above the table: context that changes how the table is READ (zero
  * counters after a stats reset) must not be JSON-only. `hint` stays out —
  * warnIfTruncated already voices it on stderr.

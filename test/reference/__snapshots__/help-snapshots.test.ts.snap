@@ -5196,7 +5196,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { bufferedCount?, since?, environment? } (+truncated:true when the page filled the limit)
+  ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { bufferedCount?, since?, environment?, unavailable? } (+truncated:true when the page filled the limit; unavailable:true = the backend could not read the Redis buffer, so an empty list means unknown, not none)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer
@@ -5222,7 +5222,7 @@ exports[`Help snapshots — contract stability > help for ib dev perf stats matc
   ib dev perf stats [flags]
 
 DESCRIPTION
-  Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, last24h summary — all over the ring buffer (at most maxEntries, default 100), with bufferedCount and since = the oldest buffered entry (null when empty). Developer-only.
+  Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, last24h summary — all over the ring buffer (at most maxEntries, default 500), with bufferedCount and since = the oldest buffered entry (null when empty); unavailable:true when the backend could not read the buffer. Developer-only.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -5233,7 +5233,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { bufferedCount, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, last24h:{ count, avgMs, maxMs, topProcedures }, since, threshold, sentryThreshold, environment }
+  { bufferedCount, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, last24h:{ count, avgMs, maxMs, topProcedures }, since, threshold, sentryThreshold, environment, unavailable? }
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -10589,7 +10589,7 @@ FLAGS
   --person NUMBER    Recipient personId in the active company (required)
   --channel STRING    push | email (SMS uses message sms send) (required)
   --message STRING    Plain text, 1-1000 characters after trimming (required)
-  --subject STRING    Push title or email subject; default Viesti, trimmed to 200 characters
+  --subject STRING    Push title or email subject; default 'Viesti: <company name>' (bare 'Viesti' without one), trimmed to 200 characters
   --from-json STRING    Read this command's flags from a JSON object in a file (or - for stdin) — keys take either spelling (kebab or camelCase). Shell-safe for prose on Windows PowerShell (splits quoted/multi-line values into separate args); an explicit flag wins over the file, and a REQUIRED flag may be supplied this way. The write-safety trio (--dry-run/--idempotency-key/--reason) is never a JSON key — use argv.
 
 WRITE-SAFETY FLAGS
@@ -10603,12 +10603,12 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { smsLogId:number|null, status:'sent', channel:'push'|'email', target:'push'|maskedEmail }. With --dry-run: { dryRun:true, personId, channel, target }. On 422: { error, smsLogId, status:'failed' }.
+  { smsLogId:number|null, status:'sent', channel:'push'|'email', target:'push'|maskedEmail }. With --dry-run: { dryRun:true, personId, channel, target }. On 422: { success:false, message, error } — an error starting 'Lähetyksen tila on epävarma' means the provider never answered and the message may have been delivered: do not resend.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  Validation             → pass --channel push or --channel email
-  exit 4 (HTTP 400)  Validation             → message must be non-empty and at most 1000 characters; email requires a recipient email address
+  exit 4 (HTTP 400)  Validation             → message must be non-empty and at most 1000 characters; email requires a recipient email address AND an email on the calling person (person.personEmail, used as reply-to)
   exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer
   exit 5 (HTTP 404)  Not found              → personId is not reachable in the active company
   exit 4 (HTTP 422)  Send failed            → inspect the error and message history before retrying; delivery may be partial or uncertain
@@ -10617,7 +10617,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS remains blocked on all AI bridges.
-  - --dry-run validates text and recipient but sends/logs nothing; it does not test delivery or guarantee a push device is reachable.
+  - --dry-run validates text, recipient and (for email) the sender's own email but sends/logs nothing; it does not test delivery or guarantee a push device is reachable.
   - Use --idempotency-key for retries. After a timeout, check message sms list before resending.
   - --from-json accepts person, channel, message and subject; explicit flags win. Write-safety flags stay on argv.
 
