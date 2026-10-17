@@ -97,7 +97,7 @@ const SERVER_ENUM_NOTE =
 const REPO_FLAG_DESC =
   "Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. `--repo \"puminet5api,betonicli\"`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via `npm run final`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none.";
 const AREA_FLAG_DESC =
-  "Code LAYER, not the feature: frontend|backend|cli|database|cicd|workspace|site (the repo goes in --repo). Not `ib dev feedback --scope` (the product surface): sms/ops/jerry/security are not areas.";
+  "Code LAYER, not the feature (sms/orders are not areas): frontend|backend|cli|database|cicd|workspace|site; the repo goes in --repo. Not `ib dev feedback --scope` (ops/jerry/security).";
 // Scope-shaped values agents predictably pass to --area (`ib dev feedback
 // --scope` accepts these). The remedy string is built from the key at the call
 // site. No `jerry` entry: AREA_REPO_REMEDIES below also carries `jerry` and
@@ -383,7 +383,7 @@ export function validateEnums(
   if (area !== undefined && !AREAS.includes(area)) {
     const lower = area.toLowerCase();
     const repoRemedy = AREA_REPO_REMEDIES[lower];
-    const firstRepo = (repo ?? "").split(",")[0].trim().toLowerCase();
+    const firstRepo = normalizeRepoCsv(repo).canonical.split(",")[0];
     const layer = REPO_DEFAULT_AREA[firstRepo];
     problems.push({
       flag: "--area",

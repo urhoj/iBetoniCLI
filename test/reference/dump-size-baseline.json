@@ -6,9 +6,9 @@
     "Never raise a ceiling casually; adding or raising an entry is a reviewed decision made in the same PR as the growth."
   ],
   "ceilings": {
-    "ib dev changelog add": 11509,
+    "ib dev changelog add": 11496,
     "ib dev feedback create": 8981,
-    "ib dev changelog update": 10937,
+    "ib dev changelog update": 10924,
     "ib dev feedback list": 8999,
     "ib keikka update": 9186,
     "ib dev feedback update": 8196,

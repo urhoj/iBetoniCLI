@@ -369,6 +369,13 @@ describe("--area repo-name remedy (fb#212)", () => {
     );
     expect(err.body?.problems?.[0]?.remedy).toContain("for --repo puminet5api that is usually `--area backend`");
   });
+
+  test("a --repo alias resolves before the layer lookup (fb#2659)", () => {
+    const err = captureThrow(() =>
+      validateEnums(undefined, "sms", undefined, undefined, undefined, "ib dev changelog add", ",be")
+    );
+    expect(err.body?.problems?.[0]?.remedy).toContain("for --repo puminet5api that is usually `--area backend`");
+  });
 });
 
 describe("changelog description input and area vocabulary", () => {
