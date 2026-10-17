@@ -63,25 +63,45 @@ export interface CustomerFkSetResult {
   sourceId: number;
   key: string;
   action: "inserted" | "updated" | "unchanged";
+  /** The key an `updated` overwrote (fb#2642). */
+  replacedKey?: string;
 }
 
 export async function runCustomerFkSet(
   client: ApiClient,
   asiakasId: number,
-  input: { source: string; key: string; owner?: number },
+  input: { source: string; key: string; owner?: number; replace?: boolean },
   flags: WriteFlags
 ): Promise<MaybeDryRun<CustomerFkSetResult>> {
   const owner = resolveOwner(client, input.owner);
   const [source, existing] = await Promise.all([resolveFkSource(client, owner, input.source), fetchCustomerFks(client, asiakasId, owner)]);
-  const row = existing.find((r) => r.sourceId === source.foreignKeySourceId);
+  const onSource = existing.filter((r) => r.sourceId === source.foreignKeySourceId);
+  const row = onSource[0];
   const key = input.key.trim();
+  // fb#2642: replacing a different key silently wiped an order-book alias
+  // ('srg' on SRV 1469). A replace must be asked for; several rows on the
+  // source are an alias list the backend UPDATE would collapse, so never.
+  if (onSource.length > 1 && !onSource.some((r) => r.key === key)) {
+    failWith(
+      `customer ${asiakasId} holds ${onSource.length} keys on source ${source.name} (${onSource.map((r) => `"${r.key}"`).join(", ")}) — \`fk set\` cannot replace one of several; append with \`ib customer fk add ${asiakasId} --source ${source.name} --key "${key}"\`, or \`fk remove\` the old one first`,
+      4
+    );
+  }
+  if (row && row.key !== key && onSource.length === 1 && !input.replace) {
+    failWith(
+      `customer ${asiakasId} already holds key "${row.key}" on source ${source.name} — \`fk set\` would REPLACE it. Keep both: \`ib customer fk add ${asiakasId} --source ${source.name} --key "${key}"\`; replace on purpose: add --replace`,
+      4
+    );
+  }
+  const unchanged = onSource.some((r) => r.key === key);
   const result: CustomerFkSetResult = {
     asiakasId,
     ownerAsiakasId: owner,
     source: source.name,
     sourceId: source.foreignKeySourceId,
     key,
-    action: !row ? "inserted" : row.key === key ? "unchanged" : "updated",
+    action: !row ? "inserted" : unchanged ? "unchanged" : "updated",
+    ...(row && !unchanged ? { replacedKey: row.key } : {}),
   };
   if (flags.dryRun) return dryRunOr(flags, result);
   if (result.action !== "unchanged") {
@@ -331,10 +351,13 @@ export function registerCustomerFkCommands(customer: Command, getClient: () => P
 
   addWriteFlagsToCommand(
     addOwnerOption(
-      addAsiakasTargetOption(fk.command("set [asiakasId]")).requiredOption("--source <ref>").requiredOption("--key <text>")
+      addAsiakasTargetOption(fk.command("set [asiakasId]"))
+        .requiredOption("--source <ref>")
+        .requiredOption("--key <text>")
+        .option("--replace")
     )
   ).action(
-    guarded(async (idStr: string | undefined, opts: WriteFlags & { asiakas?: number; owner?: number; source: string; key: string }) => {
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { asiakas?: number; owner?: number; source: string; key: string; replace?: boolean }) => {
       writeJson(await runCustomerFkSet(await getClient(), resolveAsiakasTarget(idStr, opts.asiakas), opts, opts));
     })
   );

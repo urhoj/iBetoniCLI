@@ -50,10 +50,32 @@ describe("customer fk", () => {
     const c2 = client([ROW]);
     expect(await runCustomerFkSet(c2, 1234, { source: "3", key: "F-1001", owner: 8 }, {})).toMatchObject({ action: "unchanged" });
     expect(c2.post).not.toHaveBeenCalled();
-    expect(await runCustomerFkSet(c2, 1234, { source: "3", key: "F-2", owner: 8 }, { dryRun: true })).toEqual({
+    expect(await runCustomerFkSet(c2, 1234, { source: "3", key: "F-2", owner: 8, replace: true }, { dryRun: true })).toEqual({
       dryRun: true,
-      would: expect.objectContaining({ action: "updated", key: "F-2" }),
+      would: expect.objectContaining({ action: "updated", key: "F-2", replacedKey: "F-1001" }),
     });
+    expect(c2.post).not.toHaveBeenCalled();
+  });
+
+  test("fb#2642: replacing a different key needs --replace; several keys on the source are never replaced", async () => {
+    const c = client([ROW]);
+    await expect(runCustomerFkSet(c, 1234, { source: "fennoa", key: "F-2", owner: 8 }, {})).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringContaining('already holds key "F-1001"'),
+    });
+    expect(c.post).not.toHaveBeenCalled();
+    expect(await runCustomerFkSet(c, 1234, { source: "fennoa", key: "F-2", owner: 8, replace: true }, {})).toMatchObject({
+      action: "updated",
+      replacedKey: "F-1001",
+    });
+    expect(c.post).toHaveBeenCalledTimes(1);
+
+    const c2 = client([ROW, { ...ROW, asiakasForeignKeyId: 56, foreignKey: "F-1002" }]);
+    await expect(runCustomerFkSet(c2, 1234, { source: "fennoa", key: "F-3", owner: 8, replace: true }, {})).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringContaining("cannot replace one of several"),
+    });
+    expect(await runCustomerFkSet(c2, 1234, { source: "fennoa", key: "F-1002", owner: 8 }, {})).toMatchObject({ action: "unchanged" });
     expect(c2.post).not.toHaveBeenCalled();
   });
 

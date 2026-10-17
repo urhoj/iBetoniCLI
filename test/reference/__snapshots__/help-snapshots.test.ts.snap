@@ -1658,7 +1658,7 @@ exports[`Help snapshots — contract stability > help for ib customer fk set mat
   ib customer fk set [<asiakasId>] --source <source> --key <key> [flags]
 
 DESCRIPTION
-  Set a customer's ONE foreign key on a source, REPLACING any existing key there (server upsert keyed by customer + source + owner) — for a single external id such as an accounting-system number. To keep several keys on one source (order-book name spellings) use \`fk add\`. The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).
+  Set a customer's ONE foreign key on a source (server upsert keyed by customer + source + owner) — for a single external id such as an accounting-system number. Replacing a DIFFERENT existing key needs --replace (fb#2642); to keep several keys on one source (order-book name spellings) use \`fk add\`. The existing rows are read first so the result names the action and an identical key sends nothing. --dry-run resolves client-side (the route has no server dry-run).
   Permissions: requires edit-tier company role on the owner tenant.
 
 ARGUMENTS
@@ -1668,6 +1668,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
   --source STRING    foreignKeySources row, by NAME (case-insensitive) or numeric id — \`fk sources\` lists them (required)
   --key STRING    The foreign key value (external id / nickname); trimmed (required)
+  --replace    Allow overwriting the customer's existing, different key on this source (refused without it)
   --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 WRITE-SAFETY FLAGS
@@ -1680,13 +1681,15 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged } · dry-run: { dryRun:true, would:{ …same } }
+  { asiakasId, ownerAsiakasId, source, sourceId, key, action: inserted|updated|unchanged, replacedKey? } · dry-run: { dryRun:true, would:{ …same } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (client-side)  --owner is not an integer >= 1, rejected locally before any request → pass a positive ownerAsiakasId, or omit it to use the active company
   exit 4 (client-side)  No --owner given and the token carries no active company → pass --owner <id>, or run \`ib auth switch <asiakasId>\`
   exit 4 (client-side)  --source names no row in the owner's source list (the message lists the valid names + ids) → pick one of the listed names, or check \`--owner\` — sources are per tenant (plus the global ones)
+  exit 4 (client-side)  The customer already holds a different key on this source; \`set\` would overwrite it → keep both with \`ib customer fk add\`, or pass --replace to overwrite on purpose
+  exit 4 (client-side)  The customer holds several keys on this source (an alias list) → append with \`ib customer fk add\`, or \`ib customer fk remove\` the old key first
   exit 6 (client-side)  The backend answered 200 with { success:false } — usually the UNIQUE (foreignKey, owner) index: that key already belongs to another customer of this owner → find the holder with \`ib customer fk list <other> --owner <id>\` and remove it, or use a different key
   exit 5 (HTTP 404)  Customer neither owned by --owner nor self-owned (fb#2034) → use a customer of --owner, or a company's own row
   exit 4 (HTTP 400)  Missing asiakasId / source / key / owner → pass all four
