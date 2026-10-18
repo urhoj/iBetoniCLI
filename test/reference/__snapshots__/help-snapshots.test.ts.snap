@@ -1252,7 +1252,7 @@ FLAGS
   --ytunnus STRING    Business ID (yTunnus) — required unless --from-prh/--body supplies it
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
-  --from-prh STRING    Prefill name + yTunnus + billing address from PRH for this business ID
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): prefill name + yTunnus + billing address from PRH
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
@@ -1300,7 +1300,7 @@ DESCRIPTION
 
 FLAGS
   --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
-  --from-prh STRING    Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): use it as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)
   --name STRING    Customer name (asiakasNimi)
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
@@ -2253,7 +2253,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
-  --from-prh STRING    Refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 

@@ -12,6 +12,11 @@
 import type { ApiClient } from "./api/client.js";
 import { listEnvelope, type ListEnvelope } from "./api/envelopes.js";
 import { qs } from "./api/query.js";
+import { failUsage } from "./output/json.js";
+
+// The backend's own rule (prhService.validateBusinessId). A company NAME passed here
+// got only "Invalid business ID format" back, with no way to find the id (fb#2685).
+const BUSINESS_ID = /^\d{7,8}-\d$/;
 
 /** Flat PRH company shape (mirrors backend formatCompanyData). */
 export interface PrhCompany {
@@ -42,6 +47,9 @@ export async function runPrhById(
   client: ApiClient,
   ytunnus: string
 ): Promise<PrhCompany> {
+  if (!BUSINESS_ID.test(ytunnus)) {
+    failUsage(`"${ytunnus}" is not a business ID (Y-tunnus, e.g. 0145937-9)`, `find it by name: ib opendata prh --search "${ytunnus}"`);
+  }
   const res = await client.get<{ data: PrhCompany }>(
     `/api/prh/company/${encodeURIComponent(ytunnus)}`
   );
