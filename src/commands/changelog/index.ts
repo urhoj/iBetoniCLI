@@ -506,15 +506,18 @@ function filesToJson(csv: string): string {
 }
 
 /**
- * Resolve --sha from itself or its --commit alias (feedback #210 — commit SHAs
- * are near-universally called "commit", so first tries reach for --commit).
- * Both may be given only when they agree. Shared by `add` and `update`; fold in
- * BEFORE validateFieldLengths so the 500-char sha cap applies to the alias too.
+ * Resolve --sha from itself or its --commit / --commit-shas aliases (feedback
+ * #210 — commit SHAs are near-universally called "commit", so first tries reach
+ * for --commit; fb#2679 — `commitShas` is the READ field name, so a caller
+ * copying it from `list`/`get` reaches for --commit-shas). Several may be given
+ * only when they agree. Shared by `add` and `update`; fold in BEFORE
+ * validateFieldLengths so the 500-char sha cap applies to the aliases too.
  */
-export function resolveShaAlias(sha?: string, commit?: string): string | undefined {
-  if (sha !== undefined && commit !== undefined && sha.trim() !== commit.trim())
-    failWith("--commit is an alias for --sha — pass one, or identical values", 4);
-  return sha ?? commit;
+export function resolveShaAlias(sha?: string, commit?: string, commitShas?: string): string | undefined {
+  const given = [sha, commit, commitShas].filter((v): v is string => v !== undefined);
+  if (new Set(given.map((v) => v.trim())).size > 1)
+    failWith("--commit and --commit-shas are aliases for --sha — pass one, or identical values", 4);
+  return given[0];
 }
 
 /**
@@ -692,7 +695,10 @@ const CHANGELOG_FROM_JSON: FromJsonConfig = {
   // loudly rejected as unknown (fb#541). No capability is lost — --no-resolve is a
   // valueless flag, so it has no shell-quoting problem and every caller that needs
   // --from-json for its prose can still pass --no-resolve on argv alongside it.
-  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve", "takeResolve"]),
+  // `commitShas` is the --commit-shas ARGV alias (fb#2679). Excluded so its
+  // attribute does not shadow the read-shape alias below: a JSON `commitShas`
+  // key must keep mapping to `sha`, the one flag the payload advertises.
+  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve", "takeResolve", "commitShas"]),
   readShapeAliases: READ_SHAPE_KEY_ALIASES,
   numericFields: new Set([]),
   // fb#576: --feedback is now CSV (a single id or several); csvFields is the
@@ -1069,6 +1075,7 @@ export function registerChangelogCommands(
       .option("--repo <r>", REPO_FLAG_DESC)
       .option("--sha <csv>")
       .option("--commit <csv>")
+      .option("--commit-shas <csv>")
       .option("--vtag <s>")
       .option("--bump-level <l>", "", "patch")
       .option("--feedback <ids>", "", intCsvFlag("--feedback"))
@@ -1099,7 +1106,7 @@ export function registerChangelogCommands(
       normalizeChangelogEnums(o);
       requireAddFields(description, o as Record<string, unknown>);
       validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog add", o.repo);
-      o.sha = resolveShaAlias(o.sha, o.commit)!;
+      o.sha = resolveShaAlias(o.sha, o.commit, o.commitShas)!;
       validateFieldLengths(o);
       const entryDate = resolveDate(o.date || "today")!;
       const body: ChangelogAddBody = {
@@ -1260,6 +1267,7 @@ export function registerChangelogCommands(
       .option("--repo <r>")
       .option("--sha <csv>")
       .option("--commit <csv>")
+      .option("--commit-shas <csv>")
       .option("--vtag <s>")
       // NO default, unlike `add`'s --bump-level (feedback #303). A Commander
       // default here would ride along on every unrelated patch — `update 7
@@ -1305,7 +1313,7 @@ export function registerChangelogCommands(
         failWith("--append-description and --description (or --summary/--body) are mutually exclusive", 4);
       }
     }
-    o.sha = resolveShaAlias(o.sha, o.commit)!;
+    o.sha = resolveShaAlias(o.sha, o.commit, o.commitShas)!;
     validateFieldLengths(o);
     client ??= await getClient();
     // Read-merge-write: --description REPLACES the entry, which is destructive
@@ -1467,8 +1475,9 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: REPO_FLAG_DESC },
-      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`, not `sha` (fb#1431)" },
-      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV), read back as `commitShas`; if both are given, they must match" },
+      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`" },
+      { name: "commit", type: "string", description: "Alias for --sha" },
+      { name: "commit-shas", type: "string", description: "Alias for --sha" },
       { name: "vtag", type: "string", description: "Version tag" },
       { name: "bump-level", type: "string", default: "patch", allowed: BUMP_LEVELS, description: "App version bump this implies: none|patch|minor|major" },
       {
@@ -1784,8 +1793,9 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "severity", type: "string", description: SEVERITY_FLAG_DESC, allowed: [...SEVERITIES], synonyms: SEVERITY_SYNONYMS },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: "Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one" },
-      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`, not `sha` (fb#1431)" },
-      { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV), read back as `commitShas`; if both are given, they must match" },
+      { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`" },
+      { name: "commit", type: "string", description: "Alias for --sha" },
+      { name: "commit-shas", type: "string", description: "Alias for --sha" },
       { name: "vtag", type: "string", description: "Version tag" },
       {
         name: "bump-level",

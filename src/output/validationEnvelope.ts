@@ -57,7 +57,19 @@ function bareName(flag: string): string {
   return flag.replace(/^-+/, "").trim();
 }
 
-/** Human one-line summary listing the missing/invalid flags. */
+/**
+ * Hint used instead of {@link USAGE_HINT} when EVERY problem already carries its
+ * allowed values (fb#2680): sending the caller to `--help` for values that are
+ * in this very envelope cost a round-trip.
+ */
+export const ALLOWED_VALUES_HINT =
+  "usage error — the accepted values are in problems[].allowed (and the error text); re-run with one of them";
+
+/**
+ * Human one-line summary listing the missing/invalid flags. Each invalid value
+ * names its allowed values inline (fb#2680) — `error` is the field a caller
+ * reads first, and a bare "invalid value: --area=orders" read as no guidance.
+ */
 function summarize(commandPath: string, problems: FlagProblem[]): string {
   const missing = problems.filter((p) => p.issue === "missing").map((p) => p.flag);
   const invalid = problems.filter((p) => p.issue === "invalid");
@@ -69,7 +81,7 @@ function summarize(commandPath: string, problems: FlagProblem[]): string {
   if (invalid.length)
     parts.push(
       `invalid ${invalid.length === 1 ? "value" : "values"}: ${invalid
-        .map((p) => `${p.flag}=${p.got ?? ""}`)
+        .map((p) => `${p.flag}=${p.got ?? ""}${p.allowed?.length ? ` (allowed: ${p.allowed.join("|")})` : ""}`)
         .join(", ")}`
     );
   return `${parts.join("; ") || "invalid arguments"} for ${commandPath}`;
@@ -110,6 +122,6 @@ export function buildValidationEnvelope(
     statusCode: 0,
     problems: enriched,
     ...(sample ? { sample } : {}),
-    hint: USAGE_HINT,
+    hint: enriched.every((p) => p.allowed?.length) ? ALLOWED_VALUES_HINT : USAGE_HINT,
   };
 }

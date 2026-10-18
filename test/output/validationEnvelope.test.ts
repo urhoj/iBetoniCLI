@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import {
   buildValidationEnvelope,
   USAGE_HINT,
+  ALLOWED_VALUES_HINT,
   type FlagProblem,
 } from "../../src/output/validationEnvelope.js";
 import type { CommandSpec } from "../../src/output/help.js";
@@ -77,5 +78,21 @@ describe("buildValidationEnvelope", () => {
     ]);
     expect(env.error).toContain("missing required flag: --title");
     expect(env.error).toContain("invalid value: --mode=warp");
+  });
+
+  test("summary names the allowed values inline and the hint points at them (fb#2680)", () => {
+    const env = buildValidationEnvelope("ib demo run", [
+      { flag: "--mode", issue: "invalid", got: "warp", allowed: ["fast", "slow"] },
+    ]);
+    expect(env.error).toBe("invalid value: --mode=warp (allowed: fast|slow) for ib demo run");
+    expect(env.hint).toBe(ALLOWED_VALUES_HINT);
+  });
+
+  test("hint stays generic when any problem lacks allowed values", () => {
+    const env = buildValidationEnvelope("ib demo run", [
+      { flag: "--mode", issue: "invalid", got: "warp", allowed: ["fast"] },
+      { flag: "--title", issue: "missing" },
+    ]);
+    expect(env.hint).toBe(USAGE_HINT);
   });
 });

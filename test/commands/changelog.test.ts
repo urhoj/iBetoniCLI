@@ -905,7 +905,11 @@ describe("changelog --commit alias for --sha (fb#210)", () => {
     expect(resolveShaAlias(undefined, "abc")).toBe("abc");
     expect(resolveShaAlias(undefined, undefined)).toBeUndefined();
     expect(resolveShaAlias("abc", "abc")).toBe("abc");
-    expect(() => resolveShaAlias("abc", "def")).toThrow(/alias for --sha/);
+    expect(() => resolveShaAlias("abc", "def")).toThrow(/aliases for --sha/);
+    // fb#2679: --commit-shas mirrors the read field name.
+    expect(resolveShaAlias(undefined, undefined, "abc")).toBe("abc");
+    expect(resolveShaAlias("abc", undefined, " abc ")).toBe("abc");
+    expect(() => resolveShaAlias(undefined, "abc", "def")).toThrow(/aliases for --sha/);
   });
 
   test("add accepts --commit and POSTs it as commitShas", async () => {

@@ -3641,8 +3641,9 @@ FLAGS
   --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. \`--repo "puminet5api,betonicli"\`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via \`npm run final\`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none. (max 200 chars)
-  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\`, not \`sha\` (fb#1431) (max 500 chars)
-  --commit STRING    Alias for --sha — Commit SHAs (CSV), read back as \`commitShas\`; if both are given, they must match
+  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\` (max 500 chars)
+  --commit STRING    Alias for --sha
+  --commit-shas STRING    Alias for --sha
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback STRING    cliFeedback id(s) to link — a single id or CSV (\`541,542\`), \`fb#\` anchors accepted. Role \`resolves\` (default) advances an \`open\` row to applied; a deliberately-set status (e.g. \`reviewed\`) is preserved and reported on stderr (fb#517/576). Linking an ALREADY-resolved row keeps its resolver by DEFAULT — a cross-reference, stderr says so (fb#880); --take-resolve re-owns it (fb#366). resolveFeedback is per-REQUEST: one already-resolved id demotes the WHOLE call.
@@ -3963,8 +3964,9 @@ FLAGS
   --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one (max 200 chars)
-  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\`, not \`sha\` (fb#1431) (max 500 chars)
-  --commit STRING    Alias for --sha — Commit SHAs (CSV), read back as \`commitShas\`; if both are given, they must match
+  --sha STRING    Commit SHAs (CSV); read back as \`commitShas\` (max 500 chars)
+  --commit STRING    Alias for --sha
+  --commit-shas STRING    Alias for --sha
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
   --feedback STRING    cliFeedback id(s) to link — a single id or CSV, \`fb#\` anchors accepted. \`update\` is the CORRECTION path: it records/repairs the link and NEVER changes the row's status (fb#578) — close a row with \`ib dev feedback resolve <id> --status applied\`; \`changelog add\` is what advances rows. Linking an ALREADY-resolved row TAKES it (stderr names the displaced entry); hand-written and \`Shipped:\` notes are preserved (fb#366/576).
