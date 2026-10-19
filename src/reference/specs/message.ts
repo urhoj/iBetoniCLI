@@ -619,10 +619,10 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib message driver channels",
-    description: "Available manual-message channels for one person in the active company: push device count and masked email. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required.",
+    description: "Available manual-message channels for one person in the active company: push device count, masked email and masked SMS number. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.",
     auth: "any",
     flags: [{ name: "person", type: "number", required: true, description: "Recipient personId in the active company" }],
-    outputShape: "{ pushDevices:number, email:string|null } — email is masked; zero devices means push is unavailable.",
+    outputShape: "{ pushDevices:number, email:string|null, sms:string|null, smsUnavailable:'not-allowed'|'no-phone'|'invalid-phone'|null } — email and sms are masked; zero devices means push is unavailable; smsUnavailable says why sms is null (null with sms null = the HAS_SMS check could not be made).",
     errors: [
       PERSON_PARSE_ERR,
       apiErr(403, "Permission denied", "requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer"),
@@ -645,7 +645,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ smsLogId:number|null, status:'sent', channel:'push'|'email', target:'push'|maskedEmail }. With --dry-run: { dryRun:true, personId, channel, target }. On 422: { success:false, message, error } — an error starting 'Lähetyksen tila on epävarma' means the provider never answered and the message may have been delivered: do not resend.",
+    outputShape: "{ smsLogId:number|null, status:'sent', channel:'push'|'email', target:'push'|maskedEmail }. With --dry-run: { dryRun:true, personId, channel, target }. On 422: { error, smsLogId, status:'failed'|'unknown' } — status 'unknown' (error starting 'Lähetyksen tila on epävarma') means the provider never answered and the message may have been delivered: do not resend.",
     errors: [
       PERSON_PARSE_ERR,
       { origin: "client", exit: 4, meaning: "Validation", remedy: "pass --channel push or --channel email", match: "--channel" },
