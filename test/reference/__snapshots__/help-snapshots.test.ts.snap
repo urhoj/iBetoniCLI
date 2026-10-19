@@ -1766,6 +1766,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  asiakasId 0 exists but is the shared/yhteinen sentinel (ownerAsiakasId NULL), not a customer — refused locally before any request (fb#1405) → there is no customer to fetch; the sentinel's rows surface through their consumers, e.g. \`ib betoni laatu list --shared-only\`
+  exit 5 (HTTP 404)  Customer was merged into another (soft-deleted by the merge; fb#2686) → re-run \`ib customer get\` with the asiakasId the message names
+  exit 5 (HTTP 404)  Customer was deleted (soft-deleted, not merged) → the id is right but the customer is gone; it no longer appears in lists
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read

@@ -88,6 +88,8 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, ownerAsiakasId, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }",
     errors: [
       { origin: "client", exit: 4, match: "asiakasId 0 is the shared (yhteinen) sentinel row", meaning: "asiakasId 0 exists but is the shared/yhteinen sentinel (ownerAsiakasId NULL), not a customer — refused locally before any request (fb#1405)", remedy: "there is no customer to fetch; the sentinel's rows surface through their consumers, e.g. `ib betoni laatu list --shared-only`" },
+      apiErr(404, "Customer was merged into another (soft-deleted by the merge; fb#2686)", "re-run `ib customer get` with the asiakasId the message names", "was merged into"),
+      apiErr(404, "Customer was deleted (soft-deleted, not merged)", "the id is right but the customer is gone; it no longer appears in lists", "was deleted on"),
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.read"),
     ],
