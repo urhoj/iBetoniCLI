@@ -11789,7 +11789,7 @@ exports[`Help snapshots — contract stability > help for ib opendata weather to
 
 DESCRIPTION
   Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.
-  Auth: requires login (any authenticated user).
+  Permissions: requires company admin or owner of the active company, or system admin (fb#2667).
 
 FLAGS
   --on    Enable the module

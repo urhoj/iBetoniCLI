@@ -277,7 +277,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
     command: "ib opendata weather toggle",
     description:
       "Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.",
-    auth: "any",
+    permissions: ["company admin or owner of the active company, or system admin (fb#2667)"],
     writeFlags: true,
     dryRunKind: "server",
     flags: [
