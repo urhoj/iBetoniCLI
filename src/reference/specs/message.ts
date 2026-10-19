@@ -595,6 +595,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       apiErr(403, "Permission denied", "company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin"),
       apiErr(404, "Not found", "personId is not in the active company"),
       apiErr(422, "Gateway rejected or no answer", "body.status 'failed': the gateway refused (error text carries its reason) — fix the cause before retrying, each send is billed. body.status 'unknown': no gateway answer within 15 s, the SMS MAY have been delivered — do NOT re-send until the recipient confirms. Both are logged in smsLog with that status"),
+      apiErr(429, "Rate limited / daily cap", "per-sender limit 20/min + 200/h, shared with message driver send (dry-runs not counted): wait and retry. Tenant SMS day cap (default 200 per Helsinki day; a dry-run reports it too): send a push or email via ib message driver send, or wait until tomorrow"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -651,6 +652,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       apiErr(403, "Permission denied", "requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer"),
       apiErr(404, "Not found", "personId is not reachable in the active company"),
       apiErr(422, "Send failed", "inspect the error and message history before retrying; delivery may be partial or uncertain"),
+      apiErr(429, "Rate limited", "per-sender limit 20/min + 200/h, shared with message sms send (dry-runs not counted): wait and retry"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
