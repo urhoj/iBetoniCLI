@@ -3,7 +3,10 @@
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
 import type { CommandSpec } from "../../output/help.js";
-import { ASIAKAS_TARGET_ERR, ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
+import { ASIAKAS_TARGET_ERR, ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, NOT_BUSINESS_ID_ERR, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
+
+// Shared start of the three --from-prh flag descriptions.
+const FROM_PRH = "Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with `ib opendata prh --search <name>`): ";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -122,7 +125,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "ytunnus", type: "string", description: "Business ID (yTunnus) — required unless --from-prh/--body supplies it" },
       { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
       { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
-      { name: "from-prh", type: "string", description: "Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with `ib opendata prh --search <name>`): prefill name + yTunnus + billing address from PRH" },
+      { name: "from-prh", type: "string", description: FROM_PRH + "prefill name + yTunnus + billing address from PRH" },
       { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
@@ -134,6 +137,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)",
     errors: [
+      NOT_BUSINESS_ID_ERR,
       apiErr(400, "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
@@ -163,7 +167,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
-      { name: "from-prh", type: "string", description: "Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with `ib opendata prh --search <name>`): refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)" },
+      { name: "from-prh", type: "string", description: FROM_PRH + "refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       FROM_JSON_BODY_FLAG,
     ],
@@ -173,6 +177,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     errors: [
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the primary contact", 0),
       intParseErr("--type", "pass a valid asiakasTypeId"),
+      NOT_BUSINESS_ID_ERR,
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
@@ -189,7 +194,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "ytunnus", type: "string", description: "Business ID key (yTunnus) — required unless --from-prh/--body supplies it" },
-      { name: "from-prh", type: "string", description: "Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with `ib opendata prh --search <name>`): use it as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)" },
+      { name: "from-prh", type: "string", description: FROM_PRH + "use it as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)" },
       { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
       { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
       { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
@@ -208,7 +213,8 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
     errors: [
       intParseErr("--contact-person", "pass a positive personId, or 0 to clear the primary contact", 0),
       intParseErr("--type", "pass a valid asiakasTypeId"),
-      apiErr(400, "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`"),
+      NOT_BUSINESS_ID_ERR,
+      { origin: "client", exit: 4, match: ["create-or-update requires", "ambiguous:"], meaning: "No ytunnus key, or >1 customers share the ytunnus (ambiguous) — raised locally", remedy: "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`" },
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: [

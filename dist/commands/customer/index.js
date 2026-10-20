@@ -16,7 +16,7 @@ import { registerPersonLinkCommands } from "../_shared/personLink.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
-import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
+import { assertBusinessId, runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 import { registerCustomerFkCommands, fetchCustomerFks } from "./fk.js";
@@ -127,6 +127,10 @@ export async function runCustomerByYtunnus(client, ytunnus) {
  */
 export async function runCustomerUpsert(client, opts, flags) {
     const prhYt = opts.fromPrh;
+    // Before the lookup: --from-prh is also the lookup key, and the update branch
+    // never calls PRH, so a NAME would otherwise be silently ignored (fb#2692).
+    if (prhYt)
+        assertBusinessId(prhYt);
     let key = (prhYt || opts.ytunnus || "").trim();
     if (!key) {
         try {

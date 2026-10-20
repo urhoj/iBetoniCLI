@@ -28,6 +28,7 @@ import { registerPersonLinkCommands, type PersonLinkBody } from "../_shared/pers
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
 import {
+  assertBusinessId,
   runPrhById as runCustomerPrhById,
   runPrhSearch as runCustomerPrhSearch,
   type PrhCompany,
@@ -260,6 +261,9 @@ export async function runCustomerUpsert(
   flags: WriteFlags
 ): Promise<Record<string, unknown>> {
   const prhYt = opts.fromPrh;
+  // Before the lookup: --from-prh is also the lookup key, and the update branch
+  // never calls PRH, so a NAME would otherwise be silently ignored (fb#2692).
+  if (prhYt) assertBusinessId(prhYt);
   let key = (prhYt || opts.ytunnus || "").trim();
   if (!key) {
     try {

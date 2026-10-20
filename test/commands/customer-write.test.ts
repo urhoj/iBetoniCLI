@@ -152,6 +152,14 @@ describe("runCustomerUpsert", () => {
     await expect(runCustomerUpsert(mockClient, {}, {})).rejects.toThrow(/requires/);
     expect(mockClient.get).not.toHaveBeenCalled();
   });
+
+  // fb#2692: a NAME in --from-prh used to reach the lookup and, on 1 match, was silently ignored.
+  test("--from-prh with a non-business-ID exits 4 before any lookup", async () => {
+    const err = await runCustomerUpsert(mockClient, { fromPrh: "Example Oy" }, {}).catch((e) => e);
+    expect(err.exitCode).toBe(4);
+    expect(err.message).toContain("not a business ID");
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
 });
 
 describe("runCustomerUpsert reconciles createY-dropped email/comment", () => {

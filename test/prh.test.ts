@@ -21,6 +21,25 @@ describe("runPrhById", () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  // fb#2692: near-ID input gets a format hint with the corrected ID, not a name search.
+  test.each([
+    ["01459379", "0145937-9"],
+    ["FI01459379", "0145937-9"],
+    ["0145937 9", "0145937-9"],
+    ["017282446", "01728244-6"],
+  ])("suggests the corrected ID for near-miss %s", async (input, fixed) => {
+    const get = vi.fn();
+    const err = await runPrhById(mockApiClient({ get }), input).catch((e) => e);
+    expect(err.exitCode).toBe(4);
+    expect(err.hint).toBe(`format is 7-8 digits, hyphen, check digit — did you mean ${fixed}?`);
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("a digit-only ID of the wrong length gets the format hint without a guess", async () => {
+    const err = await runPrhById(mockApiClient({ get: vi.fn() }), "1234567").catch((e) => e);
+    expect(err.hint).toBe("format is 7-8 digits, hyphen, check digit, e.g. 0145937-9");
+  });
+
   test("accepts the backend's 7- and 8-digit forms", async () => {
     const get = vi.fn().mockResolvedValue({ data: { businessId: "x", name: "X" } });
     await runPrhById(mockApiClient({ get }), "1728244-6");
