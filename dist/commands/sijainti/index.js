@@ -459,7 +459,8 @@ export function sijaintiRowMatches(row, query) {
  * Resolve a `--type` value to a numeric sijaintiTypeId against the
  * sijaintiTypes lookup. Numeric input passes through (an unknown id simply
  * matches no rows server-side). Names match the selite case-insensitively —
- * exact match wins, else a unique substring (e.g. "jäte" → Jäteasema); an
+ * exact match wins, else a unique substring (e.g. "betoni" → Betoniasema); a
+ * name that matches nothing is retried through {@link TYPE_NAME_ALIASES}; an
  * unknown or ambiguous name throws a validation error (exit 4) listing the
  * valid types so the caller can self-correct.
  */
@@ -472,6 +473,14 @@ function numericTypeId(input) {
     const n = Number(input);
     return Number.isInteger(n) && n > 0 ? n : undefined;
 }
+/**
+ * Everyday names that share no substring with the live selite (fb#2688):
+ * type 3 is "Ylijäämäbetonin vastaanottoasema", but drivers call it a
+ * jäteasema. Value = a substring of the real selite.
+ */
+const TYPE_NAME_ALIASES = {
+    jäteasema: "vastaanotto",
+};
 export function resolveSijaintiTypeId(
 // Declares only the two fields it reads, rather than the whole row: adding
 // `useJerry` to SijaintiTypeItem (fb#608) would otherwise have forced every
@@ -480,10 +489,15 @@ types, input) {
     const passthrough = numericTypeId(input);
     if (passthrough !== undefined)
         return passthrough;
-    const q = input.trim().toLowerCase();
     const named = types.filter((t) => !!t.selite);
-    const exact = named.filter((t) => t.selite.toLowerCase() === q);
-    const matches = exact.length > 0 ? exact : named.filter((t) => t.selite.toLowerCase().includes(q));
+    const find = (q) => {
+        const exact = named.filter((t) => t.selite.toLowerCase() === q);
+        return exact.length > 0 ? exact : named.filter((t) => t.selite.toLowerCase().includes(q));
+    };
+    const q = input.trim().toLowerCase();
+    let matches = find(q);
+    if (matches.length === 0 && TYPE_NAME_ALIASES[q])
+        matches = find(TYPE_NAME_ALIASES[q]);
     if (matches.length === 1)
         return matches[0].sijaintiTypeId;
     const valid = named.map((t) => `${t.sijaintiTypeId}=${t.selite}`).join(", ");

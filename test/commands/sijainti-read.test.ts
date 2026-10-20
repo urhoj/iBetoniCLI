@@ -388,6 +388,14 @@ describe("resolveSijaintiTypeId", () => {
   test("unique substring match (jäte → Jäteasema)", () => {
     expect(resolveSijaintiTypeId(TYPE_ITEMS, "jäte")).toBe(2);
   });
+  test("alias resolves when the live selite shares no substring (fb#2688)", () => {
+    const live = [
+      { sijaintiTypeId: 1, selite: "Betoniasema" },
+      { sijaintiTypeId: 3, selite: "Ylijäämäbetonin vastaanottoasema" },
+    ];
+    expect(resolveSijaintiTypeId(live, "jäteasema")).toBe(3);
+    expect(resolveSijaintiTypeId(live, "Jäteasema")).toBe(3);
+  });
   test("ambiguous substring → CliError exit 4 listing matches", () => {
     try {
       resolveSijaintiTypeId(TYPE_ITEMS, "asema");

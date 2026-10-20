@@ -39,14 +39,14 @@ export const HELP_SEARCH_SPECS: CommandSpec[] = [
       "A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.",
       "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.",
       "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up `ib <entity> get <id>`.",
-      "Sijainti is matched by name/address/typeName substring (type names like \"jäteasema\" match too) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.",
+      "Sijainti is matched by name/address/typeName substring (type names like \"vastaanotto\" match) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.",
       "--my-companies widens customer/worksite/person/keikka; vehicle stays active-company only (sijainti is always scope=all).",
     ],
     examples: [
       "ib search kamppi",
       "ib search 0401234567 --in person,keikka",
       "ib search \"Rudus\" --in customer --limit 10",
-      "ib search jäteasema --in sijainti",
+      "ib search vastaanotto --in sijainti",
     ],
   },
 ];
