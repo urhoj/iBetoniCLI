@@ -580,7 +580,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   {
     command: "ib message sms send",
     description:
-      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks, but only for a company they are a member of. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every send (and failure) is logged in smsLog and as an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
+      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks, but only for a company they are a member of. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every attempt, failed or unknown too, is logged in smsLog; only a successful send also writes an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
     auth: "any",
     flags: [
       { name: "person", type: "number", required: true, description: "Recipient personId (must belong to the active company)" },
