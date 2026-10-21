@@ -525,4 +525,21 @@ describe("ib dev betomik-orderbook day-messages enable / disable", () => {
     expect(spec).toMatchObject({ tier: "developer", writeFlags: true, dryRunKind: "server" });
     expect(spec!.errors!.some((e) => "http" in e && e.http === 403)).toBe(true);
   });
+
+  test("enable documents the 409 refusal (no run / failed stamp) as exit 4 with a remedy, and the already-on answer", () => {
+    const spec = COMMAND_SPECS.find((s) => s.command === "ib dev betomik-orderbook day-messages enable")!;
+    const err = new CliError("Ei tämän tai tulevan viikon tilauskirjan tuontia: aja synkronointi ensin. Päivän viestejä ei kytketty päälle.", 409, null, 4);
+    expect(spec.errors!.find((e) => "http" in e && e.http === 409)).toMatchObject({ exit: 4 });
+    expect(hintDetailForError(err, spec.errors).hint).toMatch(/sync/);
+    expect(spec.outputShape).toMatch(/baselineSkipped/);
+    expect(spec.notes!.join(" ")).toMatch(/right after a sync tick/);
+  });
+});
+
+describe("I2: DAY_MESSAGE_AUTO cannot be switched on through customer settings", () => {
+  test("ib customer settings names the enable command on its 403 (customer modules has no such key)", () => {
+    const spec = COMMAND_SPECS.find((s) => s.command === "ib customer settings")!;
+    const err = new CliError("Automaattisen päivän viestin (DAY_MESSAGE_AUTO) voi kytkeä päälle vain komennolla `ib dev betomik-orderbook day-messages enable`", 403, null, 3);
+    expect(hintDetailForError(err, spec.errors).hint).toMatch(/ib dev betomik-orderbook day-messages enable/);
+  });
 });

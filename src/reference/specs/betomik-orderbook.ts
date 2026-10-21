@@ -419,13 +419,15 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     flags: [],
     args: [],
-    outputShape: "{ runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — failed > 0 or dryRun = the module was NOT switched; changed false = it was already on.",
+    outputShape: "{ runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
+      { http: 409, exit: 4, meaning: "Refused, module stays off: no import run this ISO week or later, or a baseline stamp failed (body = the baseline summary)", remedy: "Run the sync tick first (no run), or re-run enable (failed stamps)" },
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked. A failed stamp leaves it off: re-run.",
+      "The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked.",
+      "Run it right after a sync tick: the baseline reads the stored import runs, so a \" k\" typed after the last tick is not stamped and the next tick sends it.",
     ],
     seeAlso: ["ib dev betomik-orderbook day-messages disable", "ib message driver day-status"],
     examples: ["ib dev betomik-orderbook day-messages enable --dry-run"],

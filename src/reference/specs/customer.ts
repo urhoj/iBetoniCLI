@@ -425,6 +425,7 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       ASIAKAS_TARGET_ERR,
       apiErr(400, "Unknown setting name, or name in both --set/--unset", "use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu"),
       { exit: 4, origin: "client", match: "gps-provider", meaning: "unknown --gps-provider: <value>", remedy: "pass ecofleet or mapon" },
+      { http: 403, exit: 3, match: "DAY_MESSAGE_AUTO", meaning: "DAY_MESSAGE_AUTO cannot be switched ON here, for any caller (switching it off is allowed)", remedy: "Use `ib dev betomik-orderbook day-messages enable`: it stamps the sheet baseline first" },
       apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,

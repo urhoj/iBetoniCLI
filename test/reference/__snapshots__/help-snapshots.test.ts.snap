@@ -2217,6 +2217,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No asiakasId given (or not a positive integer); the global --company is the acting-as context, not the target → pass <asiakasId> positionally or via --asiakas <id>
   exit 4 (HTTP 400)  Unknown setting name, or name in both --set/--unset → use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu
   exit 4 (client-side)  unknown --gps-provider: <value> → pass ecofleet or mapon
+  exit 3 (HTTP 403)  DAY_MESSAGE_AUTO cannot be switched ON here, for any caller (switching it off is allowed) → Use \`ib dev betomik-orderbook day-messages enable\`: it stamps the sheet baseline first
   exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2811,15 +2812,17 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — failed > 0 or dryRun = the module was NOT switched; changed false = it was already on.
+  { runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+  exit 4 (HTTP 409)  Refused, module stays off: no import run this ISO week or later, or a baseline stamp failed (body = the baseline summary) → Run the sync tick first (no run), or re-run enable (failed stamps)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked. A failed stamp leaves it off: re-run.
+  - The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked.
+  - Run it right after a sync tick: the baseline reads the stored import runs, so a " k" typed after the last tick is not stamped and the next tick sends it.
 
 SEE ALSO
   ib dev betomik-orderbook day-messages disable, ib message driver day-status

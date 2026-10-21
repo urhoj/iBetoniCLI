@@ -258,7 +258,8 @@ export async function runBetomikOrderbookTickRuns(client, { limit }) {
 /**
  * POST /api/betomik-orderbook/day-messages/enable | disable — the sheet " k" day-message switch
  * (DAY_MESSAGE_AUTO). enable stamps the cutover baseline first and switches on only when no stamp
- * failed; --dry-run plans the baseline and switches nothing. Sysadmin/developer only.
+ * failed (409 otherwise, or when there is no import run to baseline against; already on = no
+ * baseline, baselineSkipped); --dry-run plans the baseline and switches nothing. Sysadmin/developer only.
  */
 export async function runBetomikDayMessagesSwitch(client, action, flags) {
     return client.post(`/api/betomik-orderbook/day-messages/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
