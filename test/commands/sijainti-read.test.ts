@@ -395,6 +395,10 @@ describe("resolveSijaintiTypeId", () => {
     ];
     expect(resolveSijaintiTypeId(live, "jäteasema")).toBe(3);
     expect(resolveSijaintiTypeId(live, "Jäteasema")).toBe(3);
+    // fb#2745: inflections resolve; an inherited property is not an alias.
+    expect(resolveSijaintiTypeId(live, "jäteasemat")).toBe(3);
+    expect(resolveSijaintiTypeId(live, "jäteasemalle")).toBe(3);
+    expect(() => resolveSijaintiTypeId(live, "constructor")).toThrow(/Unknown sijainti type/);
   });
   test("ambiguous substring → CliError exit 4 listing matches", () => {
     try {
