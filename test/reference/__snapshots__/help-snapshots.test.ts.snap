@@ -1252,7 +1252,7 @@ FLAGS
   --ytunnus STRING    Business ID (yTunnus) — required unless --from-prh/--body supplies it
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
-  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): prefill name + yTunnus + billing address from PRH
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0112038-9 — not a name; find it with \`ib opendata prh --search <name>\`): prefill name + yTunnus + billing address from PRH
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
@@ -1274,7 +1274,7 @@ OUTPUT (JSON, stdout)
   flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01459379 / FI01459379) — refused locally before any request → pass the 1234567-8 form; the error hint names the corrected ID for a near-miss, or use \`ib opendata prh --search <name>\` for a name
+  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01120389 / FI01120389) — refused locally before any request → pass the 0112038-9 form; the error hint names the corrected ID for a near-miss whose check digit holds, or use \`ib opendata prh --search <name>\` for a name
   exit 4 (HTTP 400)  Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create → pass --ytunnus or --from-prh; for an ambiguous match use \`ib customer get <id>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -1284,9 +1284,9 @@ NOTES
   - --from-prh resolves a SOLE TRADER (toiminimi) too, via the EU VAT register (PRH excludes them). The name it prefills is then the owner's PERSONAL name, 'Owner Name / TRADENAME' — the legal invoicing name of a toiminimi, so usually right, but check before saving. Same for \`ib customer update\`/\`create-or-update\`. \`ib opendata prh <ytunnus>\` shows which registry answered.
 
 EXAMPLES
-  ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
+  ib customer create --from-prh 0112038-9 --email billing@x.fi --reason onboard
   ib customer create --name 'Example Oy' --ytunnus 1234567-8
-  ib customer create --from-prh 0145937-9 --get-or-create --reason onboard
+  ib customer create --from-prh 0112038-9 --get-or-create --reason onboard
 "
 `;
 
@@ -1301,7 +1301,7 @@ DESCRIPTION
 
 FLAGS
   --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
-  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): use it as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0112038-9 — not a name; find it with \`ib opendata prh --search <name>\`): use it as the key AND prefill name+yTunnus+billing address from PRH on create (a sole trader resolves via the EU VAT register, prefilling the owner personal name)
   --name STRING    Customer name (asiakasNimi)
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
@@ -1330,7 +1330,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the primary contact
   exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a valid asiakasTypeId
-  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01459379 / FI01459379) — refused locally before any request → pass the 1234567-8 form; the error hint names the corrected ID for a near-miss, or use \`ib opendata prh --search <name>\` for a name
+  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01120389 / FI01120389) — refused locally before any request → pass the 0112038-9 form; the error hint names the corrected ID for a near-miss whose check digit holds, or use \`ib opendata prh --search <name>\` for a name
   exit 4 (client-side)  No ytunnus key, or >1 customers share the ytunnus (ambiguous) — raised locally → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -2258,7 +2258,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
-  --from-prh STRING    Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with \`ib opendata prh --search <name>\`): refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)
+  --from-prh STRING    Business ID (Y-tunnus, e.g. 0112038-9 — not a name; find it with \`ib opendata prh --search <name>\`): refresh name + yTunnus + billing address from PRH, or from the EU VAT register for a sole trader (whose name is then the owner personal name) (explicit flags still win)
   --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the request body from a file (or - for stdin) instead of --body; the shell-safe route on Windows PowerShell, which splits an inline JSON value on its inner double-quotes. Mutually exclusive with --body.
 
@@ -2278,7 +2278,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --contact-person is not an integer >= 0, rejected locally before any request → pass a positive personId, or 0 to clear the primary contact
   exit 4 (client-side)  --type is not an integer >= 1, rejected locally before any request → pass a valid asiakasTypeId
-  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01459379 / FI01459379) — refused locally before any request → pass the 1234567-8 form; the error hint names the corrected ID for a near-miss, or use \`ib opendata prh --search <name>\` for a name
+  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01120389 / FI01120389) — refused locally before any request → pass the 0112038-9 form; the error hint names the corrected ID for a near-miss whose check digit holds, or use \`ib opendata prh --search <name>\` for a name
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
@@ -10897,7 +10897,7 @@ exports[`Help snapshots — contract stability > help for ib message sms send ma
   ib message sms send --person <person> --message <message> [flags]
 
 DESCRIPTION
-  Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks, but only for a company they are a member of. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every attempt, failed or unknown too, is logged in smsLog; only a successful send also writes an \`smsSent\` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.
+  Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks for the active company. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every message handed to the gateway is logged in smsLog (sent, failed or unknown); a send refused before that (bad text, unknown recipient, no phone, daily cap, --dry-run) writes no row. Only a successful send also writes an \`smsSent\` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -10920,7 +10920,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (HTTP 400)  Validation             → empty/too long/link in text, or person has no textable phone
-  exit 3 (HTTP 403)  Permission denied      → company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin
+  exit 3 (HTTP 403)  Permission denied      → company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin (a system admin/developer passes both), or the token has no active company
   exit 5 (HTTP 404)  Not found              → personId is not in the active company
   exit 4 (HTTP 422)  Gateway rejected or no answer → body.status 'failed': the gateway refused (error text carries its reason) — fix the cause before retrying, each send is billed. body.status 'unknown': no gateway answer within 15 s, the SMS MAY have been delivered — do NOT re-send until the recipient confirms. Both are logged in smsLog with that status
   exit 4 (HTTP 429)  Tenant SMS day cap     → default 200 per Helsinki day (a dry-run reports it too): send a push or email via ib message driver send, or wait until tomorrow — do not retry, rejected attempts count toward the per-sender limit
@@ -11742,7 +11742,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <ytunnus> STRING    business ID: 7-8 digits, hyphen, check digit (e.g. 0145937-9) (optional)
+  <ytunnus> STRING    business ID: 7-8 digits, hyphen, check digit (e.g. 0112038-9) (optional)
 
 FLAGS
   --search STRING    Search by company name instead
@@ -11758,8 +11758,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --page is not an integer >= 1, rejected locally before any request → pass a positive integer page number
   exit 5 (HTTP 404)  Business ID not found — or a sole trader whose VAT registration VIES could not confirm either → verify the Y-tunnus; a toiminimi under the VAT threshold is in NO free registry
-  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01459379 / FI01459379) — refused locally before any request → pass the 1234567-8 form; the error hint names the corrected ID for a near-miss, or use \`ib opendata prh --search <name>\` for a name
-  exit 4 (HTTP 400)  Invalid Y-tunnus format (the backend's own check; the client guard above normally answers first) → use the 1234567-8 form
+  exit 4 (client-side)  the value is not a business ID (a company name, or a near-miss like 01120389 / FI01120389) — refused locally before any request → pass the 0112038-9 form; the error hint names the corrected ID for a near-miss whose check digit holds, or use \`ib opendata prh --search <name>\` for a name
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -11771,7 +11770,7 @@ SEE ALSO
   ib customer create, ib opendata building
 
 EXAMPLES
-  ib opendata prh 0145937-9
+  ib opendata prh 0112038-9
   ib opendata prh --search Betoni
 "
 `;

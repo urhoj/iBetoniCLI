@@ -6,7 +6,7 @@ import type { CommandSpec } from "../../output/help.js";
 import { ASIAKAS_TARGET_ERR, ASIAKAS_TARGET_FLAG, COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, LOG_CAPPED_NOTE, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, NOT_BUSINESS_ID_ERR, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr, permErrors } from "./shared.js";
 
 // Shared start of the three --from-prh flag descriptions.
-const FROM_PRH = "Business ID (Y-tunnus, e.g. 0145937-9 — not a name; find it with `ib opendata prh --search <name>`): ";
+const FROM_PRH = "Business ID (Y-tunnus, e.g. 0112038-9 — not a name; find it with `ib opendata prh --search <name>`): ";
 
 export const CUSTOMER_SPECS: CommandSpec[] = [
 
@@ -145,9 +145,9 @@ export const CUSTOMER_SPECS: CommandSpec[] = [
       "--from-prh resolves a SOLE TRADER (toiminimi) too, via the EU VAT register (PRH excludes them). The name it prefills is then the owner's PERSONAL name, 'Owner Name / TRADENAME' — the legal invoicing name of a toiminimi, so usually right, but check before saving. Same for `ib customer update`/`create-or-update`. `ib opendata prh <ytunnus>` shows which registry answered.",
     ],
     examples: [
-      "ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard",
+      "ib customer create --from-prh 0112038-9 --email billing@x.fi --reason onboard",
       "ib customer create --name 'Example Oy' --ytunnus 1234567-8",
-      "ib customer create --from-prh 0145937-9 --get-or-create --reason onboard",
+      "ib customer create --from-prh 0112038-9 --get-or-create --reason onboard",
     ],
   },
   {

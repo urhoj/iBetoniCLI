@@ -50,8 +50,8 @@ export const NOT_BUSINESS_ID_ERR: CommandError = {
   origin: "client",
   exit: 4,
   match: "is not a business ID",
-  meaning: "the value is not a business ID (a company name, or a near-miss like 01459379 / FI01459379) — refused locally before any request",
-  remedy: "pass the 1234567-8 form; the error hint names the corrected ID for a near-miss, or use `ib opendata prh --search <name>` for a name",
+  meaning: "the value is not a business ID (a company name, or a near-miss like 01120389 / FI01120389) — refused locally before any request",
+  remedy: "pass the 0112038-9 form; the error hint names the corrected ID for a near-miss whose check digit holds, or use `ib opendata prh --search <name>` for a name",
 };
 
 /**

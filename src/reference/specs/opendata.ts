@@ -301,7 +301,7 @@ export const OPENDATA_SPECS: CommandSpec[] = [
     description:
       "Look up a company in the Finnish business registry (PRH open data). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user. Re-homed from `ib customer prh` (still works as a hidden alias); customer create/update prefill from the same data via --from-prh.",
     auth: "any",
-    args: [{ name: "ytunnus", type: "string", required: false, description: "business ID: 7-8 digits, hyphen, check digit (e.g. 0145937-9)" }],
+    args: [{ name: "ytunnus", type: "string", required: false, description: "business ID: 7-8 digits, hyphen, check digit (e.g. 0112038-9)" }],
     flags: [
       { name: "search", type: "string", description: "Search by company name instead" },
       { name: "page", type: "number", default: "1", description: "Result page for --search" },
@@ -312,7 +312,6 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       intParseErr("--page", "pass a positive integer page number"),
       apiErr(404, "Business ID not found — or a sole trader whose VAT registration VIES could not confirm either", "verify the Y-tunnus; a toiminimi under the VAT threshold is in NO free registry"),
       NOT_BUSINESS_ID_ERR,
-      apiErr(400, "Invalid Y-tunnus format (the backend's own check; the client guard above normally answers first)", "use the 1234567-8 form"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -320,6 +319,6 @@ export const OPENDATA_SPECS: CommandSpec[] = [
       "--search has NO VIES fallback (exact VAT numbers only), so name search cannot find sole traders. Look them up by Y-tunnus.",
     ],
     seeAlso: ["ib customer create", "ib opendata building"],
-    examples: ["ib opendata prh 0145937-9", "ib opendata prh --search Betoni"],
+    examples: ["ib opendata prh 0112038-9", "ib opendata prh --search Betoni"],
   },
 ];
