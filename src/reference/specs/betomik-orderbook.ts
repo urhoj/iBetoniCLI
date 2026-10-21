@@ -419,10 +419,10 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     flags: [],
     args: [],
-    outputShape: "{ runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.",
+    outputShape: "{ runs: importRunId[], markers, existing, written, failed, unstamped: [{date, plate, cell, action}], dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.",
     errors: [
       { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
-      { http: 409, exit: 4, meaning: "Refused, module stays off: no import run this ISO week or later, or a baseline stamp failed (body = the baseline summary)", remedy: "Run the sync tick first (no run), or re-run enable (failed stamps)" },
+      { http: 409, exit: 4, meaning: "Refused, module stays off: no import run this ISO week or later, a baseline stamp failed, or a \" k\" sits in a cell whose driver or vehicle is unmatched (`unstamped`; it would send once the cell matches) (body = the baseline summary)", remedy: "Run the sync tick first (no run), re-run enable (failed stamps), or teach the nickname / fix or remove the listed \" k\" cells, sync, then enable (unstamped)" },
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [

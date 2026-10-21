@@ -38,11 +38,14 @@ export async function runDriverDayText(client, opts) {
 /**
  * POST /api/sms/day-message (source "ib"). Without --channel it reads day-text first and sends on
  * the channel the server resolves for the driver (the dialog's preselect): a none_* preference does
- * not stop a manual send, exactly as in the dialog. The server rebuilds the text when --message is omitted.
+ * not stop a manual send, exactly as in the dialog, but the output then carries day-text's `pref` and
+ * `fallback` so the caller sees it (the dialog shows them as an Alert). The server rebuilds the text when
+ * --message is omitted.
  */
 export async function runDriverDaySend(client, opts) {
     const pvm = dayMessageDate(opts.date);
     let channel = opts.channel;
+    let resolved = null;
     if (!channel) {
         const day = await runDriverDayText(client, { person: opts.person, date: pvm });
         if (!day?.channel)
@@ -50,6 +53,7 @@ export async function runDriverDaySend(client, opts) {
         if (!day.text && opts.message === undefined)
             return failWith(`nothing to send: the driver has no orders on ${pvm} (pass --message to send your own text)`, 4);
         channel = day.channel;
+        resolved = { pref: day.pref ?? null, fallback: !!day.fallback };
     }
     const result = await client.post("/api/sms/day-message", {
         personId: opts.person,
@@ -59,7 +63,7 @@ export async function runDriverDaySend(client, opts) {
         ...(opts.message !== undefined ? { message: opts.message } : {}),
         ...(opts.subject !== undefined ? { subject: opts.subject } : {}),
     }, { headers: writeFlagsToHeaders(opts) });
-    return { channel, ...result };
+    return { channel, ...resolved, ...result };
 }
 /** GET /api/sms/day-messages: every day-message attempt of the active company for the day. */
 export async function runDriverDayStatus(client, opts) {

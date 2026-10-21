@@ -707,7 +707,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ channel, ...the send reply }: SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.",
+    outputShape: "{ channel, pref?, fallback?, ...the send reply } (pref/fallback = day-text's, present when --channel was omitted: pref 'none_self'|'none_manual' = the driver opted out of day messages and was sent one anyway): SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.",
     errors: [
       PERSON_PARSE_ERR,
       DAY_DATE_ERR,

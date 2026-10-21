@@ -171,7 +171,23 @@ describe("ib message driver day-send", () => {
     const out = await runDriverDaySend(client, { person: 9 });
     expect(client.get).toHaveBeenCalledExactlyOnceWith(`/api/sms/day-text/9/27?pvm=${TOMORROW()}`);
     expect(client.post).toHaveBeenCalledWith("/api/sms/day-message", expect.objectContaining({ channel: "push", pvm: TOMORROW(), source: "ib" }), { headers: {} });
-    expect(out).toMatchObject({ channel: "push", status: "sent" });
+    expect(out).toMatchObject({ channel: "push", status: "sent", pref: "email", fallback: true });
+  });
+
+  test("without --channel: a none_* preference still sends (manual send) and the output names it", async () => {
+    client.getCurrentToken.mockReturnValue(tokenFor(27));
+    client.get.mockResolvedValueOnce({ text: "Pe 23.10. 81:", channel: "sms", fallback: false, pref: "none_self" });
+    client.post.mockResolvedValueOnce({ status: "sent", smsLogId: 5 });
+    const out = await runDriverDaySend(client, { person: 9 });
+    expect(out).toMatchObject({ channel: "sms", pref: "none_self", fallback: false, status: "sent" });
+  });
+
+  test("with --channel: no day-text read, no pref in the output", async () => {
+    client.getCurrentToken.mockReturnValue(tokenFor(27));
+    client.post.mockResolvedValueOnce({ status: "sent", smsLogId: 6 });
+    const out = await runDriverDaySend(client, { person: 9, channel: "sms" }) as Record<string, unknown>;
+    expect(client.get).not.toHaveBeenCalled();
+    expect(out).not.toHaveProperty("pref");
   });
 
   test("without --channel and nothing reaches the driver: exit 4, nothing sent", async () => {

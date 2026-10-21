@@ -58,16 +58,20 @@ type DaySendOptions = WriteFlags & { person: number; date?: string; channel?: Da
 /**
  * POST /api/sms/day-message (source "ib"). Without --channel it reads day-text first and sends on
  * the channel the server resolves for the driver (the dialog's preselect): a none_* preference does
- * not stop a manual send, exactly as in the dialog. The server rebuilds the text when --message is omitted.
+ * not stop a manual send, exactly as in the dialog, but the output then carries day-text's `pref` and
+ * `fallback` so the caller sees it (the dialog shows them as an Alert). The server rebuilds the text when
+ * --message is omitted.
  */
 export async function runDriverDaySend(client: ApiClient, opts: DaySendOptions): Promise<unknown> {
   const pvm = dayMessageDate(opts.date);
   let channel = opts.channel;
+  let resolved: { pref: string | null; fallback: boolean } | null = null;
   if (!channel) {
-    const day = await runDriverDayText(client, { person: opts.person, date: pvm }) as { text?: string; channel?: DayChannel | null };
+    const day = await runDriverDayText(client, { person: opts.person, date: pvm }) as { text?: string; channel?: DayChannel | null; pref?: string | null; fallback?: boolean };
     if (!day?.channel) return failWith("no channel reaches this driver (no SMS number / push device / email): see ib message driver channels", 4);
     if (!day.text && opts.message === undefined) return failWith(`nothing to send: the driver has no orders on ${pvm} (pass --message to send your own text)`, 4);
     channel = day.channel;
+    resolved = { pref: day.pref ?? null, fallback: !!day.fallback };
   }
   const result = await client.post<Record<string, unknown>>(
     "/api/sms/day-message",
@@ -81,7 +85,7 @@ export async function runDriverDaySend(client: ApiClient, opts: DaySendOptions):
     },
     { headers: writeFlagsToHeaders(opts) }
   );
-  return { channel, ...result };
+  return { channel, ...resolved, ...result };
 }
 
 /** GET /api/sms/day-messages: every day-message attempt of the active company for the day. */

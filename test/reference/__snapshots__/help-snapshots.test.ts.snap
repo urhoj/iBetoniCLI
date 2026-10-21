@@ -2812,11 +2812,11 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.
+  { runs: importRunId[], markers, existing, written, failed, unstamped: [{date, plate, cell, action}], dryRun, enabled, changed } — dryRun = the module was NOT switched. Already on: { enabled:true, changed:false, baselineSkipped:true } and no baseline runs.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
-  exit 4 (HTTP 409)  Refused, module stays off: no import run this ISO week or later, or a baseline stamp failed (body = the baseline summary) → Run the sync tick first (no run), or re-run enable (failed stamps)
+  exit 4 (HTTP 409)  Refused, module stays off: no import run this ISO week or later, a baseline stamp failed, or a " k" sits in a cell whose driver or vehicle is unmatched (\`unstamped\`; it would send once the cell matches) (body = the baseline summary) → Run the sync tick first (no run), re-run enable (failed stamps), or teach the nickname / fix or remove the listed " k" cells, sync, then enable (unstamped)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10691,7 +10691,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { channel, ...the send reply }: SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.
+  { channel, pref?, fallback?, ...the send reply } (pref/fallback = day-text's, present when --channel was omitted: pref 'none_self'|'none_manual' = the driver opted out of day messages and was sent one anyway): SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
@@ -13219,8 +13219,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
-  exit 3 (HTTP 403)  Not allowed to read this person → see the permissions above
-  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 3 (HTTP 403)  Not allowed to read this person (also an unknown personId; a sysadmin gets value:null instead) → see the permissions above; check the personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -13266,8 +13265,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  --value is not one of the six values → pass sms, whatsapp, email, push, none_self or none_manual (lowercase)
   exit 4 (client-side)  neither or both of --value and --clear → pass --value <channel> or --clear
-  exit 3 (HTTP 403)  Not allowed to change this person's settings → see the permissions above (self/sysadmin/admin-of-owner)
-  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 3 (HTTP 403)  Not allowed to change this person's settings (also an unknown personId) → see the permissions above (self/sysadmin/admin-of-owner); check the personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

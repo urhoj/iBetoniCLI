@@ -207,7 +207,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
     flags: [PERSON_TARGET_FLAG],
     outputShape: "{ personId, value:'sms'|'whatsapp'|'email'|'push'|'none_self'|'none_manual'|null } — null = none saved, the driver gets SMS",
-    errors: [PERSON_TARGET_ERR, PERSON_PARSE_ERR, apiErr(403, "Not allowed to read this person", "see the permissions above"), apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY), ...COMMON_AUTH_ERRORS],
+    errors: [PERSON_TARGET_ERR, PERSON_PARSE_ERR, apiErr(403, "Not allowed to read this person (also an unknown personId; a sysadmin gets value:null instead)", "see the permissions above; check the personId"), ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib person day-message-channel set", "ib message driver day-text"],
     examples: ["ib person day-message-channel get 6390", "ib person day-message-channel get --person 6390"],
   },
@@ -229,8 +229,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       PERSON_PARSE_ERR,
       { origin: "client", exit: 4, match: "--value must be one of", meaning: "--value is not one of the six values", remedy: "pass sms, whatsapp, email, push, none_self or none_manual (lowercase)" },
       { origin: "client", exit: 4, match: "exactly one of --value", meaning: "neither or both of --value and --clear", remedy: "pass --value <channel> or --clear" },
-      apiErr(403, "Not allowed to change this person's settings", "see the permissions above (self/sysadmin/admin-of-owner)"),
-      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
+      apiErr(403, "Not allowed to change this person's settings (also an unknown personId)", "see the permissions above (self/sysadmin/admin-of-owner); check the personId"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
