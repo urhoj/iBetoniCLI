@@ -94,7 +94,7 @@ describe("ib message driver send", () => {
 describe("ib message driver channels", () => {
   test.each([27, 28])("uses active company %i from the token", async (owner) => {
     client.getCurrentToken.mockReturnValue(`e30.${Buffer.from(JSON.stringify({ ownerAsiakasId: owner })).toString("base64url")}.sig`);
-    const result = { pushDevices: 2, email: "m***@example.fi" };
+    const result = { pushDevices: 2, email: "m@example.fi" };
     client.get.mockResolvedValueOnce(result);
     expect(await runDriverChannels(client, { person: 9 })).toEqual(result);
     expect(client.get).toHaveBeenCalledExactlyOnceWith(`/api/sms/channels/9/${owner}`);

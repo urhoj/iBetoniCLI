@@ -619,10 +619,10 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib message driver channels",
-    description: "Available manual-message channels for one person in the active company: push device count, masked email and masked SMS number. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.",
+    description: "Available manual-message channels for one person in the active company: push device count, the email and the SMS number (msisdn, e.g. 358401234567) unmasked. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.",
     auth: "any",
     flags: [{ name: "person", type: "number", required: true, description: "Recipient personId in the active company" }],
-    outputShape: "{ pushDevices:number, email:string|null, sms:string|null, smsUnavailable:'not-allowed'|'no-phone'|'invalid-phone'|null } — email and sms are masked; zero devices means push is unavailable; smsUnavailable says why sms is null (null with sms null = the HAS_SMS check could not be made).",
+    outputShape: "{ pushDevices:number, email:string|null, sms:string|null, smsUnavailable:'not-allowed'|'no-phone'|'invalid-phone'|null } — email and sms are the real values (not masked); zero devices means push is unavailable; smsUnavailable says why sms is null (null with sms null = the HAS_SMS check could not be made).",
     errors: [
       PERSON_PARSE_ERR,
       apiErr(403, "Permission denied", "requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer"),

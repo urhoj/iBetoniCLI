@@ -10556,7 +10556,7 @@ exports[`Help snapshots — contract stability > help for ib message driver chan
   ib message driver channels --person <person> [flags]
 
 DESCRIPTION
-  Available manual-message channels for one person in the active company: push device count, masked email and masked SMS number. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.
+  Available manual-message channels for one person in the active company: push device count, the email and the SMS number (msisdn, e.g. 358401234567) unmasked. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -10567,7 +10567,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { pushDevices:number, email:string|null, sms:string|null, smsUnavailable:'not-allowed'|'no-phone'|'invalid-phone'|null } — email and sms are masked; zero devices means push is unavailable; smsUnavailable says why sms is null (null with sms null = the HAS_SMS check could not be made).
+  { pushDevices:number, email:string|null, sms:string|null, smsUnavailable:'not-allowed'|'no-phone'|'invalid-phone'|null } — email and sms are the real values (not masked); zero devices means push is unavailable; smsUnavailable says why sms is null (null with sms null = the HAS_SMS check could not be made).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
