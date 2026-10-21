@@ -260,10 +260,9 @@ export async function runCustomerUpsert(
   opts: CustomerUpsertOptions,
   flags: WriteFlags
 ): Promise<Record<string, unknown>> {
-  const prhYt = opts.fromPrh;
   // Before the lookup: --from-prh is also the lookup key, and the update branch
   // never calls PRH, so a NAME would otherwise be silently ignored (fb#2692).
-  if (prhYt) assertBusinessId(prhYt);
+  const prhYt = opts.fromPrh ? assertBusinessId(opts.fromPrh) : undefined;
   let key = (prhYt || opts.ytunnus || "").trim();
   if (!key) {
     try {
@@ -304,7 +303,7 @@ export async function runCustomerUpsert(
   // No match → create. PRH is fetched only here (not on update).
   const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
   const prh = prhYt ? await runCustomerPrhById(client, prhYt) : undefined;
-  // Same passthrough as the update branch — `prhYt` IS `opts.fromPrh`, and the
+  // Same passthrough as the update branch — `prhYt` is the trimmed `opts.fromPrh`, and the
   // builder takes the registry data via its own `prh` parameter, not the flag.
   const createBody = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
   if (createBody.yTunnus === undefined || createBody.yTunnus === null || createBody.yTunnus === "") {

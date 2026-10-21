@@ -160,6 +160,14 @@ describe("runCustomerUpsert", () => {
     expect(err.message).toContain("not a business ID");
     expect(mockClient.get).not.toHaveBeenCalled();
   });
+
+  // fb#2747: the guard ran on the untrimmed value while the key was trimmed.
+  test("--from-prh with surrounding whitespace is trimmed, not refused", async () => {
+    mGet().mockResolvedValueOnce({ items: [], count: 0 });
+    await runCustomerUpsert(mockClient, { fromPrh: " 0112038-9 " }, {}).catch(() => undefined);
+    expect(mGet().mock.calls[0][0]).toContain("0112038-9");
+    expect(mGet().mock.calls[0][0]).not.toContain("%20");
+  });
 });
 
 describe("runCustomerUpsert reconciles createY-dropped email/comment", () => {

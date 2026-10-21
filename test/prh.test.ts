@@ -23,9 +23,9 @@ describe("runPrhById", () => {
 
   // fb#2692: near-ID input gets a format hint with the corrected ID, not a name search.
   test.each([
-    ["01459379", "0145937-9"],
-    ["FI01459379", "0145937-9"],
-    ["0145937 9", "0145937-9"],
+    ["01120389", "0112038-9"],
+    ["FI01120389", "0112038-9"],
+    ["0112038 9", "0112038-9"],
     ["017282446", "01728244-6"],
   ])("suggests the corrected ID for near-miss %s", async (input, fixed) => {
     const get = vi.fn();
@@ -35,9 +35,21 @@ describe("runPrhById", () => {
     expect(get).not.toHaveBeenCalled();
   });
 
-  test("a digit-only ID of the wrong length gets the format hint without a guess", async () => {
-    const err = await runPrhById(mockApiClient({ get: vi.fn() }), "1234567").catch((e) => e);
-    expect(err.hint).toBe("format is 7-8 digits, hyphen, check digit, e.g. 0145937-9");
+  // fb#2747: 1234567-8 fails the check digit (1234567-1 is valid), so no "did you mean".
+  test.each(["1234567", "12345678", ""])("digit-only %j with no valid reading gets the format hint without a guess", async (input) => {
+    const err = await runPrhById(mockApiClient({ get: vi.fn() }), input).catch((e) => e);
+    expect(err.hint).toBe("format is 7-8 digits, hyphen, check digit, e.g. 0112038-9");
+  });
+
+  test("double quotes are dropped from the name-search hint", async () => {
+    const err = await runPrhById(mockApiClient({ get: vi.fn() }), 'Foo "Bar" Oy').catch((e) => e);
+    expect(err.hint).toBe('find it by name: ib opendata prh --search "Foo Bar Oy"');
+  });
+
+  test("surrounding whitespace is trimmed before the check and the request", async () => {
+    const get = vi.fn().mockResolvedValue({ data: { businessId: "0112038-9", name: "X" } });
+    await runPrhById(mockApiClient({ get }), " 0112038-9 ");
+    expect(get).toHaveBeenCalledWith("/api/prh/company/0112038-9");
   });
 
   test("accepts the backend's 7- and 8-digit forms", async () => {
