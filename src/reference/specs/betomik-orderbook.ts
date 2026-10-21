@@ -1,5 +1,5 @@
 import type { CommandSpec } from "../../output/help.js";
-import { FROM_JSON_BODY_FLAG, intParseErr } from "./shared.js";
+import { COMMON_AUTH_ERRORS, FROM_JSON_BODY_FLAG, intParseErr } from "./shared.js";
 
 /**
  * The `canView()` gate in puminet5api routes/betomikOrderbookRoutes.js —
@@ -409,5 +409,42 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib dev betomik-orderbook tick-report", "ib dev betomik-orderbook runs"],
     examples: ["ib dev betomik-orderbook tick-runs --limit 10"],
+  },
+  {
+    command: "ib dev betomik-orderbook day-messages enable",
+    description: "Switch on the Betomik sheet \" k\" day message (DAY_MESSAGE_AUTO, POST /api/betomik-orderbook/day-messages/enable): first stamps a baseline row for every \" k\" already in the sheet from today on (so switching on sends none of them), then enables the module only when no stamp failed.",
+    tier: "developer",
+    permissions: ["system admin or developer"],
+    writeFlags: true,
+    dryRunKind: "server",
+    flags: [],
+    args: [],
+    outputShape: "{ runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — failed > 0 or dryRun = the module was NOT switched; changed false = it was already on.",
+    errors: [
+      { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked. A failed stamp leaves it off: re-run.",
+    ],
+    seeAlso: ["ib dev betomik-orderbook day-messages disable", "ib message driver day-status"],
+    examples: ["ib dev betomik-orderbook day-messages enable --dry-run"],
+  },
+  {
+    command: "ib dev betomik-orderbook day-messages disable",
+    description: "Switch off the Betomik sheet \" k\" day message (DAY_MESSAGE_AUTO, POST /api/betomik-orderbook/day-messages/disable). Sent messages and baseline rows stay.",
+    tier: "developer",
+    permissions: ["system admin or developer"],
+    writeFlags: true,
+    dryRunKind: "server",
+    flags: [],
+    args: [],
+    outputShape: "{ enabled:false, changed } — changed false = it was already off. With --dry-run: { dryRun:true, wouldUpdate:{ ownerAsiakasId, enabled:false } }",
+    errors: [
+      { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib dev betomik-orderbook day-messages enable"],
+    examples: ["ib dev betomik-orderbook day-messages disable --reason 'paused'"],
   },
 ];

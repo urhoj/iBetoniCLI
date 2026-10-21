@@ -2,7 +2,7 @@
 // (src/reference/specs.ts) spreads every segment in a fixed sequence; order
 // within this file is load-bearing (catalogue order drives sibling-suggestion
 // ranking and the parse-guard-hint snapshots).
-import type { CommandSpec, CommandFlag } from "../../output/help.js";
+import type { CommandSpec, CommandFlag, CommandError } from "../../output/help.js";
 import { COMMON_AUTH_ERRORS, FROM_JSON_FLAGS_FLAG, PERSON_PARSE_ERR, SEARCH_ALIAS_FLAG, apiErr, clearNote, intParseErr, limitErr } from "./shared.js";
 
 /** The `--tarjous` thread-target alias every thread-addressed leaf repeats. */
@@ -20,6 +20,13 @@ const MANAGER_GATED_NOTE =
 const TARJOUS_PARSE_ERR = intParseErr("--tarjous", "pass a positive pumppuRequestId");
 /** The `--thread` parse-guard row for the leaves that register it directly (chat delete/edit/restore). */
 const THREAD_PARSE_ERR = intParseErr("--thread", "pass a positive threadId");
+
+/** The day-message leaves' `--date` (default tomorrow) and its local guard (dayMessageDate). */
+const DAY_DATE_FLAG: CommandFlag = { name: "date", type: "date", default: "tomorrow", description: "Day YYYY-MM-DD or today/yesterday/tomorrow (Europe/Helsinki)" };
+const DAY_DATE_ERR: CommandError = { origin: "client", exit: 4, match: "--date must be", meaning: "--date is not YYYY-MM-DD or an alias, rejected before any request", remedy: "pass YYYY-MM-DD, today, yesterday or tomorrow" };
+const DAY_PERSON_FLAG: CommandFlag = { name: "person", type: "number", required: true, description: "The driver's personId in the active company" };
+const SENDER_403 = apiErr(403, "Permission denied", "requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer, and the company must be your own");
+const AI_SEND_NOTE = "AI callers (MCP ib_exec, POST /api/cli/exec, /ai) may send this ONLY on an explicit user request, never autonomously, with recipient, channel and text confirmed first (owner ruling 2026-10-21); /ai also shows its write-confirmation card.";
 
 export const MESSAGE_SPECS: CommandSpec[] = [
   // ─── message chat (9) ────────────────────────────────────────────────────
@@ -600,7 +607,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS. The server refuses it over MCP ib_exec, POST /api/cli/exec and the /ai assistant (sms list stays allowed).",
+      AI_SEND_NOTE,
       "Deploy-gated: the /api/sms routes must be deployed to the target backend.",
     ],
     seeAlso: ["ib message sms list", "ib person get"],
@@ -657,7 +664,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS remains blocked on all AI bridges.",
+      "AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS: message sms send or message driver day-send, same rule (owner ruling 2026-10-21).",
       "--dry-run validates text, recipient and (for email) the sender's own email but sends/logs nothing; it does not test delivery or guarantee a push device is reachable.",
       "Use --idempotency-key for retries. After a timeout, check message sms list before resending.",
       "--from-json accepts person, channel, message and subject; explicit flags win. Write-safety flags stay on argv.",
@@ -668,5 +675,72 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       'ib message driver send --person 6390 --channel email --subject "Aikataulu" --message "Lahto klo 6.30" --idempotency-key driver-6390-schedule --reason "User requested schedule message"',
       "ib message driver send --from-json driver-message.json --dry-run",
     ],
+  },
+  {
+    command: "ib message driver day-text",
+    description: "A driver's day message for one day, as the grid dialog \"Lähetä päivän tiedot kuljettajalle\" shows it (GET /api/sms/day-text/:personId/:ownerAsiakasId?pvm=): the text, its fingerprint, the driver's channel preference and the channel a send would use. Read as you (your grid visibility); same sender roles as message driver channels.",
+    auth: "any",
+    flags: [DAY_PERSON_FLAG, DAY_DATE_FLAG],
+    outputShape: "{ text, sig, vehicleId, keikkaCount, palkkiCount, pref:'sms'|'whatsapp'|'email'|'push'|'none_self'|'none_manual'|null, channel:'sms'|'push'|'email'|null, fallback } — text '' = nothing to tell that day; channel null = nothing reaches the driver; fallback true = the preferred channel does not reach them (pref null = SMS).",
+    errors: [
+      PERSON_PARSE_ERR,
+      DAY_DATE_ERR,
+      apiErr(400, "Validation", "pvm must be a real YYYY-MM-DD day"),
+      SENDER_403,
+      apiErr(404, "Not found", "personId is not reachable in the active company"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: ["--date defaults to tomorrow (Europe/Helsinki).", "Deploy-gated: the /api/sms/day-text route must be deployed to the target backend."],
+    seeAlso: ["ib message driver day-send", "ib message driver day-status", "ib person day-message-channel get"],
+    examples: ["ib message driver day-text --person 6390", "ib message driver day-text --person 6390 --date 2026-10-23"],
+  },
+  {
+    command: "ib message driver day-send",
+    description: "Send ONE driver their day message (POST /api/sms/day-message, source ib), the grid dialog's service: the server rebuilds the text and its fingerprint, sends by SMS (up to 6 segments, only the https://betoni.online/oma link; needs HAS_SMS) or push/email, and records the attempt so the grid shows it. SMS is billed; honours --read-only. --dry-run is server-side: validates, sends and records nothing.",
+    auth: "any",
+    flags: [
+      DAY_PERSON_FLAG,
+      DAY_DATE_FLAG,
+      { name: "channel", type: "string", description: "sms | push | email; default = the channel day-text resolves from the driver's preference" },
+      { name: "message", type: "string", description: "Your own text instead of the built day message (SMS: up to 6 segments, no other link)" },
+      { name: "subject", type: "string", description: "Push title / email subject; default 'Päivän tiedot <Ti 22.10.>'" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ channel, ...the send reply }: SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.",
+    errors: [
+      PERSON_PARSE_ERR,
+      DAY_DATE_ERR,
+      { origin: "client", exit: 4, match: "--channel", meaning: "Validation", remedy: "pass --channel sms, push or email" },
+      { origin: "client", exit: 4, match: "no channel reaches", meaning: "Without --channel: no SMS number, push device or email reaches the driver", remedy: "check ib message driver channels; fix the person's contact details" },
+      { origin: "client", exit: 4, match: "nothing to send", meaning: "Without --message: the driver has no orders that day", remedy: "check the --date, or pass --message with your own text" },
+      apiErr(400, "Validation", "bad pvm/channel, an empty or too long text, or a link other than the /oma one; or no phone/email for the channel"),
+      apiErr(403, "Permission denied", "a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer; SMS also needs the HAS_SMS module"),
+      apiErr(404, "Not found", "personId is not reachable in the active company"),
+      apiErr(422, "Send failed", "status 'failed': fix the cause first; status 'unknown': it may have been delivered, check day-status before resending"),
+      apiErr(429, "Rate limited or SMS day cap", "per-sender 20/min + 200/h shared with the other sends, or the tenant SMS day cap: wait, or send by push/email", "liian monta viestiä"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      AI_SEND_NOTE,
+      "Without --channel the CLI reads day-text first and uses its channel; a none_* preference does not block a manual send (same as the dialog).",
+      "Nothing re-sends automatically. After a timeout, check day-status before sending again.",
+    ],
+    seeAlso: ["ib message driver day-text", "ib message driver day-status", "ib message sms list"],
+    examples: [
+      "ib message driver day-send --person 6390 --dry-run",
+      'ib message driver day-send --person 6390 --date 2026-10-23 --channel sms --reason "dispatcher asked"',
+    ],
+  },
+  {
+    command: "ib message driver day-status",
+    description: "Every day-message attempt of the active company for one day (GET /api/sms/day-messages/:ownerAsiakasId?pvm=), newest first: who got it, by which channel, the outcome and where it came from. One row per driver and day: the LAST attempt. Same sender roles as message driver channels.",
+    auth: "any",
+    flags: [DAY_DATE_FLAG],
+    outputShape: "ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'baseline' }> — sheet = the Betomik \" k\" trigger, baseline = stamped at its cutover (never sent).",
+    errors: [DAY_DATE_ERR, apiErr(400, "Validation", "pvm must be a real YYYY-MM-DD day"), SENDER_403, ...COMMON_AUTH_ERRORS],
+    notes: ["--date defaults to tomorrow (Europe/Helsinki).", "Deploy-gated: the /api/sms/day-messages route must be deployed to the target backend."],
+    seeAlso: ["ib message driver day-send", "ib message driver day-text"],
+    examples: ["ib message driver day-status", "ib message driver day-status --date today"],
   },
 ];

@@ -420,6 +420,19 @@ export async function runBetomikOrderbookTickRuns(
   return listEnvelope(itemsOf<BetomikTickRun>(raw));
 }
 
+/**
+ * POST /api/betomik-orderbook/day-messages/enable | disable — the sheet " k" day-message switch
+ * (DAY_MESSAGE_AUTO). enable stamps the cutover baseline first and switches on only when no stamp
+ * failed; --dry-run plans the baseline and switches nothing. Sysadmin/developer only.
+ */
+export async function runBetomikDayMessagesSwitch(
+  client: ApiClient,
+  action: "enable" | "disable",
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/betomik-orderbook/day-messages/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
+}
+
 export function registerBetomikOrderbookCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
@@ -644,6 +657,15 @@ export function registerBetomikOrderbookCommands(
       writeJson(await runBetomikOrderbookTickReport(client, body as Record<string, unknown>, opts));
     })
   );
+
+  const dayMessages = group
+    .command("day-messages")
+    .description("The sheet \" k\" day-message switch (DAY_MESSAGE_AUTO; sysadmin/developer only)");
+  for (const action of ["enable", "disable"] as const) {
+    addWriteFlagsToCommand(dayMessages.command(action)).action(
+      jsonAction(getClient, (client, opts: WriteFlags) => runBetomikDayMessagesSwitch(client, action, opts))
+    );
+  }
 
   group
     .command("tick-runs")

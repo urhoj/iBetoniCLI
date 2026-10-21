@@ -21,6 +21,7 @@ import {
   selectRowsToSync,
   runBetomikOrderbookTickReport,
   runBetomikOrderbookTickRuns,
+  runBetomikDayMessagesSwitch,
 } from "../../src/commands/betomikOrderbook/index.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { CliError, hintDetailForError } from "../../src/api/errors.js";
@@ -504,5 +505,24 @@ describe("ib dev betomik-orderbook tick-report / tick-runs", () => {
     const names = COMMAND_SPECS.map((s) => s.command);
     expect(names).toContain("ib dev betomik-orderbook tick-report");
     expect(names).toContain("ib dev betomik-orderbook tick-runs");
+  });
+});
+
+describe("ib dev betomik-orderbook day-messages enable / disable", () => {
+  beforeEach(() => mockClient.post.mockReset());
+
+  test.each(["enable", "disable"] as const)("%s POSTs an empty body with the write-flag headers", async (action) => {
+    const result = { runs: [101], markers: 2, existing: 0, written: 0, failed: 0, dryRun: true, enabled: false, changed: false };
+    mockClient.post.mockResolvedValueOnce(result);
+    expect(await runBetomikDayMessagesSwitch(mockClient, action, { dryRun: true, reason: "koulutus pidetty" })).toEqual(result);
+    expect(mockClient.post).toHaveBeenCalledWith(`/api/betomik-orderbook/day-messages/${action}`, {}, {
+      headers: { "X-Dry-Run": "1", "X-Action-Reason": "koulutus pidetty" },
+    });
+  });
+
+  test.each(["ib dev betomik-orderbook day-messages enable", "ib dev betomik-orderbook day-messages disable"])("%s is a developer-tier server-dry-run write with a 403 row", (command) => {
+    const spec = COMMAND_SPECS.find((s) => s.command === command);
+    expect(spec).toMatchObject({ tier: "developer", writeFlags: true, dryRunKind: "server" });
+    expect(spec!.errors!.some((e) => "http" in e && e.http === 403)).toBe(true);
   });
 });

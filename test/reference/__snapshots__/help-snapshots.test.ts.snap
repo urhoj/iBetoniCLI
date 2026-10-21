@@ -2752,6 +2752,83 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook day-messages disable matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook day-messages disable [flags]
+
+DESCRIPTION
+  Switch off the Betomik sheet " k" day message (DAY_MESSAGE_AUTO, POST /api/betomik-orderbook/day-messages/disable). Sent messages and baseline rows stay.
+  Permissions: requires system admin or developer.
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { enabled:false, changed } — changed false = it was already off. With --dry-run: { dryRun:true, wouldUpdate:{ ownerAsiakasId, enabled:false } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev betomik-orderbook day-messages enable
+
+EXAMPLES
+  ib dev betomik-orderbook day-messages disable --reason 'paused'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook day-messages enable matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook day-messages enable [flags]
+
+DESCRIPTION
+  Switch on the Betomik sheet " k" day message (DAY_MESSAGE_AUTO, POST /api/betomik-orderbook/day-messages/enable): first stamps a baseline row for every " k" already in the sheet from today on (so switching on sends none of them), then enables the module only when no stamp failed.
+  Permissions: requires system admin or developer.
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { runs: importRunId[], markers, existing, written, failed, dryRun, enabled, changed } — failed > 0 or dryRun = the module was NOT switched; changed false = it was already on.
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The owner switches this on only after training the tenant: never run it without --dry-run unless the owner asked. A failed stamp leaves it off: re-run.
+
+SEE ALSO
+  ib dev betomik-orderbook day-messages disable, ib message driver day-status
+
+EXAMPLES
+  ib dev betomik-orderbook day-messages enable --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook exceptions matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook exceptions <runId> [flags]
@@ -10584,6 +10661,144 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message driver day-send matches snapshot 1`] = `
+"USAGE
+  ib message driver day-send --person <person> [flags]
+
+DESCRIPTION
+  Send ONE driver their day message (POST /api/sms/day-message, source ib), the grid dialog's service: the server rebuilds the text and its fingerprint, sends by SMS (up to 6 segments, only the https://betoni.online/oma link; needs HAS_SMS) or push/email, and records the attempt so the grid shows it. SMS is billed; honours --read-only. --dry-run is server-side: validates, sends and records nothing.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --person NUMBER    The driver's personId in the active company (required)
+  --date DATE    Day YYYY-MM-DD or today/yesterday/tomorrow (Europe/Helsinki) (default: tomorrow)
+  --channel STRING    sms | push | email; default = the channel day-text resolves from the driver's preference
+  --message STRING    Your own text instead of the built day message (SMS: up to 6 segments, no other link)
+  --subject STRING    Push title / email subject; default 'Päivän tiedot <Ti 22.10.>'
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { channel, ...the send reply }: SMS { smsLogId, status:'sent', segments, phone:'***NNNN' }; push/email { smsLogId, status:'sent', channel, target }. With --dry-run: { channel, dryRun:true, ... }. On 422: { error, smsLogId, status:'failed'|'unknown' } — 'unknown' may have been delivered: do not resend.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --date is not YYYY-MM-DD or an alias, rejected before any request → pass YYYY-MM-DD, today, yesterday or tomorrow
+  exit 4 (client-side)  Validation             → pass --channel sms, push or email
+  exit 4 (client-side)  Without --channel: no SMS number, push device or email reaches the driver → check ib message driver channels; fix the person's contact details
+  exit 4 (client-side)  Without --message: the driver has no orders that day → check the --date, or pass --message with your own text
+  exit 4 (HTTP 400)  Validation             → bad pvm/channel, an empty or too long text, or a link other than the /oma one; or no phone/email for the channel
+  exit 3 (HTTP 403)  Permission denied      → a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer; SMS also needs the HAS_SMS module
+  exit 5 (HTTP 404)  Not found              → personId is not reachable in the active company
+  exit 4 (HTTP 422)  Send failed            → status 'failed': fix the cause first; status 'unknown': it may have been delivered, check day-status before resending
+  exit 4 (HTTP 429)  Rate limited or SMS day cap → per-sender 20/min + 200/h shared with the other sends, or the tenant SMS day cap: wait, or send by push/email
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - AI callers (MCP ib_exec, POST /api/cli/exec, /ai) may send this ONLY on an explicit user request, never autonomously, with recipient, channel and text confirmed first (owner ruling 2026-10-21); /ai also shows its write-confirmation card.
+  - Without --channel the CLI reads day-text first and uses its channel; a none_* preference does not block a manual send (same as the dialog).
+  - Nothing re-sends automatically. After a timeout, check day-status before sending again.
+
+SEE ALSO
+  ib message driver day-text, ib message driver day-status, ib message sms list
+
+EXAMPLES
+  ib message driver day-send --person 6390 --dry-run
+  ib message driver day-send --person 6390 --date 2026-10-23 --channel sms --reason "dispatcher asked"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message driver day-status matches snapshot 1`] = `
+"USAGE
+  ib message driver day-status [flags]
+
+DESCRIPTION
+  Every day-message attempt of the active company for one day (GET /api/sms/day-messages/:ownerAsiakasId?pvm=), newest first: who got it, by which channel, the outcome and where it came from. One row per driver and day: the LAST attempt. Same sender roles as message driver channels.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --date DATE    Day YYYY-MM-DD or today/yesterday/tomorrow (Europe/Helsinki) (default: tomorrow)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'baseline' }> — sheet = the Betomik " k" trigger, baseline = stamped at its cutover (never sent).
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --date is not YYYY-MM-DD or an alias, rejected before any request → pass YYYY-MM-DD, today, yesterday or tomorrow
+  exit 4 (HTTP 400)  Validation             → pvm must be a real YYYY-MM-DD day
+  exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer, and the company must be your own
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --date defaults to tomorrow (Europe/Helsinki).
+  - Deploy-gated: the /api/sms/day-messages route must be deployed to the target backend.
+
+SEE ALSO
+  ib message driver day-send, ib message driver day-text
+
+EXAMPLES
+  ib message driver day-status
+  ib message driver day-status --date today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message driver day-text matches snapshot 1`] = `
+"USAGE
+  ib message driver day-text --person <person> [flags]
+
+DESCRIPTION
+  A driver's day message for one day, as the grid dialog "Lähetä päivän tiedot kuljettajalle" shows it (GET /api/sms/day-text/:personId/:ownerAsiakasId?pvm=): the text, its fingerprint, the driver's channel preference and the channel a send would use. Read as you (your grid visibility); same sender roles as message driver channels.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --person NUMBER    The driver's personId in the active company (required)
+  --date DATE    Day YYYY-MM-DD or today/yesterday/tomorrow (Europe/Helsinki) (default: tomorrow)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { text, sig, vehicleId, keikkaCount, palkkiCount, pref:'sms'|'whatsapp'|'email'|'push'|'none_self'|'none_manual'|null, channel:'sms'|'push'|'email'|null, fallback } — text '' = nothing to tell that day; channel null = nothing reaches the driver; fallback true = the preferred channel does not reach them (pref null = SMS).
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --date is not YYYY-MM-DD or an alias, rejected before any request → pass YYYY-MM-DD, today, yesterday or tomorrow
+  exit 4 (HTTP 400)  Validation             → pvm must be a real YYYY-MM-DD day
+  exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer, and the company must be your own
+  exit 5 (HTTP 404)  Not found              → personId is not reachable in the active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --date defaults to tomorrow (Europe/Helsinki).
+  - Deploy-gated: the /api/sms/day-text route must be deployed to the target backend.
+
+SEE ALSO
+  ib message driver day-send, ib message driver day-status, ib person day-message-channel get
+
+EXAMPLES
+  ib message driver day-text --person 6390
+  ib message driver day-text --person 6390 --date 2026-10-23
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message driver send matches snapshot 1`] = `
 "USAGE
   ib message driver send --person <person> --channel <channel> --message <message> [flags]
@@ -10624,7 +10839,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS remains blocked on all AI bridges.
+  - AI callers may send push/email ONLY on an explicit user request, never autonomously. /ai additionally requires its write-confirmation card; MCP clients must enforce user intent. SMS: message sms send or message driver day-send, same rule (owner ruling 2026-10-21).
   - --dry-run validates text, recipient and (for email) the sender's own email but sends/logs nothing; it does not test delivery or guarantee a push device is reachable.
   - Use --idempotency-key for retries. After a timeout, check message sms list before resending.
   - --from-json accepts person, channel, message and subject; explicit flags win. Write-safety flags stay on argv.
@@ -10711,7 +10926,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Never automate this command: owner ruling 2026-10-12 allows only user-initiated SMS. The server refuses it over MCP ib_exec, POST /api/cli/exec and the /ai assistant (sms list stays allowed).
+  - AI callers (MCP ib_exec, POST /api/cli/exec, /ai) may send this ONLY on an explicit user request, never autonomously, with recipient, channel and text confirmed first (owner ruling 2026-10-21); /ai also shows its write-confirmation card.
   - Deploy-gated: the /api/sms routes must be deployed to the target backend.
 
 SEE ALSO
@@ -12974,6 +13189,94 @@ EXAMPLES
   ib person day statuses
   ib person day statuses --pretty
   ib person day statuses --full
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person day-message-channel get matches snapshot 1`] = `
+"USAGE
+  ib person day-message-channel get [<personId>] [flags]
+
+DESCRIPTION
+  How a driver wants the day message (personSettings 56 DAY_MESSAGE_CHANNEL, the profile control's value).
+  Permissions: requires self, a colleague or admin of the person's company, or sysadmin/developer (requirePersonReadAccess).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { personId, value:'sms'|'whatsapp'|'email'|'push'|'none_self'|'none_manual'|null } — null = none saved, the driver gets SMS
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 3 (HTTP 403)  Not allowed to read this person → see the permissions above
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person day-message-channel set, ib message driver day-text
+
+EXAMPLES
+  ib person day-message-channel get 6390
+  ib person day-message-channel get --person 6390
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person day-message-channel set matches snapshot 1`] = `
+"USAGE
+  ib person day-message-channel set [<personId>] [flags]
+
+DESCRIPTION
+  Set (or clear) how a driver wants the day message (personSettings 56 DAY_MESSAGE_CHANNEL), the value the profile control saves.
+  Permissions: requires self, sysadmin/developer, or admin of the target person's owner company (requirePersonWriteAccess).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+  --value STRING    sms | whatsapp | email | push | none_self | none_manual
+  --clear    Remove the preference (the driver gets SMS); instead of --value
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  200 empty body on success | { dryRun:true, personId, wouldChange:{ value?:{from,to} } } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --value is not one of the six values → pass sms, whatsapp, email, push, none_self or none_manual (lowercase)
+  exit 4 (client-side)  neither or both of --value and --clear → pass --value <channel> or --clear
+  exit 3 (HTTP 403)  Not allowed to change this person's settings → see the permissions above (self/sysadmin/admin-of-owner)
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - whatsapp sends as SMS until WhatsApp exists. none_self = the driver reads betoni.online themselves, none_manual = the dispatcher messages them: the automatic sheet trigger skips both; a manual send (grid or day-send) does not. --dry-run resolves client-side (GETs, never POSTs): the route has no X-Dry-Run guard.
+
+SEE ALSO
+  ib person day-message-channel get, ib message driver day-send
+
+EXAMPLES
+  ib person day-message-channel set 6390 --value push --reason 'driver asked'
+  ib person day-message-channel set --person 6390 --clear --dry-run
 "
 `;
 
