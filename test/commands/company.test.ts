@@ -176,4 +176,11 @@ describe("runCompanySetVarikko", () => {
     expect(mockClient.post).not.toHaveBeenCalled();
     expect(out).toEqual({ dryRun: true, wouldUpdate: { asiakasId: 27, varikkoSijaintiId: 97 } });
   });
+
+  test("null (--clear) sends sijaintiId 0 and reports the cleared depot as null (fb#2540)", async () => {
+    mockClient.post.mockResolvedValueOnce({ rowsAffected: [1] });
+    const out = await runCompanySetVarikko(mockClient, null, {});
+    expect(mockClient.post.mock.calls[0][1]).toEqual({ asiakasId: 27, sijaintiId: 0 });
+    expect(out).toEqual({ ok: true, asiakasId: 27, varikkoSijaintiId: null });
+  });
 });

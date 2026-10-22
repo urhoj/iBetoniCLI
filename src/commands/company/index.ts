@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { runPersistedSwitch } from "../../auth/switch.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failParseUsage } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { intFlag, parseId, resolveTarget } from "../../targets.js";
@@ -118,14 +118,15 @@ export async function runCompanyCurrent(
  *
  * `--dry-run` resolves client-side (echoes the request, never POSTs): the route only
  * honours X-Dry-Run from fb#2501's backend on, and an older backend would persist.
+ * `sijaintiId: null` (`--clear`) sends 0, which the backend reads as "clear to NULL" (fb#2540).
  */
 export async function runCompanySetVarikko(
   client: ApiClient,
-  sijaintiId: number,
+  sijaintiId: number | null,
   flags: WriteFlags
 ): Promise<unknown> {
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib company switch`");
-  const body = { asiakasId, sijaintiId };
+  const body = { asiakasId, sijaintiId: sijaintiId ?? 0 };
   if (flags.dryRun) return { dryRun: true, wouldUpdate: { asiakasId, varikkoSijaintiId: sijaintiId } };
   await client.post("/api/asiakas/sijainti/varikko/saveDefaultSijainti", body, {
     headers: writeFlagsToHeaders(flags),
@@ -173,10 +174,14 @@ export function registerCompanyCommands(
     );
 
   addWriteFlagsToCommand(
-    company.command("set-varikko <sijaintiId>")
+    company
+      .command("set-varikko [sijaintiId]")
+      .option("--clear", "Clear the default depot (asiakas.varikkoSijaintiId → NULL)")
   ).action(
-    guarded(async (idStr: string, opts: WriteFlags) => {
-      writeJson(await runCompanySetVarikko(await getClient(), parseId(idStr, "sijaintiId"), opts));
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { clear?: boolean }) => {
+      if ((idStr === undefined) === !opts.clear) failParseUsage("pass exactly one of <sijaintiId> or --clear");
+      const sijaintiId = opts.clear ? null : parseId(idStr as string, "sijaintiId");
+      writeJson(await runCompanySetVarikko(await getClient(), sijaintiId, opts));
     })
   );
 

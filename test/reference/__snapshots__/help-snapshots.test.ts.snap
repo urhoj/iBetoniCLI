@@ -1121,17 +1121,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib company set-varikko matches snapshot 1`] = `
 "USAGE
-  ib company set-varikko <sijaintiId> [flags]
+  ib company set-varikko [<sijaintiId>] [flags]
 
 DESCRIPTION
-  Set the active company's default depot (asiakas.varikkoSijaintiId) — the origin of the empty run to the worksite (Tyhjänä työmaalle) for every vehicle without its own depot. POST /api/asiakas/sijainti/varikko/saveDefaultSijainti.
-  Permissions: requires edit role in the active company AND in the sijainti's owner company.
+  Set or clear (--clear) the active company's default depot (asiakas.varikkoSijaintiId) — the origin of the empty run to the worksite (Tyhjänä työmaalle) for every vehicle without its own depot. POST /api/asiakas/sijainti/varikko/saveDefaultSijainti.
+  Permissions: requires edit role in the active company AND in the sijainti's owner company (--clear: the active company only).
 
 ARGUMENTS
-  <sijaintiId> NUMBER    Depot sijaintiId (a pumppuvarikko or toimipiste) (required)
+  <sijaintiId> NUMBER    Depot sijaintiId (a pumppuvarikko or toimipiste); omit with --clear (optional)
 
 FLAGS
-  (none)
+  --clear    Clear the default depot to NULL (needs a backend with fb#2540; older ones answer 400)
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -1148,6 +1148,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  sijaintiId is not a positive integer → pass the depot's sijaintiId (\`ib sijainti list\`)
   exit 4 (client-side)  no usable ownerAsiakasId on the token → run \`ib company switch\`
+  exit 4 (client-side)  both or neither of <sijaintiId> and --clear given → pass a sijaintiId to set, or --clear alone to clear
   exit 4 (HTTP 400)  Sijainti … ei ole varikko tai toimipiste / ei löydy → pick a sijainti of type pumppuvarikko or toimipiste (\`ib sijainti get <id>\`)
   exit 3 (HTTP 403)  No edit role in the active company or in the sijainti's owner → verify via \`ib company list\`; the depot must belong to a company you may edit
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -1164,6 +1165,7 @@ SEE ALSO
 EXAMPLES
   ib company set-varikko 97 --reason 'main depot'
   ib company set-varikko 97 --dry-run
+  ib company set-varikko --clear --reason 'no default depot'
 "
 `;
 

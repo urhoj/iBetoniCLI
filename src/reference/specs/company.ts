@@ -81,16 +81,17 @@ export const COMPANY_SPECS: CommandSpec[] = [
   {
     command: "ib company set-varikko",
     description:
-      "Set the active company's default depot (asiakas.varikkoSijaintiId) — the origin of the empty run to the worksite (Tyhjänä työmaalle) for every vehicle without its own depot. POST /api/asiakas/sijainti/varikko/saveDefaultSijainti.",
-    permissions: ["edit role in the active company AND in the sijainti's owner company"],
-    args: [{ name: "sijaintiId", type: "number", description: "Depot sijaintiId (a pumppuvarikko or toimipiste)" }],
-    flags: [],
+      "Set or clear (--clear) the active company's default depot (asiakas.varikkoSijaintiId) — the origin of the empty run to the worksite (Tyhjänä työmaalle) for every vehicle without its own depot. POST /api/asiakas/sijainti/varikko/saveDefaultSijainti.",
+    permissions: ["edit role in the active company AND in the sijainti's owner company (--clear: the active company only)"],
+    args: [{ name: "sijaintiId", type: "number", required: false, description: "Depot sijaintiId (a pumppuvarikko or toimipiste); omit with --clear" }],
+    flags: [{ name: "clear", type: "boolean", description: "Clear the default depot to NULL (needs a backend with fb#2540; older ones answer 400)" }],
     writeFlags: true,
     dryRunKind: "client",
     outputShape: "{ ok: true, asiakasId, varikkoSijaintiId }; with --dry-run { dryRun: true, wouldUpdate: { asiakasId, varikkoSijaintiId } } (never POSTs)",
     errors: [
       { origin: "client", exit: 4, match: "expected a positive integer", meaning: "sijaintiId is not a positive integer", remedy: "pass the depot's sijaintiId (`ib sijainti list`)" },
       { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "run `ib company switch`" },
+      { origin: "client", exit: 4, match: "exactly one of", meaning: "both or neither of <sijaintiId> and --clear given", remedy: "pass a sijaintiId to set, or --clear alone to clear" },
       apiErr(400, "Sijainti … ei ole varikko tai toimipiste / ei löydy", "pick a sijainti of type pumppuvarikko or toimipiste (`ib sijainti get <id>`)"),
       apiErr(403, "No edit role in the active company or in the sijainti's owner", "verify via `ib company list`; the depot must belong to a company you may edit"),
       ...COMMON_AUTH_ERRORS,
@@ -101,7 +102,7 @@ export const COMPANY_SPECS: CommandSpec[] = [
       "--dry-run is client-side (echoes the request) because backends before fb#2501 persisted on X-Dry-Run.",
     ],
     seeAlso: ["ib vehicle update", "ib sijainti list"],
-    examples: ["ib company set-varikko 97 --reason 'main depot'", "ib company set-varikko 97 --dry-run"],
+    examples: ["ib company set-varikko 97 --reason 'main depot'", "ib company set-varikko 97 --dry-run", "ib company set-varikko --clear --reason 'no default depot'"],
   },
   {
     command: "ib validate",

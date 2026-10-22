@@ -1,6 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { runPersistedSwitch } from "../../auth/switch.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failParseUsage } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { intFlag, parseId, resolveTarget } from "../../targets.js";
@@ -68,10 +68,11 @@ export async function runCompanyCurrent(client) {
  *
  * `--dry-run` resolves client-side (echoes the request, never POSTs): the route only
  * honours X-Dry-Run from fb#2501's backend on, and an older backend would persist.
+ * `sijaintiId: null` (`--clear`) sends 0, which the backend reads as "clear to NULL" (fb#2540).
  */
 export async function runCompanySetVarikko(client, sijaintiId, flags) {
     const asiakasId = ownerAsiakasIdFromToken(client, "run `ib company switch`");
-    const body = { asiakasId, sijaintiId };
+    const body = { asiakasId, sijaintiId: sijaintiId ?? 0 };
     if (flags.dryRun)
         return { dryRun: true, wouldUpdate: { asiakasId, varikkoSijaintiId: sijaintiId } };
     await client.post("/api/asiakas/sijainti/varikko/saveDefaultSijainti", body, {
@@ -106,8 +107,13 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .action(guarded(async (idStr, opts) => {
         writeJson(await runPersistedSwitch(resolveTarget(idStr, opts.to, "asiakasId", "to"), isReadOnly()));
     }));
-    addWriteFlagsToCommand(company.command("set-varikko <sijaintiId>")).action(guarded(async (idStr, opts) => {
-        writeJson(await runCompanySetVarikko(await getClient(), parseId(idStr, "sijaintiId"), opts));
+    addWriteFlagsToCommand(company
+        .command("set-varikko [sijaintiId]")
+        .option("--clear", "Clear the default depot (asiakas.varikkoSijaintiId → NULL)")).action(guarded(async (idStr, opts) => {
+        if ((idStr === undefined) === !opts.clear)
+            failParseUsage("pass exactly one of <sijaintiId> or --clear");
+        const sijaintiId = opts.clear ? null : parseId(idStr, "sijaintiId");
+        writeJson(await runCompanySetVarikko(await getClient(), sijaintiId, opts));
     }));
     // `ib company validate` was renamed to the top-level `ib validate` (clean
     // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.
