@@ -101,10 +101,9 @@ export const GLOSSARY_SPECS: CommandSpec[] = [
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
       ...assessWriteFlags("term"),
     ],
-    outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
+    outputShape: "the saved row, same shape as one `ib glossary list` item (relatedCommands:[{command,summary:null}])",
     notes: [
       "PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: `--synonyms \"\"` empties the list, `--entity \"\"` blanks it. " + clearNote("--synonyms") + " To OVERWRITE, pass the new value.",
-      "Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.",
       "--ai-confidence / --needs-human-review are partial too since fb#1707: an omitted one keeps the stored value (a JSON null in --from-json clears the score). DEPLOY-GATED — against a backend older than fb#1707 an omitted pair still RESETS to null/false (the fb#298 design), so a grooming write is safest carrying --ai-confidence every time. --dry-run echoes the EFFECTIVE pair either way.",
       "Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).",
       "An append flag COMPOSES with plain overwrite flags for OTHER fields in the same call: `--definition \"new\" --add-synonyms \"x\"` overwrites the definition AND merges the synonym in one request. Only the same-field twin is rejected (exit 4): --definition⊥--append-definition and --synonyms⊥--add/remove-synonyms. Deploy-gated: an un-updated backend drops the plain field instead of composing — until it deploys, set OTHER fields in a separate call.",
