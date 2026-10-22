@@ -620,6 +620,25 @@ async function columnNameSuggestion(client, sql, badColumn) {
         .join("; ");
     return `no column like '${badColumn}' in ${known.map((t) => t.table).join(", ")} — ${listing}`;
 }
+/** SQL Server 156 — captures the reserved word the parser stopped at. */
+const KEYWORD_SYNTAX_RE = /Incorrect syntax near the keyword '([^']+)'/i;
+/**
+ * Help for a column whose name is a T-SQL reserved word (fb#2764):
+ * `MAX(rowCount)` on dbo.betomikOrderbookImportRun fails as a SYNTAX error, so
+ * the generic "shape was fine; check names" hint pointed at a name that was
+ * right. Answers only when a FROM/JOIN table really has that column — a plain
+ * misplaced `WHERE`/`FROM` is a genuine syntax error and keeps the generic hint.
+ */
+async function keywordColumnSuggestion(client, sql, keyword) {
+    for (const { table } of queryTables(sql).slice(0, 6)) {
+        const rec = await runSchemaTable(client, table).catch(() => null);
+        const cols = Array.isArray(rec?.columns) ? rec.columns : [];
+        const col = cols.map((c) => c.name).find((n) => typeof n === "string" && n.toLowerCase() === keyword.toLowerCase());
+        if (col)
+            return `'${keyword}' is a T-SQL reserved word — the column ${table}.${col} must be bracketed: [${col}]`;
+    }
+    return null;
+}
 /**
  * Ad-hoc read-only SQL (fb#438). POST because query text does not belong in a
  * URL, `{ read: true }` because it is still a READ — exempt from `--read-only`
@@ -641,11 +660,14 @@ export async function runSchemaQuery(client, sql, params) {
         if (e instanceof CliError && e.statusCode === 400) {
             const objectMatch = e.message.match(INVALID_OBJECT_NAME_RE);
             const columnMatch = e.message.match(INVALID_COLUMN_NAME_RE);
+            const keywordMatch = e.message.match(KEYWORD_SYNTAX_RE);
             const suggestion = objectMatch
                 ? await nearestObjectNameSuggestion(client, objectMatch[1]).catch(() => null)
                 : columnMatch
                     ? await columnNameSuggestion(client, sql, columnMatch[1]).catch(() => null)
-                    : null;
+                    : keywordMatch
+                        ? await keywordColumnSuggestion(client, sql, keywordMatch[1]).catch(() => null)
+                        : null;
             if (suggestion)
                 throw new CliError(e.message, e.statusCode, e.body, e.exitCode, suggestion);
         }

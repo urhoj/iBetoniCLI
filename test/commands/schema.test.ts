@@ -478,6 +478,30 @@ describe("ib schema", () => {
       await expect(runSchemaQuery(mockClient, "SELECT * FROM dbo.totallyUnrelated")).rejects.toBe(original);
     });
 
+    // fb#2764: `MAX(rowCount)` is a SYNTAX error, and the generic hint sent the
+    // caller to re-check a column name that was right.
+    describe("a column named like a T-SQL keyword (fb#2764)", () => {
+      test("a keyword that is a real column of a FROM table → bracket it", async () => {
+        post().mockRejectedValueOnce(new CliError("SQL error: Incorrect syntax near the keyword 'rowCount'.", 400, null, 4));
+        get().mockResolvedValueOnce({ columns: [{ name: "importRunId" }, { name: "rowCount" }] });
+
+        await expect(
+          runSchemaQuery(mockClient, "SELECT MAX(rowCount) FROM dbo.betomikOrderbookImportRun")
+        ).rejects.toMatchObject({
+          message: "SQL error: Incorrect syntax near the keyword 'rowCount'.",
+          hint: expect.stringContaining("betomikOrderbookImportRun.rowCount must be bracketed: [rowCount]"),
+        });
+      });
+
+      test("a misplaced keyword that is no column keeps the original error untouched", async () => {
+        const original = new CliError("SQL error: Incorrect syntax near the keyword 'WHERE'.", 400, null, 4);
+        post().mockRejectedValueOnce(original);
+        get().mockResolvedValueOnce({ columns: [{ name: "keikkaId" }] });
+
+        await expect(runSchemaQuery(mockClient, "SELECT * FROM keikka WHERE")).rejects.toBe(original);
+      });
+    });
+
     // fb#1788: three consecutive exit-4s guessing `vehicle.plate` (real:
     // vehicleRegNo) — the message has no table context, but the query does.
     describe("an Invalid column name failure (fb#1788)", () => {
