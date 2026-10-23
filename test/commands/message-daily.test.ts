@@ -35,7 +35,11 @@ describe("toYyyymmdd", () => {
   });
 
   test("rejects garbage with exit 4", () => {
-    expect(() => toYyyymmdd("not-a-date")).toThrowError();
+    expect(() => toYyyymmdd("not-a-date")).toThrowError(/^--date must be/);
+  });
+
+  test("names the caller's flag in the error (drivers uses --from)", () => {
+    expect(() => toYyyymmdd("banana", "--from")).toThrowError(/^--from must be/);
   });
 });
 

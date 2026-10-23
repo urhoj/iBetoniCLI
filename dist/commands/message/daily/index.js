@@ -8,9 +8,10 @@ import { listEnvelope } from "../../../api/envelopes.js";
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
  * `today`/`yesterday`/`tomorrow` and `YYYY-MM-DD` (via {@link resolveDate}),
  * a bare `YYYYMMDD`, and the sentinel `00000000` (the undated "default" box).
- * Anything else exits 4 — the daily routes validate the same way server-side.
+ * Anything else exits 4 — the daily routes validate the same way server-side. `flag` names the
+ * flag in that error (`--from` on `drivers`).
  */
-export function toYyyymmdd(input) {
+export function toYyyymmdd(input, flag = "--date") {
     if (input === "00000000")
         return input;
     if (/^\d{8}$/.test(input))
@@ -18,7 +19,7 @@ export function toYyyymmdd(input) {
     const iso = resolveDate(input); // today/yesterday/tomorrow or YYYY-MM-DD passthrough
     if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso))
         return iso.replace(/-/g, "");
-    failWith(`--date must be YYYYMMDD, YYYY-MM-DD, or today/yesterday/tomorrow (got "${input}")`, 4);
+    failWith(`${flag} must be YYYYMMDD, YYYY-MM-DD, or today/yesterday/tomorrow (got "${input}")`, 4);
 }
 function stripSuccess(result) {
     return {
@@ -225,7 +226,7 @@ export function registerMessageDailyCommands(parent, getClient) {
     d.command("drivers")
         .option("--from <date>")
         .option("--days <n>", "", intFlag("--days"))
-        .action(jsonAction(getClient, (client, opts) => runDailyDrivers(client, toYyyymmdd(opts.from ?? "today"), opts.days ?? 7)));
+        .action(jsonAction(getClient, (client, opts) => runDailyDrivers(client, toYyyymmdd(opts.from ?? "today", "--from"), opts.days ?? 7)));
     // content + metadata writes ───────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("set <boxId>")
