@@ -187,7 +187,7 @@ export interface ChangelogAddBody {
   files?: string;
   repo?: string;
   commitShas?: string;
-  versionTag?: string;
+  versionTag?: string | null; // null = clear (update only)
   bumpLevel?: string;
   /** fb#576: a single --feedback id, OR a CSV of several, one link per id. */
   feedbackId?: number | number[];
@@ -1341,7 +1341,9 @@ export function registerChangelogCommands(
     }
     if (o.files) patch.files = filesToJson(o.files);
     if (o.sha) patch.commitShas = o.sha;
-    if (o.vtag) patch.versionTag = o.vtag;
+    // An empty --vtag CLEARS the tag (fb#2765): an entry stamped before it shipped
+    // must become pending again, or the next deploy neither bumps nor stamps it.
+    if (o.vtag !== undefined) patch.versionTag = o.vtag.trim() || null;
     if (o.date) patch.entryDate = resolveDate(o.date)!;
     if (o.bumpLevel !== undefined) patch.bumpLevel = o.bumpLevel;
     if (o.feedback !== undefined) patch.feedbackId = normalizeFeedbackIds(o.feedback);
@@ -1796,7 +1798,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "sha", type: "string", description: "Commit SHAs (CSV); read back as `commitShas`" },
       { name: "commit", type: "string", description: "Alias for --sha" },
       { name: "commit-shas", type: "string", description: "Alias for --sha" },
-      { name: "vtag", type: "string", description: "Version tag" },
+      { name: "vtag", type: "string", description: "Version tag; `--vtag=` clears it (pending again)" },
       {
         name: "bump-level",
         type: "string",
@@ -1808,13 +1810,13 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "feedback",
         type: "string",
         description:
-          "cliFeedback id(s) to link — a single id or CSV, `fb#` anchors accepted. `update` is the CORRECTION path: it records/repairs the link and NEVER changes the row's status (fb#578) — close a row with `ib dev feedback resolve <id> --status applied`; `changelog add` is what advances rows. Linking an ALREADY-resolved row TAKES it (stderr names the displaced entry); hand-written and `Shipped:` notes are preserved (fb#366/576).",
+          "cliFeedback id(s) to link — a single id or CSV, `fb#` anchors accepted. `update` is the CORRECTION path: it records/repairs the link and NEVER changes the row's status — close a row with `ib dev feedback resolve <id> --status applied`; `changelog add` is what advances rows. Linking an ALREADY-resolved row TAKES it (stderr names the displaced entry); hand-written and `Shipped:` notes are preserved.",
       },
       {
         name: "unlink",
         type: "string",
         description:
-          "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback (fb#585), which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback reopen <id>`).",
+          "REMOVE this entry's link to the named cliFeedback id(s) (single id or CSV, `fb#` ok) — the undo for a mistyped --feedback, which ADDS links and cannot correct itself. Repair in one call: `--unlink 541 --feedback 542` (unlink applies first; the same id in both flags exits 4). Clears the junction row and the projections that pointed HERE (auto `Shipped:` notes naming this entry included; hand-written notes kept). Never changes the row's status — a row closed by the removed link stays closed, reported on stderr (reopen via `ib dev feedback reopen <id>`).",
       },
       {
         name: "no-resolve",
@@ -1841,7 +1843,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
           "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, appendDescription, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
           fromJsonNonPayloadDesc(false) +
           " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped)." +
-          " A `changelog get` row round-trips (fb#1814): unchanged columns are dropped; an edited read-only one exits 4.",
+          " A `changelog get` row round-trips: unchanged columns are dropped; an edited read-only one exits 4.",
       },
     ]),
     writeFlags: true,

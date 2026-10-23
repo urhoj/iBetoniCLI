@@ -760,6 +760,17 @@ describe("changelog --summary alias for --description (fb#205)", () => {
       expect.any(Object)
     );
   });
+
+  test.each([["--vtag="], ["--vtag", ""], ["--vtag", "  "]])(
+    "update %s clears the versionTag (sends null, fb#2765)",
+    async (...flag) => {
+      asPut().mockResolvedValue({ changelogId: 3374, versionTag: null });
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(["changelog", "update", "3374", ...flag], { from: "user" });
+      expect(asPut()).toHaveBeenCalledWith("/api/changelog/3374", { versionTag: null }, expect.any(Object));
+    }
+  );
 });
 
 describe("changelog update --append-description (fb#757)", () => {
