@@ -592,7 +592,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { name: "date", type: "date", description: "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)" },
     ],
     outputShape:
-      "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[{ keikkaId, isValid, summary, issues }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
+      "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{id,type,message,fingerprint,priority,priorityName,category,categoryName,field}], dismissed:[{id,type,message,fingerprint,stepLogId,personName,entryTime}] } | day: { items:[{ keikkaId, isValid, summary, issues, dismissed }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
     errors: [
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       apiErr(400, "Bad date / keikkaId", "use YYYY-MM-DD or a positive integer"),
@@ -601,8 +601,51 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     notes: [
       "validationEnabled is the per-company grid master toggle; rules run regardless. Single 404 if the keikka is not visible; day mode validates every keikka for the date.",
     ],
-    seeAlso: ["ib validate", "ib keikka get"],
+    seeAlso: ["ib validate", "ib keikka get", "ib keikka validation dismiss"],
     examples: ["ib keikka validate 9001", "ib keikka validate --date today"],
+  },
+  {
+    command: "ib keikka validation dismiss",
+    description:
+      "Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when the warning's text changes (weather warnings excepted).",
+    permissions: ["order edit: company admin, editor or order handler"],
+    args: [
+      { name: "keikkaId", type: "number", description: "The keikka" },
+      { name: "issueId", type: "string", description: "Issue `id` from `ib keikka validate <keikkaId>` (e.g. MISSING_FACTORY)" },
+    ],
+    flags: [],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ changed, stepLogId } — changed:false when that warning was already dismissed",
+    errors: [
+      { origin: "client", exit: 5, meaning: "No active issue with that id on the keikka", remedy: "list the ids with `ib keikka validate <keikkaId>`; weather and unpaid-invoice warnings are not visible to ib and cannot be dismissed here" },
+      ...authErrors(apiErr(403, "No order-edit role on the keikka's company", "dismissing needs company admin / editor / order handler on the keikka's owner")),
+    ],
+    notes: [
+      "The fingerprint is the warning text the backend validator reports, so the dismissal also applies in the grid drawer. --reason is stored with it as an audit note.",
+    ],
+    seeAlso: ["ib keikka validate", "ib keikka validation undismiss"],
+    examples: ["ib keikka validation dismiss 13053 MISSING_FACTORY --reason \"no plant needed\""],
+  },
+  {
+    command: "ib keikka validation undismiss",
+    description: "Restore a dismissed validation warning on a keikka (the grid drawer's Palauta).",
+    permissions: ["order edit: company admin, editor or order handler"],
+    args: [
+      { name: "keikkaId", type: "number", description: "The keikka" },
+      { name: "issueId", type: "string", description: "Issue `id` from the `dismissed` list of `ib keikka validate <keikkaId>`" },
+    ],
+    flags: [],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ changed } — changed:false when it was already restored",
+    errors: [
+      { origin: "client", exit: 5, meaning: "That issue is not dismissed on the keikka", remedy: "see `dismissed` in `ib keikka validate <keikkaId>`" },
+      ...authErrors(apiErr(403, "No order-edit role on the keikka's company", "restoring needs company admin / editor / order handler on the keikka's owner")),
+      apiErr(404, "The dismissal belongs to another keikka", "re-read `ib keikka validate <keikkaId>`"),
+    ],
+    seeAlso: ["ib keikka validation dismiss", "ib keikka validate"],
+    examples: ["ib keikka validation undismiss 13053 MISSING_FACTORY"],
   },
 
   // ─── stats (1) ───────────────────────────────────────────────────────────

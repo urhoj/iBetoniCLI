@@ -661,6 +661,64 @@ export async function runKeikkaValidate(
   return failWith("Pass a keikkaId or --date <YYYY-MM-DD>", 4);
 }
 
+/** One issue as `GET /api/cli/keikka/validate/:id` projects it (fb#2802 adds id + fingerprint). */
+interface ValidatedIssue {
+  id?: string;
+  message: string;
+  fingerprint?: string;
+}
+interface ValidationResult {
+  issues?: ValidatedIssue[];
+  dismissed?: Array<ValidatedIssue & { stepLogId: number }>;
+}
+
+/**
+ * Per-order dismissal of a Keikkavalidointi warning (fb#2802). The fingerprint is
+ * never built here: it is taken from the backend validator's own projection, so a
+ * dismissal made from `ib` matches the one the grid drawer shows.
+ * POST /api/keikka-validation/dismiss — the server honours X-Dry-Run.
+ */
+export async function runValidationDismiss(
+  client: ApiClient,
+  opts: { keikkaId: number; issueId: string },
+  flags: WriteFlags
+): Promise<unknown> {
+  const result = await client.get<ValidationResult>(`/api/cli/keikka/validate/${opts.keikkaId}`);
+  const issue = (result.issues ?? []).find((i) => i.id === opts.issueId);
+  if (!issue?.fingerprint) {
+    return failWith(
+      `No active issue ${opts.issueId} on keikka ${opts.keikkaId}; list them with \`ib keikka validate ${opts.keikkaId}\``,
+      5
+    );
+  }
+  return client.post(
+    "/api/keikka-validation/dismiss",
+    { keikkaId: opts.keikkaId, issueId: opts.issueId, fingerprint: issue.fingerprint, message: issue.message },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/** Undo a dismissal: resolves the dismissed issue id to its stepLogId (fb#2802). */
+export async function runValidationUndismiss(
+  client: ApiClient,
+  opts: { keikkaId: number; issueId: string },
+  flags: WriteFlags
+): Promise<unknown> {
+  const result = await client.get<ValidationResult>(`/api/cli/keikka/validate/${opts.keikkaId}`);
+  const dismissed = (result.dismissed ?? []).find((i) => i.id === opts.issueId);
+  if (!dismissed) {
+    return failWith(
+      `Issue ${opts.issueId} is not dismissed on keikka ${opts.keikkaId}; see \`dismissed\` in \`ib keikka validate ${opts.keikkaId}\``,
+      5
+    );
+  }
+  return client.post(
+    "/api/keikka-validation/undismiss",
+    { keikkaId: opts.keikkaId, stepLogId: dismissed.stepLogId },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
 /** One raw row from GET /api/cli/keikka/persons/:keikkaId (keikkaPerson + person + source JOIN). */
 interface KeikkaPersonRawRow {
   keikkaPersonId: number;
@@ -1062,6 +1120,20 @@ export function registerKeikkaCommands(
         writeJson(result);
       })
     );
+
+  // Per-order dismissal of Keikkavalidointi warnings (fb#2802)
+  const validation = k.command("validation").description("Dismiss or restore a validation warning on one keikka");
+  for (const [verb, run] of [
+    ["dismiss", runValidationDismiss],
+    ["undismiss", runValidationUndismiss],
+  ] as const) {
+    addWriteFlagsToCommand(validation.command(`${verb} <keikkaId> <issueId>`)).action(
+      guarded(async (idStr: string, issueId: string, opts: WriteFlags) => {
+        const client = await getClient();
+        writeJson(await run(client, { keikkaId: parseId(idStr, "keikkaId"), issueId }, opts));
+      })
+    );
+  }
 
   const createCmd = addJsonBodyOptions(k.command("create"));
   addWriteFlagsToCommand(createCmd).action(

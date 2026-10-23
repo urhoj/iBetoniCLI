@@ -8672,7 +8672,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[{ keikkaId, isValid, summary, issues }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }
+  single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{id,type,message,fingerprint,priority,priorityName,category,categoryName,field}], dismissed:[{id,type,message,fingerprint,stepLogId,personName,entryTime}] } | day: { items:[{ keikkaId, isValid, summary, issues, dismissed }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Keikka not found OR outside your visible scope → verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically
@@ -8685,11 +8685,99 @@ NOTES
   - validationEnabled is the per-company grid master toggle; rules run regardless. Single 404 if the keikka is not visible; day mode validates every keikka for the date.
 
 SEE ALSO
-  ib validate, ib keikka get
+  ib validate, ib keikka get, ib keikka validation dismiss
 
 EXAMPLES
   ib keikka validate 9001
   ib keikka validate --date today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka validation dismiss matches snapshot 1`] = `
+"USAGE
+  ib keikka validation dismiss <keikkaId> <issueId> [flags]
+
+DESCRIPTION
+  Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when the warning's text changes (weather warnings excepted).
+  Permissions: requires order edit: company admin, editor or order handler.
+
+ARGUMENTS
+  <keikkaId> NUMBER    The keikka (required)
+  <issueId> STRING    Issue \`id\` from \`ib keikka validate <keikkaId>\` (e.g. MISSING_FACTORY) (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { changed, stepLogId } — changed:false when that warning was already dismissed
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (client-side)  No active issue with that id on the keikka → list the ids with \`ib keikka validate <keikkaId>\`; weather and unpaid-invoice warnings are not visible to ib and cannot be dismissed here
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No order-edit role on the keikka's company → dismissing needs company admin / editor / order handler on the keikka's owner
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The fingerprint is the warning text the backend validator reports, so the dismissal also applies in the grid drawer. --reason is stored with it as an audit note.
+
+SEE ALSO
+  ib keikka validate, ib keikka validation undismiss
+
+EXAMPLES
+  ib keikka validation dismiss 13053 MISSING_FACTORY --reason "no plant needed"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka validation undismiss matches snapshot 1`] = `
+"USAGE
+  ib keikka validation undismiss <keikkaId> <issueId> [flags]
+
+DESCRIPTION
+  Restore a dismissed validation warning on a keikka (the grid drawer's Palauta).
+  Permissions: requires order edit: company admin, editor or order handler.
+
+ARGUMENTS
+  <keikkaId> NUMBER    The keikka (required)
+  <issueId> STRING    Issue \`id\` from the \`dismissed\` list of \`ib keikka validate <keikkaId>\` (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { changed } — changed:false when it was already restored
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (client-side)  That issue is not dismissed on the keikka → see \`dismissed\` in \`ib keikka validate <keikkaId>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No order-edit role on the keikka's company → restoring needs company admin / editor / order handler on the keikka's owner
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  The dismissal belongs to another keikka → re-read \`ib keikka validate <keikkaId>\`
+
+SEE ALSO
+  ib keikka validation dismiss, ib keikka validate
+
+EXAMPLES
+  ib keikka validation undismiss 13053 MISSING_FACTORY
 "
 `;
 
