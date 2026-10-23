@@ -9,7 +9,7 @@ import type { CommandError } from "../../output/help.js";
 
 // Shared by create/update (fb#2770): its OWN row, so an enum error is never
 // answered with another field's remedy ("description is required").
-const ENUM_ERR: CommandError = { origin: "client", exit: 4, match: "must be one of", meaning: "Enum value rejected (all bad flags named at once)", remedy: "each part lists the allowed values and the closest one; the accepted aliases are on --scope/--severity" };
+const ENUM_ERR: CommandError = { origin: "client", exit: 4, match: "must be one of", meaning: "Enum value rejected (all bad flags at once)", remedy: "each part lists the allowed values (+ a did-you-mean if one fits); aliases listed on those flags" };
 
 // Shared by `update` and `resolve` (fb#2186), which validate gates identically.
 const GATE_REF_LENGTH_ERR: CommandError = { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in the row's description or note` };
@@ -59,7 +59,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "body", type: "string", description: "Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match" },
       { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
       { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (fb#369)", allowed: [...FEEDBACK_KINDS] },
-      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings). Aliases: puminet4/puminet5api/backend/frontend → app, betonijerry → jerry, betonicli → cli", allowed: [...FEEDBACK_SCOPES] },
+      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings). Aliases: puminet4/puminet5api/backend/frontend/be/fe/api → app, betonijerry → jerry, betonicli/ib → cli", allowed: [...FEEDBACK_SCOPES] },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
       { name: "error", type: "string", description: "Error message you hit, if any" },
       { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. Aliases: kriittinen/korkea/normaali/matala. high/medium/low/blocker/trivial exit 4 with a `did you mean`. See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
@@ -74,7 +74,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       ENUM_ERR,
-      { origin: "client", exit: 4, match: "is required", meaning: "No description was given", remedy: "pass it positionally, via --description/--body, or --title" },
+      { origin: "client", exit: 4, match: "is required", meaning: "No description was given", remedy: "positional, --description/--body, or --title" },
       { origin: "client", exit: 4, match: "must be an integer", meaning: "--complexity is not 1-5", remedy: "see `ib help complexity`" },
       { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in the description` },
       { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400", remedy: "pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow" },
@@ -117,11 +117,11 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
       { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
       { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other (aliases as on `feedback create`)", allowed: [...FEEDBACK_SCOPES] },
       { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText" },
       { name: "complexity", type: "string", description: "Only items with this exact complexity 1-5, or `none` for rows with NO estimate. ⚠ A numeric value EXCLUDES unestimated rows — absent means unestimated, not complex." },
       { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls. ⚠ EXCLUDES unestimated rows; `--complexity none` finds those." },
-      { name: "severity", type: "string", description: "Only items with this exact severity, or `none` for rows with NO grade. An unknown value is REJECTED (exit 4), never answered with the whole table.", allowed: [...FEEDBACK_SEVERITY_FILTERS] },
+      { name: "severity", type: "string", description: "Only items with this severity (Finnish aliases accepted), or `none` for ungraded rows. Unknown → exit 4, never the whole table.", allowed: [...FEEDBACK_SEVERITY_FILTERS] },
       { name: "oldest", type: "boolean", description: "Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first" },
       { name: "limit", type: "number", default: "50", description: "Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets `truncated: true` — the 50 default counts, not just an over-ask (fb#605, fb#1439)." },
       { name: "offset", type: "number", default: "0", description: "Skip N rows — how you reach anything beyond the 200-row cap. `--limit 200`, then `--limit 200 --offset 200`, and so on." },
@@ -154,7 +154,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: ["--gated / --ungated"], meaning: "Validation (--gated/--ungated conflict)", remedy: "pass only one of --gated [kind] or --ungated — complements, cannot both apply" },
       { origin: "client", exit: 4, match: ["must be a duration with a unit"], meaning: "--min-age has no unit or is unparseable (client-side, before any request)", remedy: "pass <n>m, <n>h or <n>d, e.g. --min-age 12h — a bare number is refused, not guessed: minutes vs hours is a silent 60x" },
       { origin: "client", exit: 4, match: ["--unclaimed / --mine / --claimed-by / --held"], meaning: "Validation (claim-filter conflict)", remedy: "pass only one of --unclaimed / --mine / --claimed-by <label> / --held" },
-      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: `--status: ${FEEDBACK_STATUSES.join("|")}; --kind: ${FEEDBACK_KINDS.join("|")}; --scope: ${FEEDBACK_SCOPES.join("|")}; --severity: ${FEEDBACK_SEVERITY_FILTERS.join("|")}; --gated value: ${FEEDBACK_GATED_FILTERS.join("|")} — STRICT server filters, unknown value -> empty list, not an error` },
+      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: `--status: ${FEEDBACK_STATUSES.join("|")}; --kind: ${FEEDBACK_KINDS.join("|")}; --scope: ${FEEDBACK_SCOPES.join("|")}; --severity: ${FEEDBACK_SEVERITY_FILTERS.join("|")}; --gated value: ${FEEDBACK_GATED_FILTERS.join("|")} — unknown → exit 4; aliases as on \`feedback create\`` },
       intParseErr("--max-complexity", "pass an integer 1-5"),
       limitErr("pass a positive integer; this command caps at 200 — page past it with --offset"),
       intParseErr("--offset", "pass a non-negative integer row offset", 0),
@@ -595,7 +595,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     tier: "developer",
     flags: [
       { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind", allowed: [...FEEDBACK_KINDS] },
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope (aliases as on `feedback create`)", allowed: [...FEEDBACK_SCOPES] },
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all. STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted", allowed: [...FEEDBACK_STATUSES] },
       { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed rows) — same as the default; mutually exclusive with --status/--all" },
       { name: "all", type: "boolean", description: "Count EVERY status (the whole table) — restores the pre-fb#1192 behaviour; mutually exclusive with --status/--unresolved" },
@@ -613,7 +613,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // carry the enum remedy and vice versa. `count` has no --gated/claim
       // flags, so only these two rows are needed here (contrast `list`'s 4).
       { origin: "client", exit: 4, match: ["--all, --unresolved", "--all, --status", "--unresolved, --status"], meaning: "Validation (status-selector conflict)", remedy: "pass only ONE of --all / --unresolved / --status — no flag is already --unresolved" },
-      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: "--kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — all STRICT server-side filters, an unknown value reports total:0, not an error" },
+      { origin: "client", exit: 4, match: ["must be one of"], meaning: "Validation (enum value rejected)", remedy: "--kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — unknown → exit 4; --scope aliases as on `feedback create`" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       ...COMMON_AUTH_ERRORS,
     ],

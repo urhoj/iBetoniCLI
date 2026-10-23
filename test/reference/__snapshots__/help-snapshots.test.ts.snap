@@ -4374,7 +4374,7 @@ DESCRIPTION
 
 FLAGS
   --kind STRING    improvement | bug | idea | legal — count only this kind
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope (aliases as on \`feedback create\`)
   --status STRING    open | reviewed | applied | dismissed, or a comma-separated list — count only these statuses; mutually exclusive with --unresolved/--all. STRICT: 'resolved' is recognized in the exit-4 did-you-mean (→ applied) but not accepted
   --unresolved    Shortcut for --status open,reviewed (un-closed rows) — same as the default; mutually exclusive with --status/--all
   --all    Count EVERY status (the whole table) — restores the pre-fb#1192 behaviour; mutually exclusive with --status/--unresolved
@@ -4388,7 +4388,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation (status-selector conflict) → pass only ONE of --all / --unresolved / --status — no flag is already --unresolved
-  exit 4 (client-side)  Validation (enum value rejected) → --kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — all STRICT server-side filters, an unknown value reports total:0, not an error
+  exit 4 (client-side)  Validation (enum value rejected) → --kind must be improvement|bug|idea|legal; --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --status values open|reviewed|applied|dismissed — unknown → exit 4; --scope aliases as on \`feedback create\`
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4428,7 +4428,7 @@ FLAGS
   --body STRING    Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match
   --title STRING    Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description.
   --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (fb#369) (default: improvement)
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings). Aliases: puminet4/puminet5api/backend/frontend → app, betonijerry → jerry, betonicli → cli (default: cli)
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings). Aliases: puminet4/puminet5api/backend/frontend/be/fe/api → app, betonijerry → jerry, betonicli/ib → cli (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. Aliases: kriittinen/korkea/normaali/matala. high/medium/low/blocker/trivial exit 4 with a \`did you mean\`. See \`ib help severity\`
@@ -4447,8 +4447,8 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Enum value rejected (all bad flags named at once) → each part lists the allowed values and the closest one; the accepted aliases are on --scope/--severity
-  exit 4 (client-side)  No description was given → pass it positionally, via --description/--body, or --title
+  exit 4 (client-side)  Enum value rejected (all bad flags at once) → each part lists the allowed values (+ a did-you-mean if one fits); aliases listed on those flags
+  exit 4 (client-side)  No description was given → positional, --description/--body, or --title
   exit 4 (client-side)  --complexity is not 1-5 → see \`ib help complexity\`
   exit 4 (client-side)  --gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400 → shorten to 200 chars; long rationale goes in the description
   exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400 → pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow
@@ -4691,11 +4691,11 @@ FLAGS
   --unresolved    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
   --all    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other (aliases as on \`feedback create\`)
   --search STRING    Substring match over description/command/resolution/errorText
   --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for rows with NO estimate. ⚠ A numeric value EXCLUDES unestimated rows — absent means unestimated, not complex.
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls. ⚠ EXCLUDES unestimated rows; \`--complexity none\` finds those.
-  --severity STRING    Only items with this exact severity, or \`none\` for rows with NO grade. An unknown value is REJECTED (exit 4), never answered with the whole table.
+  --severity STRING    Only items with this severity (Finnish aliases accepted), or \`none\` for ungraded rows. Unknown → exit 4, never the whole table.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured. ANY capped page warns on stderr and sets \`truncated: true\` — the 50 default counts, not just an over-ask (fb#605, fb#1439). (default: 50)
   --offset NUMBER    Skip N rows — how you reach anything beyond the 200-row cap. \`--limit 200\`, then \`--limit 200 --offset 200\`, and so on. (default: 0)
@@ -4720,7 +4720,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation (--gated/--ungated conflict) → pass only one of --gated [kind] or --ungated — complements, cannot both apply
   exit 4 (client-side)  --min-age has no unit or is unparseable (client-side, before any request) → pass <n>m, <n>h or <n>d, e.g. --min-age 12h — a bare number is refused, not guessed: minutes vs hours is a silent 60x
   exit 4 (client-side)  Validation (claim-filter conflict) → pass only one of --unclaimed / --mine / --claimed-by <label> / --held
-  exit 4 (client-side)  Validation (enum value rejected) → --status: open|reviewed|applied|dismissed; --kind: improvement|bug|idea|legal; --scope: cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --severity: critical|major|minor|cosmetic|none; --gated value: deploy|soak|legal|owner|owner-decision|owner-action|backlog|owner-any — STRICT server filters, unknown value -> empty list, not an error
+  exit 4 (client-side)  Validation (enum value rejected) → --status: open|reviewed|applied|dismissed; --kind: improvement|bug|idea|legal; --scope: cli|app|jerry|bsg2|workspace|security|ops|impeccable|other; --severity: critical|major|minor|cosmetic|none; --gated value: deploy|soak|legal|owner|owner-decision|owner-action|backlog|owner-any — unknown → exit 4; aliases as on \`feedback create\`
   exit 4 (client-side)  --max-complexity is not an integer >= 1, rejected locally before any request → pass an integer 1-5
   exit 4 (client-side)  --limit is not an integer >= 1, rejected locally before any request → pass a positive integer; this command caps at 200 — page past it with --offset
   exit 4 (client-side)  --offset is not an integer >= 0, rejected locally before any request → pass a non-negative integer row offset
@@ -5012,7 +5012,7 @@ OUTPUT (JSON, stdout)
   A compact ack { feedbackId, scope, kind, severity, complexity, gateKind, gateRef, gateUntil, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Enum value rejected (all bad flags named at once) → each part lists the allowed values and the closest one; the accepted aliases are on --scope/--severity
+  exit 4 (client-side)  Enum value rejected (all bad flags at once) → each part lists the allowed values (+ a did-you-mean if one fits); aliases listed on those flags
   exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
   exit 4 (client-side)  --gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400 → shorten to 200 chars; long rationale goes in the row's description or note
   exit 4 (client-side)  --gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400 → pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it

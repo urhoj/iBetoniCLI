@@ -3,7 +3,7 @@ import { Command } from "commander";
 import {
   addOwnerOption,
   assertEnum,
-  assertEnums,
+  validateAll,
   assertEnumCsv,
   numFlag,
   parseId,
@@ -15,6 +15,7 @@ import {
   zeroOneFlag,
 } from "../src/targets.js";
 import { todayHelsinki } from "../src/dates.js";
+import { CliError } from "../src/api/errors.js";
 
 /** Run fn and return the CliError exitCode it threw (or undefined if it didn't throw). */
 const exitCodeOf = (fn: () => void): number | undefined => {
@@ -396,29 +397,57 @@ describe("assertEnum (fb#369 — one retry, not a guess)", () => {
   });
 });
 
-describe("assertEnums (fb#2767 — every bad flag in one envelope)", () => {
+describe("validateAll (fb#2767/fb#2832 — every bad flag in one envelope)", () => {
   const KINDS = ["improvement", "bug"] as const;
   const SCOPES = ["cli", "app"] as const;
 
   test("all valid / undefined is a no-op", () => {
     expect(() =>
-      assertEnums([
-        { value: "bug", allowed: KINDS, flag: "--kind" },
-        { value: undefined, allowed: SCOPES, flag: "--scope" },
-      ])
+      validateAll(
+        () => assertEnum("bug", KINDS, "--kind"),
+        () => assertEnum(undefined, SCOPES, "--scope")
+      )
     ).not.toThrow();
   });
 
   test("two bad flags are both named, in order, exit 4", () => {
     const err = errorOf(() =>
-      assertEnums([
-        { value: "bugs", allowed: KINDS, flag: "--kind" },
-        { value: "nope", allowed: SCOPES, flag: "--scope" },
-      ])
+      validateAll(
+        () => assertEnum("bugs", KINDS, "--kind"),
+        () => assertEnum("nope", SCOPES, "--scope")
+      )
     );
     expect(err?.exitCode).toBe(4);
     expect(err?.message).toBe(
       "--kind must be one of: improvement, bug — did you mean bug?; --scope must be one of: cli, app"
     );
+  });
+
+  test("a single failure is rethrown unchanged, its hint kept", () => {
+    const original = new CliError("--x is bad", 0, null, 4, "custom hint");
+    const err = errorOf(() =>
+      validateAll(
+        () => {
+          throw original;
+        },
+        () => assertEnum("bug", KINDS, "--kind")
+      )
+    );
+    expect(err).toBe(original);
+  });
+
+  test("a non-validation error propagates at once, later checks never run", () => {
+    let ran = false;
+    expect(() =>
+      validateAll(
+        () => {
+          throw new Error("boom");
+        },
+        () => {
+          ran = true;
+        }
+      )
+    ).toThrow("boom");
+    expect(ran).toBe(false);
   });
 });

@@ -56,29 +56,31 @@ export function assertEnum(
   flag: string,
   synonyms?: Record<string, string>
 ): void {
-  assertEnums([{ value, allowed, flag, synonyms }]);
-}
-
-export interface EnumCheck {
-  value: string | undefined;
-  allowed: readonly string[];
-  flag: string;
-  synonyms?: Record<string, string>;
+  if (value !== undefined && !allowed.includes(value)) {
+    const guess = enumGuess(value, allowed, synonyms);
+    const hint = guess ? ` — did you mean ${guess}?` : "";
+    failWith(`${flag} must be one of: ${allowed.join(", ")}${hint}`, 4);
+  }
 }
 
 /**
- * {@link assertEnum} over several flags at once: EVERY invalid one is named in a
- * single exit-4 message (`; `-joined), so `--scope puminet4 --severity low`
- * costs one retry instead of two (fb#2767/fb#2783).
+ * Run several client-side validators and report EVERY exit-4 failure in one
+ * `; `-joined message, so `--scope puminet4 --severity low` costs one retry
+ * instead of two (fb#2767, fb#2832). A single failure is rethrown unchanged
+ * (its own hint kept); anything that is not a client exit-4 propagates at once.
  */
-export function assertEnums(checks: readonly EnumCheck[]): void {
-  const errors = checks.flatMap(({ value, allowed, flag, synonyms }) => {
-    if (value === undefined || allowed.includes(value)) return [];
-    const guess = enumGuess(value, allowed, synonyms);
-    const hint = guess ? ` — did you mean ${guess}?` : "";
-    return [`${flag} must be one of: ${allowed.join(", ")}${hint}`];
-  });
-  if (errors.length) failWith(errors.join("; "), 4);
+export function validateAll(...checks: Array<() => void>): void {
+  const failures: CliError[] = [];
+  for (const check of checks) {
+    try {
+      check();
+    } catch (e) {
+      if (!(e instanceof CliError && e.statusCode === 0 && e.exitCode === 4)) throw e;
+      failures.push(e);
+    }
+  }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length) failWith(failures.map((f) => f.message).join("; "), 4);
 }
 
 /**

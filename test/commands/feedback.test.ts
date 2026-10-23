@@ -3819,7 +3819,7 @@ describe("ib dev feedback — enum aliases + all-at-once validation (fb#2767/277
       const spec = COMMAND_SPECS.find((s) => s.command === command)!;
       const err = new CliError("--scope must be one of: cli, app — did you mean app?", 0, null, 4);
       const { hint } = hintDetailForError(err, spec.errors);
-      expect(hint).toMatch(/aliases are on --scope/);
+      expect(hint).toMatch(/aliases listed on those flags/);
       expect(hint).not.toMatch(/description is required|provide at least one of/);
     }
   );
@@ -3827,7 +3827,65 @@ describe("ib dev feedback — enum aliases + all-at-once validation (fb#2767/277
   test("create: a missing description still gets the description remedy", () => {
     const spec = COMMAND_SPECS.find((s) => s.command === "ib dev feedback create")!;
     const { hint } = hintDetailForError(new CliError("description is required", 0, null, 4), spec.errors);
-    expect(hint).toMatch(/positionally/);
+    expect(hint).toMatch(/positional, --description/);
     expect(hint).not.toMatch(/aliases/);
+  });
+});
+
+/**
+ * fb#2832: the validators that lived OUTSIDE the batched check (update's
+ * --gate-kind via gateFields, list/count's --status via resolveStatuses) now
+ * report in the same envelope. fb#2835: import alias notes name their entry,
+ * and a JSON/import severity is case-folded like the --severity flag.
+ */
+describe("ib dev feedback — remaining validators batched, import notes (fb#2832/fb#2835)", () => {
+  let cap: StderrCapture;
+  beforeEach(() => {
+    cap = captureStderr();
+  });
+  afterEach(() => cap.restore());
+
+  test("update names a bad --scope AND a bad --gate-kind in one message", async () => {
+    const err = await runFeedbackUpdate(mockClient, 1, { scope: "nope", gateKind: "zzz" }).catch((e) => e);
+    expect(err).toMatchObject({ exitCode: 4 });
+    expect(err.message).toContain("--scope must be one of");
+    expect(err.message).toContain("--gate-kind must be one of");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("update: an empty --gate-kind still clears instead of failing", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackUpdate(mockClient, 1, { gateKind: "" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/1", { gateKind: "" }, expect.anything());
+  });
+
+  test("list names a bad --scope AND a bad --status in one message", async () => {
+    const err = await runFeedbackList(mockClient, { scope: "nope", status: "zzz" }).catch((e) => e);
+    expect(err.message).toContain("--scope must be one of");
+    expect(err.message).toContain("--status: unknown value(s) zzz");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("count names a bad --kind AND a bad --status in one message", async () => {
+    const err = await runFeedbackCount(mockClient, { kind: "nope", status: "zzz" }).catch((e) => e);
+    expect(err.message).toContain("--kind must be one of");
+    expect(err.message).toContain("--status: unknown value(s) zzz");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("import prefixes each alias note with its entry index", async () => {
+    post.mockResolvedValue({ feedbackId: 1 });
+    await runFeedbackImport(mockClient, [
+      { description: "a", scope: "cli" },
+      { description: "b", scope: "backend" },
+    ]);
+    expect(cap.text()).toContain("[ib] entry 1: --scope backend → app");
+    expect(cap.text()).not.toContain("entry 0:");
+  });
+
+  test.each(["Major", "MINOR"])("a JSON/import severity %s is case-folded like the flag", async (given) => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", severity: given });
+    expect(post.mock.calls[0][1]).toMatchObject({ severity: given.toLowerCase() });
   });
 });
