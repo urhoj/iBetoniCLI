@@ -23,7 +23,7 @@ import {
   warnIfCapReached,
 } from "../../api/listCaps.js";
 import { failWith, warnNote, writeJson } from "../../output/json.js";
-import { assertEnum, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../../targets.js";
+import { assertEnum, assertEnums, assertEnumCsv, parseRefId, intFlag, cappedInt } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
@@ -209,6 +209,48 @@ const SCOPE_SYNONYMS: Record<string, string> = {
   doc: "workspace",
   documentation: "workspace",
 };
+
+/**
+ * ACCEPTED aliases — the one carve-out from the hint-never-rewrite rule above,
+ * owner call 2026-10-23 (fb#2783/fb#2767). The Finnish words are the SAME
+ * scale `ib dev changelog add` uses, and the repo names are where an agent's
+ * hand goes first; both map to exactly one value, unlike high/low. Each rewrite
+ * is announced on stderr by {@link applyAlias}, so it is never silent.
+ */
+export const SEVERITY_ALIASES: Record<string, string> = {
+  kriittinen: "critical",
+  korkea: "major",
+  normaali: "minor",
+  matala: "cosmetic",
+};
+export const SCOPE_ALIASES: Record<string, string> = {
+  puminet4: "app",
+  puminet5api: "app",
+  backend: "app",
+  frontend: "app",
+  be: "app",
+  fe: "app",
+  api: "app",
+  betonijerry: "jerry",
+  betonicli: "cli",
+  ib: "cli",
+};
+
+/** Rewrite an accepted alias to its canonical value, with a stderr note; anything else passes through. */
+function applyAlias(value: string | undefined, aliases: Record<string, string>, flag: string): string | undefined {
+  const canonical = value === undefined ? undefined : aliases[value.trim().toLowerCase()];
+  if (!canonical) return value;
+  warnNote(`[ib] ${flag} ${value} → ${canonical}`);
+  return canonical;
+}
+
+/** A copy of `input` with its --scope/--severity aliases resolved (create/update/list/count). */
+function withAliases<T extends { scope?: string; severity?: string }>(input: T): T {
+  const out = { ...input };
+  if (input.scope !== undefined) out.scope = applyAlias(input.scope, SCOPE_ALIASES, "--scope");
+  if (input.severity !== undefined) out.severity = applyAlias(input.severity, SEVERITY_ALIASES, "--severity");
+  return out;
+}
 
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
 // (severity = urgency/impact; complexity = effort + how autonomously an agent
@@ -722,20 +764,23 @@ interface FeedbackCreateBody {
   context?: { conversationId: number };
 }
 
-function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
+function buildCreateBody(raw: FeedbackCreateInput): FeedbackCreateBody {
+  const input = withAliases(raw);
   const description = input.description?.trim();
   if (!description) {
     failWith("description is required", 4);
   }
-  // All three enums are STRICT (feedback #369). --kind used to fall back to
-  // "improvement" on an unknown value while its two siblings — and `update`'s
-  // own --kind — exited 4, so a bug filed as `--kind bugs` was silently
-  // relabelled an improvement and returned a success + feedbackId: the caller
-  // moved on and the row was mis-triaged with nothing recording the rewrite.
-  assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
-  assertEnum(input.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
-  assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
-  if (input.gateKind) assertEnum(input.gateKind, GATE_KINDS, "--gate-kind");
+  // All enums are STRICT (feedback #369) apart from the announced aliases. --kind
+  // used to fall back to "improvement" on an unknown value while its siblings —
+  // and `update`'s own --kind — exited 4, so a bug filed as `--kind bugs` was
+  // silently relabelled an improvement and returned a success + feedbackId: the
+  // caller moved on and the row was mis-triaged with nothing recording the rewrite.
+  assertEnums([
+    { value: input.kind, allowed: KINDS, flag: "--kind", synonyms: KIND_SYNONYMS },
+    { value: input.scope, allowed: SCOPES, flag: "--scope", synonyms: SCOPE_SYNONYMS },
+    { value: input.severity, allowed: SEVERITIES, flag: "--severity", synonyms: SEVERITY_SYNONYMS },
+    { value: input.gateKind || undefined, allowed: GATE_KINDS, flag: "--gate-kind" },
+  ]);
   const body: FeedbackCreateBody = {
     kind: (input.kind as Kind) ?? "improvement",
     scope: (input.scope as Scope) ?? "cli",
@@ -982,15 +1027,7 @@ export async function runFeedbackList(
   client: ApiClient,
   opts: FeedbackListOptions
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  assertEnum(opts.kind, KINDS, "--kind");
-  assertEnum(opts.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
-  // SEVERITY_FILTERS, not SEVERITIES: `none` is a legal filter value, so it has
-  // to be IN the allowed list rather than bypassed around the check — bypassing
-  // left it out of the rejection message. `high`/`medium`/`low` are the
-  // vocabulary most issue trackers use and are too far from ours for edit
-  // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
-  // rather than a bare enum dump.
-  assertEnum(opts.severity, SEVERITY_FILTERS, "--severity", SEVERITY_SYNONYMS);
+  opts = withAliases(opts);
   // --gated [kind]: Commander sets `true` for the bare flag, a kind string for
   // `--gated deploy`. Sent SERVER-SIDE as `gated` (fb#1198).
   //
@@ -1002,9 +1039,20 @@ export async function runFeedbackList(
   // newest-first, the rows it dropped were the OLDEST, i.e. exactly the
   // longest-blocked ones the flag exists to surface.
   const gatedKind = typeof opts.gated === "string" ? opts.gated : undefined;
-  // GATED_FILTERS, not GATE_KINDS: `--gated owner-any` selects the whole
-  // human-blocked set and is not itself a storable kind (fb#1251).
-  if (gatedKind) assertEnum(gatedKind, GATED_FILTERS, "--gated");
+  assertEnums([
+    { value: opts.kind, allowed: KINDS, flag: "--kind" },
+    { value: opts.scope, allowed: SCOPES, flag: "--scope", synonyms: SCOPE_SYNONYMS },
+    // SEVERITY_FILTERS, not SEVERITIES: `none` is a legal filter value, so it has
+    // to be IN the allowed list rather than bypassed around the check — bypassing
+    // left it out of the rejection message. `high`/`medium`/`low` are the
+    // vocabulary most issue trackers use and are too far from ours for edit
+    // distance to bridge, so SEVERITY_SYNONYMS carries them to a did-you-mean
+    // rather than a bare enum dump.
+    { value: opts.severity, allowed: SEVERITY_FILTERS, flag: "--severity", synonyms: SEVERITY_SYNONYMS },
+    // GATED_FILTERS, not GATE_KINDS: `--gated owner-any` selects the whole
+    // human-blocked set and is not itself a storable kind (fb#1251).
+    { value: gatedKind || undefined, allowed: GATED_FILTERS, flag: "--gated" },
+  ]);
   // "any" is the wire spelling of the bare flag; the backend rejects an unknown
   // value rather than answering unfiltered, so a typo can never widen this.
   const gated = opts.gated ? (gatedKind ?? "any") : undefined;
@@ -1317,8 +1365,11 @@ export async function runFeedbackCount(
   opts: FeedbackCountOptions
 ): Promise<Record<string, unknown>> {
   // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
-  assertEnum(opts.kind, KINDS, "--kind");
-  assertEnum(opts.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
+  opts = withAliases(opts);
+  assertEnums([
+    { value: opts.kind, allowed: KINDS, flag: "--kind" },
+    { value: opts.scope, allowed: SCOPES, flag: "--scope", synonyms: SCOPE_SYNONYMS },
+  ]);
   // Status scope mirrors `list` (fb#1192): bare count is the ACTIVE bucket, not
   // the whole table — closed rows are where every settled NULL sits, so a
   // whole-table ungraded/unestimated used to read as a backlog that does not
@@ -1855,9 +1906,12 @@ export async function runFeedbackUpdate(
   input: FeedbackUpdateInput,
   current?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  assertEnum(input.scope, SCOPES, "--scope", SCOPE_SYNONYMS);
-  assertEnum(input.kind, KINDS, "--kind", KIND_SYNONYMS);
-  assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
+  input = withAliases(input);
+  assertEnums([
+    { value: input.scope, allowed: SCOPES, flag: "--scope", synonyms: SCOPE_SYNONYMS },
+    { value: input.kind, allowed: KINDS, flag: "--kind", synonyms: KIND_SYNONYMS },
+    { value: input.severity, allowed: SEVERITIES, flag: "--severity", synonyms: SEVERITY_SYNONYMS },
+  ]);
   // Empty string is the documented CLEAR convention (clearHint) — gateFields
   // validates only a non-empty --gate-kind, mirroring assertGateUntil.
   const gate = gateFields(input);

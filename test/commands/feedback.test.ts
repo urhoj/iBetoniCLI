@@ -3734,3 +3734,100 @@ describe("ib feedback reopen", () => {
     }
   });
 });
+
+/**
+ * fb#2767 / fb#2770 / fb#2783: every invalid enum is reported in ONE envelope,
+ * the Finnish severities and repo-name scopes are ACCEPTED aliases (owner call
+ * 2026-10-23, announced on stderr), and an enum error resolves to the enum
+ * remedy rather than one that opens with "description is required".
+ */
+describe("ib dev feedback — enum aliases + all-at-once validation (fb#2767/2770/2783)", () => {
+  let cap: StderrCapture;
+  beforeEach(() => {
+    cap = captureStderr();
+  });
+  afterEach(() => cap.restore());
+
+  test("create names EVERY bad enum in one message", async () => {
+    const err = await runFeedbackCreate(mockClient, { description: "x", scope: "nonsense", severity: "high" }).catch(
+      (e) => e
+    );
+    expect(err).toMatchObject({ exitCode: 4 });
+    expect(err.message).toContain("--scope must be one of");
+    expect(err.message).toContain("--severity must be one of");
+    expect(err.message).toContain("did you mean major?");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["kriittinen", "critical"],
+    ["Korkea", "major"],
+    ["normaali", "minor"],
+    ["Matala", "cosmetic"],
+  ])("create accepts --severity %s as %s and says so on stderr", async (given, canonical) => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", severity: given });
+    expect(post.mock.calls[0][1]).toMatchObject({ severity: canonical });
+    expect(cap.text()).toContain(`--severity ${given} → ${canonical}`);
+  });
+
+  test.each([
+    ["puminet4", "app"],
+    ["puminet5api", "app"],
+    ["backend", "app"],
+    ["Frontend", "app"],
+    ["betonijerry", "jerry"],
+    ["betonicli", "cli"],
+  ])("create accepts --scope %s as %s", async (given, canonical) => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", scope: given });
+    expect(post.mock.calls[0][1]).toMatchObject({ scope: canonical });
+    expect(cap.text()).toContain(`--scope ${given} → ${canonical}`);
+  });
+
+  test("the fb#2783 argv files cleanly: --scope backend --severity Matala", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", scope: "backend", severity: "Matala" });
+    expect(post.mock.calls[0][1]).toMatchObject({ scope: "app", severity: "cosmetic" });
+  });
+
+  test("a canonical value prints no alias note", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "x", scope: "app", severity: "minor" });
+    expect(cap.text()).not.toContain("→");
+  });
+
+  test("update and list resolve the same aliases", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42 });
+    await runFeedbackUpdate(mockClient, 42, { scope: "puminet4", severity: "matala" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "app", severity: "cosmetic" }, expect.anything());
+    get.mockResolvedValue([]);
+    await runFeedbackList(mockClient, { status: "open", scope: "puminet5api" });
+    expect(get.mock.calls[0][0]).toContain("scope=app");
+  });
+
+  test("update names every bad enum in one message", async () => {
+    const err = await runFeedbackUpdate(mockClient, 42, { scope: "nope", kind: "bugz" }).catch((e) => e);
+    expect(err.message).toContain("--scope must be one of");
+    expect(err.message).toContain("--kind must be one of");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test.each(["ib dev feedback create", "ib dev feedback update"])(
+    "%s: an enum error gets the enum remedy, not 'description is required' (fb#2770)",
+    (command) => {
+      const spec = COMMAND_SPECS.find((s) => s.command === command)!;
+      const err = new CliError("--scope must be one of: cli, app — did you mean app?", 0, null, 4);
+      const { hint } = hintDetailForError(err, spec.errors);
+      expect(hint).toMatch(/aliases are on --scope/);
+      expect(hint).not.toMatch(/description is required|provide at least one of/);
+    }
+  );
+
+  test("create: a missing description still gets the description remedy", () => {
+    const spec = COMMAND_SPECS.find((s) => s.command === "ib dev feedback create")!;
+    const { hint } = hintDetailForError(new CliError("description is required", 0, null, 4), spec.errors);
+    expect(hint).toMatch(/positionally/);
+    expect(hint).not.toMatch(/aliases/);
+  });
+});

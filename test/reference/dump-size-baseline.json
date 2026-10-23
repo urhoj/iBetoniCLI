@@ -7,11 +7,11 @@
   ],
   "ceilings": {
     "ib dev changelog add": 11463,
-    "ib dev feedback create": 8981,
+    "ib dev feedback create": 8968,
     "ib dev changelog update": 10887,
     "ib dev feedback list": 8999,
     "ib keikka update": 9186,
-    "ib dev feedback update": 8196,
+    "ib dev feedback update": 8186,
     "ib dev schema query": 8186,
     "ib glossary set": 7469,
     "ib sijainti update": 6988,

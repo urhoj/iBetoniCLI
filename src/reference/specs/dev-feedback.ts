@@ -7,6 +7,10 @@ import { KINDS as FEEDBACK_KINDS, SCOPES as FEEDBACK_SCOPES, STATUSES as FEEDBAC
 import { apiErr, clearHint, COMMON_AUTH_ERRORS, intParseErr, limitErr } from "./shared.js";
 import type { CommandError } from "../../output/help.js";
 
+// Shared by create/update (fb#2770): its OWN row, so an enum error is never
+// answered with another field's remedy ("description is required").
+const ENUM_ERR: CommandError = { origin: "client", exit: 4, match: "must be one of", meaning: "Enum value rejected (all bad flags named at once)", remedy: "each part lists the allowed values and the closest one; the accepted aliases are on --scope/--severity" };
+
 // Shared by `update` and `resolve` (fb#2186), which validate gates identically.
 const GATE_REF_LENGTH_ERR: CommandError = { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in the row's description or note` };
 const GATE_UNTIL_ERR: CommandError = { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400", remedy: "pass YYYY-MM-DD, a full ISO datetime, today/yesterday/tomorrow, or empty (--gate-until=) to clear it" };
@@ -55,10 +59,10 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       { name: "body", type: "string", description: "Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match" },
       { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
       { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (fb#369)", allowed: [...FEEDBACK_KINDS] },
-      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)", allowed: [...FEEDBACK_SCOPES] },
+      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings). Aliases: puminet4/puminet5api/backend/frontend → app, betonijerry → jerry, betonicli → cli", allowed: [...FEEDBACK_SCOPES] },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
       { name: "error", type: "string", description: "Error message you hit, if any" },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. STRICT: issue-tracker words (high/medium/low/blocker/trivial) exit 4 with a `did you mean`, never rewritten (fb#369). See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. Aliases: kriittinen/korkea/normaali/matala. high/medium/low/blocker/trivial exit 4 with a `did you mean`. See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull `list --max-complexity 3`. See `ib help complexity`." },
       { name: "gate-kind", type: "string", description: "What this row is waiting for, if it is a GATED row rather than a plain proposal: deploy (a repo@version ships) | soak (a wake date elapses; name a check that can FAIL, e.g. a Sentry/KQL query with a non-zero baseline — no-hits is unfalsifiable, fb#1555) | legal (a document version is superseded) | owner-decision (a call only the owner can make) | owner-action (something only the owner can do) | backlog. Bare `owner` is LEGACY (still accepted); prefer the split. Most rows have no gate — omit it.", allowed: [...FEEDBACK_GATE_KINDS] },
       { name: "gate-ref", type: "string", description: `Gate pointer, meaning depends on --gate-kind: deploy → repo@sha being waited on; legal → TYPE@version (the version being superseded); owner-decision/owner-action → free text naming the call or the task; soak → the falsifiable PASS check (query + expected non-zero result). Max ${FEEDBACK_GATE_REF_MAX} chars. Only meaningful together with --gate-kind.` },
@@ -69,7 +73,9 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; every enum is STRICT (allowed values are listed per flag) and never rewritten — the message names the closest valid value (severity: high→major, medium→minor, low→cosmetic, blocker→critical, trivial→cosmetic); --complexity must be an integer 1-5" },
+      ENUM_ERR,
+      { origin: "client", exit: 4, match: "is required", meaning: "No description was given", remedy: "pass it positionally, via --description/--body, or --title" },
+      { origin: "client", exit: 4, match: "must be an integer", meaning: "--complexity is not 1-5", remedy: "see `ib help complexity`" },
       { origin: "client", exit: 4, match: "--gate-ref must be at most", meaning: "--gate-ref exceeds the column width — checked CLIENT-SIDE (fb#1644) so the error names the flag, before the backend's own gateRef 400", remedy: `shorten to ${FEEDBACK_GATE_REF_MAX} chars; long rationale goes in the description` },
       { origin: "client", exit: 4, match: "must be YYYY-MM-DD or an ISO datetime", meaning: "--gate-until is not a parseable date — validated CLIENT-SIDE (fb#446) so the error names the flag, before the backend's own gateUntil 400", remedy: "pass YYYY-MM-DD, a full ISO datetime, or today/yesterday/tomorrow" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description, on its inner double-quotes OR on its newlines (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
@@ -78,7 +84,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       apiErr(
         400,
         "Backend predates the owner gate split",
-        "this backend's gateKind vocabulary has no owner-decision/owner-action (they ship in puminet5api@1.33.1, production since 2026-09-03) — against it use bare --gate-kind owner, the legacy value it still accepts (fb#1224)",
+        "use the legacy --gate-kind owner (no owner-decision/owner-action before puminet5api@1.33.1, fb#1224)",
         "gatekind must be one of"
       ),
       ...COMMON_AUTH_ERRORS,
@@ -86,7 +92,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     notes: [
       "gh-issue-style `feedback add --title X --description Y` works: `add` aliases `create`, --title is the first line.",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide".',
-      "SHELL QUOTING (fb#299, fb#702): Windows PowerShell splits a report on inner double-quotes AND newlines — the fragment surfaces as `too many arguments` or a bogus `unknown option`. Pass long, multi-line or quote-bearing reports via --from-json <file|->; see `ib help shell-quoting`.",
+      "SHELL QUOTING (fb#299, fb#702): PowerShell splits a report on inner double-quotes AND newlines — pass long or quote-bearing reports via --from-json <file|-> (`ib help shell-quoting`).",
       "Under the /ai assistant, IB_CONVERSATION_ID is auto-attached as context.conversationId (read it with `ib dev ai conversation <id>`).",
       "No --reason / --idempotency-key: a META request, not an audited mutation.",
     ],
@@ -445,9 +451,9 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
     dryRunKind: "client",
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other (aliases as on `feedback create`)", allowed: [...FEEDBACK_SCOPES] },
       { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — same STRICT enum as `feedback create`: five synonyms (high/medium/low/blocker/trivial) are named back to you in the exit-4 `did you mean`, none is accepted. See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — same enum and aliases as `feedback create`. See `ib help severity`", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
       { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
       { name: "gate-kind", type: "string", description: `What this row is waiting for: deploy|soak|legal|owner-decision|owner-action|backlog (bare \`owner\` is legacy, still accepted). ${clearHint("--gate-kind")}`, allowed: [...FEEDBACK_GATE_KINDS] },
@@ -466,7 +472,8 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       // Three client rows share exit 4, so EACH needs `match` — an unmatched row
       // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
       // that error-origins.test.ts enforces).
-      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
+      ENUM_ERR,
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); --complexity must be an integer 1-5; --description is mutually exclusive with --append-description" },
       GATE_REF_LENGTH_ERR,
       GATE_UNTIL_ERR,
       { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
@@ -474,7 +481,7 @@ export const DEV_FEEDBACK_SPECS: CommandSpec[] = [
       apiErr(
         400,
         "Backend predates the owner gate split",
-        "this backend's gateKind vocabulary has no owner-decision/owner-action (they ship in puminet5api@1.33.1, production since 2026-09-03) — against it use bare --gate-kind owner, the legacy value it still accepts (fb#1224)",
+        "use the legacy --gate-kind owner (no owner-decision/owner-action before puminet5api@1.33.1, fb#1224)",
         "gatekind must be one of"
       ),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),

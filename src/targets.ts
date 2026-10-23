@@ -56,11 +56,29 @@ export function assertEnum(
   flag: string,
   synonyms?: Record<string, string>
 ): void {
-  if (value !== undefined && !allowed.includes(value)) {
+  assertEnums([{ value, allowed, flag, synonyms }]);
+}
+
+export interface EnumCheck {
+  value: string | undefined;
+  allowed: readonly string[];
+  flag: string;
+  synonyms?: Record<string, string>;
+}
+
+/**
+ * {@link assertEnum} over several flags at once: EVERY invalid one is named in a
+ * single exit-4 message (`; `-joined), so `--scope puminet4 --severity low`
+ * costs one retry instead of two (fb#2767/fb#2783).
+ */
+export function assertEnums(checks: readonly EnumCheck[]): void {
+  const errors = checks.flatMap(({ value, allowed, flag, synonyms }) => {
+    if (value === undefined || allowed.includes(value)) return [];
     const guess = enumGuess(value, allowed, synonyms);
     const hint = guess ? ` — did you mean ${guess}?` : "";
-    failWith(`${flag} must be one of: ${allowed.join(", ")}${hint}`, 4);
-  }
+    return [`${flag} must be one of: ${allowed.join(", ")}${hint}`];
+  });
+  if (errors.length) failWith(errors.join("; "), 4);
 }
 
 /**

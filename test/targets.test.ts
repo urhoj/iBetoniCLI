@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   addOwnerOption,
   assertEnum,
+  assertEnums,
   assertEnumCsv,
   numFlag,
   parseId,
@@ -392,5 +393,32 @@ describe("assertEnum (fb#369 — one retry, not a guess)", () => {
     // substring — a hint prefixed ahead of it would strand every ERRORS row.
     const msg = errorOf(() => assertEnum("bugs", KINDS, "--kind"))?.message ?? "";
     expect(msg.indexOf("must be one of")).toBeLessThan(msg.indexOf("did you mean"));
+  });
+});
+
+describe("assertEnums (fb#2767 — every bad flag in one envelope)", () => {
+  const KINDS = ["improvement", "bug"] as const;
+  const SCOPES = ["cli", "app"] as const;
+
+  test("all valid / undefined is a no-op", () => {
+    expect(() =>
+      assertEnums([
+        { value: "bug", allowed: KINDS, flag: "--kind" },
+        { value: undefined, allowed: SCOPES, flag: "--scope" },
+      ])
+    ).not.toThrow();
+  });
+
+  test("two bad flags are both named, in order, exit 4", () => {
+    const err = errorOf(() =>
+      assertEnums([
+        { value: "bugs", allowed: KINDS, flag: "--kind" },
+        { value: "nope", allowed: SCOPES, flag: "--scope" },
+      ])
+    );
+    expect(err?.exitCode).toBe(4);
+    expect(err?.message).toBe(
+      "--kind must be one of: improvement, bug — did you mean bug?; --scope must be one of: cli, app"
+    );
   });
 });

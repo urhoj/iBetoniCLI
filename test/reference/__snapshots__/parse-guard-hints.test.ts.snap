@@ -603,7 +603,7 @@ ib dev feedback log --limit <n>
 
 ib dev feedback update --complexity <n>
   ! --complexity must be an integer >= 1
-  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
 
 ib dev impersonation sessions --actor <id>
   ! --actor must be an integer >= 1
@@ -671,7 +671,7 @@ ib feedback log --limit <n>
 
 ib feedback update --complexity <n>
   ! --complexity must be an integer >= 1
-  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); enum values must be valid; --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
+  > provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description/--gate-kind/--gate-ref/--gate-until (--reason only annotates a change); --complexity must be an integer 1-5; --description is mutually exclusive with --append-description
 
 ib fennoa purchases --asiakas <id>
   ! --asiakas must be an integer >= 1
