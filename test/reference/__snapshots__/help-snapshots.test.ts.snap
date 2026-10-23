@@ -10368,6 +10368,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message daily drivers matches snapshot 1`] = `
+"USAGE
+  ib message daily drivers [flags]
+
+DESCRIPTION
+  What the active company's pumpparit see on /oma: messages of every box shared to the company with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from DATE    Window start: YYYYMMDD | YYYY-MM-DD | today/tomorrow (default today)
+  --days NUMBER    Window length in days, 1–14 (default 7)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: { yyyymmdd, boxId, boxTitle, message }[], nextCursor, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days is not an integer >= 1, rejected locally before any request → pass a whole number of days, 1–14
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Use the global --company <asiakasId> to read another company you belong to.
+
+SEE ALSO
+  ib message daily list
+
+EXAMPLES
+  ib message daily drivers
+  ib message daily drivers --from 2026-10-26 --days 3
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message daily get matches snapshot 1`] = `
 "USAGE
   ib message daily get <boxId> --asiakas <asiakas> [flags]

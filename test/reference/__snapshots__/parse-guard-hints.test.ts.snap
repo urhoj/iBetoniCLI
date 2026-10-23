@@ -1045,6 +1045,10 @@ ib message chat threads --tarjous <id>
   ! --tarjous must be an integer >= 1
   > pass a positive pumppuRequestId
 
+ib message daily drivers --days <n>
+  ! --days must be an integer >= 1
+  > pass a whole number of days, 1–14
+
 ib message daily get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach

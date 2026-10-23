@@ -3,6 +3,7 @@ import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { parseId, intFlag, addAsiakasTargetOption, resolveAsiakasTarget, assertEnum } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
+import { listEnvelope } from "../../../api/envelopes.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
  * `today`/`yesterday`/`tomorrow` and `YYYY-MM-DD` (via {@link resolveDate}),
@@ -52,6 +53,14 @@ export async function runDailyGet(client, asiakasId, boxId, yyyymmdd) {
     const message = all.messages.find((m) => Number(m.boxId) === boxId) ?? null;
     const permissions = all.boxPermissions.filter((p) => Number(p.boxId) === boxId);
     return { box, message, permissions };
+}
+/**
+ * GET /api/dailyMessage/drivers — the messages the ACTIVE company shows its pumpparit
+ * (boxes with a role-8 permission row, e.g. "Pumpparitiedotteet") for `days` days from
+ * `yyyymmdd`: exactly what drivers see on /oma. Company-wide, not per person.
+ */
+export async function runDailyDrivers(client, yyyymmdd, days) {
+    return listEnvelope(await client.get(`/api/dailyMessage/drivers?from=${yyyymmdd}&days=${days}`));
 }
 // ─── writes ──────────────────────────────────────────────────────────────────
 /**
@@ -213,6 +222,10 @@ export function registerMessageDailyCommands(parent, getClient) {
         .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--date <date>")
         .action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)));
+    d.command("drivers")
+        .option("--from <date>")
+        .option("--days <n>", "", intFlag("--days"))
+        .action(jsonAction(getClient, (client, opts) => runDailyDrivers(client, toYyyymmdd(opts.from ?? "today"), opts.days ?? 7)));
     // content + metadata writes ───────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("set <boxId>")
@@ -333,6 +346,21 @@ export const MESSAGE_DAILY_SPECS = [
         outputShape: `{ box: ${DAILY_BOX_ROW}, message: {...}|null, permissions: {...}[] }`,
         errors: [DAILY_ASIAKAS_PARSE_ERR, { http: 404, exit: 5, meaning: "Box not visible for the company", remedy: "ib message daily list <asiakasId>" }, ...DAILY_AUTH_ERRORS],
         examples: ["ib message daily get 36 --asiakas 8 --date today"],
+    },
+    {
+        command: "ib message daily drivers",
+        description: "What the active company's pumpparit see on /oma: messages of every box shared to the company with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.",
+        auth: "any",
+        args: [],
+        flags: [
+            { name: "from", type: "date", description: "Window start: YYYYMMDD | YYYY-MM-DD | today/tomorrow (default today)" },
+            { name: "days", type: "number", description: "Window length in days, 1–14 (default 7)" },
+        ],
+        outputShape: "{ items: { yyyymmdd, boxId, boxTitle, message }[], nextCursor, count }",
+        errors: [dailyIntParseErr("--days", "pass a whole number of days, 1–14"), ...DAILY_AUTH_ERRORS],
+        notes: ["Use the global --company <asiakasId> to read another company you belong to."],
+        seeAlso: ["ib message daily list"],
+        examples: ["ib message daily drivers", "ib message daily drivers --from 2026-10-26 --days 3"],
     },
     {
         command: "ib message daily set",

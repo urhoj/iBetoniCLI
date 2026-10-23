@@ -3,6 +3,7 @@ import { mockApiClient } from "../helpers/mockClient.js";
 import {
   toYyyymmdd,
   runDailyList,
+  runDailyDrivers,
   runDailyGet,
   runDailySetMessage,
   runDailySaveBox,
@@ -50,6 +51,16 @@ describe("runDailyList", () => {
     asGet().mockResolvedValue({ success: true, boxes: [], messages: [], boxPermissions: [] });
     await runDailyList(mockClient, 8);
     expect(asGet()).toHaveBeenCalledWith("/api/dailyMessage/box/list/8");
+  });
+});
+
+describe("runDailyDrivers", () => {
+  test("hits /drivers with the window and wraps the rows in the list envelope", async () => {
+    const row = { yyyymmdd: 20261026, boxId: 171, boxTitle: "Pumpparitiedotteet", message: "hei" };
+    asGet().mockResolvedValue([row]);
+    const res = await runDailyDrivers(mockClient, "20261026", 7);
+    expect(asGet()).toHaveBeenCalledWith("/api/dailyMessage/drivers?from=20261026&days=7");
+    expect(res).toEqual({ items: [row], nextCursor: null, count: 1 });
   });
 });
 
