@@ -724,7 +724,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     notes: [
       AI_SEND_NOTE,
       "Without --channel the CLI reads day-text first and uses its channel; a none_* preference does not block a manual send (same as the dialog).",
-      "Nothing re-sends automatically. After a timeout, check day-status before sending again.",
+      "Nothing re-sends automatically. After a timeout, check day-status before sending again (a kept 'sent' row with errorText = an earlier send went out, the later one failed or is uncertain).",
     ],
     seeAlso: ["ib message driver day-text", "ib message driver day-status", "ib message sms list"],
     examples: [
@@ -734,7 +734,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   },
   {
     command: "ib message driver day-status",
-    description: "Every day-message attempt of the active company for one day (GET /api/sms/day-messages/:ownerAsiakasId?pvm=), newest first: who got it, by which channel, the outcome and where it came from. One row per driver and day: the LAST attempt. Same sender roles as message driver channels.",
+    description: "Every day-message attempt of the active company for one day (GET /api/sms/day-messages/:ownerAsiakasId?pvm=), newest first: who got it, by which channel, the outcome and where it came from. One row per driver and day: the last SENT attempt, or the last failed/unknown one when none succeeded; a later failed/unknown re-send keeps the sent row and only fills its errorText. Same sender roles as message driver channels.",
     auth: "any",
     flags: [DAY_DATE_FLAG],
     outputShape: "ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'baseline' }> — sheet = the Betomik \" k\" trigger, baseline = stamped at its cutover (never sent).",
