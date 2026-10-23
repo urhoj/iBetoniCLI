@@ -555,6 +555,8 @@ const CHANGELOG_FROM_JSON = {
     nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve", "takeResolve", "commitShas"]),
     readShapeAliases: READ_SHAPE_KEY_ALIASES,
     numericFields: new Set([]),
+    // `"vtag": null` clears the tag exactly like `--vtag=` (fb#2836).
+    nullClearsFields: new Set(["vtag"]),
     // fb#576: --feedback is now CSV (a single id or several); csvFields is the
     // shape the shared --from-json pipeline uses for a flag whose JSON form is a
     // string or an array of strings — see normalizeFeedbackIds below for why that
@@ -1150,6 +1152,9 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             patch.language = updLang;
         const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
         warnIfPatchIgnored(patch, result);
+        // A clear is pending-again by design, but on a mistyped id it costs a version bump (fb#2838).
+        if (patch.versionTag === null && !result?.dryRun)
+            warnNote(`entry ${id} is pending again — the next deploy bumps its --repo and restamps it`);
         warnFeedbackLinkEffects(result, warnNote, { advancesStatus: false });
         warnFeedbackUnlinkEffects(result, o.unlink);
         writeJson(result);
@@ -1573,7 +1578,7 @@ export const CHANGELOG_SPECS = [
                 name: "bump-level",
                 type: "string",
                 allowed: BUMP_LEVELS,
-                description: "Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).",
+                description: "Correct the app version bump this entry implies. NO default — omitting it leaves the recorded level untouched. Refused on a RELEASED entry unless the same call clears it (--vtag=).",
             },
             {
                 name: "feedback",

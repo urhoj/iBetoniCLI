@@ -70,6 +70,12 @@ export interface FromJsonConfig {
   objectFields?: Set<string>;
   /** Payload fields whose flag is a boolean switch — a JSON `true`/`false` is accepted, anything else rejected by name. */
   booleanFields?: Set<string>;
+  /**
+   * Payload fields where a JSON `null` means CLEAR: it becomes `""`, the value the
+   * flag's own empty spelling sends (fb#2836). Every other null is skipped, so a
+   * read row's many null columns still round-trip as "unchanged".
+   */
+  nullClearsFields?: Set<string>;
   /** Flag name used as the error prefix (default `--from-json`). */
   flagName?: string;
   /**
@@ -167,7 +173,7 @@ export function payloadKeyMap(
 export function normalizeFromJson(
   json: Record<string, unknown>,
   keys: Map<string, string>,
-  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "objectFields" | "booleanFields" | "flagName"> = {}
+  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "objectFields" | "booleanFields" | "nullClearsFields" | "flagName"> = {}
 ): Record<string, unknown> {
   const numeric = cfg.numericFields ?? new Set<string>();
   const csv = cfg.csvFields ?? new Set<string>();
@@ -182,6 +188,10 @@ export function normalizeFromJson(
     const key = keys.get(rawKey);
     if (!key) {
       unknown.push(rawKey);
+      continue;
+    }
+    if (value === null && cfg.nullClearsFields?.has(key)) {
+      out[key] = "";
       continue;
     }
     if (value === null || value === undefined) continue;

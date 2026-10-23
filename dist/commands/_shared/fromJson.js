@@ -87,6 +87,10 @@ export function normalizeFromJson(json, keys, cfg = {}) {
             unknown.push(rawKey);
             continue;
         }
+        if (value === null && cfg.nullClearsFields?.has(key)) {
+            out[key] = "";
+            continue;
+        }
         if (value === null || value === undefined)
             continue;
         if (objects.has(key)) {

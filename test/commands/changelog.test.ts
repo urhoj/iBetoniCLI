@@ -767,7 +767,31 @@ describe("changelog --summary alias for --description (fb#205)", () => {
       asPut().mockResolvedValue({ changelogId: 3374, versionTag: null });
       const program = new Command();
       registerChangelogCommands(program, async () => client);
-      await program.parseAsync(["changelog", "update", "3374", ...flag], { from: "user" });
+      const cap = captureStderr();
+      try {
+        await program.parseAsync(["changelog", "update", "3374", ...flag], { from: "user" });
+        expect(cap.text()).toContain("entry 3374 is pending again"); // fb#2838
+      } finally {
+        cap.restore();
+      }
+      expect(asPut()).toHaveBeenCalledWith("/api/changelog/3374", { versionTag: null }, expect.any(Object));
+    }
+  );
+
+  test.each([['{"vtag":null}'], ['{"versionTag":null}']])(
+    "update --from-json %s clears the versionTag (fb#2836)",
+    async (json) => {
+      const file = join(tmpdir(), `ib-vtag-null-${process.pid}-${json.length}.json`);
+      writeFileSync(file, json);
+      asGet().mockResolvedValueOnce({ changelogId: 3374, versionTag: "puminet5api@1.54.1" });
+      asPut().mockResolvedValue({ changelogId: 3374, versionTag: null });
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      try {
+        await program.parseAsync(["changelog", "update", "3374", "--from-json", file], { from: "user" });
+      } finally {
+        unlinkSync(file);
+      }
       expect(asPut()).toHaveBeenCalledWith("/api/changelog/3374", { versionTag: null }, expect.any(Object));
     }
   );
