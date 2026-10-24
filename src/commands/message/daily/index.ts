@@ -550,7 +550,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
   {
     command: "ib message daily drivers",
     description:
-      "What the active company's pumpparit see on /oma: messages of every box shared to the company with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.",
+      "What the active company's pumpparit see on /oma: messages of every box the company owns or is shared, with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.",
     auth: "any",
     args: [],
     flags: [

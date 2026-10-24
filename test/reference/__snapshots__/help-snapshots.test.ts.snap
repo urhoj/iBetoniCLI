@@ -10376,7 +10376,7 @@ exports[`Help snapshots — contract stability > help for ib message daily drive
   ib message daily drivers [flags]
 
 DESCRIPTION
-  What the active company's pumpparit see on /oma: messages of every box shared to the company with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.
+  What the active company's pumpparit see on /oma: messages of every box the company owns or is shared, with a pumppari (role 8) permission row, for a date window. Company-wide, not per person.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
