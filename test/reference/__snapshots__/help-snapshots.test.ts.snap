@@ -3213,7 +3213,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin/developer and not an admin of the Betomik company → Use a developer token, or an asiakasAdmin of asiakasId 27
 
 NOTES
-  - rowKind is the owner's rule applied at import (factory column non-empty => keikka; empty or 'Halli' => palkki) unless a human overrode it via \`review\`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see \`propose\`/\`ai-stats\`.
+  - rowKind is the parser's classify_row_kind result at import (rules: Betomik pilot doc section 5) unless a human overrode it via \`review\`; palkkiType names one of the tenant's grid_palkkiTypes. aiJson is the AI proposer's stored proposal ({rowKind, palkkiType, customer, site, plant, drivers, confidence, reason} or {error}) — see \`propose\`/\`ai-stats\`.
 
 SEE ALSO
   ib dev betomik-orderbook row, ib dev betomik-orderbook find
