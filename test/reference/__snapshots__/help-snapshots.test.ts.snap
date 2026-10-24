@@ -3725,7 +3725,7 @@ FLAGS
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus (max 500 chars)
   --status STRING    Tila (Julkaistu/Korjattu/...) (max 30 chars)
-  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
+  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT \`ib dev feedback --severity\`'s IMPACT ladder: the maps do not round-trip (normaali→minor there, minor→Matala here), so re-judge. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV); a cross-lane change names BOTH, e.g. \`--repo "puminet5api,betonicli"\`. THREE outcomes: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — bumped independently next deploy from the max --bump-level naming it; (2) standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2, betonipumppu — no app bump (version via \`npm run final\`); (3) any OTHER non-blank value is REJECTED (400/exit 4) at add-time, never reaching a deploy fail-safe. BLANK/omitted --repo differs: it IS accepted, and deploy Step 0 fail-safe-bumps every coordinated repo unless --bump-level none. (max 200 chars)
   --sha STRING    Commit SHAs (CSV); read back as \`commitShas\` (max 500 chars)
@@ -4048,7 +4048,7 @@ FLAGS
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus (max 500 chars)
   --status STRING    Status update (e.g. mark deployed) (max 30 chars)
-  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
+  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT \`ib dev feedback --severity\`'s IMPACT ladder: the maps do not round-trip (normaali→minor there, minor→Matala here), so re-judge. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one (max 200 chars)
   --sha STRING    Commit SHAs (CSV); read back as \`commitShas\` (max 500 chars)
@@ -8746,7 +8746,7 @@ exports[`Help snapshots — contract stability > help for ib keikka validation u
   ib keikka validation undismiss <keikkaId> <issueId> [flags]
 
 DESCRIPTION
-  Restore a dismissed validation warning on a keikka (the grid drawer's Palauta).
+  Restore a dismissed validation warning on a keikka (the grid drawer's Palauta). --reason is NOT stored here: the restore only soft-deletes the dismissal row (fb#2804).
   Permissions: requires order edit: company admin, editor or order handler.
 
 ARGUMENTS

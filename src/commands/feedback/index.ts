@@ -213,9 +213,12 @@ const SCOPE_SYNONYMS: Record<string, string> = {
 
 /**
  * ACCEPTED aliases — the one carve-out from the hint-never-rewrite rule above,
- * owner call 2026-10-23 (fb#2783/fb#2767). The Finnish words are the SAME
- * scale `ib dev changelog add` uses, and the repo names are where an agent's
- * hand goes first; both map to exactly one value, unlike high/low. Each rewrite
+ * owner call 2026-10-23 (fb#2783/fb#2767). The Finnish words are the WORDS of
+ * `ib dev changelog add`'s urgency ladder, mapped by rank onto this impact
+ * ladder as a convenience — NOT the same scale: changelog maps minor→Matala, so
+ * normaali→minor does not round-trip (owner call 2026-10-24, fb#2833). The repo
+ * names are where an agent's hand goes first; both map to exactly one value,
+ * unlike high/low. Each rewrite
  * is announced on stderr by {@link applyAlias}, so it is never silent.
  */
 const SEVERITY_ALIASES: Record<string, string> = {

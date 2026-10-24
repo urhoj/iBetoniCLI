@@ -629,7 +629,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
   {
     command: "ib keikka validation undismiss",
-    description: "Restore a dismissed validation warning on a keikka (the grid drawer's Palauta).",
+    description: "Restore a dismissed validation warning on a keikka (the grid drawer's Palauta). --reason is NOT stored here: the restore only soft-deletes the dismissal row (fb#2804).",
     permissions: ["order edit: company admin, editor or order handler"],
     args: [
       { name: "keikkaId", type: "number", description: "The keikka" },

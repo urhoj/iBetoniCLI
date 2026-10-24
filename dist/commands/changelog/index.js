@@ -63,7 +63,7 @@ const AREA_SCOPE_VALUES = new Set(["app", "bsg2", "impeccable", "ops", "other", 
 // Named once and used by both the Commander options and the specs, so the
 // "these two --severity flags are different scales" warning cannot survive on
 // one surface and go missing on the other (feedback #359).
-const SEVERITY_FLAG_DESC = "Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with `ib dev feedback --severity` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali.";
+const SEVERITY_FLAG_DESC = "Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT `ib dev feedback --severity`'s IMPACT ladder: the maps do not round-trip (normaali→minor there, minor→Matala here), so re-judge.";
 // The three fragments `add` and `update` state IDENTICALLY. Hoisted for the same
 // reason as SEVERITY_FLAG_DESC above: a rule that lives in two string literals
 // drifts. It already did — fb#633 had to hand-edit both `outputShape`s to add
@@ -417,9 +417,10 @@ export function normalizeEnumFlag(value) {
  * that is what the ~90 non-null rows in `devChangelog` already hold.
  *
  * Deliberately NOT the same ladder as `ib dev feedback --severity`
- * (critical|major|minor|cosmetic), which measures IMPACT: `Normaali` has no
- * counterpart there at all, so a value cannot be carried between the two
- * commands by lookup — it has to be re-judged (feedback #359).
+ * (critical|major|minor|cosmetic), which measures IMPACT. Feedback accepts these
+ * Finnish words as rank aliases (normaali→minor, fb#2783), but the two maps do
+ * not round-trip (minor→Matala below), so a value cannot be carried between the
+ * two commands by lookup — it has to be re-judged (feedback #359, fb#2833).
  */
 const SEVERITIES = ["Kriittinen", "Korkea", "Normaali", "Matala"];
 /**
