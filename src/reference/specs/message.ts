@@ -625,6 +625,25 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     examples: ["ib message sms list --person 6390"],
   },
   {
+    command: "ib message sms log",
+    description: "Every driver message (SMS, push, email) the active company sent in a Helsinki date range, newest first, with the SMS cost estimate. Company admins/owners and system admin/developer only.",
+    auth: "any",
+    flags: [
+      { name: "from", type: "string", description: "First day YYYY-MM-DD or today/yesterday (default: 30 days ago)" },
+      { name: "to", type: "string", description: "Last day, inclusive (default: today)" },
+      { name: "channel", type: "string", description: "sms | push | email (default: all)" },
+    ],
+    outputShape: "{ items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.",
+    errors: [
+      apiErr(400, "Invalid range or channel", "dates are YYYY-MM-DD with from <= to; channel is sms, push or email"),
+      apiErr(403, "Permission denied", "requires company admin/owner or system admin/developer"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: ["Deploy-gated: GET /api/sms/log must be deployed to the target backend. Rows are kept 180 days."],
+    seeAlso: ["ib message sms list", "ib message driver day-status"],
+    examples: ["ib message sms log --from 2026-10-01 --channel sms"],
+  },
+  {
     command: "ib message driver channels",
     description: "Available manual-message channels for one person in the active company: push device count, the email and the SMS number (msisdn, e.g. 358401234567) unmasked. Uses the same recipient scope and sender permissions as the UI; no HAS_SMS module required for the call, but sms is offered only when the company has HAS_SMS.",
     auth: "any",

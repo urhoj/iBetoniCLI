@@ -11022,6 +11022,43 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message sms log matches snapshot 1`] = `
+"USAGE
+  ib message sms log [flags]
+
+DESCRIPTION
+  Every driver message (SMS, push, email) the active company sent in a Helsinki date range, newest first, with the SMS cost estimate. Company admins/owners and system admin/developer only.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --from STRING    First day YYYY-MM-DD or today/yesterday (default: 30 days ago)
+  --to STRING    Last day, inclusive (default: today)
+  --channel STRING    sms | push | email (default: all)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Invalid range or channel → dates are YYYY-MM-DD with from <= to; channel is sms, push or email
+  exit 3 (HTTP 403)  Permission denied      → requires company admin/owner or system admin/developer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: GET /api/sms/log must be deployed to the target backend. Rows are kept 180 days.
+
+SEE ALSO
+  ib message sms list, ib message driver day-status
+
+EXAMPLES
+  ib message sms log --from 2026-10-01 --channel sms
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message sms send matches snapshot 1`] = `
 "USAGE
   ib message sms send --person <person> --message <message> [flags]

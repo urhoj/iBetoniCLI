@@ -3,6 +3,7 @@ import type { ApiClient } from "../../../api/client.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../../api/writeFlags.js";
 import { resolveActiveOwnerAsiakasId } from "../../../owner.js";
 import { intFlag } from "../../../targets.js";
+import { resolveDate } from "../../../dates.js";
 import { jsonAction } from "../../_shared/action.js";
 
 // --dry-run is honoured SERVER-side (POST /api/sms/send reads X-Dry-Run): the server
@@ -24,10 +25,31 @@ export async function runSmsList(client: ApiClient, opts: { person: number; owne
   return client.get(`/api/sms/person/${opts.person}/${opts.owner}`);
 }
 
+/** Server row cap of GET /api/sms/log (smsLogSql.listForTenant); no cursor, so a full page = truncated. */
+const SMS_LOG_CAP = 500;
+
+/** GET /api/sms/log (fb#2534): the active company's whole message log + SMS cost estimate, as a list envelope. */
+export async function runSmsLog(
+  client: ApiClient,
+  opts: { owner: number; from?: string; to?: string; channel?: string }
+): Promise<unknown> {
+  const q = new URLSearchParams();
+  const from = resolveDate(opts.from);
+  const to = resolveDate(opts.to);
+  if (from) q.set("from", from);
+  if (to) q.set("to", to);
+  if (opts.channel) q.set("channel", opts.channel);
+  const qs = q.toString();
+  const r = await client.get<{ items?: unknown[]; totals?: unknown }>(`/api/sms/log/${opts.owner}${qs ? `?${qs}` : ""}`);
+  const items = r?.items ?? [];
+  return { items, nextCursor: null, count: items.length, truncated: items.length >= SMS_LOG_CAP, totals: r?.totals ?? null };
+}
+
 /**
  * Register `ib message sms` — manual driver SMS (HAS_SMS tenants, admins):
  *   send --person <id> --message <text>   send one SMS (≤ 2 segments, no links)
  *   list --person <id>                    SMS sent to that person, newest first
+ *   log [--from] [--to] [--channel]       every message of the company + SMS cost estimate
  */
 export function registerMessageSmsCommands(parent: Command, getClient: () => Promise<ApiClient>): void {
   const s = parent.command("sms").description("Manual SMS to a driver of the active company (HAS_SMS module, admins)");
@@ -45,6 +67,16 @@ export function registerMessageSmsCommands(parent: Command, getClient: () => Pro
     .action(
       jsonAction(getClient, async (client, opts: { person: number }) =>
         runSmsList(client, { person: opts.person, owner: await resolveActiveOwnerAsiakasId(client) })
+      )
+    );
+
+  s.command("log")
+    .option("--from <date>")
+    .option("--to <date>")
+    .option("--channel <channel>")
+    .action(
+      jsonAction(getClient, async (client, opts: { from?: string; to?: string; channel?: string }) =>
+        runSmsLog(client, { ...opts, owner: await resolveActiveOwnerAsiakasId(client) })
       )
     );
 }
