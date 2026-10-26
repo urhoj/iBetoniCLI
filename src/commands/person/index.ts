@@ -370,11 +370,17 @@ export interface PersonRoleListItem {
   asiakasPersonSettingId: number;
   roleTypeId: number;
   role: string | null;
+  asiakasId: number;
+  startDate: string | null;
+  endDate: string | null;
+  active: boolean;
 }
 
 interface AsiakasPersonSettingRow {
   asiakasPersonSettingId: number;
   asiakasPersonSettingTypeId: number;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 /**
@@ -388,6 +394,9 @@ interface AsiakasPersonSettingRow {
  * the session's active company — the same "target defaults to the lens" rule
  * `sijainti create` follows (fb#1783/fb#1770: `--company 27` alone used to
  * exit 4 "missing required flag: --asiakas").
+ *
+ * The backing view does NOT filter expired roles, so each item carries its
+ * dates and `active` = startDate <= now < endDate, null bounds open (fb#2887).
  */
 export async function runPersonRoleList(
   client: ApiClient,
@@ -404,11 +413,20 @@ export async function runPersonRoleList(
   } else if (raw && typeof raw === "object") {
     rows = raw.recordset || raw.recordsets?.[0] || [];
   }
-  const items = rows.map((r) => ({
-    asiakasPersonSettingId: r.asiakasPersonSettingId,
-    roleTypeId: r.asiakasPersonSettingTypeId,
-    role: roleNameForTypeId(r.asiakasPersonSettingTypeId),
-  }));
+  const now = Date.now();
+  const items = rows.map((r) => {
+    const startDate = r.startDate ?? null;
+    const endDate = r.endDate ?? null;
+    return {
+      asiakasPersonSettingId: r.asiakasPersonSettingId,
+      roleTypeId: r.asiakasPersonSettingTypeId,
+      role: roleNameForTypeId(r.asiakasPersonSettingTypeId),
+      asiakasId,
+      startDate,
+      endDate,
+      active: (!startDate || Date.parse(startDate) <= now) && (!endDate || Date.parse(endDate) > now),
+    };
+  });
   return listEnvelope(items);
 }
 

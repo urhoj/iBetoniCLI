@@ -266,7 +266,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId — defaults to the acting company (the global --company <id>, else the session's active company); pass it to read another tenant's roles (fb#1783)" },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
+      "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null, asiakasId, startDate: string|null, endDate: string|null, active: boolean }> — expired roles are listed too; `active` = startDate <= now < endDate (null = open)",
     errors: [
       PERSON_TARGET_ERR,
       PERSON_PARSE_ERR,

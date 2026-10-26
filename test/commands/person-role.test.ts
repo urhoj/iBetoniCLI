@@ -21,8 +21,8 @@ describe("runPersonRoleList", () => {
     const result = await runPersonRoleList(mockClient, 5351, 26);
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/26/5351");
     expect(result.items).toEqual([
-      { asiakasPersonSettingId: 501, roleTypeId: 11, role: "keikkaHandler" },
-      { asiakasPersonSettingId: 502, roleTypeId: 9999, role: null },
+      { asiakasPersonSettingId: 501, roleTypeId: 11, role: "keikkaHandler", asiakasId: 26, startDate: null, endDate: null, active: true },
+      { asiakasPersonSettingId: 502, roleTypeId: 9999, role: null, asiakasId: 26, startDate: null, endDate: null, active: true },
     ]);
     expect(result.count).toBe(2);
     expect(result.nextCursor).toBeNull();
@@ -33,7 +33,20 @@ describe("runPersonRoleList", () => {
       recordset: [{ asiakasPersonSettingId: 503, asiakasPersonSettingTypeId: 8 }],
     });
     const result = await runPersonRoleList(mockClient, 5351, 26);
-    expect(result.items[0]).toEqual({ asiakasPersonSettingId: 503, roleTypeId: 8, role: "pumppari" });
+    expect(result.items[0]).toEqual({ asiakasPersonSettingId: 503, roleTypeId: 8, role: "pumppari", asiakasId: 26, startDate: null, endDate: null, active: true });
+  });
+
+  // fb#2887: the view lists expired roles too, so each item carries its dates,
+  // the company it belongs to, and whether it is valid right now.
+  test("carries asiakasId + start/end dates and an active flag (expired and future roles are inactive)", async () => {
+    mockClient.get.mockResolvedValueOnce([
+      { asiakasPersonSettingId: 1, asiakasPersonSettingTypeId: 2, startDate: "2020-01-01T00:00:00.000Z", endDate: null },
+      { asiakasPersonSettingId: 2, asiakasPersonSettingTypeId: 2, startDate: "2020-01-01T00:00:00.000Z", endDate: "2021-01-01T00:00:00.000Z" },
+      { asiakasPersonSettingId: 3, asiakasPersonSettingTypeId: 2, startDate: "2999-01-01T00:00:00.000Z", endDate: null },
+    ]);
+    const { items } = await runPersonRoleList(mockClient, 6291, 27);
+    expect(items.map((i) => [i.asiakasId, i.active])).toEqual([[27, true], [27, false], [27, false]]);
+    expect(items[1]).toMatchObject({ startDate: "2020-01-01T00:00:00.000Z", endDate: "2021-01-01T00:00:00.000Z" });
   });
 
   test("returns an empty envelope when the person has no roles", async () => {
@@ -51,7 +64,7 @@ describe("runPersonRoleList", () => {
     mockClient.get.mockResolvedValueOnce([{ asiakasPersonSettingId: 9, asiakasPersonSettingTypeId: 8 }]);
     const result = await runPersonRoleList(mockClient, 316);
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakasPersonSettings/get/27/316");
-    expect(result.items[0]).toEqual({ asiakasPersonSettingId: 9, roleTypeId: 8, role: "pumppari" });
+    expect(result.items[0]).toEqual({ asiakasPersonSettingId: 9, roleTypeId: 8, role: "pumppari", asiakasId: 27, startDate: null, endDate: null, active: true });
   });
 
   test("an explicit --asiakas still wins over the acting company", async () => {

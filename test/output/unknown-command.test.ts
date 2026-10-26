@@ -15,6 +15,7 @@ import {
   buildExcessArgumentsEnvelope,
   asDateSuggestion,
   dateFlagSuggestion,
+  idFlagSuggestion,
   siblingsAcceptingOption,
   siblingGroupsWithCommand,
   descendantsOwningVerb,
@@ -778,6 +779,20 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
     expect(env.didYouMean).toBeNull();
     expect(env.hint).toMatch(/PowerShell/);
     expect(env.hint).toContain("<vehicleId>");
+  });
+
+  // fb#2889: `ib betoni laatu list 30` — the supplier id belongs in --asiakas.
+  test("a lone integer on a positional-less command with one id flag suggests that flag", () => {
+    const env = buildExcessArgumentsEnvelope(leafByPath("betoni", "laatu", "list"), ["30"], "too many arguments");
+    expect(env.didYouMean).toBe("--asiakas 30");
+    expect(env.hint).toContain("Did you mean `--asiakas 30`?");
+    expect(env.hint).not.toMatch(/PowerShell/);
+  });
+
+  test("no id-flag guess for a non-integer, or a command owning two id flags", () => {
+    expect(idFlagSuggestion(leafByPath("betoni", "laatu", "list"), ["rudus"])).toBeNull();
+    expect(idFlagSuggestion(leafByPath("betoni", "laatu", "list"), ["30", "31"])).toBeNull();
+    expect(idFlagSuggestion(leafByPath("keikka", "list"), ["30"])).toBeNull();
   });
 
   test("still lists the command's real positionals and flags", () => {

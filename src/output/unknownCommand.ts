@@ -1006,6 +1006,22 @@ export function dateFlagSuggestion(
   return null;
 }
 
+/** Target-id flags a bare integer positional most likely meant (fb#2889). */
+const ID_FLAGS = ["asiakas", "person", "worksite", "keikka", "vehicle"];
+
+/**
+ * `--<idFlag> <n>` when the ONLY excess token is a positive integer, the command
+ * declares no positionals, and it owns exactly one target-id flag — otherwise
+ * null. `ib betoni laatu list 30` → `--asiakas 30`. Two id flags is a guess, so
+ * silence: a wrong suggestion is worse than none.
+ */
+export function idFlagSuggestion(cmd: Command, excess: string[]): string | null {
+  const { spec, positionals } = commandSurface(cmd);
+  if (positionals.length || excess.length !== 1 || !/^[1-9]\d*$/.test(excess[0])) return null;
+  const owned = (spec?.flags ?? []).map((f) => f.name).filter((n) => ID_FLAGS.includes(n));
+  return owned.length === 1 ? `--${owned[0]} ${excess[0]}` : null;
+}
+
 export interface ExcessArgumentsEnvelope {
   success: false;
   error: string;
@@ -1133,7 +1149,8 @@ export function buildExcessArgumentsEnvelope(
   // No date suggestion when a misplaced flag leads: didYouMean must never name
   // a remedy the hint does not (fb#2074).
   const dated = misplaced.length ? null : dateFlagSuggestion(cmd, excess);
-  const didYouMean = dated?.suggestion ?? null;
+  const idFlag = misplaced.length || dated ? null : idFlagSuggestion(cmd, excess);
+  const didYouMean = dated?.suggestion ?? idFlag;
 
   const parts: string[] = [];
   if (misplaced.length) {
@@ -1150,6 +1167,8 @@ export function buildExcessArgumentsEnvelope(
         (dated.token !== dated.date ? ` (and the documented format is YYYY-MM-DD)` : "") +
         "."
     );
+  } else if (idFlag) {
+    parts.push(`Did you mean \`${idFlag}\`? This command takes that id as a FLAG, not a positional.`);
   } else {
     // No date to latch onto. Lead with the command's OWN curated remedy when it
     // documents this failure — on the prose-bearing commands that is "pass the
