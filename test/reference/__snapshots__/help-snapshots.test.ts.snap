@@ -12068,7 +12068,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - totalPrecipitation / avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation, maxWindSpeed, maxWindGust, weatherSymbol and description cover the pumping hours only; the averages also span the 4 hardening hours after it. hourly[].time is the END of its hour; isPumpingPeriod = that hour (time-1h..time) overlaps the pumping period. The \`?\` fields are absent when FMI answers with a single time point (hourly then has one entry). \`...\` = avgHumidity, avgDewPoint, avgPressure, start/end/avgFeelsLike.
+  - totalPrecipitation / avgTemperature / maxWindSpeed / maxWindGust are null when FMI has no data for the window. totalPrecipitation, maxWindSpeed, maxWindGust, weatherSymbol and description cover the pumping hours only (all hours when none is pumping); the averages also span the 4 hardening hours after it. hourly[].time is the END of its hour; isPumpingPeriod = that hour (time-1h..time) overlaps the pumping period. The \`?\` fields are absent when FMI answers with a single time point (hourly then has one entry). \`...\` = avgHumidity, avgDewPoint, avgPressure, start/end/avgFeelsLike.
 
 EXAMPLES
   ib opendata weather pumping --lat 60.17 --lng 24.94 --start now --duration 120
