@@ -41,6 +41,10 @@ describe("ib message sms log (fb#2534)", () => {
     expect(client.get).toHaveBeenCalledWith("/api/sms/log/27?from=2026-10-01&to=2026-10-26&channel=sms");
     expect(out).toEqual({ items: [{ smsLogId: 1 }], nextCursor: null, count: 1, truncated: false, totals: TOTALS });
   });
+  test("truncated comes from the server", async () => {
+    client.get.mockResolvedValueOnce({ items: [{ smsLogId: 1 }], truncated: true, totals: TOTALS });
+    expect(await runSmsLog(client, { owner: 27 })).toMatchObject({ truncated: true, count: 1 });
+  });
   test("no flags -> server defaults (no query string)", async () => {
     client.get.mockResolvedValueOnce({ items: [], totals: TOTALS });
     await runSmsLog(client, { owner: 27 });

@@ -25,9 +25,6 @@ export async function runSmsList(client: ApiClient, opts: { person: number; owne
   return client.get(`/api/sms/person/${opts.person}/${opts.owner}`);
 }
 
-/** Server row cap of GET /api/sms/log (smsLogSql.listForTenant); no cursor, so a full page = truncated. */
-const SMS_LOG_CAP = 500;
-
 /** GET /api/sms/log (fb#2534): the active company's whole message log + SMS cost estimate, as a list envelope. */
 export async function runSmsLog(
   client: ApiClient,
@@ -40,9 +37,10 @@ export async function runSmsLog(
   if (to) q.set("to", to);
   if (opts.channel) q.set("channel", opts.channel);
   const qs = q.toString();
-  const r = await client.get<{ items?: unknown[]; totals?: unknown }>(`/api/sms/log/${opts.owner}${qs ? `?${qs}` : ""}`);
+  // The server caps at 500 rows and says whether more matched (no cursor).
+  const r = await client.get<{ items?: unknown[]; truncated?: boolean; totals?: unknown }>(`/api/sms/log/${opts.owner}${qs ? `?${qs}` : ""}`);
   const items = r?.items ?? [];
-  return { items, nextCursor: null, count: items.length, truncated: items.length >= SMS_LOG_CAP, totals: r?.totals ?? null };
+  return { items, nextCursor: null, count: items.length, truncated: r?.truncated === true, totals: r?.totals ?? null };
 }
 
 /**

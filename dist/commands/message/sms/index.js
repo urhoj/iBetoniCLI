@@ -12,8 +12,6 @@ export async function runSmsSend(client, opts) {
 export async function runSmsList(client, opts) {
     return client.get(`/api/sms/person/${opts.person}/${opts.owner}`);
 }
-/** Server row cap of GET /api/sms/log (smsLogSql.listForTenant); no cursor, so a full page = truncated. */
-const SMS_LOG_CAP = 500;
 /** GET /api/sms/log (fb#2534): the active company's whole message log + SMS cost estimate, as a list envelope. */
 export async function runSmsLog(client, opts) {
     const q = new URLSearchParams();
@@ -26,9 +24,10 @@ export async function runSmsLog(client, opts) {
     if (opts.channel)
         q.set("channel", opts.channel);
     const qs = q.toString();
+    // The server caps at 500 rows and says whether more matched (no cursor).
     const r = await client.get(`/api/sms/log/${opts.owner}${qs ? `?${qs}` : ""}`);
     const items = r?.items ?? [];
-    return { items, nextCursor: null, count: items.length, truncated: items.length >= SMS_LOG_CAP, totals: r?.totals ?? null };
+    return { items, nextCursor: null, count: items.length, truncated: r?.truncated === true, totals: r?.totals ?? null };
 }
 /**
  * Register `ib message sms` — manual driver SMS (HAS_SMS tenants, admins):
