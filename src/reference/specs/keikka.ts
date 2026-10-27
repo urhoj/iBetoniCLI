@@ -380,7 +380,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "must be after the start", meaning: "--end is not after the (new or current) start; same-day only", remedy: "pass an --end later than the start, or move --start first" },
       { origin: "client", exit: 4, match: "no pumppuAika to move from", meaning: "No pumppuAika, so a partial time flag has nothing to fill", remedy: "pass both --date and --start" },
       { origin: "client", exit: 4, match: "--vehicle must be an integer", meaning: "--vehicle not an integer >= 1", remedy: "pass a positive vehicleId" },
-      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, or an unknown/ambiguous spec value; pump: a value outside 0..999)", "check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)"),
+      apiErr(400, "Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, an unknown/ambiguous spec value or bad --rasitus; pump: a value outside 0..999)", "the message names the plant's real supplier, the known classes, or the concrete lines (pick one with --betoni-line)"),
       apiErr(404, "Keikka, or a --customer/--worksite/--plant/--source/--betoni-line target, not found, soft-deleted, OR outside your visible scope", "the message names which id; another tenant's rows (or another keikka's --betoni-line) 404 identically to missing ones"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],

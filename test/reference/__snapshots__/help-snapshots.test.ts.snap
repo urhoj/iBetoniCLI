@@ -8631,7 +8631,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --end is not after the (new or current) start; same-day only → pass an --end later than the start, or move --start first
   exit 4 (client-side)  No pumppuAika, so a partial time flag has nothing to fill → pass both --date and --start
   exit 4 (client-side)  --vehicle not an integer >= 1 → pass a positive vehicleId
-  exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, or an unknown/ambiguous spec value; pump: a value outside 0..999) → check the flags — the message names the plant's real supplier, or lists the keikka's concrete lines (pick one with --betoni-line)
+  exit 4 (HTTP 400)  Body rejected (move: pumppuKesto outside 15..10080 min; re-point: --supplier does not own --plant; text: over the length cap; concrete: no concrete line, or several and no --betoni-line, an unknown/ambiguous spec value or bad --rasitus; pump: a value outside 0..999) → the message names the plant's real supplier, the known classes, or the concrete lines (pick one with --betoni-line)
   exit 5 (HTTP 404)  Keikka, or a --customer/--worksite/--plant/--source/--betoni-line target, not found, soft-deleted, OR outside your visible scope → the message names which id; another tenant's rows (or another keikka's --betoni-line) 404 identically to missing ones
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
