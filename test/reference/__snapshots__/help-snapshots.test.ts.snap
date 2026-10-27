@@ -8702,7 +8702,7 @@ exports[`Help snapshots — contract stability > help for ib keikka validation d
   ib keikka validation dismiss <keikkaId> <issueId> [flags]
 
 DESCRIPTION
-  Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when the warning's text changes (weather warnings excepted).
+  Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when what the warning reports changes or the keikka moves to another vehicle (weather warnings excepted).
   Permissions: requires order edit: company admin, editor or order handler.
 
 ARGUMENTS
@@ -8732,7 +8732,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - The fingerprint is the warning text the backend validator reports, so the dismissal also applies in the grid drawer. --reason is stored with it as an audit note.
+  - The fingerprint is what the backend validator reports (the warning text, or a rule's own key such as a concrete row's id + m3/grain/slump), so the dismissal also applies in the grid drawer. The server records the keikka's current vehicle with it (nothing to send). --reason is stored with it as an audit note.
 
 SEE ALSO
   ib keikka validate, ib keikka validation undismiss

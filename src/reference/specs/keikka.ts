@@ -608,7 +608,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   {
     command: "ib keikka validation dismiss",
     description:
-      "Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when the warning's text changes (weather warnings excepted).",
+      "Dismiss ONE validation warning on ONE keikka for the whole company (the grid drawer's Ohita). It comes back by itself when what the warning reports changes or the keikka moves to another vehicle (weather warnings excepted).",
     permissions: ["order edit: company admin, editor or order handler"],
     args: [
       { name: "keikkaId", type: "number", description: "The keikka" },
@@ -623,7 +623,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
       ...authErrors(apiErr(403, "No order-edit role on the keikka's company", "dismissing needs company admin / editor / order handler on the keikka's owner")),
     ],
     notes: [
-      "The fingerprint is the warning text the backend validator reports, so the dismissal also applies in the grid drawer. --reason is stored with it as an audit note.",
+      "The fingerprint is what the backend validator reports (the warning text, or a rule's own key such as a concrete row's id + m3/grain/slump), so the dismissal also applies in the grid drawer. The server records the keikka's current vehicle with it (nothing to send). --reason is stored with it as an audit note.",
     ],
     seeAlso: ["ib keikka validate", "ib keikka validation undismiss"],
     examples: ["ib keikka validation dismiss 13053 MISSING_FACTORY --reason \"no plant needed\""],
