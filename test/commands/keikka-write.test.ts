@@ -163,6 +163,17 @@ describe("ib keikka create/update/drivers", () => {
     await expect(runKeikkaUpdate(mockClient, 12741, { laatu: "RAK", puomi: 32 }, {})).rejects.toThrow(/cannot be combined/);
   });
 
+  test("runKeikkaUpdate --rasitus joins the concrete group and sends the raw csv as rasitusluokat (fb#2927)", async () => {
+    mockClient.post.mockResolvedValueOnce({ keikkaId: 12609, changed: ["rasitusluokat"] });
+    await runKeikkaUpdate(mockClient, 12609, { rasitus: "XC1,XC2", betoniLine: 43310 }, { reason: "X0 exclusive" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/keikka/betoni/12609",
+      { rasitusluokat: "XC1,XC2", keikkaBetoniId: 43310 },
+      { headers: { "X-Action-Reason": "X0 exclusive" } }
+    );
+    await expect(runKeikkaUpdate(mockClient, 12609, { rasitus: "", comment: "x" }, {})).rejects.toThrow(/cannot be combined/);
+  });
+
   test("runKeikkaUpdate concrete flags: --betoni-line alone and mixing with a text flag exit 4 before any POST", async () => {
     await expect(runKeikkaUpdate(mockClient, 12278, { betoniLine: 900 }, {})).rejects.toThrow(/--betoni-line needs/);
     await expect(runKeikkaUpdate(mockClient, 12278, { m3: 15, comment: "x" }, {})).rejects.toThrow(/cannot be combined/);

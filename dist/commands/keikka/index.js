@@ -251,6 +251,7 @@ const BETONI_SPEC_FLAGS = [
     ["raekoko", "raeKokoId"],
     ["notkeus", "notkeusId"],
     ["kayttoika", "kayttoIkaId"],
+    ["rasitus", "rasitusluokat"],
 ];
 /**
  * Update a keikka. Six flag groups, six routes, one group per call (no atomicity
@@ -272,7 +273,8 @@ const BETONI_SPEC_FLAGS = [
  *     (fb#1432).
  * The concrete spec flags (`--laatu/--lujuus/--raekoko/--notkeus/--kayttoika`, fb#2567) join
  * the concrete group and are sent raw: the backend resolves an id or a name ("C37") against
- * the keikka owner's reference, so MCP callers get the same resolution.
+ * the keikka owner's reference, so MCP callers get the same resolution. `--rasitus` (fb#2927) joins
+ * them too: a comma-separated list the backend validates and applies the X0 rule to.
  */
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     const needsRow = fields.date !== undefined || fields.start !== undefined || fields.end !== undefined;
@@ -286,13 +288,13 @@ export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
         failWith("--supplier needs --plant — the supplier is the plant's owning company", 4);
     }
     if (fields.betoniLine !== undefined && !isBetoni) {
-        failWith("--betoni-line needs a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) — it only picks which concrete line they write", 4);
+        failWith("--betoni-line needs a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika/--rasitus) — it only picks which concrete line they write", 4);
     }
     if ([fields.status !== undefined, isMove, isRefs, isInfo, isBetoni, isPump].filter(Boolean).length > 1) {
-        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title), the concrete flags (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) and the pump flags (--puomi/--optimal-puomi/--linja) cannot be combined — run one command per group", 4);
+        failWith("--status, the move flags (--vehicle/--date/--start/--end), the reference flags (--customer/--worksite/--plant/--source), the text flags (--driving-instructions/--comment/--title), the concrete flags (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika/--rasitus) and the pump flags (--puomi/--optimal-puomi/--linja) cannot be combined — run one command per group", 4);
     }
     if (fields.status === undefined && !isMove && !isRefs && !isInfo && !isBetoni && !isPump) {
-        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title), a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika) or a pump flag (--puomi/--optimal-puomi/--linja)", 4);
+        failWith("Nothing to update: pass --status, a move flag (--vehicle/--date/--start/--end), a reference flag (--customer/--worksite/--plant/--source), a text flag (--driving-instructions/--comment/--title), a concrete flag (--m3/--betoni-comment/--laatu/--lujuus/--raekoko/--notkeus/--kayttoika/--rasitus) or a pump flag (--puomi/--optimal-puomi/--linja)", 4);
     }
     if (isPump) {
         const body = {};
@@ -789,6 +791,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--raekoko <idOrName>", "Set the aggregate size (betoniRaeKoko id or name, e.g. 16mm)")
         .option("--notkeus <idOrName>", "Set the consistency class (betoniNotkeus id or name, e.g. S3)")
         .option("--kayttoika <idOrName>", "Set the design service life (betoniKayttoIka id or name, e.g. 50v)")
+        .option("--rasitus <csv>", 'Set the exposure classes (rasitusluokat, e.g. XC1,XC2); X0 is dropped next to a real class; "" clears')
         .option("--betoni-line <keikkaBetoniId>", "Which concrete line (needed when the keikka has several)", intFlag("--betoni-line"))
         // 0..999 upper bound is the backend's (400), not restated here
         .option("--puomi <m>", "Minimum boom length (pumppuPuomi, m); 0 = none", intFlag("--puomi", 0))
@@ -818,6 +821,7 @@ export function registerKeikkaCommands(parent, getClient) {
             raekoko: opts.raekoko,
             notkeus: opts.notkeus,
             kayttoika: opts.kayttoika,
+            rasitus: opts.rasitus,
             puomi: opts.puomi,
             optimalPuomi: opts.optimalPuomi,
             linja: opts.linja,
