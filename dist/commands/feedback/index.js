@@ -42,8 +42,8 @@ export const STATUSES = ["open", "reviewed", "applied", "dismissed"];
  */
 export const ACTIVE_STATUSES = ["open", "reviewed"];
 /**
- * The ONE status word that isn't a status: "resolved" is the single most
- * natural guess for this enum, precisely because the command that validates
+ * Status words that aren't statuses, mapped to the one they mean. "resolved"
+ * is the most natural guess for this enum, precisely because the command that validates
  * it is named `resolve` — but it means "fixed/shipped", which is `applied`,
  * not `reviewed` (merely looked at). Raw edit distance gets this backwards:
  * "resolved" and "reviewed" are both 8 characters with few substitutions, so
@@ -51,7 +51,8 @@ export const ACTIVE_STATUSES = ["open", "reviewed"];
  * direction, for a caller who just fixed something (fb#1364, hit twice in one
  * session). Checked BEFORE the fuzzy matcher by `enumGuess`, same as
  * SEVERITY_SYNONYMS below — a curated mapping wins over a same-length
- * accident. `rejected` had the same trap (edit distance → `reviewed`, fb#2904).
+ * accident. `rejected` had the same trap (edit distance → `reviewed`, fb#2904);
+ * wontfix/declined → dismissed and done/fixed → applied ride along.
  */
 const STATUS_SYNONYMS = {
     resolved: "applied",
