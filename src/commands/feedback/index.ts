@@ -63,10 +63,15 @@ export const ACTIVE_STATUSES = ["open", "reviewed"] as const;
  * direction, for a caller who just fixed something (fb#1364, hit twice in one
  * session). Checked BEFORE the fuzzy matcher by `enumGuess`, same as
  * SEVERITY_SYNONYMS below — a curated mapping wins over a same-length
- * accident.
+ * accident. `rejected` had the same trap (edit distance → `reviewed`, fb#2904).
  */
 const STATUS_SYNONYMS: Record<string, string> = {
   resolved: "applied",
+  done: "applied",
+  fixed: "applied",
+  rejected: "dismissed",
+  wontfix: "dismissed",
+  declined: "dismissed",
 };
 
 /**

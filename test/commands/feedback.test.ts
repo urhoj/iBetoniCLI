@@ -985,6 +985,16 @@ describe("ib feedback resolve", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ["rejected", "dismissed"], ["wontfix", "dismissed"], ["declined", "dismissed"],
+    ["done", "applied"], ["fixed", "applied"],
+  ])("fb#2904: `%s` is redirected to `%s`, not the edit-distance-closer `reviewed`", async (status, want) => {
+    await expect(
+      runFeedbackResolve(mockClient, 1, { status })
+    ).rejects.toThrow(new RegExp(`did you mean ${want}\\?`));
+    expect(put).not.toHaveBeenCalled();
+  });
+
   // feedback #327: a resolution note quotes commands/SQL/errors, so it hits the
   // same PowerShell argv-splitting hazard --from-json was added to `create` for.
   describe("--from-json (feedback #327)", () => {
