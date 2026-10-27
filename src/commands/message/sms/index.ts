@@ -45,7 +45,7 @@ export async function runSmsLog(
 
 /**
  * Register `ib message sms` — manual driver SMS (HAS_SMS tenants, admins):
- *   send --person <id> --message <text>   send one SMS (≤ 2 segments, no links)
+ *   send --person <id> --message <text>   send one SMS (≤ 2 segments, no links but our own hosts)
  *   list --person <id>                    SMS sent to that person, newest first
  *   log [--from] [--to] [--channel]       every message of the company + SMS cost estimate
  */

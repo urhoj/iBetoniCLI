@@ -587,18 +587,18 @@ export const MESSAGE_SPECS: CommandSpec[] = [
   {
     command: "ib message sms send",
     description:
-      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks for the active company. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links. Every message handed to the gateway is logged in smsLog (sent, failed or unknown); a send refused before that (bad text, unknown recipient, no phone, daily cap, --dry-run) writes no row. Only a successful send also writes an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
+      "Send ONE free-text SMS to a person of the active company (GatewayAPI, sender iBetoni). Requires the HAS_SMS company module and an admin or dispatcher role (asiakasAdmin, owner, editor, keikkaHandler, laskuAdmin or laskupohjaAdmin); a system admin/developer skips both checks for the active company. The server resolves the phone from the person's personPhone — you never pass a number. Max 2 segments (306 GSM-7 / 134 UCS-2 chars), no links except our own hosts betoni.online and app.ibetoni.fi (bare, https:// or with a path; lookalikes and emails are refused). Every message handed to the gateway is logged in smsLog (sent, failed or unknown); a send refused before that (bad text, unknown recipient, no phone, daily cap, --dry-run) writes no row. Only a successful send also writes an `smsSent` changeTracker row on the person. A REAL, billed write — honours --read-only. --dry-run is server-side: validates text + recipient, sends nothing.",
     auth: "any",
     flags: [
       { name: "person", type: "number", required: true, description: "Recipient personId (must belong to the active company)" },
-      { name: "message", type: "string", required: true, description: "SMS text (≤ 2 segments, no links)" },
+      { name: "message", type: "string", required: true, description: "SMS text (≤ 2 segments, no links except betoni.online / app.ibetoni.fi)" },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ smsLogId, status:'sent', segments, phone:'***NNNN' }. With --dry-run: { dryRun:true, personId, phone:'***NNNN', segments }. On 422: { error, smsLogId, status:'failed'|'unknown' }.",
     errors: [
       PERSON_PARSE_ERR,
-      apiErr(400, "Validation", "empty/too long/link in text, or person has no textable phone"),
+      apiErr(400, "Validation", "empty/too long/link other than betoni.online or app.ibetoni.fi in text, or person has no textable phone"),
       apiErr(403, "Permission denied", "company lacks the HAS_SMS module or caller has none of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin (a system admin/developer passes both), or the token has no active company"),
       apiErr(404, "Not found", "personId is not in the active company"),
       apiErr(422, "Gateway rejected or no answer", "body.status 'failed': the gateway refused (error text carries its reason) — fix the cause before retrying, each send is billed. body.status 'unknown': no gateway answer within 15 s, the SMS MAY have been delivered — do NOT re-send until the recipient confirms. Both are logged in smsLog with that status"),
