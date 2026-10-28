@@ -218,7 +218,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     flags: [{ name: "asiakas", type: "number", description: "asiakasId to set as this person's default active company", required: true }],
     writeFlags: true,
     dryRunKind: "client",
-    outputShape: "200 empty body on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)",
+    outputShape: "200 text body OK on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)",
     errors: [
       PERSON_PARSE_ERR,
       apiErr(403, "Not allowed to change this person's settings", "see the permissions above (self/sysadmin/admin-of-owner)"),
@@ -254,7 +254,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "client",
-    outputShape: "200 empty body on success | { dryRun:true, personId, wouldChange:{ value?:{from,to} } } (with --dry-run)",
+    outputShape: "200 text body OK on success | { dryRun:true, personId, wouldChange:{ value?:{from,to} } } (with --dry-run)",
     errors: [
       PERSON_TARGET_ERR,
       PERSON_PARSE_ERR,
@@ -292,7 +292,7 @@ export const PERSON_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     dryRunKind: "client",
-    outputShape: "200 empty body on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)",
+    outputShape: "200 text body OK on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)",
     errors: [
       PERSON_TARGET_ERR,
       PERSON_PARSE_ERR,
@@ -301,7 +301,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "Betomik only for now. A push needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).",
+      "Betomik only, and only date-valid pumpparit at Betomik (27) are ever pushed (the job's pumppari rule): 'on' for anyone else is stored and shown by get, but nothing is sent. A push also needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).",
     ],
     seeAlso: ["ib person driver-day-push get", "ib dev betomik-orderbook day-push-preview"],
     examples: ["ib person driver-day-push set 6390 --on --reason 'driver asked'", "ib person driver-day-push set --person 6390 --off --dry-run"],

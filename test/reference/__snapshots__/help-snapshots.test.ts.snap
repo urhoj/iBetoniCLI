@@ -2850,7 +2850,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { pvm, optedIn, sent, already, empty, noDevice, failed } — sent = WOULD be sent; already = an auto push for the day was already tried or this exact list was sent; empty = no orders; noDevice = opted in without a push device
+  { pvm, optedIn, sent, already, empty, noDevice, failed } — sent = WOULD be attempted (an upper bound: a real run can still fail on the text-length cap or the push provider); already = an auto push for the day was already tried or this exact list was sent; empty = no orders; noDevice = opted in without a push device
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
@@ -2859,7 +2859,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Read-only. 'Tomorrow' is computed from now (Europe/Helsinki). Opt-in per driver: ib person driver-day-push get|set.
+  - Read-only (a read error in the dry run is not reported to Sentry). 'Tomorrow' is computed from now (Europe/Helsinki), so after midnight it previews the day after that evening's run. Opt-in per driver: ib person driver-day-push get|set.
 
 SEE ALSO
   ib person driver-day-push get, ib message driver day-status
@@ -13691,7 +13691,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  200 empty body on success | { dryRun:true, personId, wouldChange:{ value?:{from,to} } } (with --dry-run)
+  200 text body OK on success | { dryRun:true, personId, wouldChange:{ value?:{from,to} } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
@@ -13772,7 +13772,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  200 empty body on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)
+  200 text body OK on success | { dryRun:true, personId, wouldChange:{ companyId?:{from,to} } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
@@ -13894,7 +13894,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  200 empty body on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)
+  200 text body OK on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
@@ -13905,7 +13905,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Betomik only for now. A push needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).
+  - Betomik only, and only date-valid pumpparit at Betomik (27) are ever pushed (the job's pumppari rule): 'on' for anyone else is stored and shown by get, but nothing is sent. A push also needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).
 
 SEE ALSO
   ib person driver-day-push get, ib dev betomik-orderbook day-push-preview
