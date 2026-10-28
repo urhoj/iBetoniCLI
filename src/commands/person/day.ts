@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { resolveDate, toYyyymmddInt, addDaysISO } from "../../dates.js";
+import { resolveDate, toYyyymmddInt, addDaysISO, isIsoDateOrDateTime } from "../../dates.js";
 import { diffFields } from "../../diff.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import {
@@ -195,7 +195,8 @@ export async function runPersonDaySetRange(
   const from = resolveDate(fromInput)!;
   const to = resolveDate(toInput)!;
   for (const [flag, d] of [["--from", from], ["--to", to]]) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
+    // isIsoDateOrDateTime rejects 2026-02-30, which Date.parse rolls over (fb#2967).
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isIsoDateOrDateTime(d)) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
   }
   if (to < from) failWith(`--to (${to}) is before --from (${from})`, 4);
   const days: string[] = [];
@@ -251,7 +252,7 @@ export async function runPersonDaySetRange(
     try {
       await client.post(`/api/personPvm/save/${asiakasId}`, body, { headers });
     } catch (e) {
-      warnNote(`[ib] person day set: ${set.length} of ${pending.length} days saved before ${date} failed — re-run the same command to resume (saved days come back as unchanged).`);
+      warnNote(`[ib] person day set: ${set.length} of ${pending.length} days saved before ${date} failed (saved: ${set.join(", ") || "none"}) — re-run the same command to resume (saved days come back as unchanged).`);
       throw e;
     }
     set.push(date);
@@ -301,6 +302,7 @@ function projectStatus(r: Row): StatusRowFull {
 
 /** Apply the given flags onto a backend status row (0/1 flags become booleans). */
 function mergeStatusFlags(row: Row, flags: PersonDayStatusFlags): Row {
+  if (flags.prefix && flags.prefix.length > 2) failWith("--prefix is at most 2 characters", 4);
   const next: Row = { ...row };
   for (const flag of Object.keys(STATUS_FIELDS) as StatusFieldFlag[]) {
     const v = flags[flag];
@@ -317,9 +319,8 @@ function mergeStatusFlags(row: Row, flags: PersonDayStatusFlags): Row {
  */
 export async function runPersonDayStatusCreate(client: ApiClient, flags: PersonDayStatusFlags): Promise<unknown> {
   if (!flags.name) failWith("--name is required", 4);
-  if (flags.prefix && flags.prefix.length > 2) failWith("--prefix is at most 2 characters", 4);
   const body = mergeStatusFlags(
-    { personPvmStatusId: -1, personPvmStatus: flags.code ?? flags.name, pois: true, vakioVapaa: false, active: true, prefix: "", style: null, personPvmStatusDescription: null },
+    { personPvmStatusId: -1, personPvmStatus: flags.name, pois: true, vakioVapaa: false, active: true, prefix: "", style: null, personPvmStatusDescription: null },
     flags
   );
   if (flags.dryRun) return { dryRun: true, wouldCreate: body };
@@ -334,7 +335,6 @@ export async function runPersonDayStatusCreate(client: ApiClient, flags: PersonD
  * unless the caller is a system admin/developer. `--dry-run` is client-side.
  */
 export async function runPersonDayStatusUpdate(client: ApiClient, statusId: number, flags: PersonDayStatusFlags): Promise<unknown> {
-  if (flags.prefix && flags.prefix.length > 2) failWith("--prefix is at most 2 characters", 4);
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const rows = await client.get<Row[]>(`/api/personPvm/statusList/${asiakasId}`);
   const current = (rows || []).find((r) => Number(r.personPvmStatusId) === statusId);

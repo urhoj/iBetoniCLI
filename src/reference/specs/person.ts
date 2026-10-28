@@ -579,7 +579,7 @@ export const PERSON_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person day status create",
-    description: "Create a day-status type (e.g. Sairasloma) owned by the active company. Requires --reason unless --dry-run.",
+    description: "Create a day-status type, such as Sairasloma, owned by the active company. Requires --reason unless --dry-run.",
     permissions: ["Admin or HR Admin on the active company (server-enforced)"],
     flags: [
       { name: "name", type: "string", description: "Display name (personPvmStatusName)", required: true },
@@ -599,6 +599,7 @@ export const PERSON_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "--name is required", meaning: "no --name given", remedy: "pass --name" },
       { origin: "client", exit: 4, match: "must be", meaning: "--pois/--vakio-vapaa/--active is not 0 or 1", remedy: "pass 0 or 1" },
       { origin: "client", exit: 4, match: "--prefix is at most", meaning: "--prefix is over 2 characters", remedy: "shorten --prefix to 1–2 characters" },
+      apiErr(400, "A field is longer than its column (name/code 50, description/style 500 chars)", "shorten the named field", "is at most"),
       apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -630,7 +631,8 @@ export const PERSON_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "must be", meaning: "--pois/--vakio-vapaa/--active is not 0 or 1", remedy: "pass 0 or 1" },
       { origin: "client", exit: 4, match: "--prefix is at most", meaning: "--prefix is over 2 characters", remedy: "shorten --prefix to 1–2 characters" },
       { origin: "client", exit: 5, match: "No status", meaning: "the id is not in the active company's status list", remedy: "check `ib person day statuses --full`" },
-      apiErr(403, "Another company's status, or a global status without system-admin rights", "edit only your company's own statuses; create a new one instead of changing a global one"),
+      apiErr(400, "A field is longer than its column (name/code 50, description/style 500 chars)", "shorten the named field", "is at most"),
+      apiErr(403, "Not Admin or HR Admin on the active company, or a global status (ownerAsiakasId null) without system-admin rights", "use an Admin/HR account; to change a global status, create your own with `ib person day status create`"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: ["Read-merge-write: the save overwrites every column, so the current row is read first."],

@@ -251,6 +251,9 @@ describe("runPersonDaySetRange", () => {
     const c = rangeClient([]);
     await expect(runPersonDaySetRange(c, 1, "2026-01-01", "2026-12-31", "41", {})).rejects.toThrow(/at most 186/);
     await expect(runPersonDaySetRange(c, 1, "2026-02-01", "2026-01-01", "41", {})).rejects.toThrow(/before --from/);
+    // An impossible calendar date must exit 4 here, not reach the backend as a 500 (fb#2967).
+    await expect(runPersonDaySetRange(c, 1, "2026-02-30", "2026-03-03", "41", {})).rejects.toThrow(/expected YYYY-MM-DD/);
+    await expect(runPersonDaySetRange(c, 1, "2026-02-25", "2026-04-31", "41", {})).rejects.toThrow(/expected YYYY-MM-DD/);
     expect(c.get).not.toHaveBeenCalled();
   });
 });

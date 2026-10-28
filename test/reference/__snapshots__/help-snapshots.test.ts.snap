@@ -13338,7 +13338,7 @@ exports[`Help snapshots — contract stability > help for ib person day status c
   ib person day status create --name <name> [flags]
 
 DESCRIPTION
-  Create a day-status type (e.g. Sairasloma) owned by the active company. Requires --reason unless --dry-run.
+  Create a day-status type, such as Sairasloma, owned by the active company. Requires --reason unless --dry-run.
   Permissions: requires Admin or HR Admin on the active company (server-enforced).
 
 FLAGS
@@ -13367,6 +13367,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  no --name given        → pass --name
   exit 4 (client-side)  --pois/--vakio-vapaa/--active is not 0 or 1 → pass 0 or 1
   exit 4 (client-side)  --prefix is over 2 characters → shorten --prefix to 1–2 characters
+  exit 4 (HTTP 400)  A field is longer than its column (name/code 50, description/style 500 chars) → shorten the named field
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -13420,7 +13421,8 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --pois/--vakio-vapaa/--active is not 0 or 1 → pass 0 or 1
   exit 4 (client-side)  --prefix is over 2 characters → shorten --prefix to 1–2 characters
   exit 5 (client-side)  the id is not in the active company's status list → check \`ib person day statuses --full\`
-  exit 3 (HTTP 403)  Another company's status, or a global status without system-admin rights → edit only your company's own statuses; create a new one instead of changing a global one
+  exit 4 (HTTP 400)  A field is longer than its column (name/code 50, description/style 500 chars) → shorten the named field
+  exit 3 (HTTP 403)  Not Admin or HR Admin on the active company, or a global status (ownerAsiakasId null) without system-admin rights → use an Admin/HR account; to change a global status, create your own with \`ib person day status create\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
