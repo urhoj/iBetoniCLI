@@ -21,6 +21,7 @@ import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonAppSeenCommand } from "./appSeen.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { registerPersonDayMessageChannelCommands } from "./dayMessageChannel.js";
+import { registerPersonDriverDayPushCommands } from "./driverDayPush.js";
 import { registerPersonInviteLoginCommand } from "./inviteLogin.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { applyFromJson } from "../_shared/fromJson.js";
@@ -469,6 +470,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     registerPersonAppSeenCommand(p, getClient);
     registerPersonActivityCommand(p, getClient);
     registerPersonDayMessageChannelCommands(p, getClient);
+    registerPersonDriverDayPushCommands(p, getClient);
     registerPersonInviteLoginCommand(p, getClient);
     p.command("list")
         .option("--logged-in-since <iso>")

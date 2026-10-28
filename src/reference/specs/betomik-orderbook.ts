@@ -449,4 +449,21 @@ export const BETOMIK_ORDERBOOK_SPECS: CommandSpec[] = [
     seeAlso: ["ib dev betomik-orderbook day-messages enable"],
     examples: ["ib dev betomik-orderbook day-messages disable --reason 'paused'"],
   },
+  {
+    command: "ib dev betomik-orderbook day-push-preview",
+    description: "Dry run of the 20:00 driver day push (GET /api/betomik-orderbook/day-push/preview): runs the job's own sendTomorrow with dryRun, so nothing is pushed or recorded, and returns how tomorrow's run would go.",
+    tier: "developer",
+    permissions: ["system admin or developer"],
+    flags: [],
+    args: [],
+    outputShape: "{ pvm, optedIn, sent, already, empty, noDevice, failed } — sent = WOULD be sent; already = an auto push for the day was already tried or this exact list was sent; empty = no orders; noDevice = opted in without a push device",
+    errors: [
+      { http: 403, exit: 3, meaning: "Not a system admin or developer", remedy: "Use a developer token" },
+      { http: 404, exit: 5, meaning: "Backend predates the preview route", remedy: "Deploy puminet5api with the route first" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: ["Read-only. 'Tomorrow' is computed from now (Europe/Helsinki). Opt-in per driver: ib person driver-day-push get|set."],
+    seeAlso: ["ib person driver-day-push get", "ib message driver day-status"],
+    examples: ["ib dev betomik-orderbook day-push-preview"],
+  },
 ];

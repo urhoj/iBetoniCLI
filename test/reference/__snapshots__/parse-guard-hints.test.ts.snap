@@ -1397,6 +1397,14 @@ ib person default-company set --asiakas <id>
   ! --asiakas must be an integer >= 1
   > asiakasId to set as this person's default active company
 
+ib person driver-day-push get --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
+ib person driver-day-push set --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib person duplicates --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`

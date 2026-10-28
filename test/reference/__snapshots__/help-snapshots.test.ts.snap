@@ -2834,6 +2834,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook day-push-preview matches snapshot 1`] = `
+"USAGE
+  ib dev betomik-orderbook day-push-preview [flags]
+
+DESCRIPTION
+  Dry run of the 20:00 driver day push (GET /api/betomik-orderbook/day-push/preview): runs the job's own sendTomorrow with dryRun, so nothing is pushed or recorded, and returns how tomorrow's run would go.
+  Permissions: requires system admin or developer.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { pvm, optedIn, sent, already, empty, noDevice, failed } — sent = WOULD be sent; already = an auto push for the day was already tried or this exact list was sent; empty = no orders; noDevice = opted in without a push device
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin or developer → Use a developer token
+  exit 5 (HTTP 404)  Backend predates the preview route → Deploy puminet5api with the route first
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read-only. 'Tomorrow' is computed from now (Europe/Helsinki). Opt-in per driver: ib person driver-day-push get|set.
+
+SEE ALSO
+  ib person driver-day-push get, ib message driver day-status
+
+EXAMPLES
+  ib dev betomik-orderbook day-push-preview
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev betomik-orderbook exceptions matches snapshot 1`] = `
 "USAGE
   ib dev betomik-orderbook exceptions <runId> [flags]
@@ -13793,6 +13828,91 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib person delete 5351 --dry-run
   ib person delete 5351 --reason "departed"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person driver-day-push get matches snapshot 1`] = `
+"USAGE
+  ib person driver-day-push get [<personId>] [flags]
+
+DESCRIPTION
+  Whether a driver gets tomorrow's orders as a push at 20:00 (personSettings 34 NOTIFY_DAILY_CONFIRMED, the profile switch's value).
+  Permissions: requires self, a colleague or admin of the person's company, or sysadmin/developer (requirePersonReadAccess).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { personId, enabled:boolean } — no saved row = false
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 3 (HTTP 403)  Not allowed to read this person (also an unknown personId) → see the permissions above; check the personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person driver-day-push set, ib dev betomik-orderbook day-push-preview
+
+EXAMPLES
+  ib person driver-day-push get 6390
+  ib person driver-day-push get --person 6390
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person driver-day-push set matches snapshot 1`] = `
+"USAGE
+  ib person driver-day-push set [<personId>] [flags]
+
+DESCRIPTION
+  Switch a driver's 20:00 push of tomorrow's orders on or off (personSettings 34 NOTIFY_DAILY_CONFIRMED), the value the profile switch saves.
+  Permissions: requires self, sysadmin/developer, or admin of the target person's owner company (requirePersonWriteAccess).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+  --on    Switch the push on
+  --off    Switch the push off; instead of --on
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  200 empty body on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  neither or both of --on and --off → pass --on or --off
+  exit 3 (HTTP 403)  Not allowed to change this person's settings (also an unknown personId) → see the permissions above (self/sysadmin/admin-of-owner); check the personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Betomik only for now. A push needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).
+
+SEE ALSO
+  ib person driver-day-push get, ib dev betomik-orderbook day-push-preview
+
+EXAMPLES
+  ib person driver-day-push set 6390 --on --reason 'driver asked'
+  ib person driver-day-push set --person 6390 --off --dry-run
 "
 `;
 

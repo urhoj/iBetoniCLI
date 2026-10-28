@@ -264,6 +264,13 @@ export async function runBetomikOrderbookTickRuns(client, { limit }) {
 export async function runBetomikDayMessagesSwitch(client, action, flags) {
     return client.post(`/api/betomik-orderbook/day-messages/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
 }
+/**
+ * GET /api/betomik-orderbook/day-push/preview — a dry run of the 20:00 driver day push
+ * (autoPush.sendTomorrow({dryRun:true})): counts only, nothing is sent. Sysadmin/developer only.
+ */
+export async function runBetomikDayPushPreview(client) {
+    return client.get("/api/betomik-orderbook/day-push/preview");
+}
 export function registerBetomikOrderbookCommands(parent, getClient) {
     const group = parent
         .command("betomik-orderbook")
@@ -422,6 +429,10 @@ export function registerBetomikOrderbookCommands(parent, getClient) {
     for (const action of ["enable", "disable"]) {
         addWriteFlagsToCommand(dayMessages.command(action)).action(jsonAction(getClient, (client, opts) => runBetomikDayMessagesSwitch(client, action, opts)));
     }
+    group
+        .command("day-push-preview")
+        .description("Dry run of the 20:00 driver day push: who would get tomorrow's list (counts only)")
+        .action(jsonAction(getClient, (client) => runBetomikDayPushPreview(client)));
     group
         .command("tick-runs")
         .description("Recent scheduled-tick runs (start, duration, exit code, sync counts), newest first")

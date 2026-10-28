@@ -256,6 +256,43 @@ export const PERSON_SPECS: CommandSpec[] = [
     examples: ["ib person day-message-channel set 6390 --value push --reason 'driver asked'", "ib person day-message-channel set --person 6390 --clear --dry-run"],
   },
   {
+    command: "ib person driver-day-push get",
+    description: "Whether a driver gets tomorrow's orders as a push at 20:00 (personSettings 34 NOTIFY_DAILY_CONFIRMED, the profile switch's value).",
+    permissions: ["self, a colleague or admin of the person's company, or sysadmin/developer (requirePersonReadAccess)"],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
+    flags: [PERSON_TARGET_FLAG],
+    outputShape: "{ personId, enabled:boolean } — no saved row = false",
+    errors: [PERSON_TARGET_ERR, PERSON_PARSE_ERR, apiErr(403, "Not allowed to read this person (also an unknown personId)", "see the permissions above; check the personId"), ...COMMON_AUTH_ERRORS],
+    seeAlso: ["ib person driver-day-push set", "ib dev betomik-orderbook day-push-preview"],
+    examples: ["ib person driver-day-push get 6390", "ib person driver-day-push get --person 6390"],
+  },
+  {
+    command: "ib person driver-day-push set",
+    description: "Switch a driver's 20:00 push of tomorrow's orders on or off (personSettings 34 NOTIFY_DAILY_CONFIRMED), the value the profile switch saves.",
+    permissions: ["self, sysadmin/developer, or admin of the target person's owner company (requirePersonWriteAccess)"],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
+    flags: [
+      PERSON_TARGET_FLAG,
+      { name: "on", type: "boolean", description: "Switch the push on" },
+      { name: "off", type: "boolean", description: "Switch the push off; instead of --on" },
+    ],
+    writeFlags: true,
+    dryRunKind: "client",
+    outputShape: "200 empty body on success | { dryRun:true, personId, wouldChange:{ enabled?:{from,to} } } (with --dry-run)",
+    errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
+      { origin: "client", exit: 4, match: "exactly one of --on", meaning: "neither or both of --on and --off", remedy: "pass --on or --off" },
+      apiErr(403, "Not allowed to change this person's settings (also an unknown personId)", "see the permissions above (self/sysadmin/admin-of-owner); check the personId"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Betomik only for now. A push needs a registered push device: the profile switch also asks the phone for push permission, this command does not, so an 'on' driver without a device is counted noDevice and gets nothing. --dry-run resolves client-side (GETs, never POSTs).",
+    ],
+    seeAlso: ["ib person driver-day-push get", "ib dev betomik-orderbook day-push-preview"],
+    examples: ["ib person driver-day-push set 6390 --on --reason 'driver asked'", "ib person driver-day-push set --person 6390 --off --dry-run"],
+  },
+  {
     command: "ib person invite-login",
     description:
       "Send ONE person of the active company a login invite ('kirjautumiskutsu'): SMS when the company has HAS_SMS and the person has a textable phone that is also their SMS login number, otherwise the welcome email; neither = refused. The server fills the approved text with the first name, the company name and this week's (Helsinki Mon–Sun) non-cancelled orders. Refuses a person who has already logged in unless --force. One person per call — no batch. Same sender roles, per-sender limit, SMS day cap, smsLog row and changeTracker row as `ib message sms send` / `ib message driver send`. A REAL write (SMS is billed); --dry-run is server-side: picks the channel and returns the text, sends nothing.",

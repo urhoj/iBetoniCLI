@@ -94,6 +94,10 @@ describe("no new naming outliers", () => {
    * ended) started colliding once `ib keikka pins` became the fifth command
    * with `--end` (a window-end date, mirroring the backend's `start`/`end`
    * query params) — an accidental stem match, not a spelling drift.
+   *
+   * `--only-missing` (`ib keikka recompute-matka`'s skip-already-computed
+   * filter) started colliding once `ib person driver-day-push set` became the
+   * fifth command with `--on` (a boolean switch) — an accidental stem match.
    */
   const ALLOWED_NEAR_SPELLINGS = new Set([
     "today",
@@ -103,6 +107,7 @@ describe("no new naming outliers", () => {
     "sijainti-types",
     "in",
     "end-reason",
+    "only-missing",
   ]);
 
   /**
