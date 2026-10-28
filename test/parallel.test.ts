@@ -13,8 +13,10 @@ describe("bothInOrder", () => {
 
   test("runs concurrently (total ≈ the slower one, not the sum)", async () => {
     const started = Date.now();
-    await bothInOrder(after(30, 1), after(30, 2));
-    expect(Date.now() - started).toBeLessThan(55);
+    // 200 ms each: sequential would be 400, so < 350 still proves overlap while leaving a loaded
+    // machine 150 ms of timer slack (fb#1465 — at 30/55 a busy box flaked this).
+    await bothInOrder(after(200, 1), after(200, 2));
+    expect(Date.now() - started).toBeLessThan(350);
   });
 
   test("when BOTH reject, the FIRST argument's error wins regardless of timing", async () => {
