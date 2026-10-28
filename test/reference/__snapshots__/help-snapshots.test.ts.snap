@@ -9379,7 +9379,7 @@ exports[`Help snapshots — contract stability > help for ib legal status matche
   ib legal status [flags]
 
 DESCRIPTION
-  Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under \`missing\` are active documents not yet accepted; an empty result means the scope has no active documents.
+  Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under \`missing\` are active documents not yet accepted; \`informational\` lists privacy notices (PRIVACY / BETONIJERRY_PRIVACY), which are shown for reading and never accepted. An empty result means the scope has no active documents.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -9391,7 +9391,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  {personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}
+  {personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...], informational: [{typeName, version, effectiveDate, ...}]}
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId

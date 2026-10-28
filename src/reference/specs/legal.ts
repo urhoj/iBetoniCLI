@@ -96,14 +96,14 @@ export const LEGAL_SPECS: CommandSpec[] = [
   {
     command: "ib legal status",
     description:
-      "Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under `missing` are active documents not yet accepted; an empty result means the scope has no active documents.",
+      "Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under `missing` are active documents not yet accepted; `informational` lists privacy notices (PRIVACY / BETONIJERRY_PRIVACY), which are shown for reading and never accepted. An empty result means the scope has no active documents.",
     auth: "any",
     flags: [
       { name: "person", type: "number", description: "Check another personId (developer/sysadmin only)" },
       { name: "owner", type: "number", description: "ownerAsiakasId scope (default: your company from the token)" },
     ],
     outputShape:
-      "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}",
+      "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...], informational: [{typeName, version, effectiveDate, ...}]}",
     errors: [
       PERSON_PARSE_ERR,
       OWNER_PARSE_ERR,

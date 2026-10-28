@@ -105,6 +105,8 @@ export async function runLegalStatus(client, personId, ownerAsiakasId) {
         requiresAcceptance: data.requiresAcceptance === true,
         accepted: (data.acceptedAcceptances ?? []).map(stripContent),
         missing: (data.missingAcceptances ?? []).map(stripContent),
+        // Privacy notices: readable, never accepted (cl#3767).
+        informational: (data.informationalDocuments ?? []).map(stripContent),
     };
 }
 /**

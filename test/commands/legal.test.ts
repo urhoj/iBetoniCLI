@@ -156,6 +156,18 @@ describe("ib legal reads", () => {
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/check-acceptances/5");
   });
 
+  test("status passes privacy notices through as informational (cl#3767)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({
+      missingAcceptances: [],
+      acceptedAcceptances: [],
+      informationalDocuments: [{ typeName: "PRIVACY", version: "p2", effectiveDate: "2026-10-27" }],
+      requiresAcceptance: false,
+    });
+    const out = await runLegalStatus(c, 5, null);
+    expect(out.informational).toEqual([{ typeName: "PRIVACY", version: "p2", effectiveDate: "2026-10-27" }]);
+  });
+
   test("versions strips content, returns envelope", async () => {
     const c = mockClient();
     c.get.mockResolvedValue([

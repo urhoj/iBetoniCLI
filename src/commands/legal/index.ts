@@ -166,11 +166,13 @@ export async function runLegalStatus(
   requiresAcceptance: boolean;
   accepted: Row[];
   missing: Row[];
+  informational: Row[];
 }> {
   const q = ownerAsiakasId != null ? `?ownerAsiakasId=${ownerAsiakasId}` : "";
   const data = await client.get<{
     missingAcceptances?: Row[];
     acceptedAcceptances?: Row[];
+    informationalDocuments?: Row[];
     requiresAcceptance: boolean;
   }>(`/api/legal-documents/check-acceptances/${personId}${q}`);
   // markdownContent on missing docs can exceed 10 KB each — `ib legal show` reads content.
@@ -180,6 +182,8 @@ export async function runLegalStatus(
     requiresAcceptance: data.requiresAcceptance === true,
     accepted: (data.acceptedAcceptances ?? []).map(stripContent),
     missing: (data.missingAcceptances ?? []).map(stripContent),
+    // Privacy notices: readable, never accepted (cl#3767).
+    informational: (data.informationalDocuments ?? []).map(stripContent),
   };
 }
 
