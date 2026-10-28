@@ -1,6 +1,13 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
-import { runPersonRoleList, runPersonRoleGrant, runPersonRoleRevoke } from "../../src/commands/person/index.js";
+import {
+  runPersonRoleList,
+  runPersonRoleGrant,
+  runPersonRoleRevoke,
+  runPersonRoleSetDates,
+  roleDatesFromFlags,
+} from "../../src/commands/person/index.js";
+import { todayHelsinki } from "../../src/dates.js";
 
 const mockClient = mockApiClient();
 
@@ -155,5 +162,45 @@ describe("runPersonRoleRevoke", () => {
     const call = mockClient.delete.mock.calls[0];
     expect(call[1].headers["X-Dry-Run"]).toBe("1");
     expect(result).toMatchObject({ dryRun: true });
+  });
+});
+
+// fb#2935: end-date a role instead of deleting it.
+describe("runPersonRoleSetDates", () => {
+  beforeEach(() => { mockClient.get.mockReset(); mockClient.put.mockReset(); });
+
+  test("PUTs only the given dates to the by-role dates path, with no read first", async () => {
+    mockClient.put.mockResolvedValueOnce({ updated: 1, asiakasPersonSettingId: 501 });
+    const result = await runPersonRoleSetDates(mockClient, 5351, 8, 11, { endDate: "2026-10-28" }, { reason: "moved" });
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/asiakasPersonSettings/byRole/8/5351/11/dates",
+      { endDate: "2026-10-28" },
+      { headers: { "X-Action-Reason": "moved" } }
+    );
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ updated: 1 });
+  });
+
+  test("forwards X-Dry-Run and passes the wouldUpdate preview through", async () => {
+    mockClient.put.mockResolvedValueOnce({ dryRun: true, wouldUpdate: { asiakasPersonSettingId: 501 } });
+    const result = await runPersonRoleSetDates(mockClient, 5351, 8, 11, { endDate: "2026-10-28" }, { dryRun: true });
+    expect(mockClient.put.mock.calls[0][2].headers["X-Dry-Run"]).toBe("1");
+    expect(result).toMatchObject({ dryRun: true });
+  });
+});
+
+describe("roleDatesFromFlags", () => {
+  test("end sends only endDate (so startDate is kept), defaulting to today", () => {
+    expect(roleDatesFromFlags("end", {})).toEqual({ endDate: todayHelsinki() });
+    expect(roleDatesFromFlags("end", { date: "2026-10-31" })).toEqual({ endDate: "2026-10-31" });
+  });
+
+  test("set-dates sends only the flags given; an empty string clears to null", () => {
+    expect(roleDatesFromFlags("set-dates", { start: "2026-11-01" })).toEqual({ startDate: "2026-11-01" });
+    expect(roleDatesFromFlags("set-dates", { end: "" })).toEqual({ endDate: null });
+  });
+
+  test("set-dates with neither flag exits 4", () => {
+    expect(() => roleDatesFromFlags("set-dates", {})).toThrow(/--start and\/or --end/);
   });
 });

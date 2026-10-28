@@ -14793,6 +14793,56 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person role end matches snapshot 1`] = `
+"USAGE
+  ib person role end [<personId>] [flags]
+
+DESCRIPTION
+  End-date a per-company role and KEEP its history row (revoke deletes it). Sets endDate (default today) and keeps startDate. PUT /api/asiakasPersonSettings/byRole/.../dates, resolved server-side and uncached like revoke; change-tracked. --dry-run previews old → new via the backend.
+  Permissions: requires company admin on the target tenant (tier per role).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+  --role STRING    Role name (REQUIRED)
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+  --date STRING    End date YYYY-MM-DD or today/tomorrow (default today); \`role list\` shows the role inactive from that day
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { updated: 1, asiakasPersonSettingId, startDate, endDate } | { dryRun:true, wouldUpdate:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId, old:{ startDate, endDate }, new:{ startDate, endDate } }, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (HTTP 400)  Bad date (not a date, or outside 1900–2079) or an id that is not a positive integer → use YYYY-MM-DD or today/tomorrow
+  exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
+  exit 5 (HTTP 404)  The person does not hold this role on --asiakas (or the backend predates fb#2935) → check \`ib person role list <personId> --asiakas <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person role set-dates, ib person role list, ib person role revoke
+
+EXAMPLES
+  ib person role end 6301 --role pumppari --asiakas 8 --reason 'moved to Betomik'
+  ib person role end 6301 --role pumppari --asiakas 8 --date 2026-10-31 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person role explain matches snapshot 1`] = `
 "USAGE
   ib person role explain <name> [flags]
@@ -14956,6 +15006,58 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person role set-dates matches snapshot 1`] = `
+"USAGE
+  ib person role set-dates [<personId>] [flags]
+
+DESCRIPTION
+  Set a per-company role's start and/or end date. An omitted flag keeps that date; \`""\` clears it (open-ended). PUT /api/asiakasPersonSettings/byRole/.../dates, resolved server-side and uncached; change-tracked. --dry-run previews old → new via the backend.
+  Permissions: requires company admin on the target tenant (tier per role).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+  --role STRING    Role name (REQUIRED)
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+  --start STRING    Start date YYYY-MM-DD or today/tomorrow; "" clears
+  --end STRING    End date YYYY-MM-DD or today/tomorrow; "" clears
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { updated: 1, asiakasPersonSettingId, startDate, endDate } | { dryRun:true, wouldUpdate:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId, old:{ startDate, endDate }, new:{ startDate, endDate } }, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Neither date flag given → pass --start <date>, --end <date>, or both
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
+  exit 4 (client-side)  --asiakas is not an integer >= 1, rejected locally before any request → pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
+  exit 4 (HTTP 400)  Bad date (not a date, or outside 1900–2079) or an id that is not a positive integer → use YYYY-MM-DD or today/tomorrow
+  exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
+  exit 5 (HTTP 404)  The person does not hold this role on --asiakas (or the backend predates fb#2935) → check \`ib person role list <personId> --asiakas <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person role end, ib person role list
+
+EXAMPLES
+  ib person role set-dates 6301 --role pumppari --asiakas 27 --start 2026-11-01 --reason 'starts at Betomik'
+  ib person role set-dates 6301 --role pumppari --asiakas 8 --end '' --reason 'reopen role'
 "
 `;
 

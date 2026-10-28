@@ -29,7 +29,7 @@ import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 import { diffFields } from "../../diff.js";
-import { isIsoDateOrDateTime, resolveDateTime } from "../../dates.js";
+import { isIsoDateOrDateTime, resolveDate, resolveDateTime } from "../../dates.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
  * /api/person/newPerson body. Email is intentionally optional: person.personEmail
@@ -324,6 +324,32 @@ export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeI
     // resolve the row uncached in the same request that deletes it, so
     // { removed: 0 } now means the role is genuinely absent.
     return await client.delete(`/api/asiakasPersonSettings/byRole/${asiakasId}/${personId}/${roleTypeId}`, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * The request body for `person role end` / `set-dates`. `end` sends only endDate
+ * (default today), so startDate is kept. `set-dates` sends only the flags given;
+ * `""` clears that date (null). Exits 4 when set-dates gets neither flag.
+ */
+export function roleDatesFromFlags(verb, opts) {
+    if (verb === "end")
+        return { endDate: resolveDate(opts.date || "today") ?? null };
+    if (opts.start === undefined && opts.end === undefined)
+        failWith("pass --start and/or --end", 4);
+    const dates = {};
+    if (opts.start !== undefined)
+        dates.startDate = resolveDate(opts.start) ?? null;
+    if (opts.end !== undefined)
+        dates.endDate = resolveDate(opts.end) ?? null;
+    return dates;
+}
+/**
+ * PUT /api/asiakasPersonSettings/byRole/:asiakasId/:personId/:roleTypeId/dates —
+ * set a role's start/end dates, keeping the history row (fb#2935). Only the keys
+ * present in `dates` are sent; the backend keeps an omitted date and clears one
+ * sent as null. Resolved server-side and uncached, like revoke (fb#1537).
+ */
+export async function runPersonRoleSetDates(client, personId, asiakasId, roleTypeId, dates, flags) {
+    return await client.put(`/api/asiakasPersonSettings/byRole/${asiakasId}/${personId}/${roleTypeId}/dates`, dates, { headers: writeFlagsToHeaders(flags) });
 }
 /**
  * `ib person me` — the caller's own rich profile. Derives personId from the JWT
@@ -737,7 +763,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--person <id>", "", intFlag("--person"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, resolvePersonTarget(personIdStr, opts.person), opts.asiakas)));
-    // grant/revoke share the whole registration; only the run fn differs.
+    // grant/revoke/end/set-dates share the whole registration; only the run fn differs.
     const roleWriteAction = (run) => guarded(async (personIdStr, opts) => {
         const personId = resolvePersonTarget(personIdStr, opts.person);
         let roleTypeId;
@@ -756,15 +782,19 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         const client = await getClient();
         writeJson(await run(client, personId, opts.asiakas, roleTypeId, opts));
     });
-    for (const [name, run] of [
-        ["grant", runPersonRoleGrant],
-        ["revoke", runPersonRoleRevoke],
-    ]) {
-        addWriteFlagsToCommand(personRole
+    const setDates = (verb) => (client, personId, asiakasId, roleTypeId, opts) => runPersonRoleSetDates(client, personId, asiakasId, roleTypeId, roleDatesFromFlags(verb, opts), opts);
+    const roleCommands = [
+        ["grant", runPersonRoleGrant, (c) => c],
+        ["revoke", runPersonRoleRevoke, (c) => c],
+        ["end", setDates("end"), (c) => c.option("--date <date>")],
+        ["set-dates", setDates("set-dates"), (c) => c.option("--start <date>").option("--end <date>")],
+    ];
+    for (const [name, run, extra] of roleCommands) {
+        addWriteFlagsToCommand(extra(personRole
             .command(`${name} [personId]`)
             .option("--person <id>", "", intFlag("--person"))
             .requiredOption("--role <name>")
-            .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))).action(roleWriteAction(run));
+            .requiredOption("--asiakas <id>", "", intFlag("--asiakas")))).action(roleWriteAction(run));
     }
     // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
     // then enriches with the LIVE DB description/comment via an authenticated GET

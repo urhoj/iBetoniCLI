@@ -59,7 +59,7 @@ import { requireFlags } from "../_shared/jsonBody.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 import { diffFields } from "../../diff.js";
-import { isIsoDateOrDateTime, resolveDateTime } from "../../dates.js";
+import { isIsoDateOrDateTime, resolveDate, resolveDateTime } from "../../dates.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -484,6 +484,44 @@ export async function runPersonRoleRevoke(
   // { removed: 0 } now means the role is genuinely absent.
   return await client.delete(
     `/api/asiakasPersonSettings/byRole/${asiakasId}/${personId}/${roleTypeId}`,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * The request body for `person role end` / `set-dates`. `end` sends only endDate
+ * (default today), so startDate is kept. `set-dates` sends only the flags given;
+ * `""` clears that date (null). Exits 4 when set-dates gets neither flag.
+ */
+export function roleDatesFromFlags(
+  verb: "end" | "set-dates",
+  opts: { date?: string; start?: string; end?: string }
+): { startDate?: string | null; endDate?: string | null } {
+  if (verb === "end") return { endDate: resolveDate(opts.date || "today") ?? null };
+  if (opts.start === undefined && opts.end === undefined) failWith("pass --start and/or --end", 4);
+  const dates: { startDate?: string | null; endDate?: string | null } = {};
+  if (opts.start !== undefined) dates.startDate = resolveDate(opts.start) ?? null;
+  if (opts.end !== undefined) dates.endDate = resolveDate(opts.end) ?? null;
+  return dates;
+}
+
+/**
+ * PUT /api/asiakasPersonSettings/byRole/:asiakasId/:personId/:roleTypeId/dates —
+ * set a role's start/end dates, keeping the history row (fb#2935). Only the keys
+ * present in `dates` are sent; the backend keeps an omitted date and clears one
+ * sent as null. Resolved server-side and uncached, like revoke (fb#1537).
+ */
+export async function runPersonRoleSetDates(
+  client: ApiClient,
+  personId: number,
+  asiakasId: number,
+  roleTypeId: number,
+  dates: { startDate?: string | null; endDate?: string | null },
+  flags: WriteFlags
+): Promise<unknown> {
+  return await client.put(
+    `/api/asiakasPersonSettings/byRole/${asiakasId}/${personId}/${roleTypeId}/dates`,
+    dates,
     { headers: writeFlagsToHeaders(flags) }
   );
 }
@@ -1126,17 +1164,19 @@ export function registerPersonCommands(
       )
     );
 
-  // grant/revoke share the whole registration; only the run fn differs.
+  type RoleWriteOpts = WriteFlags & { person?: number; role: string; asiakas: number; date?: string; start?: string; end?: string };
+
+  // grant/revoke/end/set-dates share the whole registration; only the run fn differs.
   const roleWriteAction = (
     run: (
       client: ApiClient,
       personId: number,
       asiakasId: number,
       roleTypeId: number,
-      flags: WriteFlags
+      flags: RoleWriteOpts
     ) => Promise<unknown>
   ) =>
-    guarded(async (personIdStr: string | undefined, opts: WriteFlags & { person?: number; role: string; asiakas: number }) => {
+    guarded(async (personIdStr: string | undefined, opts: RoleWriteOpts) => {
       const personId = resolvePersonTarget(personIdStr, opts.person);
       let roleTypeId: number;
       try {
@@ -1154,16 +1194,25 @@ export function registerPersonCommands(
       writeJson(await run(client, personId, opts.asiakas, roleTypeId, opts));
     });
 
-  for (const [name, run] of [
-    ["grant", runPersonRoleGrant],
-    ["revoke", runPersonRoleRevoke],
-  ] as const) {
+  const setDates =
+    (verb: "end" | "set-dates"): Parameters<typeof roleWriteAction>[0] =>
+    (client, personId, asiakasId, roleTypeId, opts) =>
+      runPersonRoleSetDates(client, personId, asiakasId, roleTypeId, roleDatesFromFlags(verb, opts), opts);
+  const roleCommands: [string, Parameters<typeof roleWriteAction>[0], (c: Command) => Command][] = [
+    ["grant", runPersonRoleGrant, (c) => c],
+    ["revoke", runPersonRoleRevoke, (c) => c],
+    ["end", setDates("end"), (c) => c.option("--date <date>")],
+    ["set-dates", setDates("set-dates"), (c) => c.option("--start <date>").option("--end <date>")],
+  ];
+  for (const [name, run, extra] of roleCommands) {
     addWriteFlagsToCommand(
-      personRole
-        .command(`${name} [personId]`)
-        .option("--person <id>", "", intFlag("--person"))
-        .requiredOption("--role <name>")
-        .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
+      extra(
+        personRole
+          .command(`${name} [personId]`)
+          .option("--person <id>", "", intFlag("--person"))
+          .requiredOption("--role <name>")
+          .requiredOption("--asiakas <id>", "", intFlag("--asiakas"))
+      )
     ).action(roleWriteAction(run));
   }
 

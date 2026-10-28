@@ -5,6 +5,20 @@
 import type { CommandSpec } from "../../output/help.js";
 import { apiErr, limitErr, authErrors, COMMON_AUTH_ERRORS, permErrors, ASIAKAS_FLAG_ERR, TRUNCATED_NOTE, LOG_CAPPED_NOTE, LOG_FIELD_HINT_NOTE, PERSON_SCOPE_404_REMEDY, PERSON_SCOPE_NOTE, ROLE_NAME_CLIENT_ERROR, LIMIT_500_FLAG, OWNER_ASIAKAS_FLAG, SEARCH_ALIAS_FLAG, MERGE_DRY_RUN_FIRST_NOTE, MERGE_VALIDATE_READONLY_NOTE, PERSON_PARSE_ERR, PERSON_TARGET_ERR, PERSON_TARGET_FLAG, OTHER_TENANT_403_REMEDY } from "./shared.js";
 
+// `person role end` + `set-dates` share one backend route (fb#2935).
+const ROLE_DATES_OUTPUT =
+  "{ updated: 1, asiakasPersonSettingId, startDate, endDate } | { dryRun:true, wouldUpdate:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId, old:{ startDate, endDate }, new:{ startDate, endDate } }, validation }";
+const ROLE_DATES_ERRORS: CommandSpec["errors"] = [
+  PERSON_TARGET_ERR,
+  PERSON_PARSE_ERR,
+  ROLE_NAME_CLIENT_ERROR,
+  ASIAKAS_FLAG_ERR,
+  apiErr(400, "Bad date (not a date, or outside 1900–2079) or an id that is not a positive integer", "use YYYY-MM-DD or today/tomorrow"),
+  apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
+  apiErr(404, "The person does not hold this role on --asiakas (or the backend predates fb#2935)", "check `ib person role list <personId> --asiakas <id>`"),
+  ...COMMON_AUTH_ERRORS,
+];
+
 export const PERSON_SPECS: CommandSpec[] = [
 
   // ─── person (3) ──────────────────────────────────────────────────────────
@@ -412,6 +426,56 @@ export const PERSON_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation"],
+  },
+  {
+    command: "ib person role end",
+    description:
+      "End-date a per-company role and KEEP its history row (revoke deletes it). Sets endDate (default today) and keeps startDate. PUT /api/asiakasPersonSettings/byRole/.../dates, resolved server-side and uncached like revoke; change-tracked. --dry-run previews old → new via the backend.",
+    permissions: ["company admin on the target tenant (tier per role)"],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
+    flags: [
+      PERSON_TARGET_FLAG,
+      { name: "role", type: "string", description: "Role name (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+      { name: "date", type: "string", description: "End date YYYY-MM-DD or today/tomorrow (default today); `role list` shows the role inactive from that day" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    reasonPolicy: "unless-dry-run",
+    outputShape: ROLE_DATES_OUTPUT,
+    errors: ROLE_DATES_ERRORS,
+    seeAlso: ["ib person role set-dates", "ib person role list", "ib person role revoke"],
+    examples: [
+      "ib person role end 6301 --role pumppari --asiakas 8 --reason 'moved to Betomik'",
+      "ib person role end 6301 --role pumppari --asiakas 8 --date 2026-10-31 --dry-run",
+    ],
+  },
+  {
+    command: "ib person role set-dates",
+    description:
+      "Set a per-company role's start and/or end date. An omitted flag keeps that date; `\"\"` clears it (open-ended). PUT /api/asiakasPersonSettings/byRole/.../dates, resolved server-side and uncached; change-tracked. --dry-run previews old → new via the backend.",
+    permissions: ["company admin on the target tenant (tier per role)"],
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
+    flags: [
+      PERSON_TARGET_FLAG,
+      { name: "role", type: "string", description: "Role name (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+      { name: "start", type: "string", description: "Start date YYYY-MM-DD or today/tomorrow; \"\" clears" },
+      { name: "end", type: "string", description: "End date YYYY-MM-DD or today/tomorrow; \"\" clears" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    reasonPolicy: "unless-dry-run",
+    outputShape: ROLE_DATES_OUTPUT,
+    errors: [
+      { origin: "client", exit: 4, match: "pass --start and/or --end", meaning: "Neither date flag given", remedy: "pass --start <date>, --end <date>, or both" },
+      ...ROLE_DATES_ERRORS,
+    ],
+    seeAlso: ["ib person role end", "ib person role list"],
+    examples: [
+      "ib person role set-dates 6301 --role pumppari --asiakas 27 --start 2026-11-01 --reason 'starts at Betomik'",
+      "ib person role set-dates 6301 --role pumppari --asiakas 8 --end '' --reason 'reopen role'",
+    ],
   },
   {
     command: "ib person role explain",
