@@ -256,6 +256,41 @@ export const PERSON_SPECS: CommandSpec[] = [
     examples: ["ib person day-message-channel set 6390 --value push --reason 'driver asked'", "ib person day-message-channel set --person 6390 --clear --dry-run"],
   },
   {
+    command: "ib person invite-login",
+    description:
+      "Send ONE person of the active company a login invite ('kirjautumiskutsu'): SMS when the company has HAS_SMS and the person has a textable phone that is also their SMS login number, otherwise the welcome email; neither = refused. The server fills the approved text with the first name, the company name and this week's (Helsinki Mon–Sun) non-cancelled orders. Refuses a person who has already logged in unless --force. One person per call — no batch. Same sender roles, per-sender limit, SMS day cap, smsLog row and changeTracker row as `ib message sms send` / `ib message driver send`. A REAL write (SMS is billed); --dry-run is server-side: picks the channel and returns the text, sends nothing.",
+    auth: "any",
+    args: [{ name: "personId", type: "number", required: false, description: "personId (or pass --person)" }],
+    flags: [
+      PERSON_TARGET_FLAG,
+      { name: "channel", type: "string", description: "sms | email — force a channel (default: SMS if possible, else email)" },
+      { name: "no-orders", type: "boolean", description: "Leave this week's order count out of the text" },
+      { name: "message", type: "string", description: "Own text instead of the template (SMS rules apply: ≤ 2 segments, no links but betoni.online / app.ibetoni.fi)" },
+      { name: "force", type: "boolean", description: "Send even though the person has already logged in" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape:
+      "{ channel:'sms'|'email', text, lastLogin:string|null, smsLogId, status:'sent', ...sms: segments, phone:'***NNNN' | email: target:'p***@domain' }. With --dry-run: { dryRun:true, channel, text, lastLogin, personId, phone+segments | target }. On 409: { error, lastLogin }. On 422: { error, smsLogId, status:'failed'|'unknown', channel }.",
+    errors: [
+      PERSON_TARGET_ERR,
+      PERSON_PARSE_ERR,
+      { origin: "client", exit: 4, match: "--channel must be one of", meaning: "--channel is not sms or email", remedy: "pass --channel sms or --channel email, or omit it" },
+      apiErr(400, "Validation", "no textable SMS login number and no valid email; --channel sms without HAS_SMS or a login number; --message too long or with a foreign link; or you (the sender) have no email for an email invite"),
+      apiErr(403, "Permission denied", "requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer"),
+      apiErr(404, "Not found", "personId is not in the active company"),
+      apiErr(409, "Already logged in", "the person has logged in (body.lastLogin) — no invite needed; add --force only if they really need it again"),
+      apiErr(422, "Send failed or no answer", "status 'unknown' = no provider answer, it MAY have been delivered: do NOT re-send. 'failed' = refused, fix the cause first"),
+      apiErr(429, "Day cap or rate limit", "SMS day cap (try --channel email or tomorrow) or the per-sender 20/min + 200/h limit: wait"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "AI callers may send this ONLY on an explicit user request, never autonomously, with the person and channel confirmed after a --dry-run (owner ruling 2026-10-21). Deploy-gated: POST /api/sms/invite-login.",
+    ],
+    seeAlso: ["ib person list", "ib message driver channels", "ib message sms list"],
+    examples: ["ib person invite-login 6390 --dry-run", "ib person invite-login 6390 --reason 'new driver' --idempotency-key invite-6390-20261028"],
+  },
+  {
     command: "ib person role list",
     description:
       "List a person's per-company roles (asiakasPersonSettings) for one asiakas — the acting company by default, `--asiakas` to target another. Role names resolved via ROLE_NAME_BY_TYPEID.",

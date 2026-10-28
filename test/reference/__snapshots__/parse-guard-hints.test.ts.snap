@@ -1445,6 +1445,10 @@ ib person get --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach
 
+ib person invite-login --person <id>
+  ! --person must be an integer >= 1
+  > pass a positive personId
+
 ib person list --asiakas <id>
   ! --asiakas must be an integer >= 1
   > pass a positive asiakasId (a company id) — \`ib company list\` shows the ones you can reach

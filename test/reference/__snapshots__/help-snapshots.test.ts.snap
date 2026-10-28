@@ -14192,6 +14192,62 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person invite-login matches snapshot 1`] = `
+"USAGE
+  ib person invite-login [<personId>] [flags]
+
+DESCRIPTION
+  Send ONE person of the active company a login invite ('kirjautumiskutsu'): SMS when the company has HAS_SMS and the person has a textable phone that is also their SMS login number, otherwise the welcome email; neither = refused. The server fills the approved text with the first name, the company name and this week's (Helsinki Mon–Sun) non-cancelled orders. Refuses a person who has already logged in unless --force. One person per call — no batch. Same sender roles, per-sender limit, SMS day cap, smsLog row and changeTracker row as \`ib message sms send\` / \`ib message driver send\`. A REAL write (SMS is billed); --dry-run is server-side: picks the channel and returns the text, sends nothing.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <personId> NUMBER    personId (or pass --person) (optional)
+
+FLAGS
+  --person NUMBER    Target personId (alias for the positional)
+  --channel STRING    sms | email — force a channel (default: SMS if possible, else email)
+  --no-orders    Leave this week's order count out of the text
+  --message STRING    Own text instead of the template (SMS rules apply: ≤ 2 segments, no links but betoni.online / app.ibetoni.fi)
+  --force    Send even though the person has already logged in
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { channel:'sms'|'email', text, lastLogin:string|null, smsLogId, status:'sent', ...sms: segments, phone:'***NNNN' | email: target:'p***@domain' }. With --dry-run: { dryRun:true, channel, text, lastLogin, personId, phone+segments | target }. On 409: { error, lastLogin }. On 422: { error, smsLogId, status:'failed'|'unknown', channel }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
+  exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  --channel is not sms or email → pass --channel sms or --channel email, or omit it
+  exit 4 (HTTP 400)  Validation             → no textable SMS login number and no valid email; --channel sms without HAS_SMS or a login number; --message too long or with a foreign link; or you (the sender) have no email for an email invite
+  exit 3 (HTTP 403)  Permission denied      → requires a sender role (asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin) or system admin/developer
+  exit 5 (HTTP 404)  Not found              → personId is not in the active company
+  exit 4 (HTTP 409)  Already logged in      → the person has logged in (body.lastLogin) — no invite needed; add --force only if they really need it again
+  exit 4 (HTTP 422)  Send failed or no answer → status 'unknown' = no provider answer, it MAY have been delivered: do NOT re-send. 'failed' = refused, fix the cause first
+  exit 4 (HTTP 429)  Day cap or rate limit  → SMS day cap (try --channel email or tomorrow) or the per-sender 20/min + 200/h limit: wait
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - AI callers may send this ONLY on an explicit user request, never autonomously, with the person and channel confirmed after a --dry-run (owner ruling 2026-10-21). Deploy-gated: POST /api/sms/invite-login.
+
+SEE ALSO
+  ib person list, ib message driver channels, ib message sms list
+
+EXAMPLES
+  ib person invite-login 6390 --dry-run
+  ib person invite-login 6390 --reason 'new driver' --idempotency-key invite-6390-20261028
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person list matches snapshot 1`] = `
 "USAGE
   ib person list [flags]

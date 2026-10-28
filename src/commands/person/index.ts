@@ -51,6 +51,7 @@ import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonAppSeenCommand } from "./appSeen.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { registerPersonDayMessageChannelCommands } from "./dayMessageChannel.js";
+import { registerPersonInviteLoginCommand } from "./inviteLogin.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { requireFlags } from "../_shared/jsonBody.js";
@@ -737,6 +738,7 @@ export function registerPersonCommands(
   registerPersonAppSeenCommand(p, getClient);
   registerPersonActivityCommand(p, getClient);
   registerPersonDayMessageChannelCommands(p, getClient);
+  registerPersonInviteLoginCommand(p, getClient);
 
   p.command("list")
     .option("--logged-in-since <iso>")
