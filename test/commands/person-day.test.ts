@@ -6,6 +6,9 @@ import {
   resolveStatusId,
   runPersonDaySet,
   runPersonDayClear,
+  runPersonDaySetRange,
+  runPersonDayStatusCreate,
+  runPersonDayStatusUpdate,
 } from "../../src/commands/person/day.js";
 
 const JWT =
@@ -187,5 +190,105 @@ describe("runPersonDayClear", () => {
     const out = await runPersonDayClear(c, 555, "2026-06-10", { reason: "x" });
     expect(c.delete).not.toHaveBeenCalled();
     expect(out).toEqual({ deleted: false, message: "no personPvm row for that person/date" });
+  });
+});
+
+// fb#2945 — 2026-10-30 is a Friday, 10-31 Sat, 11-01 Sun, 11-02 Mon, 11-03 Tue.
+const STATUSES = [
+  { personPvmStatusId: 5, personPvmStatus: "Pois", personPvmStatusName: "Pois", pois: true, vakioVapaa: false },
+  { personPvmStatusId: 6, personPvmStatus: "Pois, viikonloppu", personPvmStatusName: "Viikonloppu", pois: true, vakioVapaa: true },
+  { personPvmStatusId: 41, personPvmStatus: "Sairasloma", personPvmStatusName: "Sairasloma", pois: true, vakioVapaa: false },
+];
+
+function rangeClient(dayRows: unknown[]): MockApiClient {
+  const c = makeClient();
+  c.get.mockImplementation(async (path: string) => (path.includes("/statusList/") ? STATUSES : dayRows));
+  c.post.mockResolvedValue({ personPvmId: 1 });
+  return c;
+}
+
+describe("runPersonDaySetRange", () => {
+  test("writes every day, preserving vehicle on an existing row, with a per-day idempotency key", async () => {
+    const c = rangeClient([
+      { personPvmId: 77, pvm: 20261102, personPvmStatusId: 5, personPvmText: "x", vehicleId: 1227, pois: true },
+    ]);
+    const out = (await runPersonDaySetRange(c, 6381, "2026-11-02", "2026-11-03", "sairasloma", { reason: "r", idempotencyKey: "k" })) as Record<string, unknown>;
+    expect(c.get).toHaveBeenCalledWith("/api/personPvm/list/1349?startDate=2026-11-02&endDate=2026-11-03&personId=6381");
+    expect(c.post).toHaveBeenCalledTimes(2);
+    expect(c.post).toHaveBeenNthCalledWith(
+      1,
+      "/api/personPvm/save/1349",
+      { personId: 6381, pvm: 20261102, personPvmStatusId: 41, personPvmText: "x", vehicleId: 1227, personPvmId: 77 },
+      { headers: { "X-Action-Reason": "r", "Idempotency-Key": "k:2026-11-02" } }
+    );
+    expect(c.post.mock.calls[1][1]).toEqual({ personId: 6381, pvm: 20261103, personPvmStatusId: 41, personPvmText: null, vehicleId: null });
+    expect(out.set).toEqual(["2026-11-02", "2026-11-03"]);
+  });
+
+  test("--weekdays-only skips Sat/Sun and an existing vakioVapaa day; same-status days are unchanged", async () => {
+    const c = rangeClient([
+      { personPvmId: 1, pvm: 20261030, personPvmStatusId: 6, personPvmText: null, vehicleId: null, pois: true },
+      { personPvmId: 2, pvm: 20261103, personPvmStatusId: 41, personPvmText: null, vehicleId: null, pois: true },
+    ]);
+    const out = (await runPersonDaySetRange(c, 6381, "2026-10-30", "2026-11-03", "41", { reason: "r", weekdaysOnly: true })) as Record<string, unknown>;
+    expect(out.skipped).toEqual([
+      { date: "2026-10-30", reason: "vakioVapaa status 6" },
+      { date: "2026-10-31", reason: "weekend" },
+      { date: "2026-11-01", reason: "weekend" },
+    ]);
+    expect(out.unchanged).toEqual(["2026-11-03"]);
+    expect(out.set).toEqual(["2026-11-02"]);
+  });
+
+  test("--dry-run never POSTs", async () => {
+    const c = rangeClient([]);
+    const out = (await runPersonDaySetRange(c, 6381, "2026-11-02", "2026-11-02", "41", { dryRun: true })) as Record<string, unknown>;
+    expect(c.post).not.toHaveBeenCalled();
+    expect(out.wouldChange).toEqual([{ date: "2026-11-02", status: { from: null, to: 41 } }]);
+  });
+
+  test("rejects a range over the cap and a reversed range", async () => {
+    const c = rangeClient([]);
+    await expect(runPersonDaySetRange(c, 1, "2026-01-01", "2026-12-31", "41", {})).rejects.toThrow(/at most 186/);
+    await expect(runPersonDaySetRange(c, 1, "2026-02-01", "2026-01-01", "41", {})).rejects.toThrow(/before --from/);
+    expect(c.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("runPersonDayStatusCreate / Update (fb#2944)", () => {
+  const saved = { personPvmStatusId: 41, personPvmStatus: "Sairasloma", personPvmStatusName: "Sairasloma", pois: true, vakioVapaa: false, prefix: "S", style: null, active: true, ownerAsiakasId: 1349, personPvmStatusDescription: null };
+
+  test("create posts id -1 with defaults and projects the saved row", async () => {
+    const c = makeClient();
+    c.post.mockResolvedValueOnce(saved);
+    const out = await runPersonDayStatusCreate(c, { name: "Sairasloma", prefix: "S", reason: "r" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/personPvm/status/save",
+      { personPvmStatusId: -1, personPvmStatus: "Sairasloma", personPvmStatusName: "Sairasloma", pois: true, vakioVapaa: false, active: true, prefix: "S", style: null, personPvmStatusDescription: null },
+      { headers: { "X-Action-Reason": "r" } }
+    );
+    expect(out).toMatchObject({ statusId: 41, name: "Sairasloma", ownerAsiakasId: 1349 });
+  });
+
+  test("update read-merges: only the given flag changes", async () => {
+    const c = makeClient();
+    c.get.mockResolvedValueOnce([saved]);
+    c.post.mockResolvedValueOnce({ ...saved, active: false });
+    await runPersonDayStatusUpdate(c, 41, { active: 0, reason: "r" });
+    expect(c.post.mock.calls[0][1]).toEqual({ ...saved, active: false });
+  });
+
+  test("update --dry-run reports the diff and never POSTs", async () => {
+    const c = makeClient();
+    c.get.mockResolvedValueOnce([saved]);
+    const out = await runPersonDayStatusUpdate(c, 41, { style: "orange", dryRun: true });
+    expect(c.post).not.toHaveBeenCalled();
+    expect(out).toEqual({ dryRun: true, statusId: 41, wouldChange: { style: { from: null, to: "orange" } } });
+  });
+
+  test("update of an unknown id exits 5", async () => {
+    const c = makeClient();
+    c.get.mockResolvedValueOnce([saved]);
+    await expect(runPersonDayStatusUpdate(c, 999, { active: 0 })).rejects.toMatchObject({ exitCode: 5 });
   });
 });

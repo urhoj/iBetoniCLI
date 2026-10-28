@@ -1,12 +1,13 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { resolveDate, toYyyymmddInt } from "../../dates.js";
+import { resolveDate, toYyyymmddInt, addDaysISO } from "../../dates.js";
+import { diffFields } from "../../diff.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
-import { intFlag, resolvePersonTarget } from "../../targets.js";
+import { intFlag, zeroOneFlag, resolvePersonTarget } from "../../targets.js";
 /** 20260610 → "2026-06-10". */
 function intToDate(n) {
     const s = String(n);
@@ -17,23 +18,11 @@ export async function runPersonDayStatuses(client, opts = {}) {
     const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const rows = await client.get(`/api/personPvm/statusList/${asiakasId}`);
     const items = (rows || []).map((r) => {
-        const base = {
-            statusId: Number(r.personPvmStatusId),
-            code: r.personPvmStatus ?? null,
-            name: r.personPvmStatusName ?? null,
-            pois: !!r.pois,
-            vakioVapaa: !!r.vakioVapaa,
-        };
-        if (!opts.full)
-            return base;
-        return {
-            ...base,
-            description: r.personPvmStatusDescription ?? null,
-            prefix: r.prefix ?? null,
-            style: r.style ?? null,
-            active: !!r.active,
-            ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
-        };
+        const full = projectStatus(r);
+        if (opts.full)
+            return full;
+        const { statusId, code, name, pois, vakioVapaa } = full;
+        return { statusId, code, name, pois, vakioVapaa };
     });
     return listEnvelope(items);
 }
@@ -64,6 +53,13 @@ export async function resolveStatusId(client, value) {
     if (/^\d+$/.test(v))
         return Number(v);
     const { items } = await runPersonDayStatuses(client);
+    return matchStatusId(items, v);
+}
+/** The pure half of {@link resolveStatusId}: match an id or code/name against a fetched list. */
+export function matchStatusId(items, value) {
+    const v = value.trim();
+    if (/^\d+$/.test(v))
+        return Number(v);
     const lc = v.toLowerCase();
     const matches = items.filter((s) => (s.code && s.code.toLowerCase() === lc) ||
         (s.name && s.name.toLowerCase() === lc));
@@ -119,6 +115,168 @@ export async function runPersonDaySet(client, personId, date, statusValue, flags
         headers: writeFlagsToHeaders(flags),
     });
 }
+/** Longest range one `day set --from/--to` call may write (fb#2945) — a long sick leave fits. */
+export const MAX_RANGE_DAYS = 186;
+/**
+ * `ib person day set --from/--to` (fb#2945): the single-day set over a date range,
+ * with ONE status-list read and ONE day-list read for the whole range, then one save
+ * per day — same read-merge semantics (existing row updated in place, vehicle and
+ * text preserved). A day already holding the target status and text is skipped as
+ * `unchanged`, so re-running the same command after a mid-range failure resumes.
+ * `--weekdays-only` skips Saturdays/Sundays and days already holding a vakioVapaa
+ * status (a holiday someone entered). `--idempotency-key` is suffixed per day
+ * (`<key>:<date>`) — one key on 65 different writes would collide.
+ */
+export async function runPersonDaySetRange(client, personId, fromInput, toInput, statusValue, flags) {
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
+    const from = resolveDate(fromInput);
+    const to = resolveDate(toInput);
+    for (const [flag, d] of [["--from", from], ["--to", to]]) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d)))
+            failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
+    }
+    if (to < from)
+        failWith(`--to (${to}) is before --from (${from})`, 4);
+    const days = [];
+    for (let d = from; d <= to; d = addDaysISO(d, 1))
+        days.push(d);
+    if (days.length > MAX_RANGE_DAYS)
+        failWith(`range is ${days.length} days; at most ${MAX_RANGE_DAYS} per call — split it`, 4);
+    const [statuses, existing] = await bothInOrder(runPersonDayStatuses(client), runPersonDayGet(client, personId, from, to));
+    const statusId = matchStatusId(statuses.items, statusValue);
+    const vakioVapaaIds = new Set(statuses.items.filter((s) => s.vakioVapaa).map((s) => s.statusId));
+    const byDate = new Map(existing.items.map((r) => [r.date, r]));
+    const skipped = [];
+    const unchanged = [];
+    const pending = [];
+    for (const date of days) {
+        const current = byDate.get(date);
+        const curStatusId = current?.statusId ?? null;
+        if (flags.weekdaysOnly) {
+            const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+            if (dow === 0 || dow === 6) {
+                skipped.push({ date, reason: "weekend" });
+                continue;
+            }
+            if (curStatusId != null && curStatusId !== statusId && vakioVapaaIds.has(curStatusId)) {
+                skipped.push({ date, reason: `vakioVapaa status ${curStatusId}` });
+                continue;
+            }
+        }
+        const curText = current?.text ?? null;
+        const nextText = flags.text ?? curText;
+        if (curStatusId === statusId && curText === nextText) {
+            unchanged.push(date);
+            continue;
+        }
+        pending.push({ date, current, nextText });
+    }
+    const base = { personId, from, to, statusId, skipped, unchanged };
+    if (flags.dryRun) {
+        const wouldChange = pending.map(({ date, current, nextText }) => ({
+            date,
+            status: { from: current?.statusId ?? null, to: statusId },
+            ...((current?.text ?? null) !== nextText ? { text: { from: current?.text ?? null, to: nextText } } : {}),
+        }));
+        return { dryRun: true, ...base, wouldChange, count: wouldChange.length };
+    }
+    const set = [];
+    for (const { date, current, nextText } of pending) {
+        const body = {
+            personId,
+            pvm: toYyyymmddInt(date),
+            personPvmStatusId: statusId,
+            personPvmText: nextText,
+            vehicleId: current?.vehicleId ?? null,
+        };
+        if (current)
+            body.personPvmId = current.personPvmId;
+        const headers = writeFlagsToHeaders({ ...flags, idempotencyKey: flags.idempotencyKey && `${flags.idempotencyKey}:${date}` });
+        try {
+            await client.post(`/api/personPvm/save/${asiakasId}`, body, { headers });
+        }
+        catch (e) {
+            warnNote(`[ib] person day set: ${set.length} of ${pending.length} days saved before ${date} failed — re-run the same command to resume (saved days come back as unchanged).`);
+            throw e;
+        }
+        set.push(date);
+    }
+    return { ...base, set, count: set.length };
+}
+/** The editable fields of a day-status type, keyed by CLI flag → backend column. */
+const STATUS_FIELDS = {
+    name: "personPvmStatusName",
+    code: "personPvmStatus",
+    description: "personPvmStatusDescription",
+    pois: "pois",
+    vakioVapaa: "vakioVapaa",
+    style: "style",
+    prefix: "prefix",
+    active: "active",
+};
+/** Backend row → the projected {@link StatusRowFull} shape `day statuses --full` prints. */
+function projectStatus(r) {
+    return {
+        statusId: Number(r.personPvmStatusId),
+        code: r.personPvmStatus ?? null,
+        name: r.personPvmStatusName ?? null,
+        pois: !!r.pois,
+        vakioVapaa: !!r.vakioVapaa,
+        description: r.personPvmStatusDescription ?? null,
+        prefix: r.prefix ?? null,
+        style: r.style ?? null,
+        active: !!r.active,
+        ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
+    };
+}
+/** Apply the given flags onto a backend status row (0/1 flags become booleans). */
+function mergeStatusFlags(row, flags) {
+    const next = { ...row };
+    for (const flag of Object.keys(STATUS_FIELDS)) {
+        const v = flags[flag];
+        if (v === undefined)
+            continue;
+        next[STATUS_FIELDS[flag]] = typeof v === "number" ? v === 1 : v;
+    }
+    return next;
+}
+/**
+ * `ib person day status create` (fb#2944): a new day-status type owned by the active
+ * company. The backend pins the owner from the token. Defaults: --code = --name,
+ * pois 1 (an absence), vakioVapaa 0, active 1. `--dry-run` is client-side.
+ */
+export async function runPersonDayStatusCreate(client, flags) {
+    if (!flags.name)
+        failWith("--name is required", 4);
+    if (flags.prefix && flags.prefix.length > 2)
+        failWith("--prefix is at most 2 characters", 4);
+    const body = mergeStatusFlags({ personPvmStatusId: -1, personPvmStatus: flags.code ?? flags.name, pois: true, vakioVapaa: false, active: true, prefix: "", style: null, personPvmStatusDescription: null }, flags);
+    if (flags.dryRun)
+        return { dryRun: true, wouldCreate: body };
+    const saved = await client.post("/api/personPvm/status/save", body, { headers: writeFlagsToHeaders(flags) });
+    return projectStatus(saved);
+}
+/**
+ * `ib person day status update <statusId>` (fb#2944). Read-merge-write: the save
+ * overwrites EVERY column, so the current row is read first and only the given
+ * flags change. Global statuses (ownerAsiakasId null) are refused by the backend
+ * unless the caller is a system admin/developer. `--dry-run` is client-side.
+ */
+export async function runPersonDayStatusUpdate(client, statusId, flags) {
+    if (flags.prefix && flags.prefix.length > 2)
+        failWith("--prefix is at most 2 characters", 4);
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
+    const rows = await client.get(`/api/personPvm/statusList/${asiakasId}`);
+    const current = (rows || []).find((r) => Number(r.personPvmStatusId) === statusId);
+    if (!current)
+        failWith(`No status ${statusId} for the active company — see \`ib person day statuses\``, 5);
+    const next = mergeStatusFlags(current, flags);
+    if (flags.dryRun) {
+        return { dryRun: true, statusId, wouldChange: diffFields(current, next, Object.values(STATUS_FIELDS)) };
+    }
+    const saved = await client.post("/api/personPvm/status/save", next, { headers: writeFlagsToHeaders(flags) });
+    return projectStatus(saved);
+}
 /**
  * Delete a person's personPvm row for a date (remove the status entry).
  * Resolves the personPvmId via the day list first. `--dry-run` is CLIENT-side
@@ -170,12 +328,41 @@ export function registerPersonDayCommands(person, getClient) {
     const setCmd = day
         .command("set [personId]")
         .option("--person <id>", "", intFlag("--person", 1))
-        .requiredOption("--date <date>")
+        .option("--date <date>")
+        .option("--from <date>")
+        .option("--to <date>")
+        .option("--weekdays-only")
         .requiredOption("--status <id|name>")
         .option("--text <s>");
     addWriteFlagsToCommand(setCmd).action(guarded(async (personId, opts) => {
-        const result = await runPersonDaySet(await getClient(), resolvePersonTarget(personId, opts.person), opts.date, opts.status, opts);
+        const target = resolvePersonTarget(personId, opts.person);
+        // Exactly one of --date (one day) or --from[/--to] (a range, fb#2945).
+        if (!!opts.date === !!opts.from)
+            failWith("pass either --date <date> or --from <date> [--to <date>]", 4);
+        if (opts.to && !opts.from)
+            failWith("--to needs --from", 4);
+        if (opts.weekdaysOnly && !opts.from)
+            failWith("--weekdays-only applies to a --from/--to range", 4);
+        const result = opts.from
+            ? await runPersonDaySetRange(await getClient(), target, opts.from, opts.to ?? opts.from, opts.status, opts)
+            : await runPersonDaySet(await getClient(), target, opts.date, opts.status, opts);
         writeJson(result);
+    }));
+    const status = day.command("status").description("Create or edit the company's day-status types (vacation/sick/…)");
+    const addStatusFieldFlags = (cmd) => cmd
+        .option("--name <s>")
+        .option("--code <s>")
+        .option("--description <s>")
+        .option("--pois <0|1>", "", zeroOneFlag("--pois"))
+        .option("--vakio-vapaa <0|1>", "", zeroOneFlag("--vakio-vapaa"))
+        .option("--style <s>")
+        .option("--prefix <s>")
+        .option("--active <0|1>", "", zeroOneFlag("--active"));
+    addWriteFlagsToCommand(addStatusFieldFlags(status.command("create"))).action(guarded(async (opts) => {
+        writeJson(await runPersonDayStatusCreate(await getClient(), opts));
+    }));
+    addWriteFlagsToCommand(addStatusFieldFlags(status.command("update <statusId>"))).action(guarded(async (statusId, opts) => {
+        writeJson(await runPersonDayStatusUpdate(await getClient(), intFlag("statusId", 1)(statusId), opts));
     }));
     const clearCmd = day
         .command("clear [personId]")

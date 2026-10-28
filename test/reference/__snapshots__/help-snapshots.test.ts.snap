@@ -13275,10 +13275,10 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day set matches snapshot 1`] = `
 "USAGE
-  ib person day set [<personId>] --date <date> --status <status> [flags]
+  ib person day set [<personId>] --status <status> [flags]
 
 DESCRIPTION
-  Set a person's day availability status (vacation/sick/free/…). Requires --reason unless --dry-run.
+  Set a person's day availability status (vacation/sick/free/…) for one day (--date) or a range (--from/--to). Requires --reason unless --dry-run.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -13287,7 +13287,10 @@ ARGUMENTS
 
 FLAGS
   --person NUMBER    Target personId (alias for the positional)
-  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --date DATE    One day YYYY-MM-DD (or today/yesterday/tomorrow); or use --from/--to
+  --from DATE    Range start (instead of --date); at most 186 days per call
+  --to DATE    Range end, inclusive (default: --from)
+  --weekdays-only    Range only: skip Sat/Sun and days already holding a vakioVapaa status (holiday)
   --status STRING    personPvmStatusId or status name (see \`ib person day statuses\`) (required)
   --text STRING    Free-text note on the day row
 
@@ -13301,11 +13304,13 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)
+  --date: personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } }. --from: { personId, from, to, statusId, set[], unchanged[], skipped[{date,reason}], count } | { dryRun:true, …, wouldChange[{ date, status, text? }], count }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
+  exit 4 (client-side)  neither or both of --date / --from given → one day: --date; a range: --from [--to]
+  exit 4 (client-side)  range longer than 186 days → split the range into several calls
   exit 4 (HTTP 400)  Missing --reason or unknown/ambiguous --status → supply --reason; check \`ib person day statuses\`
   exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -13316,13 +13321,118 @@ NOTES
   - --status accepts an id or a name (resolved via \`ib person day statuses\`).
   - --reason required unless --dry-run (exit 4).
   - Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use \`ib vehicle driver assign\` for that (atomic).
+  - Range: days already at the target status+text are \`unchanged\` (no write), so re-running after a mid-range failure resumes. --idempotency-key is suffixed \`:<date>\` per day.
 
 SEE ALSO
-  ib person day statuses, ib person day clear, ib vehicle driver assign
+  ib person day statuses, ib person day status create, ib person day clear, ib vehicle driver assign
 
 EXAMPLES
   ib person day set --person 555 --date tomorrow --status loma --reason 'kesäloma'
   ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run
+  ib person day set 6381 --from 2026-10-29 --to 2027-01-28 --status Sairasloma --weekdays-only --reason 'sairasloma 3 kk'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person day status create matches snapshot 1`] = `
+"USAGE
+  ib person day status create --name <name> [flags]
+
+DESCRIPTION
+  Create a day-status type (e.g. Sairasloma) owned by the active company. Requires --reason unless --dry-run.
+  Permissions: requires Admin or HR Admin on the active company (server-enforced).
+
+FLAGS
+  --name STRING    Display name (personPvmStatusName) (required)
+  --code STRING    Status text (personPvmStatus); default: --name
+  --description STRING    Longer description
+  --pois NUMBER    1 = an absence (default), 0 = present
+  --vakio-vapaa NUMBER    1 = standard day off (weekend/holiday), default 0
+  --style STRING    CSS colour for the calendar cell
+  --prefix STRING    Letter shown in the cell (max 2 chars)
+  --active NUMBER    1 = selectable (default), 0 = hidden
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { statusId, code, name, pois, vakioVapaa, description, prefix, style, active, ownerAsiakasId } | { dryRun:true, wouldCreate } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  no --name given        → pass --name
+  exit 4 (client-side)  --pois/--vakio-vapaa/--active is not 0 or 1 → pass 0 or 1
+  exit 4 (client-side)  --prefix is over 2 characters → shorten --prefix to 1–2 characters
+  exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The owner is always the active company (\`ib auth switch\` to change it).
+
+SEE ALSO
+  ib person day statuses, ib person day status update, ib person day set
+
+EXAMPLES
+  ib person day status create --name Sairasloma --prefix S --pois 1 --reason 'uusi poissaolotyyppi'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person day status update matches snapshot 1`] = `
+"USAGE
+  ib person day status update <statusId> [flags]
+
+DESCRIPTION
+  Edit a day-status type by id; only the given flags change. Requires --reason unless --dry-run.
+  Permissions: requires Admin or HR Admin on the active company; global statuses (ownerAsiakasId null): system admin/developer only (server-enforced).
+
+ARGUMENTS
+  <statusId> NUMBER    personPvmStatusId (see \`ib person day statuses --full\`) (required)
+
+FLAGS
+  --name STRING    Display name (personPvmStatusName)
+  --code STRING    Status text (personPvmStatus)
+  --description STRING    Longer description
+  --pois NUMBER    1 = an absence, 0 = present
+  --vakio-vapaa NUMBER    1 = standard day off (weekend/holiday)
+  --style STRING    CSS colour for the calendar cell
+  --prefix STRING    Letter shown in the cell (max 2 chars)
+  --active NUMBER    1 = selectable, 0 = hidden
+
+WRITE-SAFETY FLAGS
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { statusId, code, name, pois, vakioVapaa, description, prefix, style, active, ownerAsiakasId } | { dryRun:true, statusId, wouldChange } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  statusId is not a positive integer → pass the id from \`ib person day statuses --full\`
+  exit 4 (client-side)  --pois/--vakio-vapaa/--active is not 0 or 1 → pass 0 or 1
+  exit 4 (client-side)  --prefix is over 2 characters → shorten --prefix to 1–2 characters
+  exit 5 (client-side)  the id is not in the active company's status list → check \`ib person day statuses --full\`
+  exit 3 (HTTP 403)  Another company's status, or a global status without system-admin rights → edit only your company's own statuses; create a new one instead of changing a global one
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read-merge-write: the save overwrites every column, so the current row is read first.
+
+SEE ALSO
+  ib person day statuses, ib person day status create
+
+EXAMPLES
+  ib person day status update 41 --style orange --dry-run
+  ib person day status update 41 --active 0 --reason 'ei enää käytössä'
 "
 `;
 

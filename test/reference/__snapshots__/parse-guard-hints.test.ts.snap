@@ -1357,6 +1357,30 @@ ib person day set --person <id>
   ! --person must be an integer >= 1
   > pass a positive personId
 
+ib person day status create --active <0|1>
+  ! --active must be an integer >= 0
+  > pass 0 or 1
+
+ib person day status create --pois <0|1>
+  ! --pois must be an integer >= 0
+  > pass 0 or 1
+
+ib person day status create --vakio-vapaa <0|1>
+  ! --vakio-vapaa must be an integer >= 0
+  > pass 0 or 1
+
+ib person day status update --active <0|1>
+  ! --active must be an integer >= 0
+  > pass 0 or 1
+
+ib person day status update --pois <0|1>
+  ! --pois must be an integer >= 0
+  > pass 0 or 1
+
+ib person day status update --vakio-vapaa <0|1>
+  ! --vakio-vapaa must be an integer >= 0
+  > pass 0 or 1
+
 ib person day-message-channel get --person <id>
   ! --person must be an integer >= 1
   > pass a positive personId
