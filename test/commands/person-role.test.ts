@@ -200,6 +200,10 @@ describe("roleDatesFromFlags", () => {
     expect(roleDatesFromFlags("set-dates", { end: "" })).toEqual({ endDate: null });
   });
 
+  test("end --date '' exits 4 instead of silently meaning today (fb#3000)", () => {
+    expect(() => roleDatesFromFlags("end", { date: "" })).toThrow(/--date must not be empty/);
+  });
+
   test("set-dates with neither flag exits 4", () => {
     expect(() => roleDatesFromFlags("set-dates", {})).toThrow(/--start and\/or --end/);
   });

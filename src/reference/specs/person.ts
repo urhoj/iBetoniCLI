@@ -443,7 +443,10 @@ export const PERSON_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     outputShape: ROLE_DATES_OUTPUT,
-    errors: ROLE_DATES_ERRORS,
+    errors: [
+      { origin: "client", exit: 4, match: "--date must not be empty", meaning: "--date was given as an empty string", remedy: "omit --date for today, or pass a date; to clear an end date use `ib person role set-dates --end ''`" },
+      ...ROLE_DATES_ERRORS,
+    ],
     seeAlso: ["ib person role set-dates", "ib person role list", "ib person role revoke"],
     examples: [
       "ib person role end 6301 --role pumppari --asiakas 8 --reason 'moved to Betomik'",

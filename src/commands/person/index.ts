@@ -497,7 +497,11 @@ export function roleDatesFromFlags(
   verb: "end" | "set-dates",
   opts: { date?: string; start?: string; end?: string }
 ): { startDate?: string | null; endDate?: string | null } {
-  if (verb === "end") return { endDate: resolveDate(opts.date || "today") ?? null };
+  if (verb === "end") {
+    // fb#3000: "" must not silently mean today (set-dates reads "" as clear).
+    if (opts.date === "") failWith("--date must not be empty (omit it for today)", 4);
+    return { endDate: resolveDate(opts.date ?? "today") ?? null };
+  }
   if (opts.start === undefined && opts.end === undefined) failWith("pass --start and/or --end", 4);
   const dates: { startDate?: string | null; endDate?: string | null } = {};
   if (opts.start !== undefined) dates.startDate = resolveDate(opts.start) ?? null;

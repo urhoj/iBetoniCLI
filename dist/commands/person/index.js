@@ -331,8 +331,12 @@ export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeI
  * `""` clears that date (null). Exits 4 when set-dates gets neither flag.
  */
 export function roleDatesFromFlags(verb, opts) {
-    if (verb === "end")
-        return { endDate: resolveDate(opts.date || "today") ?? null };
+    if (verb === "end") {
+        // fb#3000: "" must not silently mean today (set-dates reads "" as clear).
+        if (opts.date === "")
+            failWith("--date must not be empty (omit it for today)", 4);
+        return { endDate: resolveDate(opts.date ?? "today") ?? null };
+    }
     if (opts.start === undefined && opts.end === undefined)
         failWith("pass --start and/or --end", 4);
     const dates = {};

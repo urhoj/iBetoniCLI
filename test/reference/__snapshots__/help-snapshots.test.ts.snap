@@ -14824,6 +14824,7 @@ OUTPUT (JSON, stdout)
   { updated: 1, asiakasPersonSettingId, startDate, endDate } | { dryRun:true, wouldUpdate:{ asiakasPersonSettingId, asiakasId, personId, personSettingTypeId, old:{ startDate, endDate }, new:{ startDate, endDate } }, validation }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --date was given as an empty string → omit --date for today, or pass a date; to clear an end date use \`ib person role set-dates --end ''\`
   exit 4 (client-side)  No personId given (or not a positive integer) → pass <personId> positionally or via --person <id>
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
   exit 4 (client-side)  unknown or ambiguous role name — rejected by the CLI before any request → pass an exact role name; the error names your options and \`ib person role explain <name>\` describes one. "tarjousAdmin" is not a role name — it denotes TWO (fb#418)
