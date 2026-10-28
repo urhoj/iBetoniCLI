@@ -756,7 +756,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     description: "Every day-message attempt of the active company for one day (GET /api/sms/day-messages/:ownerAsiakasId?pvm=), newest first: who got it, by which channel, the outcome and where it came from. One row per driver and day: the last SENT attempt, or the last failed/unknown one when none succeeded; a later failed/unknown re-send keeps the sent row and only fills its errorText. Same sender roles as message driver channels.",
     auth: "any",
     flags: [DAY_DATE_FLAG],
-    outputShape: "ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'baseline' }> — sheet = the Betomik \" k\" trigger, baseline = stamped at its cutover (never sent).",
+    outputShape: "ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'auto'|'baseline' }> — sheet = the Betomik \" k\" trigger, auto = the 20:00 driver day push (one try per day; may overwrite an earlier failed sheet row), baseline = stamped at its cutover (never sent).",
     errors: [DAY_DATE_ERR, apiErr(400, "Validation", "pvm must be a real YYYY-MM-DD day"), SENDER_403, ...COMMON_AUTH_ERRORS],
     notes: ["--date defaults to tomorrow (Europe/Helsinki).", "Deploy-gated: the /api/sms/day-messages route must be deployed to the target backend."],
     seeAlso: ["ib message driver day-send", "ib message driver day-text"],

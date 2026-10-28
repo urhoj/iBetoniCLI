@@ -11023,7 +11023,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'baseline' }> — sheet = the Betomik " k" trigger, baseline = stamped at its cutover (never sent).
+  ListEnvelope<{ personId, personFirstName, personLastName, pvm, vehicleId, sig, channel, status:'sent'|'failed'|'unknown'|'baseline', smsLogId, errorText, sentAt, sentBy, source:'grid'|'ib'|'sheet'|'auto'|'baseline' }> — sheet = the Betomik " k" trigger, auto = the 20:00 driver day push (one try per day; may overwrite an earlier failed sheet row), baseline = stamped at its cutover (never sent).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --date is not YYYY-MM-DD or an alias, rejected before any request → pass YYYY-MM-DD, today, yesterday or tomorrow
