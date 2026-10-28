@@ -476,6 +476,21 @@ export async function runValidationUndismiss(client, opts, flags) {
     }
     return client.post("/api/keikka-validation/undismiss", { keikkaId: opts.keikkaId, stepLogId: dismissed.stepLogId }, { headers: writeFlagsToHeaders(flags) });
 }
+/**
+ * Pump-left-worksite departure watch (fb#2979): PUT arms, DELETE cancels — the
+ * caller is always the recipient. /api/keikka-watch honours X-Dry-Run.
+ */
+export async function runWatchSet(client, keikkaId, on, flags) {
+    const path = `/api/keikka-watch/${keikkaId}`;
+    const opts = { headers: writeFlagsToHeaders(flags) };
+    return on ? client.put(path, {}, opts) : client.delete(path, opts);
+}
+/** The caller's own watches from today on, as a list envelope. */
+export async function runWatchList(client, keikkaId) {
+    const rows = await client.get(`/api/keikka-watch${keikkaId ? `?keikkaId=${keikkaId}` : ""}`);
+    const items = Array.isArray(rows) ? rows : [];
+    return { items, count: items.length, nextCursor: null };
+}
 function projectKeikkaPersonRow(r) {
     return {
         keikkaPersonId: r.keikkaPersonId,
@@ -745,6 +760,24 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(await run(client, { keikkaId: parseId(idStr, "keikkaId"), issueId }, opts));
         }));
     }
+    // Pump-left-worksite one-shot push (fb#2979)
+    const watch = k.command("watch").description("Push me once when a keikka's pump truck leaves its worksite (Mapon)");
+    for (const [verb, on] of [
+        ["set", true],
+        ["cancel", false],
+    ]) {
+        addWriteFlagsToCommand(watch.command(`${verb} <keikkaId>`)).action(guarded(async (idStr, opts) => {
+            const client = await getClient();
+            writeJson(await runWatchSet(client, parseId(idStr, "keikkaId"), on, opts));
+        }));
+    }
+    watch
+        .command("list")
+        .option("--keikka <keikkaId>", "Only this keikkaId", intFlag("--keikka"))
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runWatchList(client, opts.keikka));
+    }));
     const createCmd = addJsonBodyOptions(k.command("create"));
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts, cmd) => {
         const parsed = resolveJsonBody(cmd, opts, { required: true });

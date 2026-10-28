@@ -8785,6 +8785,125 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka watch cancel matches snapshot 1`] = `
+"USAGE
+  ib keikka watch cancel <keikkaId> [flags]
+
+DESCRIPTION
+  Cancel your pump-left-worksite watch on a keikka.
+  Permissions: requires company admin or order handler on the keikka's owner.
+
+ARGUMENTS
+  <keikkaId> NUMBER    The keikka (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { cancelled } — false when you had no watch on it
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  The company's GPS provider is not Mapon → there is nothing to cancel on an Ecofleet company
+  exit 5 (HTTP 404)  Keikka not found or deleted → verify the keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin or order handler of the keikka's company → needs company admin or order handler on the keikka's owner
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib keikka watch set, ib keikka watch list
+
+EXAMPLES
+  ib keikka watch cancel 13254
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka watch list matches snapshot 1`] = `
+"USAGE
+  ib keikka watch list [flags]
+
+DESCRIPTION
+  Your own pump-left-worksite watches on keikkat from today on (fired ones carry firedAt).
+  Permissions: requires any authenticated user (shows only your own watches).
+
+FLAGS
+  --keikka NUMBER    Only this keikkaId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items:[{ keikkaId, ownerAsiakasId, createdAt, firedAt, pumppuAika, vehicleId, tyomaaId }], count, nextCursor:null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --keikka is not an integer >= 1, rejected locally before any request → pass a positive keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib keikka watch set, ib keikka watch cancel
+
+EXAMPLES
+  ib keikka watch list
+  ib keikka watch list --keikka 13254
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka watch set matches snapshot 1`] = `
+"USAGE
+  ib keikka watch set <keikkaId> [flags]
+
+DESCRIPTION
+  Push me ONCE when this keikka's pump truck leaves its worksite (the grid menu's Muistutukset → "Lähetä ilmoitus kun pumppu poistuu työmaalta"). Mapon-tracked companies only. Re-arms a watch that already fired.
+  Permissions: requires company admin or order handler on the keikka's owner.
+
+ARGUMENTS
+  <keikkaId> NUMBER    The keikka (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { keikkaId, personId, createdAt, firedAt:null }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  The company's GPS provider is not Mapon → departure events come only from Mapon's position push; nothing to watch on an Ecofleet company
+  exit 5 (HTTP 404)  Keikka not found or deleted → verify the keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin or order handler of the keikka's company → watching needs company admin or order handler on the keikka's owner
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The recipient is always you (the caller). It fires when the keikka's vehicle leaves the keikka's worksite on the keikka's own day after its start time; an unfired watch goes inert after that day. --reason is not stored.
+
+SEE ALSO
+  ib keikka watch list, ib keikka watch cancel
+
+EXAMPLES
+  ib keikka watch set 13254
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib legal accept matches snapshot 1`] = `
 "USAGE
   ib legal accept [<typeName>] [flags]

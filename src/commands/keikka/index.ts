@@ -723,6 +723,23 @@ export async function runValidationUndismiss(
   );
 }
 
+/**
+ * Pump-left-worksite departure watch (fb#2979): PUT arms, DELETE cancels — the
+ * caller is always the recipient. /api/keikka-watch honours X-Dry-Run.
+ */
+export async function runWatchSet(client: ApiClient, keikkaId: number, on: boolean, flags: WriteFlags): Promise<unknown> {
+  const path = `/api/keikka-watch/${keikkaId}`;
+  const opts = { headers: writeFlagsToHeaders(flags) };
+  return on ? client.put(path, {}, opts) : client.delete(path, opts);
+}
+
+/** The caller's own watches from today on, as a list envelope. */
+export async function runWatchList(client: ApiClient, keikkaId?: number): Promise<ListEnvelope<unknown>> {
+  const rows = await client.get<unknown[]>(`/api/keikka-watch${keikkaId ? `?keikkaId=${keikkaId}` : ""}`);
+  const items = Array.isArray(rows) ? rows : [];
+  return { items, count: items.length, nextCursor: null };
+}
+
 /** One raw row from GET /api/cli/keikka/persons/:keikkaId (keikkaPerson + person + source JOIN). */
 interface KeikkaPersonRawRow {
   keikkaPersonId: number;
@@ -1138,6 +1155,29 @@ export function registerKeikkaCommands(
       })
     );
   }
+
+  // Pump-left-worksite one-shot push (fb#2979)
+  const watch = k.command("watch").description("Push me once when a keikka's pump truck leaves its worksite (Mapon)");
+  for (const [verb, on] of [
+    ["set", true],
+    ["cancel", false],
+  ] as const) {
+    addWriteFlagsToCommand(watch.command(`${verb} <keikkaId>`)).action(
+      guarded(async (idStr: string, opts: WriteFlags) => {
+        const client = await getClient();
+        writeJson(await runWatchSet(client, parseId(idStr, "keikkaId"), on, opts));
+      })
+    );
+  }
+  watch
+    .command("list")
+    .option("--keikka <keikkaId>", "Only this keikkaId", intFlag("--keikka"))
+    .action(
+      guarded(async (opts: { keikka?: number }) => {
+        const client = await getClient();
+        writeJson(await runWatchList(client, opts.keikka));
+      })
+    );
 
   const createCmd = addJsonBodyOptions(k.command("create"));
   addWriteFlagsToCommand(createCmd).action(

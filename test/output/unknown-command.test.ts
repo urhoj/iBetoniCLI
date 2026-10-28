@@ -593,6 +593,7 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
   test("a depth-2 descendant owning the verb IS surfaced (fb#833)", () => {
     expect(descendantsOwningVerb("ib keikka", "list", "developer")).toEqual([
       "ib keikka person list",
+      "ib keikka watch list",
     ]);
   });
 

@@ -648,6 +648,55 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     seeAlso: ["ib keikka validation dismiss", "ib keikka validate"],
     examples: ["ib keikka validation undismiss 13053 MISSING_FACTORY"],
   },
+  {
+    command: "ib keikka watch set",
+    description:
+      "Push me ONCE when this keikka's pump truck leaves its worksite (the grid menu's Muistutukset → \"Lähetä ilmoitus kun pumppu poistuu työmaalta\"). Mapon-tracked companies only. Re-arms a watch that already fired.",
+    permissions: ["company admin or order handler on the keikka's owner"],
+    args: [{ name: "keikkaId", type: "number", description: "The keikka" }],
+    flags: [],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ keikkaId, personId, createdAt, firedAt:null }",
+    errors: [
+      apiErr(400, "The company's GPS provider is not Mapon", "departure events come only from Mapon's position push; nothing to watch on an Ecofleet company"),
+      apiErr(404, "Keikka not found or deleted", "verify the keikkaId"),
+      ...authErrors(apiErr(403, "Not an admin or order handler of the keikka's company", "watching needs company admin or order handler on the keikka's owner")),
+    ],
+    notes: [
+      "The recipient is always you (the caller). It fires when the keikka's vehicle leaves the keikka's worksite on the keikka's own day after its start time; an unfired watch goes inert after that day. --reason is not stored.",
+    ],
+    seeAlso: ["ib keikka watch list", "ib keikka watch cancel"],
+    examples: ["ib keikka watch set 13254"],
+  },
+  {
+    command: "ib keikka watch cancel",
+    description: "Cancel your pump-left-worksite watch on a keikka.",
+    permissions: ["company admin or order handler on the keikka's owner"],
+    args: [{ name: "keikkaId", type: "number", description: "The keikka" }],
+    flags: [],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ cancelled } — false when you had no watch on it",
+    errors: [
+      apiErr(400, "The company's GPS provider is not Mapon", "there is nothing to cancel on an Ecofleet company"),
+      apiErr(404, "Keikka not found or deleted", "verify the keikkaId"),
+      ...authErrors(apiErr(403, "Not an admin or order handler of the keikka's company", "needs company admin or order handler on the keikka's owner")),
+    ],
+    seeAlso: ["ib keikka watch set", "ib keikka watch list"],
+    examples: ["ib keikka watch cancel 13254"],
+  },
+  {
+    command: "ib keikka watch list",
+    description: "Your own pump-left-worksite watches on keikkat from today on (fired ones carry firedAt).",
+    permissions: ["any authenticated user (shows only your own watches)"],
+    args: [],
+    flags: [{ name: "keikka", type: "number", description: "Only this keikkaId" }],
+    outputShape: "{ items:[{ keikkaId, ownerAsiakasId, createdAt, firedAt, pumppuAika, vehicleId, tyomaaId }], count, nextCursor:null }",
+    errors: [intParseErr("--keikka", "pass a positive keikkaId"), ...authErrors()],
+    seeAlso: ["ib keikka watch set", "ib keikka watch cancel"],
+    examples: ["ib keikka watch list", "ib keikka watch list --keikka 13254"],
+  },
 
   // ─── stats (1) ───────────────────────────────────────────────────────────
   {
