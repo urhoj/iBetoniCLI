@@ -92,6 +92,11 @@ export function isIsoDateOrDateTime(value: string): boolean {
   return day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d;
 }
 
+/** A bare `YYYY-MM-DD` that names a real calendar day (no time part). */
+export function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && isIsoDateOrDateTime(value);
+}
+
 /** Already carries a zone: trailing `Z` or a `±HH:MM` / `±HHMM` offset. */
 const ZONED_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 

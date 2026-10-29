@@ -9,7 +9,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { addJsonBodyOptions, resolveJsonBody, type JsonBodyFlags } from "../_shared/jsonBody.js";
-import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween, isIsoDateOrDateTime } from "../../dates.js";
+import { resolveDate, todayHelsinki, addDaysISO, composeInstant, minutesBetween, isIsoDate } from "../../dates.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, resolveTarget, cappedInt, queryAliasOption, intFlag, numFlag, assertEnum } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -226,7 +226,7 @@ export async function runKeikkaPins(
 ): Promise<{ pins: unknown[]; truncated: boolean; count: number; range: { start: string; end: string } }> {
   // Checked here, not left to the backend: addDaysISO on a bad --end throws a raw RangeError (fb#2518).
   for (const [flag, v] of [["--start", opts.start], ["--end", opts.end]] as const) {
-    if (v !== undefined && !(/^\d{4}-\d{2}-\d{2}$/.test(v) && isIsoDateOrDateTime(v))) {
+    if (v !== undefined && !isIsoDate(v)) {
       failWith(`${flag} must be a YYYY-MM-DD date (got '${v}').`, 4);
     }
   }

@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { resolveDate, toYyyymmddInt, addDaysISO, isIsoDateOrDateTime } from "../../dates.js";
+import { resolveDate, toYyyymmddInt, addDaysISO, isIsoDate } from "../../dates.js";
 import { diffFields } from "../../diff.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import {
@@ -131,15 +131,16 @@ export async function runPersonDaySet(
   flags: PersonDaySetFlags
 ): Promise<unknown> {
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
-  assertIsoDate("--date", resolveDate(date)!);
-  const pvm = toYyyymmddInt(date);
+  const day = resolveDate(date)!;
+  assertDay("--date", day);
+  const pvm = toYyyymmddInt(day);
   // The status lookup (only issued for a non-numeric --status) is keyed on the
   // status name; the day read on person+date. Independent, so run them together —
   // ordered so a bad --status still reports the validation error, not whichever
   // of the two failed first.
   const [statusId, existing] = await bothInOrder(
     resolveStatusId(client, statusValue),
-    runPersonDayGet(client, personId, date, date)
+    runPersonDayGet(client, personId, day, day)
   );
   const current = existing.items[0] as Row | undefined;
   const curStatusId = current ? ((current.statusId as number | null) ?? null) : null;
@@ -151,7 +152,7 @@ export async function runPersonDaySet(
     const wouldChange: Record<string, { from: unknown; to: unknown }> = {};
     if (curStatusId !== statusId) wouldChange.status = { from: curStatusId, to: statusId };
     if ((curText ?? null) !== (nextText ?? null)) wouldChange.text = { from: curText ?? null, to: nextText ?? null };
-    return { dryRun: true, personId, date: resolveDate(date), wouldChange };
+    return { dryRun: true, personId, date: day, wouldChange };
   }
 
   const body: Record<string, unknown> = {
@@ -167,9 +168,9 @@ export async function runPersonDaySet(
   });
 }
 
-/** A calendar date or exit 4 — isIsoDateOrDateTime rejects 2026-02-30, which Date.parse rolls over (fb#2967, fb#2971). */
-function assertIsoDate(flag: string, d: string): void {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isIsoDateOrDateTime(d)) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
+/** A calendar date or exit 4 — rejects 2026-02-30, which Date.parse rolls over (fb#2967, fb#2971). */
+function assertDay(flag: string, d: string): void {
+  if (!isIsoDate(d)) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
 }
 
 /** Longest range one `day set --from/--to` call may write (fb#2945) — a long sick leave fits. */
@@ -200,8 +201,8 @@ export async function runPersonDaySetRange(
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const from = resolveDate(fromInput)!;
   const to = resolveDate(toInput)!;
-  assertIsoDate("--from", from);
-  assertIsoDate("--to", to);
+  assertDay("--from", from);
+  assertDay("--to", to);
   if (to < from) failWith(`--to (${to}) is before --from (${from})`, 4);
   const days: string[] = [];
   for (let d = from; d <= to; d = addDaysISO(d, 1)) days.push(d);

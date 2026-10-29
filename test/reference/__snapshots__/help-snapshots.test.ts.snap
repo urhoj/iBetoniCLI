@@ -13583,7 +13583,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Read-merge-write: the current row is read first and only the given flags change.
   - --style "" clears the colour (stored NULL); in PowerShell write --style= because a bare "" is dropped.
-  - Edits only statuses the ACTIVE company owns (or global ones as sysadmin); another company's status is 403 even for a sysadmin, by design — \`ib auth switch\` to that company first.
+  - Edits only statuses the ACTIVE company owns (or global ones as sysadmin); another company's status is not in the active list, so the CLI exits 5 (the raw API answers 403, even for a sysadmin, by design) — \`ib auth switch\` to that company first.
 
 SEE ALSO
   ib person day statuses, ib person day status create
