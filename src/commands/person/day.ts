@@ -131,6 +131,7 @@ export async function runPersonDaySet(
   flags: PersonDaySetFlags
 ): Promise<unknown> {
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
+  assertIsoDate("--date", resolveDate(date)!);
   const pvm = toYyyymmddInt(date);
   // The status lookup (only issued for a non-numeric --status) is keyed on the
   // status name; the day read on person+date. Independent, so run them together —
@@ -166,6 +167,11 @@ export async function runPersonDaySet(
   });
 }
 
+/** A calendar date or exit 4 — isIsoDateOrDateTime rejects 2026-02-30, which Date.parse rolls over (fb#2967, fb#2971). */
+function assertIsoDate(flag: string, d: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isIsoDateOrDateTime(d)) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
+}
+
 /** Longest range one `day set --from/--to` call may write (fb#2945) — a long sick leave fits. */
 export const MAX_RANGE_DAYS = 186;
 
@@ -194,10 +200,8 @@ export async function runPersonDaySetRange(
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const from = resolveDate(fromInput)!;
   const to = resolveDate(toInput)!;
-  for (const [flag, d] of [["--from", from], ["--to", to]]) {
-    // isIsoDateOrDateTime rejects 2026-02-30, which Date.parse rolls over (fb#2967).
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isIsoDateOrDateTime(d)) failWith(`${flag}: expected YYYY-MM-DD, got "${d}"`, 4);
-  }
+  assertIsoDate("--from", from);
+  assertIsoDate("--to", to);
   if (to < from) failWith(`--to (${to}) is before --from (${from})`, 4);
   const days: string[] = [];
   for (let d = from; d <= to; d = addDaysISO(d, 1)) days.push(d);
@@ -302,7 +306,6 @@ function projectStatus(r: Row): StatusRowFull {
 
 /** Apply the given flags onto a backend status row (0/1 flags become booleans). */
 function mergeStatusFlags(row: Row, flags: PersonDayStatusFlags): Row {
-  if (flags.prefix && flags.prefix.length > 2) failWith("--prefix is at most 2 characters", 4);
   const next: Row = { ...row };
   for (const flag of Object.keys(STATUS_FIELDS) as StatusFieldFlag[]) {
     const v = flags[flag];
@@ -312,6 +315,11 @@ function mergeStatusFlags(row: Row, flags: PersonDayStatusFlags): Row {
   return next;
 }
 
+/** Local flag checks, run BEFORE any read so a bad flag exits 4 rather than a lookup's 5 (fb#2971). */
+function assertStatusFlags(flags: PersonDayStatusFlags): void {
+  if (flags.prefix && flags.prefix.length > 2) failWith("--prefix is at most 2 characters", 4);
+}
+
 /**
  * `ib person day status create` (fb#2944): a new day-status type owned by the active
  * company. The backend pins the owner from the token. Defaults: --code = --name,
@@ -319,6 +327,7 @@ function mergeStatusFlags(row: Row, flags: PersonDayStatusFlags): Row {
  */
 export async function runPersonDayStatusCreate(client: ApiClient, flags: PersonDayStatusFlags): Promise<unknown> {
   if (!flags.name) failWith("--name is required", 4);
+  assertStatusFlags(flags);
   const body = mergeStatusFlags(
     { personPvmStatusId: -1, personPvmStatus: flags.name, pois: true, vakioVapaa: false, active: true, prefix: "", style: null, personPvmStatusDescription: null },
     flags
@@ -335,6 +344,7 @@ export async function runPersonDayStatusCreate(client: ApiClient, flags: PersonD
  * unless the caller is a system admin/developer. `--dry-run` is client-side.
  */
 export async function runPersonDayStatusUpdate(client: ApiClient, statusId: number, flags: PersonDayStatusFlags): Promise<unknown> {
+  assertStatusFlags(flags);
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const rows = await client.get<Row[]>(`/api/personPvm/statusList/${asiakasId}`);
   const current = (rows || []).find((r) => Number(r.personPvmStatusId) === statusId);

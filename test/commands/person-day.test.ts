@@ -294,4 +294,24 @@ describe("runPersonDayStatusCreate / Update (fb#2944)", () => {
     c.get.mockResolvedValueOnce([saved]);
     await expect(runPersonDayStatusUpdate(c, 999, { active: 0 })).rejects.toMatchObject({ exitCode: 5 });
   });
+
+  test("a bad --prefix exits 4 before the status-list read (fb#2971)", async () => {
+    const c = makeClient();
+    await expect(runPersonDayStatusUpdate(c, 999, { prefix: "ABC" })).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.get).not.toHaveBeenCalled();
+  });
+
+  test('--style "" is sent as empty, which the backend stores as NULL (fb#2971)', async () => {
+    const c = makeClient();
+    c.get.mockResolvedValueOnce([{ ...saved, style: "orange" }]);
+    c.post.mockResolvedValueOnce(saved);
+    await runPersonDayStatusUpdate(c, 41, { style: "" });
+    expect(c.post.mock.calls[0][1]).toMatchObject({ style: "" });
+  });
+});
+
+test("runPersonDaySet: an impossible --date exits 4 before any read (fb#2971)", async () => {
+  const c = makeClient();
+  await expect(runPersonDaySet(c, 555, "2026-02-30", "2", {})).rejects.toMatchObject({ exitCode: 4, message: expect.stringContaining("--date") });
+  expect(c.get).not.toHaveBeenCalled();
 });
