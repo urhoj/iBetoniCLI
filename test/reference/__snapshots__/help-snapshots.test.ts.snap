@@ -11157,7 +11157,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ smsLogId, createdAt, channel:'sms'|'push'|'email', subject:null|string, message, segments:null|number, status:'sent'|'failed'|'unknown', errorText, senderPersonId, senderName }] } — segments is null for non-SMS messages; 'unknown' = the gateway never answered, the SMS may have been delivered.
+  { items: [{ smsLogId, createdAt, channel:'sms'|'push'|'email', subject:null|string, message, segments:null|number, status:'sent'|'failed'|'unknown', deliveryStatus:'delivered'|'undeliverable'|'pending'|null, deliveredAt, errorText, senderPersonId, senderName }] } — segments is null for non-SMS messages; status is the send result ('unknown' = the gateway never answered, the SMS may have been delivered); deliveryStatus is the GatewayAPI delivery report (SMS only, null = none yet), deliveredAt the time of the last report.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  --person is not an integer >= 1, rejected locally before any request → pass a positive personId
@@ -11194,7 +11194,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.
+  { items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', deliveryStatus:'delivered'|'undeliverable'|'pending'|null, deliveredAt, errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — deliveryStatus/deliveredAt as in sms list; totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid range or channel → dates are YYYY-MM-DD with from <= to; channel is sms, push or email

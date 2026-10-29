@@ -618,7 +618,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
     description: "Messages sent to one person of the active company across SMS, push and email, newest first. Requires an admin or dispatcher role.",
     auth: "any",
     flags: [{ name: "person", type: "number", required: true, description: "Recipient personId" }],
-    outputShape: "{ items: [{ smsLogId, createdAt, channel:'sms'|'push'|'email', subject:null|string, message, segments:null|number, status:'sent'|'failed'|'unknown', errorText, senderPersonId, senderName }] } — segments is null for non-SMS messages; 'unknown' = the gateway never answered, the SMS may have been delivered.",
+    outputShape: "{ items: [{ smsLogId, createdAt, channel:'sms'|'push'|'email', subject:null|string, message, segments:null|number, status:'sent'|'failed'|'unknown', deliveryStatus:'delivered'|'undeliverable'|'pending'|null, deliveredAt, errorText, senderPersonId, senderName }] } — segments is null for non-SMS messages; status is the send result ('unknown' = the gateway never answered, the SMS may have been delivered); deliveryStatus is the GatewayAPI delivery report (SMS only, null = none yet), deliveredAt the time of the last report.",
     errors: [PERSON_PARSE_ERR, apiErr(403, "Permission denied", "caller lacks one of asiakasAdmin/owner/editor/keikkaHandler/laskuAdmin/laskupohjaAdmin and is not a system admin/developer"), ...COMMON_AUTH_ERRORS],
     notes: ["Deploy-gated: the /api/sms routes must be deployed to the target backend."],
     seeAlso: ["ib message sms send", "ib message driver channels", "ib message driver send"],
@@ -633,7 +633,7 @@ export const MESSAGE_SPECS: CommandSpec[] = [
       { name: "to", type: "string", description: "Last day, inclusive (default: today)" },
       { name: "channel", type: "string", description: "sms | push | email (default: all)" },
     ],
-    outputShape: "{ items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.",
+    outputShape: "{ items: [{ smsLogId, createdAt, channel, phone, email, subject, message, segments, status:'sent'|'failed'|'unknown', deliveryStatus:'delivered'|'undeliverable'|'pending'|null, deliveredAt, errorText, recipientPersonId, recipientName, senderPersonId, senderName }], nextCursor:null, count, truncated, totals: { smsCount, smsSegments, segmentPriceEur, estimatedEur } } — deliveryStatus/deliveredAt as in sms list; totals cover sent+unknown SMS of the whole range (not just the 500 returned rows); estimatedEur = segments × GatewayAPI price, an estimate.",
     errors: [
       apiErr(400, "Invalid range or channel", "dates are YYYY-MM-DD with from <= to; channel is sms, push or email"),
       apiErr(403, "Permission denied", "requires company admin/owner or system admin/developer"),
