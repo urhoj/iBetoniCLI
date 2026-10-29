@@ -849,6 +849,28 @@ export const PERSON_SPECS: CommandSpec[] = [
     examples: ["ib person app-seen --date today", "ib person app-seen --date 2026-09-24 --company 27"],
   },
   {
+    command: "ib person push-status",
+    description:
+      "Push readiness per member of the acting company (global --company <id> for another): last login, active push devices, the 20:00 push opt-in, the day-message channel and what the person last did with the login push question. Answers \"who logged in today and did they allow push\".",
+    permissions: ["dispatch role (keikkaEdit) on the acting company, same gate as ib person app-seen"],
+    flags: [
+      { name: "since", type: "date", description: "Only persons whose last login is on/after this Helsinki date (YYYY-MM-DD or today/yesterday)" },
+      { name: "drivers-only", type: "boolean", description: "Only date-valid pumpparit" },
+    ],
+    outputShape:
+      "ListEnvelope<{ personId, name, lastLoginTime, lastActiveTime, pumppari, pushOffered, activeDevices, lastDeviceSeenAt, dailyPush, dayMessageChannel, promptOutcome, promptAt, promptSnoozedUntil }>",
+    errors: [
+      apiErr(400, "since must be a real YYYY-MM-DD calendar date", "pass --since YYYY-MM-DD or today/yesterday"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Read-only, newest login first. promptOutcome: shown (asked, no answer yet), later, declined (Ei kiitos), denied (phone/browser blocked notifications), token_failed, sw_failed, ios_unsupported (iPhone Safari outside the installed app), subscribed; null = never asked.",
+      "pushOffered = the login question is offered at all (Betomik pumpparit only). The phone's own permission answer is recorded only from 2026-10-29; before that a decline shows as declined, a snooze as null.",
+    ],
+    seeAlso: ["ib person driver-day-push get", "ib person day-message-channel get", "ib person app-seen"],
+    examples: ["ib person push-status --since today --company 27", "ib person push-status --drivers-only"],
+  },
+  {
     command: "ib person activity",
     description:
       "Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.",

@@ -49,6 +49,7 @@ import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonFkCommands } from "./fk.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonAppSeenCommand } from "./appSeen.js";
+import { registerPersonPushStatusCommand } from "./pushStatus.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { registerPersonDayMessageChannelCommands } from "./dayMessageChannel.js";
 import { registerPersonDriverDayPushCommands } from "./driverDayPush.js";
@@ -779,6 +780,7 @@ export function registerPersonCommands(
   registerPersonFkCommands(p, getClient);
   registerPersonAbsencesCommand(p, getClient);
   registerPersonAppSeenCommand(p, getClient);
+  registerPersonPushStatusCommand(p, getClient);
   registerPersonActivityCommand(p, getClient);
   registerPersonDayMessageChannelCommands(p, getClient);
   registerPersonDriverDayPushCommands(p, getClient);

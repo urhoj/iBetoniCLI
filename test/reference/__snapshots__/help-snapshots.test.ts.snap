@@ -14792,6 +14792,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person push-status matches snapshot 1`] = `
+"USAGE
+  ib person push-status [flags]
+
+DESCRIPTION
+  Push readiness per member of the acting company (global --company <id> for another): last login, active push devices, the 20:00 push opt-in, the day-message channel and what the person last did with the login push question. Answers "who logged in today and did they allow push".
+  Permissions: requires dispatch role (keikkaEdit) on the acting company, same gate as ib person app-seen.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --since DATE    Only persons whose last login is on/after this Helsinki date (YYYY-MM-DD or today/yesterday)
+  --drivers-only    Only date-valid pumpparit
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, lastLoginTime, lastActiveTime, pumppari, pushOffered, activeDevices, lastDeviceSeenAt, dailyPush, dayMessageChannel, promptOutcome, promptAt, promptSnoozedUntil }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  since must be a real YYYY-MM-DD calendar date → pass --since YYYY-MM-DD or today/yesterday
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read-only, newest login first. promptOutcome: shown (asked, no answer yet), later, declined (Ei kiitos), denied (phone/browser blocked notifications), token_failed, sw_failed, ios_unsupported (iPhone Safari outside the installed app), subscribed; null = never asked.
+  - pushOffered = the login question is offered at all (Betomik pumpparit only). The phone's own permission answer is recorded only from 2026-10-29; before that a decline shows as declined, a snooze as null.
+
+SEE ALSO
+  ib person driver-day-push get, ib person day-message-channel get, ib person app-seen
+
+EXAMPLES
+  ib person push-status --since today --company 27
+  ib person push-status --drivers-only
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person role end matches snapshot 1`] = `
 "USAGE
   ib person role end [<personId>] [flags]
