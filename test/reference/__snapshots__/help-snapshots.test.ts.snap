@@ -8825,8 +8825,8 @@ exports[`Help snapshots — contract stability > help for ib keikka watch cancel
   ib keikka watch cancel <keikkaId> [flags]
 
 DESCRIPTION
-  Cancel your pump-left-worksite watch on a keikka.
-  Permissions: requires company admin or order handler on the keikka's owner.
+  Cancel your pump-left-worksite watch on a keikka. Needs no role: it only touches your own watch, so you can cancel after losing access.
+  Permissions: requires any signed-in user (own watch only).
 
 ARGUMENTS
   <keikkaId> NUMBER    The keikka (required)
@@ -8848,10 +8848,7 @@ OUTPUT (JSON, stdout)
   { cancelled } — false when you had no watch on it
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  The company's GPS provider is not Mapon → there is nothing to cancel on an Ecofleet company
-  exit 5 (HTTP 404)  Keikka not found or deleted → verify the keikkaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin or order handler of the keikka's company → needs company admin or order handler on the keikka's owner
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
@@ -8900,7 +8897,7 @@ exports[`Help snapshots — contract stability > help for ib keikka watch set ma
 
 DESCRIPTION
   Push me ONCE when this keikka's pump truck leaves its worksite (the grid menu's Muistutukset → "Lähetä ilmoitus kun pumppu poistuu työmaalta"). Mapon-tracked companies only. Re-arms a watch that already fired.
-  Permissions: requires company admin or order handler on the keikka's owner.
+  Permissions: requires company admin, company owner or order handler on the keikka's owner (or system admin).
 
 ARGUMENTS
   <keikkaId> NUMBER    The keikka (required)
@@ -8929,7 +8926,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - The recipient is always you (the caller). It fires when the keikka's vehicle leaves the keikka's worksite on the keikka's own day after its start time; an unfired watch goes inert after that day. --reason is not stored.
+  - The recipient is always you (the caller). It fires once when the keikka's vehicle leaves the keikka's worksite within 12 h after the keikka's start (a pour past midnight still fires), and only while you still hold one of these roles there; otherwise it stays unfired. --reason is not stored.
 
 SEE ALSO
   ib keikka watch list, ib keikka watch cancel
