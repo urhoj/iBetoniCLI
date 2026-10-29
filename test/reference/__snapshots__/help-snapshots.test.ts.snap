@@ -8864,7 +8864,7 @@ exports[`Help snapshots — contract stability > help for ib keikka watch list m
   ib keikka watch list [flags]
 
 DESCRIPTION
-  Your own pump-left-worksite watches on keikkat from today on (fired ones carry firedAt).
+  Your own pump-left-worksite watches on keikkat from today on, plus pours that started under 12 h ago (fired ones carry firedAt).
   Permissions: requires any authenticated user (shows only your own watches).
 
 FLAGS
@@ -8920,6 +8920,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  The company's GPS provider is not Mapon → departure events come only from Mapon's position push; nothing to watch on an Ecofleet company
+  exit 4 (HTTP 400)  The order is cancelled (tila 8/10), has no pump time, or its pump time is before today (Helsinki) → a watch there could never fire; pick a live order from today on
+  exit 4 (HTTP 400)  The pump truck already left this worksite after the order's start and has not come back → too late to watch this departure
   exit 5 (HTTP 404)  Keikka not found or deleted → verify the keikkaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not an admin or order handler of the keikka's company → watching needs company admin or order handler on the keikka's owner

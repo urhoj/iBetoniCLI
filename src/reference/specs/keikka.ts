@@ -659,7 +659,9 @@ export const KEIKKA_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ keikkaId, personId, createdAt, firedAt:null }",
     errors: [
-      apiErr(400, "The company's GPS provider is not Mapon", "departure events come only from Mapon's position push; nothing to watch on an Ecofleet company"),
+      apiErr(400, "The company's GPS provider is not Mapon", "departure events come only from Mapon's position push; nothing to watch on an Ecofleet company", "Mapon"),
+      apiErr(400, "The order is cancelled (tila 8/10), has no pump time, or its pump time is before today (Helsinki)", "a watch there could never fire; pick a live order from today on", ["peruttu", "pumppuaikaa", "jo mennyt"]),
+      apiErr(400, "The pump truck already left this worksite after the order's start and has not come back", "too late to watch this departure", "jo lähtenyt"),
       apiErr(404, "Keikka not found or deleted", "verify the keikkaId"),
       ...authErrors(apiErr(403, "Not an admin or order handler of the keikka's company", "watching needs company admin or order handler on the keikka's owner")),
     ],
@@ -684,7 +686,7 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
   {
     command: "ib keikka watch list",
-    description: "Your own pump-left-worksite watches on keikkat from today on (fired ones carry firedAt).",
+    description: "Your own pump-left-worksite watches on keikkat from today on, plus pours that started under 12 h ago (fired ones carry firedAt).",
     permissions: ["any authenticated user (shows only your own watches)"],
     args: [],
     flags: [{ name: "keikka", type: "number", description: "Only this keikkaId" }],
