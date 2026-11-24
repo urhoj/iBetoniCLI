@@ -8363,6 +8363,52 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka note matches snapshot 1`] = `
+"USAGE
+  ib keikka note <keikkaId> --text <text> [flags]
+
+DESCRIPTION
+  Append one note (Huomio) to an order's comment. Append-only: the server stamps the line (DD.MM.YYYY HH:mm) and no existing text can change. Open to everyone who can READ the order, e.g. its driver; notifies like a comment edit.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <keikkaId> NUMBER    Target keikkaId (required)
+
+FLAGS
+  --text STRING    Note text, 1-500 characters; newlines become spaces (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { keikkaId, keikkaComment } (the full comment) | --dry-run: { dryRun: true, wouldAdd: { keikkaId, line } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Note is empty or over 500 characters → pass --text with 1-500 characters
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No read access to the order → pick an order you can read (\`ib keikka get <id>\`)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 409)  The order no longer exists → check the keikkaId
+
+NOTES
+  - To replace or clear the comment use \`ib keikka update --comment\` (order editors only). The Betomik order-book sync keeps notes added here.
+
+SEE ALSO
+  ib keikka update, ib keikka get, ib keikka log
+
+EXAMPLES
+  ib keikka note 9001 --text "Portti 2 lukossa"
+  ib keikka note 9001 --text "Portti 2 lukossa" --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka person list matches snapshot 1`] = `
 "USAGE
   ib keikka person list [<keikkaId>] [flags]

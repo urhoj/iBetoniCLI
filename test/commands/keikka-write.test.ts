@@ -5,6 +5,7 @@ import {
   runKeikkaUpdate,
   runKeikkaDriversAssign,
   runKeikkaCopy,
+  runKeikkaNote,
 } from "../../src/commands/keikka/index.js";
 
 const mockClient = mockApiClient();
@@ -138,6 +139,16 @@ describe("ib keikka create/update/drivers", () => {
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/cli/keikka/info/12276",
       { keikkaAjoOhje: "Portti 2", keikkaComment: "", keikkaOtsikko: "Valu" },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("runKeikkaNote posts only the new text, with the write-flag headers", async () => {
+    mockClient.post.mockResolvedValueOnce({ dryRun: true });
+    await runKeikkaNote(mockClient, 13676, "Portti 2", { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/keikka/comment/add",
+      { keikkaId: 13676, text: "Portti 2" },
       { headers: { "X-Dry-Run": "1" } }
     );
   });

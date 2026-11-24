@@ -546,6 +546,16 @@ export async function runKeikkaUpdate(
   );
 }
 
+/** POST /api/keikka/comment/add — append one server-stamped note; open to every order reader. */
+export async function runKeikkaNote(
+  client: ApiClient,
+  keikkaId: number,
+  text: string,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/keikka/comment/add", { keikkaId, text }, { headers: writeFlagsToHeaders(flags) });
+}
+
 /**
  * POST /api/keikka/defaultDriver/assign/:keikkaId with an empty body. The
  * backend uses the JWT/keikka context to pick the appropriate default
@@ -1334,6 +1344,14 @@ export function registerKeikkaCommands(
         opts
       );
       writeJson(result);
+    })
+  );
+
+  const noteCmd = k.command("note <keikkaId>").requiredOption("--text <text>", "Note text");
+  addWriteFlagsToCommand(noteCmd).action(
+    guarded(async (idStr: string, opts: WriteFlags & { text: string }) => {
+      const client = await getClient();
+      writeJson(await runKeikkaNote(client, parseId(idStr, "keikkaId"), opts.text, opts));
     })
   );
 

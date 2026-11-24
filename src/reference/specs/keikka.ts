@@ -510,6 +510,32 @@ export const KEIKKA_SPECS: CommandSpec[] = [
   },
 
   {
+    command: "ib keikka note",
+    description:
+      "Append one note (Huomio) to an order's comment. Append-only: the server stamps the line (DD.MM.YYYY HH:mm) and no existing text can change. Open to everyone who can READ the order, e.g. its driver; notifies like a comment edit.",
+    auth: "any",
+    args: [{ name: "keikkaId", type: "number", description: "Target keikkaId" }],
+    flags: [
+      { name: "text", type: "string", required: true, description: "Note text, 1-500 characters; newlines become spaces" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape: "{ keikkaId, keikkaComment } (the full comment) | --dry-run: { dryRun: true, wouldAdd: { keikkaId, line } }",
+    errors: [
+      apiErr(400, "Note is empty or over 500 characters", "pass --text with 1-500 characters"),
+      ...authErrors(apiErr(403, "No read access to the order", "pick an order you can read (`ib keikka get <id>`)")),
+      apiErr(409, "The order no longer exists", "check the keikkaId"),
+    ],
+    notes: [
+      "To replace or clear the comment use `ib keikka update --comment` (order editors only). The Betomik order-book sync keeps notes added here.",
+    ],
+    seeAlso: ["ib keikka update", "ib keikka get", "ib keikka log"],
+    examples: [
+      "ib keikka note 9001 --text \"Portti 2 lukossa\"",
+      "ib keikka note 9001 --text \"Portti 2 lukossa\" --dry-run",
+    ],
+  },
+  {
     command: "ib keikka tilat",
     aliases: ["ib keikka statuses"],
     description:
