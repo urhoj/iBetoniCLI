@@ -41,9 +41,12 @@ export async function runStats(client, opts) {
         resolveStatsPeriod(opts); // throws on a second period flag
         if (opts.by || opts.all)
             throw new CliError("--iso-week cannot be combined with --by or --all", 0, null, 4);
-        if (!/^\d{4}-\d{2}$/.test(opts.isoWeek))
+        // The ISO 8601 spelling 2026-W47 / 2026W47 is what AI callers write (fb#3117).
+        const m = /^(\d{4})-?W(\d{2})$/i.exec(opts.isoWeek);
+        const week = m ? `${m[1]}-${m[2]}` : opts.isoWeek;
+        if (!/^\d{4}-\d{2}$/.test(week))
             throw new CliError("--iso-week must be YYYY-WW, e.g. 2026-39", 0, null, 4);
-        return client.get(`/api/stat/weekly${qs({ week: opts.isoWeek })}`);
+        return client.get(`/api/stat/weekly${qs({ week })}`);
     }
     const { from, to } = resolveStatsPeriod(opts);
     if (opts.by)

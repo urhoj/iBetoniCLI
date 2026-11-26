@@ -16491,7 +16491,7 @@ FLAGS
   --today    Shortcut for --from today --to today
   --month STRING    Whole calendar month YYYY-MM (expands to first→last day)
   --week DATE    7-day window starting <start>
-  --iso-week STRING    ISO week YYYY-WW of the ACTIVE company's own orders (GET /api/stat/weekly, company admins only, Helsinki Mon–Sun); adds days per vehicle/driver, fleet and roster, plus GPS driven km (Mapon tenants). Excludes the other period flags, --by and --all
+  --iso-week STRING    ISO week YYYY-WW (2026-W47 also accepted) of the ACTIVE company's own orders (GET /api/stat/weekly, company admins only, Helsinki Mon–Sun); adds days per vehicle/driver, fleet and roster, plus GPS driven km (Mapon tenants). Excludes the other period flags, --by and --all
   --by STRING    Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)
   --all    All tenants (requires developer/system-admin access; 403 otherwise)
 

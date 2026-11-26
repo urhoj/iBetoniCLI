@@ -704,6 +704,17 @@ export const OPTION_REDIRECTS: Record<string, string> = {
  */
 export const OPTION_DID_YOU_MEAN_OVERRIDES: Record<string, string> = {
   "ib dev feedback list --claimed": "held",
+  // fb#3119: AI callers ask for a breakdown as --group-by / --by-<dim>. Per-command,
+  // not FLAG_SYNONYMS: `dev feedback claim --by` is a claimer label, not a grouping.
+  "ib stats --group-by": "by",
+  "ib stats --groupby": "by",
+  "ib stats --group": "by",
+  "ib stats --by-driver": "by",
+  "ib stats --by-vehicle": "by",
+  "ib stats --by-customer": "by",
+  "ib stats --by-worksite": "by",
+  "ib stats --by-day": "by",
+  "ib stats --by-status": "by",
 };
 
 /**

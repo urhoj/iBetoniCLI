@@ -55,6 +55,14 @@ describe("parseId", () => {
     expect(() => parseId("abc", "keikkaId")).toThrow(/invalid keikkaId: "abc"/);
   });
 
+  test("a non-numeric vehicleId (a plate) is pointed at `ib vehicle search` (fb#3118)", () => {
+    expect(exitCodeOf(() => parseId("ABC-123", "vehicleId"))).toBe(4);
+    expect(() => parseId("ABC-123", "vehicleId")).toThrow(/ib vehicle search ABC-123/);
+    // numeric-but-invalid and other fields keep the plain message
+    expect(() => parseId("0", "vehicleId")).toThrow(/expected a positive integer$/);
+    expect(() => parseId("ABC-123", "keikkaId")).toThrow(/expected a positive integer$/);
+  });
+
   test("asiakasId 0 is refused as the shared sentinel, not as a typo (fb#1405)", () => {
     expect(exitCodeOf(() => parseId("0", "asiakasId"))).toBe(4);
     expect(() => parseId(" 0 ", "asiakasId")).toThrow(/asiakasId 0 is the shared \(yhteinen\) sentinel row/);

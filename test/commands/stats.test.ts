@@ -59,6 +59,15 @@ describe("runStats --iso-week (company-scoped weekly route)", () => {
     await runStats(mockClient, { isoWeek: "2026-39" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/stat/weekly?week=2026-39");
   });
+  test("accepts the ISO 8601 week form 2026-W47 / 2026W47 and normalises it (fb#3117)", async () => {
+    for (const form of ["2026-W47", "2026W47", "2026-w47"]) {
+      await runStats(mockClient, { isoWeek: form });
+      expect(mockClient.get).toHaveBeenLastCalledWith("/api/stat/weekly?week=2026-47");
+    }
+    for (const bad of ["W47", "2026-W5", "2026-W470"]) {
+      await expect(runStats(mockClient, { isoWeek: bad })).rejects.toThrow(/YYYY-WW/);
+    }
+  });
   test("rejects a malformed week before any network call", async () => {
     await expect(runStats(mockClient, { isoWeek: "2026-9" })).rejects.toThrow(/YYYY-WW/);
     expect(mockClient.get).not.toHaveBeenCalled();

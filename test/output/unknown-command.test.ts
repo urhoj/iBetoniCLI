@@ -240,6 +240,14 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
     expect(env.didYouMean).toBe("--held");
   });
 
+  // fb#3119: AI callers ask `ib stats` for a breakdown as --group-by / --by-driver;
+  // neither spelling nor FLAG_SYNONYMS reaches --by, so the envelope answered null.
+  test("curated override: stats --group-by / --by-driver → --by (fb#3119)", () => {
+    for (const guess of ["--group-by", "--groupby", "--by-driver", "--by-vehicle"]) {
+      expect(buildUnknownOptionEnvelope(leafByPath("stats"), guess).didYouMean).toBe("--by");
+    }
+  });
+
   // fb#1026: OPTION_DID_YOU_MEAN_OVERRIDES/OPTION_REDIRECTS were keyed on the
   // raw invoked path, so the SAME command reached through a hidden back-compat
   // alias (`ib feedback list`, DEV_ALIAS_DOMAINS' top-level alias for `ib dev

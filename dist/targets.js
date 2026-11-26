@@ -288,6 +288,11 @@ export function parseId(idStr, name) {
         if (name === "asiakasId" && trimmed === "0") {
             failWith("asiakasId 0 is the shared (yhteinen) sentinel row, not a customer record — nothing to fetch; its rows surface through their consumers (e.g. `ib betoni laatu list --shared-only`)", 4);
         }
+        // A plate/name where a vehicleId goes (fb#3118): name the lookup, never guess
+        // the id — write commands (assign/clear/default set) share this parser.
+        if (name === "vehicleId" && /[a-zåäö].*[a-zåäö]/i.test(trimmed)) {
+            failWith(`invalid vehicleId: "${idStr}" — expected a positive integer; it looks like a registration plate or vehicle name — resolve it with \`ib vehicle search ${trimmed}\` and pass its vehicleId`, 4);
+        }
         failWith(`invalid ${name}: "${idStr}" — expected a positive integer`, 4);
     }
     return n;
